@@ -1,0 +1,58 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.python-version
+
+# Virtual Environment
+venv/
+.venv/
+env/
+bin/
+lib/
+share/
+ENV/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.sqlite3
+*.db
+
+# IDE & System
+.vscode/
+.idea/
+.DS_Store
+*.swp
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.railway/
+
+# Celery (Important: contains binary null bytes)
+celerybeat-schedule
+
+# Static & Media (Generated content)
+media/
+staticfiles/
+coverage/
+htmlcov/
+dist/
+build/
+.git
+.env
+__pycache__
+*.pyc

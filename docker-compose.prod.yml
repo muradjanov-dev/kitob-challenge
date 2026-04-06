@@ -1,0 +1,75 @@
+services:
+  db:
+    image: postgres:14
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_PORT=${DB_PORT}
+    restart: always
+    container_name: kitob_db
+    # In prod, we don't expose 5432 to the world, only to other containers.
+    # ports:
+    #   - 5432:5432
+
+  redis:
+    image: redis:6-alpine
+    restart: always
+    container_name: kitob_redis
+    # ports:
+    #   - 6379:6379
+
+  web_django: &web_django
+    restart: always
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    image: kitob_web:latest # Tag the image
+    command: gunicorn src.wsgi:application --bind 0.0.0.0:8000 --workers=3 --threads=4 --worker-class=gthread --timeout 30 --access-logfile -
+    volumes:
+      # ONLY mount media and static, NOT code
+      - ./static:/app/static
+      - ./media:/app/media
+      - ./locale:/app/locale
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Tashkent
+    ports:
+      - 8000:8000 # Ideally proxied via Nginx, but exposed for now
+    depends_on:
+      - db
+      - redis
+
+  bot:
+    <<: *web_django
+    image: kitob_web:latest
+    ports: []
+    restart: always
+    command: python manage.py runbot
+    depends_on:
+      - db
+      - redis
+      - web_django # Ensure web builds image first if using build context
+
+  celery_worker:
+    <<: *web_django
+    image: kitob_web:latest
+    ports: []
+    command: celery -A src worker --loglevel=info
+    container_name: kitob_celery_worker
+
+  celery_beat:
+    <<: *web_django
+    image: kitob_web:latest
+    ports: []
+    command: celery -A src beat --loglevel=info
+    container_name: kitob_celery_beat
+
+volumes:
+  postgres_data:
+  static_volume:

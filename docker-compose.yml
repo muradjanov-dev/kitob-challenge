@@ -1,0 +1,107 @@
+services:
+  db:
+    image: postgres:14
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
+      - POSTGRES_DB=${DB_NAME}
+    restart: always
+    container_name: kitob_db
+
+  pgbouncer:
+    image: edoburu/pgbouncer:1.18.0
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=${POSTGRES_DATABASE_URL}
+      - POOL_MODE=transaction
+      - DEFAULT_POOL_SIZE=20
+      - MAX_CLIENT_CONN=1000
+      - AUTH_TYPE=plain
+    depends_on:
+      - db
+    container_name: kitob_pgbouncer
+
+  redis:
+    image: redis:6-alpine
+    restart: always
+    container_name: kitob_redis
+
+  web_django: &web_django
+    restart: always
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    command: gunicorn src.wsgi:application --bind 0.0.0.0:8000 --workers=4 --threads=4 --worker-class=gthread --timeout 60 --access-logfile -
+    security_opt:
+      - seccomp:unconfined
+    volumes:
+      - ./:/app
+      - ./static:/app/static
+      - ./media:/app/media
+      - ./locale:/app/locale
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Tashkent
+      - DATABASE_URL=postgres://${DB_USER}:${DB_PASS}@pgbouncer:5432/${DB_NAME}
+      - DB_HOST=pgbouncer
+      - DB_PORT=5432
+    ports:
+      - 8000:8000
+    depends_on:
+      - db
+      - redis
+      - pgbouncer
+
+  bot:
+    <<: *web_django
+    ports: [ ]
+    restart: always
+    command: python manage.py runbot
+
+  celery_worker:
+    build: .
+    command: celery -A src worker --loglevel=info --pool=threads --concurrency=100
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgres://${DB_USER}:${DB_PASS}@pgbouncer:5432/${DB_NAME}
+      - TZ=Asia/Tashkent
+      - DB_HOST=pgbouncer
+      - DB_PORT=5432
+    depends_on:
+      - db
+      - redis
+      - pgbouncer
+    restart: always
+    container_name: kitob_celery_worker
+
+  celery_beat:
+    build: .
+    command: celery -A src beat --loglevel=info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgres://${DB_USER}:${DB_PASS}@pgbouncer:5432/${DB_NAME}
+      - TZ=Asia/Tashkent
+      - DB_HOST=pgbouncer
+      - DB_PORT=5432
+    depends_on:
+      - db
+      - redis
+      - pgbouncer
+    restart: always
+    container_name: kitob_celery_beat
+
+volumes:
+  postgres_data:
+  static_volume:

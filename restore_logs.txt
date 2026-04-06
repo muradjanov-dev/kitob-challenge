@@ -1,0 +1,100 @@
+kitob_db             | 2026-01-27 21:13:10.255 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.255 UTC [161] DETAIL:  Key (id)=(245) already exists.
+kitob_db             | 2026-01-27 21:13:10.255 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (245, '2026-01-06 04:41:32.440507+00', 87, 2, 'Ikki eshik orasi', NULL, 'Sadoqat bu muhim sifatlardan biri ekan. Insonlar suratlarga emas ma''nolarga e''tibor berishlari kerak ekanini o‘rgandim...');
+kitob_db             | 2026-01-27 21:13:10.262 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.262 UTC [161] DETAIL:  Key (id)=(251) already exists.
+kitob_db             | 2026-01-27 21:13:10.262 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (251, '2026-01-06 08:27:15.026004+00', 210, 202, 'Риёзус солихин', NULL, 'ХАЁТ  ВАКТ ----БОЙЛИК');
+kitob_db             | 2026-01-27 21:13:10.276 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.276 UTC [161] DETAIL:  Key (id)=(278) already exists.
+kitob_db             | 2026-01-27 21:13:10.276 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (278, '2026-01-06 12:42:45.548551+00', 45, 164, 'Islomga bag''ishlangan umr Mahramiyat tarbiyasi', NULL, 'Yoshlarga yoshligidan mahramiyat tarbiyasi oʻrgatish kerek');
+kitob_db             | 2026-01-27 21:13:10.325 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.325 UTC [161] DETAIL:  Key (id)=(293) already exists.
+kitob_db             | 2026-01-27 21:13:10.325 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (293, '2026-01-06 17:55:27.185281+00', 68, 206, 'Tafsiri Hilol', NULL, 'Muqaddas Qur’oni Karimning tafsirini o’qish bu ulkan baxt');
+kitob_db             | 2026-01-27 21:13:10.329 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.329 UTC [161] DETAIL:  Key (id)=(297) already exists.
+kitob_db             | 2026-01-27 21:13:10.329 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (297, '2026-01-06 18:04:06.965158+00', 40, 135, 'Yoʻldosh Eshbek, Abdumurod Tilovov “Islomda oila saodati”', NULL, 'Erkak, avvalo, onasining (otasining) va soʻngra ayolining haqqini oʻylashi kerak. Onasini, otasini xafa qilib, ayolini kuldirgan erkakning hech yuzi kulmagay!');
+kitob_db             | 2026-01-27 21:13:10.329 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.329 UTC [161] DETAIL:  Key (id)=(298) already exists.
+kitob_db             | 2026-01-27 21:13:10.329 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (298, '2026-01-06 18:04:32.259722+00', 80, 254, 'Maryam', NULL, 'Odamlar har doim gapiraverishadi, sen muvaffaqiyatga erishganingda ham, yomon ish qilganingda ham, bu jarayon avval ham davom etgan, keyin ham davom etadi.
+kitob_db             |  HATTO Paygʻambarlar orqasidan qanaqa yomon gaplar gapirishgan, tuxmatlar qilishgan, aziyat berishgan lekin ular Allohning elchilari edi.
+kitob_db             |  Shu uchun hech kimning gapiga eʼtibor bermasdan, xafa boʻlmasdan, yoʻlimizni davom ettirishimiz lozim');
+kitob_db             | 2026-01-27 21:13:10.350 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.350 UTC [161] DETAIL:  Key (id)=(314) already exists.
+kitob_db             | 2026-01-27 21:13:10.350 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (314, '2026-01-07 13:47:54.798356+00', 181, 206, 'Yo nasib', NULL, 'Nasib qilgan narsa seni qayerda bo’lsang xam topib keladi 
+kitob_db             |  Nasib qilmagani qolinda bolsa xam senga tegmaydi');
+kitob_db             | 2026-01-27 21:13:10.449 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.449 UTC [161] DETAIL:  Key (id)=(344) already exists.
+kitob_db             | 2026-01-27 21:13:10.449 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (344, '2026-01-07 18:55:15.983372+00', 40, 135, 'Yoʻldosh Eshbek, Abdumurod Tilovov “Islomda oila saodati”', NULL, 'Ota-onani rizo qilsangiz, Alloh sizdan rozi boʻlarkan, Ota-onaning gʻazabini keltirsangiz, Alloh sizdan gʻazab qilarkan.');
+kitob_db             | 2026-01-27 21:13:10.484 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.484 UTC [161] DETAIL:  Key (id)=(358) already exists.
+kitob_db             | 2026-01-27 21:13:10.484 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (358, '2026-01-08 15:45:12.673414+00', 126, 206, 'Ayollar olami sultoni Xadicha (96) 
+kitob_db             |  Patrisiya (30)', NULL, 'Xaqiqiy vafo 
+kitob_db             |  Xaqiqiy sevgi 
+kitob_db             |  Xaqiqiy sadoqat
+kitob_db             |  Xaqiqiy fidokorlik 
+kitob_db             |  Xaqiqiy muxabbat');
+kitob_db             | 2026-01-27 21:13:10.610 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.610 UTC [161] DETAIL:  Key (id)=(384) already exists.
+kitob_db             | 2026-01-27 21:13:10.610 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (384, '2026-01-09 15:03:01.656594+00', 91, 206, 'Patrisiya (74) 
+kitob_db             |  Turkiston kechalari (17)', NULL, 'Shu go’zal o’lkamda yolg’iz g’aripman');
+kitob_db             | 2026-01-27 21:13:10.665 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.665 UTC [161] DETAIL:  Key (id)=(398) already exists.
+kitob_db             | 2026-01-27 21:13:10.665 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (398, '2026-01-09 18:36:21.695422+00', 122, 135, 'Yoʻldosh Eshbek, Abdumurod Tilovov “Islomda oila saodati” (yakun)', NULL, 'Ayrimlar nomini devorda qoldiradi, ayrimlar esa kitoblarda!');
+kitob_db             | 2026-01-27 21:13:10.687 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.687 UTC [161] DETAIL:  Key (id)=(404) already exists.
+kitob_db             | 2026-01-27 21:13:10.687 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (404, '2026-01-10 14:36:59.956268+00', 67, 206, 'Xadis va xayot 20 juz (57)
+kitob_db             |  Patrisiya (10)', NULL, 'Xaqiqat albatta qaror topadi');
+kitob_db             | 2026-01-27 21:13:10.747 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.747 UTC [161] DETAIL:  Key (id)=(426) already exists.
+kitob_db             | 2026-01-27 21:13:10.747 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (426, '2026-01-11 17:31:35.782422+00', 85, 206, 'Xadis va xayot 20 (42)
+kitob_db             |  Patrisiya (43)', NULL, 'Ilm - bu boylik');
+kitob_db             | 2026-01-27 21:13:10.799 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.799 UTC [161] DETAIL:  Key (id)=(451) already exists.
+kitob_db             | 2026-01-27 21:13:10.799 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (451, '2026-01-12 18:50:28.388834+00', 117, 135, 'Shayx Oiz al-Qarniy “Baxtli boʻlmoq uchun”', NULL, 'Hech qachon mahzun boʻlmang. Oʻtgan ish oʻtdi uni qaytara olmaysiz. Ertaga esa hali kelmadi. Bugunning qadriga yeting.');
+kitob_db             | 2026-01-27 21:13:10.843 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.843 UTC [161] DETAIL:  Key (id)=(463) already exists.
+kitob_db             | 2026-01-27 21:13:10.843 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (463, '2026-01-13 18:52:06.116694+00', 71, 135, 'Shayx Oiz al-Qarniy “Baxtli boʻlmoq uchun” (yakun)', NULL, 'Ilm istamoq har bir musulmonga farzdir.');
+kitob_db             | 2026-01-27 21:13:10.844 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.844 UTC [161] DETAIL:  Key (id)=(464) already exists.
+kitob_db             | 2026-01-27 21:13:10.844 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (464, '2026-01-13 19:30:32.303656+00', 38, 206, 'Patrisiya', NULL, 'Mo’min yaxshi qoshni bolishi kerak 
+kitob_db             |  Davatning eng yaxshisi bu namuna bo’lish');
+kitob_db             | 2026-01-27 21:13:10.905 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.905 UTC [161] DETAIL:  Key (id)=(478) already exists.
+kitob_db             | 2026-01-27 21:13:10.905 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (478, '2026-01-14 18:48:13.155816+00', 73, 135, 'Abu Homid Gʻazzoliy “Obroʻparastlik va riyo”', NULL, 'Inson obroʻparastlik va riyodan nafratlanishi kerak. Uni tanqid qilganni yomon koʻrishi emas, yaxshi koʻrishi kerak.');
+kitob_db             | 2026-01-27 21:13:10.976 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.976 UTC [161] DETAIL:  Key (id)=(488) already exists.
+kitob_db             | 2026-01-27 21:13:10.976 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (488, '2026-01-15 17:12:36.355091+00', 51, 206, 'Xadis va xayot 20 juz', NULL, 'Allohning vadasi xaq');
+kitob_db             | 2026-01-27 21:13:10.991 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:10.991 UTC [161] DETAIL:  Key (id)=(491) already exists.
+kitob_db             | 2026-01-27 21:13:10.991 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (491, '2026-01-15 18:54:43.287475+00', 164, 135, 'Abu Homid Gʻazzoliy “Obroʻparastlik va riyo” (yakun)', NULL, 'Riyo insonni halok qiluvchi illatlardan biri ekan.');
+kitob_db             | 2026-01-27 21:13:11.024 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:11.024 UTC [161] DETAIL:  Key (id)=(499) already exists.
+kitob_db             | 2026-01-27 21:13:11.024 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (499, '2026-01-16 13:37:03.42756+00', 184, 206, 'Patrisiya', NULL, 'Barcha yechim Islomda');
+kitob_db             | 2026-01-27 21:13:11.075 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:11.075 UTC [161] DETAIL:  Key (id)=(511) already exists.
+kitob_db             | 2026-01-27 21:13:11.075 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (511, '2026-01-16 18:56:11.642263+00', 47, 135, 'Yusuf Tovasliy “Hikmatlar xazinasi”', NULL, 'Oila qurmoqchi boʻlgan insonlar avvalo oila ilmini oʻrganishlari kerak. Bu ularning baxtli turmushlariga sabab boʻladi.');
+kitob_db             | 2026-01-27 21:13:11.120 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:11.120 UTC [161] DETAIL:  Key (id)=(528) already exists.
+kitob_db             | 2026-01-27 21:13:11.120 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (528, '2026-01-17 18:41:55.575117+00', 50, 135, 'Yusuf Tovasliy “Hikmatlar xazinasi”', NULL, 'Inson dinini oʻrganmas ekan, tarbiyani ham oʻrgana olmaydi, oʻrgata olmaydi.');
+kitob_db             | 2026-01-27 21:13:11.127 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:11.127 UTC [161] DETAIL:  Key (id)=(531) already exists.
+kitob_db             | 2026-01-27 21:13:11.127 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (531, '2026-01-17 19:45:08.177881+00', 121, 206, 'Turkiston kechalari', NULL, 'Millat shariatdan uzoqlasharkan tanazzulga yuz tutadi');
+kitob_db             | 2026-01-27 21:13:11.127 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:11.127 UTC [161] DETAIL:  Key (id)=(532) already exists.
+kitob_db             | 2026-01-27 21:13:11.127 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (532, '2026-01-18 01:54:06.220003+00', 100, 202, 'Мусхаф', NULL, 'Ўлим Ҳақ');
+kitob_db             | 2026-01-27 21:13:11.132 UTC [161] ERROR:  insert or update on table "tgbot_confirmationreport" violates foreign key constraint "tgbot_confirmationre_user_id_c6201bba_fk_telegram_"
+kitob_db             | 2026-01-27 21:13:11.132 UTC [161] DETAIL:  Key (user_id)=(177) is not present in table "telegram_profiles".
+kitob_db             | 2026-01-27 21:13:11.132 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (536, '2026-01-18 12:40:30.776093+00', 10, 177, 'Diqqat', NULL, 'Test');
+kitob_db             | 2026-01-27 21:13:11.166 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:11.166 UTC [161] DETAIL:  Key (id)=(553) already exists.
+kitob_db             | 2026-01-27 21:13:11.166 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (553, '2026-01-18 18:48:58.875112+00', 102, 135, 'Yusuf Tovasliy “Hikmatlar xazinasi”', NULL, 'Inson hayotda hamisha rost soʻzlashi lozim. Yomonliklar yolgʻon soʻzlashdan kelib chiqadi.');
+kitob_db             | 2026-01-27 21:13:11.234 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:11.234 UTC [161] DETAIL:  Key (id)=(570) already exists.
+kitob_db             | 2026-01-27 21:13:11.234 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (570, '2026-01-19 18:40:48.182649+00', 50, 254, 'Men', NULL, 'Nafs bu ichingda seni doim nazorat qilib turibdi ammo san unga magʻlub boʻlmasliging lozim');
+kitob_db             | 2026-01-27 21:13:11.234 UTC [161] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-27 21:13:11.234 UTC [161] DETAIL:  Key (id)=(571) already exists.
+kitob_db             | 2026-01-27 21:13:11.234 UTC [161] STATEMENT:  INSERT INTO public.tgbot_confirmationreport (id, date, pages_read, user_id, book, spent_time, conclusion) VALUES (571, '2026-01-19 18:46:30.809245+00', 178, 135, 'Yusuf Tovasliy “Hikmatlar xazinasi”', NULL, 'Soliha ayoling boʻlsa, uying jannat misoli boʻladi');
+kitob_db             | 2026-01-28 14:44:56.553 UTC [1248] ERROR:  duplicate key value violates unique constraint "tgbot_confirmationreport_pkey"
+kitob_db             | 2026-01-28 14:44:56.553 UTC [1248] DETAIL:  Key (id)=(579) already exists.
+kitob_db             | 2026-01-28 14:44:56.553 UTC [1248] STATEMENT:  INSERT INTO "tgbot_confirmationreport" ("user_id", "date", "book", "pages_read", "spent_time", "conclusion") VALUES (233, '2026-01-28T14:44:56.548720+00:00'::timestamptz, NULL, 126, NULL, 'Odamlarning gapiga quloq tuting soʻzlarini tushunib ularning qalbini anglay olasiz
+kitob_db             |  Boy ota✍') RETURNING "tgbot_confirmationreport"."id"
