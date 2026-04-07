@@ -2,5 +2,5 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "python manage.py migrate --noinput && echo 'Migration done, starting gunicorn...' && python -c 'import src.wsgi; print(\"WSGI OK\")' && gunicorn src.wsgi --bind 0.0.0.0:${PORT:-8000} --workers 1 --timeout 120 --log-level debug --capture-output --error-logfile - --access-logfile -"
+startCommand = "chmod +x entrypoint.sh && ./entrypoint.sh"
 restartPolicyType = "on_failure"
