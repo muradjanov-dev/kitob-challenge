@@ -9,7 +9,7 @@ from tgbot.bot.loader import dp, bot, gettext as _
 from tgbot.models import Payment
 from tgbot.bot.utils import get_user
 from tgbot.bot.keyboards.inline import send_receipt_button
-from tgbot.bot.handlers.users.habit_notification import MONTHLY_PAYMENT
+MONTHLY_PAYMENT = 50000
 from tgbot.bot.consts import ADMIN_GROUP_ID
 
 

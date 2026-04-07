@@ -36,16 +36,17 @@ def region_markup():
 def main_markup(language="uz"):
     if language == "uz":
         content = "📚 Kitob hisoboti"
+        premium = "💎 Premium obuna"
         lang = "🌐 Tilni o'zgartirish"
         message_to_admin = "📞 Adminga bilan bog'lanish"
-
     elif language == "ru":
         content = "📚 Отчет о книге"
+        premium = "💎 Подписка"
         lang = "🌐 Изменить язык"
         message_to_admin = "📞 Напишите администратору"
-
     else:
         content = "📚 Kitob hisoboti"
+        premium = "💎 Premium obuna"
         lang = "🌐 Tilni o'zgartirish"
         message_to_admin = "📞 Adminga bilan bog'lanish"
 
@@ -54,6 +55,7 @@ def main_markup(language="uz"):
         KeyboardButton(text="🏆 Konkurs(Yanvar)"),
         KeyboardButton(text=content),
         KeyboardButton(text="👤 Kabinet"),
+        KeyboardButton(text=premium),
         KeyboardButton(text=message_to_admin),
     )
     button.row(
