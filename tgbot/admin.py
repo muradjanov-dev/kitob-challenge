@@ -5,8 +5,8 @@ from django.contrib.auth.models import User, Group
 from django.db.models import Count
 
 from . import models
-from tgbot.tasks import weekly_report_for_general, check_user_exists, run_total_pages, \
-    daily_top_read_user, weekly_top_read_user, send_habit_notifications, set_notification_must_be_sent
+from tgbot.tasks import weekly_report_for_general, run_total_pages, \
+    daily_top_read_user, weekly_top_read_user
 from tgbot.mixins import TabbedTranslationAdmin, TranslationRequiredMixin
 
 
@@ -82,21 +82,8 @@ class TelegramProfileAdmin(admin.ModelAdmin):
     referral_count.admin_order_field = '_referral_count'
     referral_count.short_description = 'Referrals'
 
-    actions = ['trigger_check_user_exists', 'trigger_total_pages_by_user',
-               'trigger_daily_top_read_user_action_button', 'trigger_weekly_top_read_user_action_button', 'trigger_send_habit_notifications', 'trigger_set_notification_must_be_sent']
-
-    def trigger_check_user_exists(self, request, queryset):
-        """
-        Admin action to trigger the Celery task to check user existence.
-        """
-        check_user_exists.delay()  # Trigger the Celery task
-        self.message_user(
-            request,
-            "The task to check user existence has been triggered successfully!",
-            messages.SUCCESS
-        )
-
-    trigger_check_user_exists.short_description = "Check user existence in Telegram group"
+    actions = ['trigger_total_pages_by_user',
+               'trigger_daily_top_read_user_action_button', 'trigger_weekly_top_read_user_action_button']
 
     def trigger_total_pages_by_user(self, request, queryset):
         """
@@ -133,24 +120,6 @@ class TelegramProfileAdmin(admin.ModelAdmin):
         )
 
     trigger_weekly_top_read_user_action_button.short_description = "Send top 20 pages in week to Telegram group"
-
-    def trigger_send_habit_notifications(self, request, queryset):
-        send_habit_notifications.delay()
-        self.message_user(
-            request,
-            "The task to send habit notfications has been triggered successfully!"
-        )
-
-    trigger_send_habit_notifications.short_description = "Send habit notification"
-
-    def trigger_set_notification_must_be_sent(self, request, queryset):
-        set_notification_must_be_sent.delay()
-        self.message_user(
-            request,
-            "notification_must_be_sent = True!"
-        )
-
-    trigger_set_notification_must_be_sent.short_description = "notification_must_be_sent = True"
 
 
 @admin.register(models.UserReferal)
