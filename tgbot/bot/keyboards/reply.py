@@ -52,7 +52,6 @@ def main_markup(language="uz"):
 
     button = ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     button.add(
-        KeyboardButton(text="🏆 Konkurs(Yanvar)"),
         KeyboardButton(text=content),
         KeyboardButton(text="👤 Kabinet"),
         KeyboardButton(text=premium),
