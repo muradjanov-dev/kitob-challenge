@@ -18,7 +18,7 @@ if [ "$SERVICE_TYPE" = "web" ]; then
     # as commands but are intentionally hidden from the menu.
     curl -s -X POST "https://api.telegram.org/bot${API_TOKEN}/setMyCommands" \
       -H "Content-Type: application/json" \
-      -d '{"commands":[{"command":"start","description":"Asosiy menyu / Главное меню"}]}' \
+      -d '{"commands":[{"command":"start","description":"Asosiy menyuga qaytish"}]}' \
       || echo "setMyCommands failed (non-fatal)"
     echo ""
   fi
