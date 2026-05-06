@@ -38,11 +38,13 @@ def region_markup():
 
 def main_markup(language="uz", is_admin=False):
     """Inline main menu. callback_data uses `menu:<action>` namespace.
-    The 📚 Kitob hisoboti button spans the full width across multiple rows
-    (rendered as one large button via long decorated text + own row)."""
+    The 📚 Kitob hisoboti button is rendered as a tall full-width hero
+    (visually ≈ 4 ordinary buttons) by stacking decorative lines + a
+    blank padding row above and below the title."""
     if language == "ru":
         labels = {
-            "report_big": "📚 ОТПРАВИТЬ ОТЧЁТ О КНИГЕ 📚",
+            # Multi-line text → Telegram renders the button taller.
+            "report_big": "📚\n\n📚 Отчет о книге 📚\n\n📚",
             "cabinet": "👤 Кабинет",
             "premium": "💎 Подписка",
             "achievements": "🏆 Мои достижения",
@@ -52,7 +54,7 @@ def main_markup(language="uz", is_admin=False):
         }
     else:
         labels = {
-            "report_big": "📚 KITOB HISOBOTINI JO'NATISH 📚",
+            "report_big": "📚\n\n📚 Kitob hisoboti 📚\n\n📚",
             "cabinet": "👤 Kabinet",
             "premium": "💎 Premium obuna",
             "achievements": "🏆 Yutuqlarim",
@@ -62,7 +64,7 @@ def main_markup(language="uz", is_admin=False):
         }
 
     kb = InlineKeyboardMarkup(row_width=2)
-    # Hero row — single full-width button, rendered visually largest.
+    # Hero row — single full-width tall button.
     kb.row(InlineKeyboardButton(text=labels["report_big"], callback_data="menu:report"))
     kb.row(
         InlineKeyboardButton(text=labels["cabinet"], callback_data="menu:cabinet"),
