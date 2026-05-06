@@ -82,10 +82,7 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "premium":
         await _menu_premium(call, user, state)
     elif action == "achievements":
-        await call.answer(
-            _t(lang, "🏆 Yutuqlar tizimi tez orada!", "🏆 Достижения скоро!"),
-            show_alert=True,
-        )
+        await _menu_achievements(call, user, state)
     elif action == "contact":
         await _menu_contact(call, user, state)
     elif action == "language":
@@ -316,6 +313,64 @@ async def _menu_language(call, user, state: FSMContext):
     text = _t(lang, "Tilni o'zgartiring", "Измените язык")
     await call.message.answer(text, reply_markup=languages_markup)
     await ChangeLanguageState.language_change.set()
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Achievements list (Yutuqlarim).
+# ──────────────────────────────────────────────────────────────────────────
+async def _menu_achievements(call, user, state: FSMContext):
+    from tgbot.services.achievements import list_user_achievements
+
+    await call.answer()
+    if not user:
+        await call.message.answer(
+            _t(_user_lang(user), "Avval /start bosing", "Сначала /start"),
+        )
+        return
+    lang = _user_lang(user)
+    items = await sync_to_async(list_user_achievements)(user)
+
+    unlocked_count = sum(1 for it in items if it["unlocked"])
+    total = len(items)
+
+    header = _t(
+        lang,
+        f"🏆 <b>Yutuqlarim</b> ({unlocked_count}/{total})\n\n",
+        f"🏆 <b>Мои достижения</b> ({unlocked_count}/{total})\n\n",
+    )
+
+    lines_unlocked, lines_locked = [], []
+    for it in items:
+        title = it["title_ru"] if lang == "ru" else it["title_uz"]
+        if it["unlocked"]:
+            lines_unlocked.append(f"{it['emoji']} <b>{title}</b>")
+        else:
+            lines_locked.append(f"🔒 {it['emoji']} <i>{title}</i>")
+
+    body_parts = []
+    if lines_unlocked:
+        body_parts.append(_t(lang, "<b>Qo'lga kiritilgan:</b>\n", "<b>Получено:</b>\n"))
+        body_parts.append("\n".join(lines_unlocked))
+    if lines_locked:
+        if body_parts:
+            body_parts.append("\n\n")
+        body_parts.append(_t(lang, "<b>Hali olinmagan:</b>\n", "<b>Ещё не открыто:</b>\n"))
+        body_parts.append("\n".join(lines_locked))
+
+    text = header + "".join(body_parts)
+    # Telegram caps message at 4096 chars — split if needed.
+    MAX = 4000
+    if len(text) <= MAX:
+        await call.message.answer(text, parse_mode="HTML")
+    else:
+        chunk = ""
+        for line in text.split("\n"):
+            if len(chunk) + len(line) + 1 > MAX:
+                await call.message.answer(chunk, parse_mode="HTML")
+                chunk = ""
+            chunk += line + "\n"
+        if chunk:
+            await call.message.answer(chunk, parse_mode="HTML")
 
 
 # ──────────────────────────────────────────────────────────────────────────

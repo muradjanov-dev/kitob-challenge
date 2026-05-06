@@ -472,3 +472,26 @@ class BotPollVote(BaseModel):
         db_table = "bot_poll_votes"
         unique_together = (("poll", "user"),)
         ordering = ("-created_at",)
+
+
+class UserAchievement(BaseModel):
+    """Records that a user has unlocked a particular achievement.
+    Achievement metadata (title, emoji, criteria) lives in code, not DB —
+    `code` is the stable identifier that maps to ACHIEVEMENTS in achievements.py."""
+    user = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="achievements"
+    )
+    code = models.CharField(max_length=64)
+    awarded_at = models.DateTimeField(auto_now_add=True)
+    congratulated = models.BooleanField(
+        default=False,
+        help_text="True once the Tabriklash broadcast has been sent.",
+    )
+
+    class Meta:
+        db_table = "user_achievements"
+        unique_together = (("user", "code"),)
+        ordering = ("-awarded_at",)
+
+    def __str__(self):
+        return f"{self.user_id}/{self.code}"

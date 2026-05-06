@@ -8,7 +8,7 @@ from asgiref.sync import sync_to_async
 from django.core.paginator import Paginator
 
 from tgbot.models import ConfirmationReport, BooksToRead
-from tgbot.bot.keyboards.reply import confirm_markup, main_markup, back_keyboard
+from tgbot.bot.keyboards.reply import main_markup, back_keyboard
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.loader import gettext as _
 from tgbot.bot.states.main import ReportState
@@ -413,21 +413,48 @@ async def spent_time_handler(message: types.Message, state: FSMContext):
         "Tasdiqlaysizmi?"
     )
 
-    await message.answer(confirmation_message, reply_markup=confirm_markup(), parse_mode='HTML')
+    confirm_kb = InlineKeyboardMarkup(row_width=2)
+    confirm_kb.add(
+        InlineKeyboardButton("✅ Tasdiqlash", callback_data="report:confirm"),
+        InlineKeyboardButton("❌ Bekor qilish", callback_data="report:cancel"),
+    )
+    await message.answer(confirmation_message, reply_markup=confirm_kb, parse_mode='HTML')
     await ReportState.confirm_report.set()
 
     # Timeout logic optional/as per original
 
 
-@dp.message_handler(state=ReportState.confirm_report)
-async def confirm_report(message: types.Message, state: FSMContext):
-    user = get_user(message.from_user.id)
+@dp.callback_query_handler(
+    lambda c: c.data in ("report:confirm", "report:cancel"),
+    state=ReportState.confirm_report,
+)
+async def confirm_report_callback(call: CallbackQuery, state: FSMContext):
+    user = get_user(call.from_user.id)
+    await call.answer()
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
 
-    if message.text.lower() != _("tasdiqlash"):
-        await message.answer(_("Bekor qilindi."), reply_markup=main_markup())
+    if call.data == "report:cancel":
+        lang = (user.language if user else None) or "uz"
+        await call.message.answer(
+            "Bekor qilindi." if lang != "ru" else "Отменено.",
+            reply_markup=main_markup(language=lang),
+        )
         await state.finish()
         return
 
+    # Re-use the existing implementation by faking a message-style call.
+    message = call.message
+    try:
+        message.from_user = call.from_user
+    except Exception:
+        pass
+    await _do_confirm_report(message, user, state)
+
+
+async def _do_confirm_report(message, user, state: FSMContext):
     today = timezone.localdate()
 
     # Check exists
@@ -553,5 +580,12 @@ async def confirm_report(message: types.Message, state: FSMContext):
         parse_mode="HTML",
         disable_web_page_preview=True,
     )
+
+    # Trigger achievement evaluation + Tabriklash broadcast (fire-and-forget).
+    try:
+        from tgbot.tasks import check_user_achievements
+        check_user_achievements.delay(user.id)
+    except Exception as e:
+        print(f"check_user_achievements dispatch failed: {e}")
 
     await state.finish()

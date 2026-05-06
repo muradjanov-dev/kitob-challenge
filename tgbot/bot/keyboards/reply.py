@@ -129,7 +129,26 @@ back_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True,
 )
 
-admin_keyboard = ReplyKeyboardMarkup(
+admin_keyboard = InlineKeyboardMarkup(row_width=2)
+admin_keyboard.row(
+    InlineKeyboardButton(text="✅ Ro'yhatdan o'tganlar", callback_data="admin:registered"),
+    InlineKeyboardButton(text="❌ Ro'yhatdan o'tmaganlar", callback_data="admin:unregistered"),
+)
+admin_keyboard.row(
+    InlineKeyboardButton(text="👨‍👩‍👦‍👦 Barcha foydalanuvchilar", callback_data="admin:all_users"),
+    InlineKeyboardButton(text="📊 Statistikani ko'rish", callback_data="admin:stats"),
+)
+admin_keyboard.row(
+    InlineKeyboardButton(text="✉️ Habar yuborish", callback_data="admin:notify"),
+    InlineKeyboardButton(text="📋 Eslatmalar", callback_data="admin:reminders"),
+)
+admin_keyboard.row(
+    InlineKeyboardButton(text="📊 So'rovnoma", callback_data="admin:poll_new"),
+    InlineKeyboardButton(text="📊 So'rovnoma natijalari", callback_data="admin:poll_results"),
+)
+
+# The deprecated reply-keyboard version (kept for any legacy callers).
+_admin_reply_keyboard_legacy = ReplyKeyboardMarkup(
     keyboard=[
         [
             KeyboardButton(text=_("✅ Ro'yhatdan o'tganlar")),

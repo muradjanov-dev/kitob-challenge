@@ -6,7 +6,7 @@ import json
 
 from celery import shared_task
 
-from tgbot.models import DailyMessage, ConfirmationReport, TelegramProfile, Group, ScheduledReminder, BotPoll
+from tgbot.models import DailyMessage, ConfirmationReport, TelegramProfile, Group, ScheduledReminder, BotPoll, UserAchievement
 
 from django.utils import timezone
 from django.db.models import Sum, Window, F
@@ -449,6 +449,57 @@ def broadcast_reminder(text: str):
         except Exception:
             failed += 1
     print(f"broadcast_reminder: sent={sent} failed={failed}")
+
+
+GENERAL_GROUP_ID = -1002237773868
+
+
+@shared_task
+def check_user_achievements(user_id: int):
+    """Evaluate achievements for the given TelegramProfile, award new ones,
+    and broadcast Tabriklash for each unlock to the general group."""
+    from tgbot.services.achievements import award_new_achievements
+
+    user = TelegramProfile.objects.filter(id=user_id).first()
+    if not user:
+        return
+    newly = award_new_achievements(user)
+    if not newly:
+        return
+
+    name = escape(user.full_name or user.username or "Foydalanuvchi")
+    tg_id = user.telegram_id
+    user_link = f"<a href='tg://user?id={tg_id}'>{name}</a>"
+
+    for ach in newly:
+        title = ach.get("title_uz") or ach.get("title_ru") or ach["code"]
+        text = (
+            "🎉 <b>Tabriklaymiz!</b>\n\n"
+            f"{user_link} yangi yutuqni qo'lga kiritdi:\n\n"
+            f"{ach['emoji']} <b>{title}</b>\n\n"
+            "Davom etamiz! 📚🔥"
+        )
+        try:
+            send_message(GENERAL_GROUP_ID, text)
+        except Exception as e:
+            print(f"tabriklash broadcast failed for {tg_id}/{ach['code']}: {e}")
+        try:
+            UserAchievement.objects.filter(
+                user=user, code=ach["code"]
+            ).update(congratulated=True)
+        except Exception as e:
+            print(f"mark congratulated failed: {e}")
+
+        # Personal DM to the user.
+        try:
+            dm_text = (
+                f"🎉 <b>Yangi yutuq!</b>\n\n"
+                f"{ach['emoji']} <b>{title}</b>\n\n"
+                "Tabriklaymiz! Davom eting 🚀"
+            )
+            send_notification(chat_id=user.telegram_id, text=dm_text)
+        except Exception as e:
+            print(f"achievement DM failed for {tg_id}: {e}")
 
 
 @shared_task

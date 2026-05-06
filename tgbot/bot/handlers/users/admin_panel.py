@@ -301,3 +301,51 @@ async def input_user_id(message: types.Message, state: FSMContext):
         await message.answer("Foydalanuvchi topilmadi. Iltimos, to'g'ri ID kiriting.")
 
     await state.finish()
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Inline admin keyboard router. Each callback_data is `admin:<action>`.
+# Existing reply-keyboard text handlers are kept as fallback above.
+# ──────────────────────────────────────────────────────────────────────────
+@dp.callback_query_handler(
+    lambda c: c.data and c.data.startswith("admin:"),
+    state="*",
+)
+async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
+    user = get_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+
+    action = call.data.split(":", 1)[1]
+    await call.answer()
+
+    # Bypass reply-keyboard. Mutate from_user so any inner permission checks
+    # see the actual user.
+    msg = call.message
+    try:
+        msg.from_user = call.from_user
+    except Exception:
+        pass
+
+    if action == "registered":
+        await registered_lists(msg)
+    elif action == "unregistered":
+        await unregistered_lists(msg)
+    elif action == "all_users":
+        await all_users(msg)
+    elif action == "stats":
+        await show_global_statistics(msg)
+    elif action == "notify":
+        await send_notification_text_handler(msg)
+    elif action == "reminders":
+        from tgbot.bot.handlers.users.reminders import reminders_menu
+        await reminders_menu(msg, state)
+    elif action == "poll_new":
+        from tgbot.bot.handlers.users.polls_admin import poll_admin_start
+        await poll_admin_start(msg, state)
+    elif action == "poll_results":
+        from tgbot.bot.handlers.users.polls_admin import poll_results_list
+        await poll_results_list(msg, state)
+    else:
+        await msg.answer("Noma'lum amal.")
