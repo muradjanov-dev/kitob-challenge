@@ -175,17 +175,26 @@ async def unregistered_lists(message: types.Message):
 
 @dp.message_handler(IsPrivate(), Text(contains="‍👩‍👦‍👦 Barcha foydalanuvchilar"))
 async def all_users(message: types.Message):
-    all_users = TelegramProfile.objects.all().order_by('id')
-    total_users_count = all_users.count()
+    all_users_qs = TelegramProfile.objects.all().order_by('id')
+    total_users_count = all_users_qs.count()
+    registered_count = all_users_qs.filter(is_registered=True).count()
+    unregistered_count = total_users_count - registered_count
 
-    response = f"Barcha foydalanuvchilar soni: {total_users_count}\n"
-    response += "-----------------------------------------------\n"
-    response += "ID  |  User (✅/🚫)\n"
-    response += "-----------------------------------------------\n"
+    response = (
+        "👨‍👩‍👦‍👦 <b>Barcha foydalanuvchilar</b>\n\n"
+        f"📊 Jami: <b>{total_users_count}</b>\n"
+        f"✅ Ro'yxatdan to'liq o'tgan: <b>{registered_count}</b>\n"
+        f"🚫 Ro'yxatdan to'liq o'tmagan: <b>{unregistered_count}</b>\n\n"
+        "<i>Belgilar:</i>\n"
+        "✅ — registratsiyani to'liq tugatgan (ism, jins, hudud, yosh tanlagan)\n"
+        "🚫 — boshlagan-u tugatmagan, yoki /restart bosgan\n"
+        "-----------------------------------------------\n"
+        "<code>ID  |  User</code>\n"
+        "-----------------------------------------------\n"
+    )
 
-    for user in all_users:
+    for user in all_users_qs:
         user_id = user.telegram_id
-
         if user.full_name:
             mention = hlink(user.full_name, f"tg://user?id={user_id}")
         elif user.username:
@@ -193,11 +202,22 @@ async def all_users(message: types.Message):
         else:
             mention = hlink("Ism qo'yilmagan", f"tg://user?id={user_id}")
 
-        if user.is_registered:
-            response += f"{user.id}  |  {mention} ✅\n"
-        else:
-            response += f"{user.id}  |  {mention} 🚫\n"
-    await message.answer(response, parse_mode="HTML")
+        flag = "✅" if user.is_registered else "🚫"
+        response += f"{user.id}  |  {mention} {flag}\n"
+
+    # Telegram message limit is 4096 — split if needed.
+    MAX = 4000
+    if len(response) <= MAX:
+        await message.answer(response, parse_mode="HTML")
+    else:
+        chunk = ""
+        for line in response.split("\n"):
+            if len(chunk) + len(line) + 1 > MAX:
+                await message.answer(chunk, parse_mode="HTML")
+                chunk = ""
+            chunk += line + "\n"
+        if chunk:
+            await message.answer(chunk, parse_mode="HTML")
 
 
 @dp.message_handler(IsPrivate(), Text("📊 Statistikani ko'rish"))

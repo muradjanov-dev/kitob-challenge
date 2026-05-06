@@ -37,10 +37,12 @@ def region_markup():
 
 
 def main_markup(language="uz", is_admin=False):
-    """Inline main menu. callback_data uses `menu:<action>` namespace."""
+    """Inline main menu. callback_data uses `menu:<action>` namespace.
+    The 📚 Kitob hisoboti button spans the full width across multiple rows
+    (rendered as one large button via long decorated text + own row)."""
     if language == "ru":
         labels = {
-            "report": "📚 Отчет о книге",
+            "report_big": "📚 ОТПРАВИТЬ ОТЧЁТ О КНИГЕ 📚",
             "cabinet": "👤 Кабинет",
             "premium": "💎 Подписка",
             "achievements": "🏆 Мои достижения",
@@ -50,7 +52,7 @@ def main_markup(language="uz", is_admin=False):
         }
     else:
         labels = {
-            "report": "📚 Kitob hisoboti",
+            "report_big": "📚 KITOB HISOBOTINI JO'NATISH 📚",
             "cabinet": "👤 Kabinet",
             "premium": "💎 Premium obuna",
             "achievements": "🏆 Yutuqlarim",
@@ -60,19 +62,29 @@ def main_markup(language="uz", is_admin=False):
         }
 
     kb = InlineKeyboardMarkup(row_width=2)
+    # Hero row — single full-width button, rendered visually largest.
+    kb.row(InlineKeyboardButton(text=labels["report_big"], callback_data="menu:report"))
     kb.row(
-        InlineKeyboardButton(text=labels["report"], callback_data="menu:report"),
         InlineKeyboardButton(text=labels["cabinet"], callback_data="menu:cabinet"),
-    )
-    kb.row(
-        InlineKeyboardButton(text=labels["premium"], callback_data="menu:premium"),
         InlineKeyboardButton(text=labels["achievements"], callback_data="menu:achievements"),
     )
+    kb.row(InlineKeyboardButton(text=labels["premium"], callback_data="menu:premium"))
     kb.row(InlineKeyboardButton(text=labels["contact"], callback_data="menu:contact"))
     kb.row(InlineKeyboardButton(text=labels["lang"], callback_data="menu:language"))
     if is_admin:
         kb.row(InlineKeyboardButton(text=labels["admin"], callback_data="menu:admin"))
     return kb
+
+
+def report_reply_keyboard(language="uz"):
+    """Persistent bottom reply keyboard with the single 📚 Kitob hisoboti
+    button. Always visible so the user can submit a report from anywhere."""
+    text = "📚 Отчет о книге" if language == "ru" else "📚 Kitob hisoboti"
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=text)]],
+        resize_keyboard=True,
+        is_persistent=True,
+    )
 
 
 def main_markup_for_user(user):
@@ -131,11 +143,9 @@ back_keyboard = ReplyKeyboardMarkup(
 
 admin_keyboard = InlineKeyboardMarkup(row_width=2)
 admin_keyboard.row(
-    InlineKeyboardButton(text="✅ Ro'yhatdan o'tganlar", callback_data="admin:registered"),
-    InlineKeyboardButton(text="❌ Ro'yhatdan o'tmaganlar", callback_data="admin:unregistered"),
+    InlineKeyboardButton(text="👨‍👩‍👦‍👦 Barcha foydalanuvchilar", callback_data="admin:all_users"),
 )
 admin_keyboard.row(
-    InlineKeyboardButton(text="👨‍👩‍👦‍👦 Barcha foydalanuvchilar", callback_data="admin:all_users"),
     InlineKeyboardButton(text="📊 Statistikani ko'rish", callback_data="admin:stats"),
 )
 admin_keyboard.row(

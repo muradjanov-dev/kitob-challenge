@@ -19,7 +19,9 @@ from aiogram.types import (
 
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.utils import get_user
-from tgbot.bot.keyboards.reply import main_markup_for_user, admin_keyboard, back_keyboard
+from tgbot.bot.keyboards.reply import (
+    main_markup_for_user, admin_keyboard, back_keyboard, report_reply_keyboard,
+)
 from tgbot.bot.keyboards.inline import languages_markup
 from tgbot.bot.states.main import (
     ContactAdminState, ChangeLanguageState, ReportState,
@@ -45,9 +47,9 @@ async def send_main_menu(message: types.Message, user, header_text=None):
     lang = _user_lang(user)
     header = header_text or _t(lang, "🏠 Asosiy menyu", "🏠 Главное меню")
     sub = _t(lang, "Quyidagilardan birini tanlang:", "Выберите одно из ниже:")
-    # First clear any stale reply keyboard.
+    # Persistent reply kb with the big "Kitob hisoboti" button.
     try:
-        await message.answer(header, reply_markup=ReplyKeyboardRemove())
+        await message.answer(header, reply_markup=report_reply_keyboard(lang))
     except Exception:
         pass
     await message.answer(sub, reply_markup=main_markup_for_user(user))

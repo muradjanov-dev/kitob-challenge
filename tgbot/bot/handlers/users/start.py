@@ -45,7 +45,15 @@ async def do_start(message: types.Message, state: FSMContext):
     args = message.get_args()
     lang = _user_lang(user)
 
-    if user and user.is_registered:
+    # Treat as registered if either flag is set OR they have a full_name
+    # (handles legacy /restart that wiped is_registered=False).
+    already_registered = bool(
+        user and (user.is_registered or (user.full_name and user.gender))
+    )
+    if already_registered:
+        if user and not user.is_registered:
+            user.is_registered = True
+            await sync_to_async(user.save)(update_fields=["is_registered"])
         await state.finish()
         await send_main_menu(
             message, user,
