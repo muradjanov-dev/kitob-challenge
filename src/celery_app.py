@@ -63,4 +63,25 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=0, minute=17, day_of_month='*/3')
     },
 
+    'check-and-dispatch-reminders': {
+        'task': 'tgbot.tasks.check_and_dispatch_reminders',
+        'schedule': crontab(),  # every minute
+    },
+
+    # Daily 3x random inspiration with "Hisobot jo'natish" CTA button (Tashkent).
+    'random-inspiration-07': {
+        'task': 'tgbot.tasks.send_random_inspiration',
+        'schedule': crontab(hour=7, minute=0),
+    },
+    'random-inspiration-13': {
+        'task': 'tgbot.tasks.send_random_inspiration',
+        'schedule': crontab(hour=13, minute=0),
+    },
+    'random-inspiration-21': {
+        'task': 'tgbot.tasks.send_random_inspiration',
+        'schedule': crontab(hour=21, minute=0),
+    },
 }
+
+# Use Tashkent local time for crontab schedules (matches admin-set HH:MM).
+app.conf.timezone = 'Asia/Tashkent'

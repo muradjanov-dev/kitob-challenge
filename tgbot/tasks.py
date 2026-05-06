@@ -3,18 +3,14 @@ import random
 import requests
 import environ
 import json
-from aiogram.types import ReplyKeyboardRemove
-from tgbot.bot.keyboards.reply import main_markup
 
 from celery import shared_task
 
-from tgbot.models import DailyMessage, ConfirmationReport, TelegramProfile, Group
-from tgbot.models import Contest, ContestParticipant, Question, ContestSubmission
+from tgbot.models import DailyMessage, ConfirmationReport, TelegramProfile, Group, ScheduledReminder, BotPoll
 
 from django.utils import timezone
-from django.db.models import Sum, Q, Window, F, Count
+from django.db.models import Sum, Window, F
 from django.db.models.functions.window import Rank
-from asgiref.sync import sync_to_async
 from django.utils.html import escape
 
 
@@ -316,574 +312,178 @@ def weekly_report_for_general():
     send_message(general_id, groups_sorted[0][2])
 
 
-# --- CONTEST TASKS ---
-
-@shared_task
-def notify_contest_participants(contest_id):
-    """
-    Notifies eligible users for a specific upcoming contest.
-    This task is scheduled via ETA from the Contest model.
-    """
-    try:
-        contest = Contest.objects.get(id=contest_id)
-    except Contest.DoesNotExist:
-        print(f"Contest {contest_id} not found for notification.")
-        return
-
-    # Validation: Ensure contest is still pending/active
-    if contest.is_finished:
-        print(
-            f"Contest {contest.name} is already finished. Skipping notification.")
-        return
-
-    if contest.is_notified:
-        print(f"Contest {contest.name} already notified. Skipping.")
-        return
-
-    print(f"Notifying for contest: {contest.name}")
-    contest.is_notified = True
-    contest.save(update_fields=['is_notified'])
-
-    # Filter users with referrals >= req_referrals
-    eligible_users = TelegramProfile.objects.annotate(
-        referral_count=Count('referrals')
-    ).filter(
-        referral_count__gte=contest.req_referrals,
-        is_blocked=False,
-        is_registered=True
-    )
-
-    print(f"Found {eligible_users.count()} eligible users for {contest.name}")
-
-    # Determine message based on time remaining roughly
-    # Since we schedule it exactly when we want, we can just say "Starting soon"
-    # or calculate difference if needed. For now, assuming standard message.
-    msg = f"🔔 <b>Diqqat!</b>\n\n'{contest.name}' konkursi TEZ ORADA boshlanadi! Tayyor turing!"
-
-    # Fan-out notifications
-    remove_kb = ReplyKeyboardRemove().to_python()
-    for user in eligible_users:
-        send_notification_with_celery.delay(
-            user.telegram_id, msg, reply_markup=remove_kb)
-
-
-@shared_task(name='tgbot.tasks.notify_upcoming_contests')
-def notify_upcoming_contests_shim(*args, **kwargs):
-    """
-    Shim for legacy task name 'notify_upcoming_contests' that might still be in the queue.
-    This task does nothing but acknowledge the message to prevent worker errors.
-    """
-    print("Legacy task `tgbot.tasks.notify_upcoming_contests` received and ignored.")
+INSPIRATION_POOL = [
+    "📚 Bir bet — bir qadam. Bugungi qadamingni tashladingmi?",
+    "🚀 Kitob o'qiganingni unutma — hisobotni jo'natsang, ball ham, faxr ham seniki!",
+    "🔥 Mutolaa — miyangning sport zali. Bugungi mashqni yozib qoldir!",
+    "⏳ Vaqt o'tadi, betlar qoladi. Bugun nechta bet o'qiding?",
+    "💡 Eng zo'r investitsiya — kitob. Eng oson hisobot — bitta tugma!",
+    "🌱 Har kuni bir bet — yil oxiriga 365 bet. Hisobotni unutma!",
+    "📖 \"Kitob — eng sodiq do'st\" (xalq maqoli). Do'stingni bugun ziyorat qildingmi?",
+    "💪 Kuchli odamlar har kuni o'qiydi. Sen ham kuchlilardansan — isbotla!",
+    "🎯 Maqsad — kun bo'yi bir bet. Ortig'i bonus, kami — bahonadan boshqa narsa emas.",
+    "✨ Bilim — yorug'lik. Hisobot — uni ko'rsatuvchi shamchiroq.",
+    "📊 Statistikani ko'rdingmi? Senikini ham qo'shaylik!",
+    "🏆 Chempionlar reytingida bo'shliq seni kutyapti — hisobot bilan to'ldir!",
+    "🧠 Miya muskuldek — ishlatmasang, semiradi. Bugun mashq qildingmi?",
+    "🌟 Bill Gates yiliga 50 ta kitob o'qiydi. Sen-chi?",
+    "📚 Mark Tven aytgan: \"O'qimagan odam — o'qiy olmaydigan odamdan farq qilmaydi.\" Farqni ko'rsat!",
+    "🔖 \"Kitob — qalbning oynasi.\" Bugun oynaga qaradingmi?",
+    "🎁 Hisobot yuborgan har bir kun — kelajak senga sovg'a.",
+    "⚡ 5 daqiqa vaqt + 1 tugma = bugungi hisobot tayyor!",
+    "🎓 Buyuklar kitobdan tug'iladi. Bugun bir bet ham yozilmagan tarixing yo'q.",
+    "💎 Bir bet o'qish — bir olmos. Kolleksiyangni boyitding-ku, qayd et!",
+    "🌍 Dunyoni o'zgartirgan har bir g'oya kitobdan boshlangan. Senikini boshlaylik!",
+    "🛤 Yo'l uzoq, lekin har bet — bir qadam. Bugungi qadamni yozib ket!",
+    "🔋 Energiya bormi? Kitob — eng yaxshi quvvatlovchi. Hisobotni unutma!",
+    "🥇 Bugun reytingda yuqoriga ko'tarilishni xohlaysanmi? Hisobot — eng tez yo'l!",
+    "📝 Eslatma: hisobotsiz kun — yo'qotilgan kun. Yo'qotma!",
+    "🎬 Ertangi sen bugungi mutolaadan tug'iladi. Kim bo'lishni xohlaysan?",
+    "🏃‍♂️ Mutolaa — to'xtab qolmaslikning eng zo'r usuli. Yana bir bet!",
+    "🌈 \"Kitob — sehrli eshik.\" Bugun qaysi olamga sayohat qilding?",
+    "🧩 Har kun — bir bo'lakcha. Hisobotsiz rasm to'liq bo'lmaydi!",
+    "☕ Choy + kitob = mukammal kun. Hisobot esa muhrlaydi!",
+    "🎙 Hech kim seni majburlamayapti, lekin hech kim o'rningga ham o'qimaydi.",
+    "🦁 Kitob o'qigan odam — qalbi sher. Bugun sher bo'l!",
+    "📈 Daromadingni ikki barobarga oshirishni xohlaysanmi? Yiliga 12 ta kitob o'qi!",
+    "🛡 Jaholat — eng katta dushman. Qurolib ol — kitob bilan!",
+    "🌙 Tun tushdi — kitob ochildi. Ertaga hisobot bilan kunni boshla!",
+    "🎈 Hisobot yubormoq — yengil, vijdoning xotirjam. Sinab ko'r!",
+    "💌 Kelajakdagi senga xat: \"Bugun hisobotni jo'natdim!\" — yozib ber.",
+    "🎯 Aniq maqsad: bugun bir bet. Aniq harakat: hisobot tugmasi.",
+    "🔮 Bashorat: hisobot yuborgan odam — ertaga ham yuboradi. Boshlanishi shu yerda!",
+    "🥷 Sukutdagi qahramon — har kuni o'qiyotgan odam. Sen ham shulardanmisan?",
+    "📿 \"Tomchi-tomchi yig'ilib ko'l bo'ladi.\" Bet-bet yig'ilib — kutubxona!",
+    "🚂 Mutolaa poyezdi to'xtamasdan ketyapti — chiqib qolma, hisobot ber!",
+    "🪴 Bilim — daraxt. Har bet — bir suv. Suvsiz qoldirma!",
+    "🦋 O'zgarish kichik harakatlardan boshlanadi. Bugungi harakat — hisobot.",
+    "🧭 Yo'lingni yo'qotma — kitob ko'rsatadi. Qadamingni yoz — hisobot esda tutadi.",
+    "🏔 Tog'lar bir kunda zabt etilmaydi. Lekin har kun bir qadam — albatta cho'qqida!",
+    "🍀 Omad — tayyorgarlik bilan uchrashishdir. O'qib tayyor bo'l!",
+    "🎨 Hayot — sen chizayotgan rasm. Kitob — eng zo'r bo'yoqlar to'plami.",
+    "🪄 Sehr yo'q, mehnat bor. Bugungi mehnat — bir bet va bir tugma.",
+    "🌅 Yangi kun — yangi imkoniyat. Hisobot bilan boshla, faxr bilan tugat!",
+    "📮 Hisobot tugmasi seni kutmoqda. Bosishga tayyormisan? 👇",
+]
 
 
-@shared_task
-def broadcast_description_task(contest_id):
-    """
-    Broadcasts the contest description to all participants.
-    """
-    try:
-        contest = Contest.objects.get(id=contest_id)
-        participants = ContestParticipant.objects.filter(
-            contest=contest).select_related('user')
-
-        msg = f"ℹ️ <b>Konkurs haqida:</b>\n\n{contest.description}"
-
-        for participant in participants:
-            send_notification_with_celery.delay(
-                participant.user.telegram_id, msg)
-    except Contest.DoesNotExist:
-        pass
+def _cta_reply_markup():
+    """Inline keyboard with the 'Hisobot jo'natish' CTA button."""
+    button = {
+        "inline_keyboard": [[{
+            "text": "📚 Hisobot jo'natish",
+            "callback_data": "cta_send_report",
+        }]]
+    }
+    return json.dumps(button)
 
 
 @shared_task
-def broadcast_message_task(contest_id, message_text):
-    """
-    Generic task to broadcast a text message to all contest participants.
-    Useful for countdowns (3..2..1) and announcements.
-    """
-    try:
-        # We fetch participants even for countdowns to ensure we target the right audience.
-        # Ideally, for countdowns before contest starts, we might need a broader audience,
-        # but logically countdown happens AFTER registration closes or just before start.
-        # Assuming participants are created at start_contest_task.
-        participants = ContestParticipant.objects.filter(
-            contest_id=contest_id).select_related('user')
-
-        for participant in participants:
-            send_notification_with_celery.delay(
-                participant.user.telegram_id, message_text)
-
-    except Exception as e:
-        print(f"Error in broadcast_message_task for contest {contest_id}: {e}")
-
-
-@shared_task
-def broadcast_question_task(contest_id, question_id):
-    """
-    Fan-out task: Fetches all participants and schedules a sending task for EACH user.
-    This runs at the specific scheduled time for the question.
-    """
-    try:
-        # Verify contest is still active/valid if needed
-        contest = Contest.objects.get(id=contest_id)
-        if contest.is_finished:
-            return
-
-        participants = ContestParticipant.objects.filter(contest=contest)
-
-        # Optimization: Only apply heavy COUNT/JOIN if there is a referral requirement
-        if contest.req_referrals > 0:
-            participants = participants.annotate(
-                referral_count=Count('user__referrals')
-            ).filter(
-                referral_count__gte=contest.req_referrals
-            )
-
-        participants = participants.select_related(
-            'user').only('user__id', 'user__telegram_id')
-
-        # OPTIMIZATION: Fetch question data ONCE
-        question = Question.objects.get(id=question_id)
-        question_data = {
-            "id": question.id,
-            "question": question.question,
-            "options": question.options,
-            "correct_option": question.correct_option,
-            "explanation": question.explanation
-        }
-
-        for participant in participants:
-            # Fire and forget - the worker queue will handle the load
-            # Passing telegram_id and question_data explicitly to avoid DB lookups in the worker
-            send_question_to_user_optimized.delay(
-                participant.user.id, participant.user.telegram_id, contest.id, question_data)
-
-    except Exception as e:
-        print(
-            f"Error in broadcast_question_task for contest {contest_id}, question {question_id}: {e}")
-
-
-@shared_task
-def start_contest_by_id(contest_id):
-    """
-    Starts a specific contest by its ID.
-    Scheduled via celery beat or eta.
-    """
-    asyncio.run(_start_single_contest(contest_id))
-
-
-@shared_task
-def start_contest_task():
-    """
-    Legacy task - removed from schedule but kept for backward compatibility if needed.
-    """
-    pass
-
-
-async def _start_single_contest(contest_id):
-    contest = await sync_to_async(Contest.objects.get)(id=contest_id)
-
-    # 1. Fetch Questions
-    questions = await sync_to_async(list)(Question.objects.filter(contest=contest).order_by('order'))
-    if not questions:
-        print(f"Contest {contest.name} has no questions. Not starting.")
-        return
-
-    # CLEANUP: Remove data from previous runs (PollState, Participants, Submissions)
-    # This allows re-starting a contest and re-testing.
-    from tgbot.models import PollState
-    await sync_to_async(PollState.objects.filter(question__contest=contest).delete)()
-    await sync_to_async(ContestParticipant.objects.filter(contest=contest).delete)()
-
-    # 2. Mark Started
-    contest.is_started = True
-    await sync_to_async(contest.save)(update_fields=['is_started'])
-
-    # 3. Create Participants (Snapshot of eligible users)
-    eligible_users_qs = TelegramProfile.objects.annotate(
-        referral_count=Count('referrals')
-    ).filter(referral_count__gte=contest.req_referrals, is_blocked=False, is_registered=True)
-
-    eligible_users = await sync_to_async(list)(eligible_users_qs)
-
-    if not eligible_users:
-        print(f"Contest {contest.name} has no eligible users.")
-        return
-
-    # Bulk create participants
-    # We use sync logic wrapped or just run it via sync_to_async
-    existing_uids = await sync_to_async(lambda: list(ContestParticipant.objects.filter(contest=contest).values_list('user_id', flat=True)))()
-
-    new_participants = []
-    for user in eligible_users:
-        if user.id not in existing_uids:
-            new_participants.append(
-                ContestParticipant(contest=contest, user=user))
-
-    if new_participants:
-        await sync_to_async(ContestParticipant.objects.bulk_create)(new_participants, ignore_conflicts=True)
-
-    # 4. Global Scheduler Logic
-    # We schedule everything relative to NOW.
-
-    # Countdown: 3, 2, 1, GO!
-    broadcast_message_task.apply_async((contest.id, "3️⃣"), countdown=0)
-    broadcast_message_task.apply_async((contest.id, "2️⃣"), countdown=1)
-    broadcast_message_task.apply_async((contest.id, "1️⃣"), countdown=2)
-    broadcast_message_task.apply_async(
-        (contest.id, "🚀 Boshladik!"), countdown=3)
-
-    initial_delay = 5
-    question_interval = 40
-
-    # Schedule ALL questions with fixed interval
-    for index, question in enumerate(questions):
-        delay = initial_delay + (index * question_interval)
-        broadcast_question_task.apply_async(
-            (contest.id, question.id), countdown=delay)
-
-    # Schedule Finish Task as a fallback/safety measure.
-    # We assume max possible time = questions * 45s (40s + 5s buffer) + initial delay
-    max_duration = initial_delay + (len(questions) * question_interval) + 60
-    finish_contest_task.apply_async((contest.id,), countdown=max_duration)
-
-
-@shared_task
-def send_question_to_user_task(user_db_id, contest_id, question_id):
-    """
-    Legacy task kept for backward compatibility or direct calls.
-    Ideally, use send_question_to_user_optimized.
-    """
-    asyncio.run(_send_question_async(user_db_id, contest_id, question_id))
-
-
-@shared_task
-def send_question_to_user_optimized(user_db_id, user_telegram_id, contest_id, question_data):
-    """
-    Optimized version that takes prepared data to minimize DB lookups.
-    """
-    asyncio.run(_send_question_optimized_async(
-        user_db_id, user_telegram_id, contest_id, question_data))
-
-
-async def _send_question_optimized_async(user_db_id, user_telegram_id, contest_id, question_data):
-    try:
-        # print(f"DEBUG: Processing question {question_data['id']} for user {user_db_id}")
-
-        # Idempotency check: Don't send if already sent
-        # We still need to check this, unfortunately, or trust the scheduler.
-        # For 1000 users, checking existence is fast (index scan).
-        from tgbot.models import PollState
-
-        # Optimization: We could cache this check too if needed, but DB is reliable source of truth.
-        if await sync_to_async(PollState.objects.filter(user_id=user_db_id, question_id=question_data['id']).exists)():
-            return
-
-        # No need to fetch User object or Question object! We have IDs and Data.
-
-        # Verify participant still exists/active?
-        # For high performance, we might skip this if we trust the broadcast list.
-        # But if we must:
-        # participant = await sync_to_async(ContestParticipant.objects.get)(contest_id=contest_id, user_id=user_db_id)
-
-        # We'll skip fetching Participant for the 'message sending' part to speed it up.
-        # We can update `last_question_sent_at` in background or bulk later if analytics need it.
-        # For strict correctness, let's just do a direct update which is faster than get+save.
-        await sync_to_async(ContestParticipant.objects.filter(contest_id=contest_id, user_id=user_db_id).update)(last_question_sent_at=timezone.now())
-
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPoll"
-        import json
-        data = {
-            "chat_id": user_telegram_id,
-            "question": question_data['question'],
-            "options": json.dumps(question_data['options']),
-            "type": "quiz",
-            "correct_option_id": question_data['correct_option'],
-            "is_anonymous": False,
-            "explanation": question_data['explanation'],
-            "open_period": 40,  # Native countdown
-            "parse_mode": "HTML"
-        }
-
-        response = requests.post(url, data=data)
-        res_data = response.json()
-
-        if res_data.get("ok"):
-            poll_id = res_data["result"]["poll"]["id"]
-
-            # We need User instance for ForeignKey.
-            # Django allows setting ID directly usually: poll.user_id = user_db_id
-            # But standard create() kwargs expects instance for FK?
-            # Actually, `user_id` argument works for `create` if the field is `user`.
-
-            await sync_to_async(PollState.objects.create)(
-                poll_id=poll_id,
-                user_id=user_db_id,  # Optimization: set FK by ID directly
-                # Optimization: set FK by ID directly
-                question_id=question_data['id']
-            )
-
-            # Schedule timeout check
-            check_question_timeout_task.apply_async(
-                (user_db_id, contest_id, question_data['id']), countdown=41
-            )
-        else:
-            print(f"Failed to send poll optimized: {res_data}")
-
-    except Exception as e:
-        print(
-            f"Error sending question optimized {question_data.get('id')} to user {user_db_id}: {e}")
-
-
-@shared_task
-def check_question_timeout_task(user_db_id, contest_id, question_id, user_telegram_id=None):
-    """
-    Optimized timeout checker.
-    """
-    asyncio.run(_check_question_timeout_async(
-        user_db_id, contest_id, question_id, user_telegram_id))
-
-
-async def _send_question_async(user_db_id, contest_id, question_id):
-    try:
-        print(
-            f"DEBUG: Processing question {question_id} for user {user_db_id} in contest {contest_id}")
-        # Idempotency check: Don't send if already sent
-        from tgbot.models import PollState
-        if await sync_to_async(PollState.objects.filter(user_id=user_db_id, question_id=question_id).exists)():
-            print(
-                f"DEBUG: PollState exists for user {user_db_id}, question {question_id}. Skipping.")
-            return
-
-        user = await sync_to_async(TelegramProfile.objects.get)(id=user_db_id)
-        question = await sync_to_async(Question.objects.get)(id=question_id)
-
-        try:
-            participant = await sync_to_async(ContestParticipant.objects.get)(contest_id=contest_id, user_id=user_db_id)
-        except ContestParticipant.DoesNotExist:
-            print(
-                f"DEBUG: ContestParticipant not found for user {user_db_id}, contest {contest_id}")
-            return
-
-        # Update last sent time for precision timing calculation later if needed
-        participant.last_question_sent_at = timezone.now()
-        await sync_to_async(participant.save)(update_fields=['last_question_sent_at'])
-
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPoll"
-        import json
-        data = {
-            "chat_id": user.telegram_id,
-            "question": question.question,
-            "options": json.dumps(question.options),
-            "type": "quiz",
-            "correct_option_id": question.correct_option,
-            "is_anonymous": False,
-            "explanation": question.explanation,
-            "open_period": 40,  # Native countdown
-            "parse_mode": "HTML"
-        }
-        response = requests.post(url, data=data)
-        res_data = response.json()
-
-        if res_data.get("ok"):
-            poll_id = res_data["result"]["poll"]["id"]
-            from tgbot.models import PollState
-            await sync_to_async(PollState.objects.create)(
-                poll_id=poll_id,
-                user=user,
-                question=question
-            )
-
-            # Schedule timeout check in 41 seconds (40s + 1s buffer)
-            check_question_timeout_task.apply_async(
-                (user_db_id, contest_id, question_id), countdown=41
-            )
-        else:
-            print(f"Failed to send poll: {res_data}")
-
-    except Exception as e:
-        print(
-            f"Error sending question {question_id} to user {user_db_id}: {e}")
-
-
-async def _check_question_timeout_async(user_db_id, contest_id, question_id, user_telegram_id=None):
-    try:
-        # 1. Check if user already answered
-        from tgbot.models import ContestSubmission
-        # Optimized existence check
-        has_answered = await sync_to_async(ContestSubmission.objects.filter(
-            participant__user_id=user_db_id,
-            participant__contest_id=contest_id,
-            question_id=question_id
-        ).exists)()
-
-        if has_answered:
-            # User answered in time, nothing to do.
-            return
-
-        # 2. Timeout!
-        print(f"User {user_db_id} timed out on question {question_id}")
-
-        # Proceed to next question logic
-        question = await sync_to_async(Question.objects.get)(id=question_id)
-
-        # Determine next question
-        next_question = await sync_to_async(
-            Question.objects.filter(
-                contest_id=contest_id, order__gt=question.order).order_by('order').first
-        )()
-
-        if next_question:
-            # Global scheduler handles next question sending.
-            pass
-        else:
-            # Finish for user
-            try:
-                participant = await sync_to_async(ContestParticipant.objects.get)(contest_id=contest_id, user_id=user_db_id)
-                participant.is_finished = True
-                await sync_to_async(participant.save)(update_fields=['is_finished'])
-
-                # Send individual result
-                score = participant.total_score
-                time_s = participant.total_time
-                msg = (f"🏁 <b>Konkurs yakunlandi!</b>\n\n"
-                       f"👤 Ism: {participant.user.full_name}\n"
-                       f"✅ To'g'ri javoblar: {score} ta\n"
-                       f"⏱ Sarflagan vaqt: {time_s:.1f} soniya")
-
-                # Check if ALL participants finished
-                unfinished_count = await sync_to_async(ContestParticipant.objects.filter(
-                    contest_id=contest_id, is_finished=False).count)()
-
-                if unfinished_count == 0:
-                    finish_contest_task.delay(contest_id)
-
-                # Restore Request Main Menu
-                menu_kb = main_markup(
-                    language=participant.user.language or "uz").to_python()
-
-                send_notification.delay(
-                    participant.user.telegram_id, msg, reply_markup=menu_kb)
-
-            except Exception as e:
-                print(
-                    f"Error finishing contest for user {user_db_id} on timeout: {e}")
-
-    except Exception as e:
-        print(f"Error in timeout check for user {user_db_id}: {e}")
-
-
-@shared_task
-def finish_contest_task(contest_id):
-    asyncio.run(_finish_contest(contest_id))
-
-
-async def _finish_contest(contest_id):
-    contest = await sync_to_async(Contest.objects.get)(id=contest_id)
-    if contest.is_finished:
-        return
-
-    contest.is_finished = True
-    await sync_to_async(contest.save)(update_fields=['is_finished'])
-
-    # Broadcast results
-    broadcast_contest_results.delay(contest_id)
-    send_contest_report_to_admins.delay(contest_id)
-
-
-@shared_task
-def broadcast_contest_results(contest_id):
-    # This task is now simpler, as we don't send global rankings to everyone.
-    # Maybe just a "Thank you" message if desired, or nothing as implemented below.
-    # Users get their individual results when they finish.
-    pass
-
-
-@shared_task
-def send_contest_report_to_admins(contest_id):
-    asyncio.run(_send_contest_report_to_admins_async(contest_id))
-
-
-async def _send_contest_report_to_admins_async(contest_id):
-    from tgbot.bot.consts import ADMIN_GROUP_ID, TECHNICAL_SUPPORT_THREAD_ID
-
-    contest = await sync_to_async(Contest.objects.get)(id=contest_id)
-
-    # 1. Fetch Data
-    participants_qs = ContestParticipant.objects.filter(contest=contest).select_related('user').annotate(
-        rank=Window(
-            expression=Rank(),
-            order_by=[F('total_score').desc(), F('total_time').asc()]
-        )
-    ).order_by('rank')
-
-    participants = await sync_to_async(list)(participants_qs)
-
-    if not participants:
-        return
-
-    # 2. Build Message
-    header_title = f"🏁 <b>{contest.name}</b> yakunlandi. Natijalar ro'yxati:\n\n"
-
-    # Table Header
-    # Columns: Rank(3) | Name(20) | Score(5) | Time(7)
-    table_header = "N   | Ism Familiya         | T.JAV | VAQT\n"
-    table_header += "----------------------------------------------\n"
-
-    chunk_size = 3500  # Safe limit for HTML
-    message_parts = []
-
-    current_body = ""
-
-    for p in participants:
-        user_name = p.user.full_name or str(p.user.telegram_id)
-        if not user_name or user_name == 'None':
-            user_name = str(p.user.telegram_id)
-
-        # Truncate name to 20 chars
-        if len(user_name) > 19:
-            user_name = user_name[:18] + ".."
-
-        rank = str(p.rank) + "."
-        score = str(p.total_score)
-        time_s = f"{p.total_time:.1f}s"
-
-        # Format Line: Rank<4 | Name<20 | Score>5 | Time>7
-        line = f"{rank:<4}| {user_name:<20} | {score:^5} | {time_s:>7}\n"
-
-        if len(header_title) + len(table_header) + len(current_body) + len(line) + 20 > chunk_size:
-            # Check if this is the first part (needs header_title)
-            if not message_parts:
-                full_msg = header_title + \
-                    f"<pre>{table_header}{current_body}</pre>"
-            else:
-                full_msg = f"<pre>{table_header}{current_body}</pre>"
-
-            message_parts.append(full_msg)
-            current_body = line
-        else:
-            current_body += line
-
-    # Append absolute last part
-    if current_body:
-        if not message_parts:
-            full_msg = header_title + \
-                f"<pre>{table_header}{current_body}</pre>"
-        else:
-            full_msg = f"<pre>{table_header}{current_body}</pre>"
-        message_parts.append(full_msg)
-
-    # 3. Send
+def send_random_inspiration():
+    """Pick a random inspirational text from INSPIRATION_POOL and broadcast to
+    all registered users with a 'Hisobot jo'natish' inline CTA button."""
+    text = random.choice(INSPIRATION_POOL)
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-
-    for part in message_parts:
-        data = {
-            "chat_id": ADMIN_GROUP_ID,
-            "message_thread_id": TECHNICAL_SUPPORT_THREAD_ID,
-            "text": part,
-            "parse_mode": "HTML"
-        }
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent, failed = 0, 0
+    reply_markup = _cta_reply_markup()
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
         try:
-            requests.post(url, json=data)
-        except Exception as e:
-            print(f"Error sending admin report: {e}")
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": chat_id,
+                    "text": text,
+                    "parse_mode": "HTML",
+                    "reply_markup": reply_markup,
+                },
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    print(f"send_random_inspiration: sent={sent} failed={failed}")
+
+
+@shared_task
+def check_and_dispatch_reminders():
+    """Beat-driven: every minute, if any reminder is due, broadcast ONE random
+    text from the pool of all active reminders. Schedules act as triggers; the
+    text sent is independent of which reminder fired."""
+    now = timezone.localtime()
+    due_exists = ScheduledReminder.objects.filter(
+        is_active=True, hour=now.hour, minute=now.minute
+    ).exists()
+    if not due_exists:
+        return
+    pool = list(
+        ScheduledReminder.objects
+        .filter(is_active=True)
+        .values_list("text", flat=True)
+    )
+    if not pool:
+        return
+    broadcast_reminder.delay(random.choice(pool))
+
+
+@shared_task
+def broadcast_reminder(text: str):
+    """Send `text` to every registered, non-blocked TelegramProfile."""
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent, failed = 0, 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    print(f"broadcast_reminder: sent={sent} failed={failed}")
+
+
+@shared_task
+def broadcast_poll(poll_id: int):
+    """Send a BotPoll to every registered user as a message with inline-button options."""
+    poll = BotPoll.objects.filter(id=poll_id).first()
+    if not poll or not poll.is_active:
+        print(f"broadcast_poll: poll {poll_id} not found or inactive")
+        return
+
+    text = f"📊 <b>{escape(poll.question)}</b>"
+    buttons = []
+    for idx, opt in enumerate(poll.options):
+        buttons.append([{"text": opt, "callback_data": f"poll_vote:{poll.id}:{idx}"}])
+    reply_markup = json.dumps({"inline_keyboard": buttons})
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent, failed = 0, 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": chat_id,
+                    "text": text,
+                    "parse_mode": "HTML",
+                    "reply_markup": reply_markup,
+                },
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    print(f"broadcast_poll #{poll_id}: sent={sent} failed={failed}")

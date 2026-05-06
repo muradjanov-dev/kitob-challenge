@@ -120,6 +120,78 @@ async def send_book_selection_menu(message_or_call, state: FSMContext, page=1):
         await message_or_call.answer(text, reply_markup=markup)
 
 
+@dp.callback_query_handler(lambda c: c.data == "cta_send_report", state="*")
+async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
+    user = get_user(call.from_user.id)
+    if not user:
+        await call.answer("Avval /start bosing", show_alert=True)
+        return
+    if user.is_blocked:
+        await call.answer(_("Siz bot tomonidan bloklangansiz."), show_alert=True)
+        return
+
+    today = timezone.localdate()
+    if await get_confirmation_report_exists(user, today):
+        await call.answer(
+            _("Siz bugungi kun uchun allaqachon hisobotingizni yubordingiz."),
+            show_alert=True,
+        )
+        return
+
+    await call.answer()
+    await state.finish()
+
+    from django.db.models.functions import TruncDate
+    distinct_days = await sync_to_async(
+        lambda: ConfirmationReport.objects
+            .filter(user=user)
+            .annotate(_d=TruncDate("date"))
+            .values("_d")
+            .distinct()
+            .count()
+    )()
+    reading_day = distinct_days + 1
+    await state.update_data(reading_day=reading_day, selected_book_ids=[])
+    await ReportState.select_book.set()
+
+    # Remove the inline CTA on the broadcast so the user can't double-tap.
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+    # Build & send a fresh book-selection menu. We can't reuse
+    # send_book_selection_menu directly because call.message.from_user is the
+    # bot, not the user.
+    books_page = await get_user_books(user, 1)
+    markup = InlineKeyboardMarkup(row_width=1)
+    for book in books_page:
+        text = book.title
+        percent = 0
+        if book.total_pages > 0:
+            percent = int((book.current_page / book.total_pages) * 100)
+        text = f"{text} ({percent}%)"
+        markup.add(InlineKeyboardButton(
+            text=text, callback_data=f"select_book:{book.id}:1"))
+    nav_buttons = []
+    if books_page.has_previous():
+        nav_buttons.append(InlineKeyboardButton(
+            text="⬅️", callback_data=f"books_page:{books_page.previous_page_number()}"))
+    nav_buttons.append(InlineKeyboardButton(
+        text=f"1/{books_page.paginator.num_pages}", callback_data="noop"))
+    if books_page.has_next():
+        nav_buttons.append(InlineKeyboardButton(
+            text="➡️", callback_data=f"books_page:{books_page.next_page_number()}"))
+    markup.row(*nav_buttons)
+    markup.add(InlineKeyboardButton(
+        text="➕ Yangi kitob qo'shish", callback_data="add_new_book"))
+
+    await call.message.answer(
+        _("Qaysi kitobni o'qiyotganingizni tanlang (bir nechtasini tanlash mumkin):"),
+        reply_markup=markup,
+    )
+
+
 @dp.message_handler(ChatTypeFilter(ChatType.PRIVATE), text="📚 Kitob hisoboti", state="*")
 @dp.message_handler(ChatTypeFilter(ChatType.PRIVATE), text="📚 Отчет о книге", state="*")
 async def send_daily_report_handler(message: types.Message, state: FSMContext):
@@ -128,27 +200,18 @@ async def send_daily_report_handler(message: types.Message, state: FSMContext):
         await message.answer(_("Siz bot tomonidan bloklangansiz."))
         return await state.finish()
 
-    await message.answer(_("Nechanchi kun o'qiyotganingizni kiriting:"), reply_markup=back_keyboard)
-    await ReportState.reading_day.set()
-
-
-@dp.message_handler(state=ReportState.reading_day)
-async def process_reading_day(message: types.Message, state: FSMContext):
-    if message.text == _("🔙 Orqaga"):
-        await message.answer(_("Bosh menyu"), reply_markup=main_markup())
-        await state.finish()
-        return
-
-    day = message.text
-    if not day.isdigit():
-        await message.answer(_("Iltimos, to'g'ri kun raqamini kiriting."), reply_markup=back_keyboard)
-        return
-
-    if 1 > int(day) or int(day) > 500:
-        await message.answer(_("Iltimos, to'g'ri kun raqamini kiriting."), reply_markup=back_keyboard)
-        return
-
-    await state.update_data(reading_day=int(day))
+    # Reading day = (distinct calendar dates already reported by this user) + 1
+    from django.db.models.functions import TruncDate
+    distinct_days = await sync_to_async(
+        lambda: ConfirmationReport.objects
+            .filter(user=user)
+            .annotate(_d=TruncDate("date"))
+            .values("_d")
+            .distinct()
+            .count()
+    )()
+    reading_day = distinct_days + 1
+    await state.update_data(reading_day=reading_day)
     await ReportState.select_book.set()
     await send_book_selection_menu(message, state)
 
@@ -417,8 +480,6 @@ async def confirm_report(message: types.Message, state: FSMContext):
         except Exception as e:
             print(f"Error updating book {bid}: {e}")
 
-    await message.answer(_("Hisobotingiz yuborildi."), reply_markup=main_markup())
-
     report_message = (
         f"<b><a href='tg://user?id={user.telegram_id}'>{user.full_name}</a></b>:\n\n"
         f"📊#kun - {reading_day}  ({report.date.strftime('%Y-%m-%d')})\n\n"
@@ -461,9 +522,10 @@ async def confirm_report(message: types.Message, state: FSMContext):
         else:
             target_thread_id = E_GIRLS_THREAD_ID
 
+    sent_msg = None
     if target_chat_id:
         try:
-            await bot.send_message(
+            sent_msg = await bot.send_message(
                 chat_id=target_chat_id,
                 message_thread_id=target_thread_id,
                 text=report_message,
@@ -472,5 +534,24 @@ async def confirm_report(message: types.Message, state: FSMContext):
         except Exception as e:
             print(
                 f"Error sending report to group {target_chat_id} thread {target_thread_id}: {e}")
+
+    lang = user.language or "uz"
+    done_text = "Ваш отчёт отправлен." if lang == "ru" else "Hisobotingiz yuborildi."
+    if sent_msg:
+        chat_id_str = str(target_chat_id).lstrip("-")
+        if chat_id_str.startswith("100"):
+            chat_id_str = chat_id_str[3:]
+        link = f"https://t.me/c/{chat_id_str}/{sent_msg.message_id}"
+        link_label = "📨 Открыть отчёт" if lang == "ru" else "📨 Hisobotni ko'rish"
+        confirmation_text = f'{done_text}\n\n<a href="{link}">{link_label}</a>'
+    else:
+        confirmation_text = done_text
+
+    await message.answer(
+        confirmation_text,
+        reply_markup=main_markup(language=lang),
+        parse_mode="HTML",
+        disable_web_page_preview=True,
+    )
 
     await state.finish()
