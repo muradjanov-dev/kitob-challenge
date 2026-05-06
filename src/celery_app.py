@@ -73,9 +73,9 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.send_random_inspiration',
         'schedule': crontab(hour=7, minute=0),
     },
-    'random-inspiration-13': {
+    'random-inspiration-13-30': {
         'task': 'tgbot.tasks.send_random_inspiration',
-        'schedule': crontab(hour=13, minute=0),
+        'schedule': crontab(hour=13, minute=30),
     },
     'random-inspiration-21': {
         'task': 'tgbot.tasks.send_random_inspiration',

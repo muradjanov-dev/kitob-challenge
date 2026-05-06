@@ -60,6 +60,15 @@ for raw in admins.split(","):
     except Exception as e:
         print(f"notify failed for {chat_id}: {e}")
 PY
+
+  # Optional: one-shot test broadcast of a random inspiration to all users.
+  # Set BROADCAST_INSPIRATION_ON_BOOT=1 on the web service for the deploy,
+  # then unset after the broadcast fires.
+  if [ "$BROADCAST_INSPIRATION_ON_BOOT" = "1" ]; then
+    echo "=== Firing one-shot inspiration broadcast ==="
+    python manage.py shell -c "from tgbot.tasks import send_random_inspiration; send_random_inspiration()" \
+      || echo "broadcast failed (non-fatal)"
+  fi
 fi
 
 case "$SERVICE_TYPE" in
