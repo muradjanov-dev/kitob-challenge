@@ -14,10 +14,13 @@ if [ "$SERVICE_TYPE" = "web" ]; then
 
   echo "=== Setting bot commands ==="
   if [ -n "$API_TOKEN" ]; then
+    # Only /start is exposed as a shortkey. /admin and /restart still work
+    # as commands but are intentionally hidden from the menu.
     curl -s -X POST "https://api.telegram.org/bot${API_TOKEN}/setMyCommands" \
       -H "Content-Type: application/json" \
-      -d '{"commands":[{"command":"start","description":"Botni ishga tushirish / Asosiy menyu"},{"command":"admin","description":"Admin panel (faqat adminlar)"},{"command":"restart","description":"Qaytadan boshlash"}]}' \
-      > /dev/null 2>&1 || echo "setMyCommands failed (non-fatal)"
+      -d '{"commands":[{"command":"start","description":"Asosiy menyu / Главное меню"}]}' \
+      || echo "setMyCommands failed (non-fatal)"
+    echo ""
   fi
 
   echo "=== Notifying admins of deploy ==="
