@@ -79,11 +79,17 @@ def main_markup(language="uz", is_admin=False):
 
 
 def report_reply_keyboard(language="uz"):
-    """Persistent bottom reply keyboard with the single 📚 Kitob hisoboti
-    button. Always visible so the user can submit a report from anywhere."""
-    text = "📚 Отчет о книге" if language == "ru" else "📚 Kitob hisoboti"
+    """Persistent bottom reply keyboard with two buttons:
+    📚 Kitob hisoboti (primary action) and 🏠 Bosh menyu (return to main).
+    Both are always visible so the user can never feel 'lost in a flow'."""
+    if language == "ru":
+        report_text = "📚 Отчет о книге"
+        home_text = "🏠 Главное меню"
+    else:
+        report_text = "📚 Kitob hisoboti"
+        home_text = "🏠 Bosh menyu"
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=text)]],
+        keyboard=[[KeyboardButton(text=report_text), KeyboardButton(text=home_text)]],
         resize_keyboard=True,
         is_persistent=True,
     )

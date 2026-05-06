@@ -5,19 +5,15 @@ Every main-menu inline button has callback_data `menu:<action>`. This module
 dispatches each action to the appropriate logic. Existing reply-keyboard text
 handlers are kept as fallback for older clients with stale keyboards.
 """
-import os
-
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from asgiref.sync import sync_to_async
 from django.utils import timezone
 from django.db.models import Count, Avg, Sum, F
 from django.db.models.functions import ExtractWeekDay, ExtractHour, Length, TruncDate
-from aiogram.types import (
-    InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove,
-)
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from tgbot.bot.loader import dp, bot
+from tgbot.bot.loader import dp
 from tgbot.bot.utils import get_user
 from tgbot.bot.keyboards.reply import (
     main_markup_for_user, admin_keyboard, back_keyboard, report_reply_keyboard,
@@ -27,7 +23,7 @@ from tgbot.bot.states.main import (
     ContactAdminState, ChangeLanguageState, ReportState,
 )
 from tgbot.models import (
-    TelegramProfile, BookReport, ConfirmationReport, BooksToRead, Payment,
+    BookReport, ConfirmationReport, BooksToRead, Payment,
 )
 
 
@@ -56,10 +52,24 @@ async def send_main_menu(message: types.Message, user, header_text=None):
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# /menu command — quick way to summon the menu from anywhere.
+# /menu command + 🏠 Bosh menyu reply-keyboard button — summon the menu
+# from anywhere. Persistent reply kb means user is never stuck.
 # ──────────────────────────────────────────────────────────────────────────
+HOME_BUTTON_TEXTS = ["🏠 Bosh menyu", "🏠 Главное меню", "🏠 Asosiy menyu"]
+
+
 @dp.message_handler(commands=["menu"], state="*")
 async def menu_command(message: types.Message, state: FSMContext):
+    await state.finish()
+    user = get_user(message.from_user.id)
+    await send_main_menu(message, user)
+
+
+@dp.message_handler(
+    lambda m: m.text in HOME_BUTTON_TEXTS,
+    state="*",
+)
+async def home_button_handler(message: types.Message, state: FSMContext):
     await state.finish()
     user = get_user(message.from_user.id)
     await send_main_menu(message, user)
