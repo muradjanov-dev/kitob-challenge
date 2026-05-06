@@ -1,0 +1,169 @@
+import re
+
+from aiogram import types
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters import Text
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from asgiref.sync import sync_to_async
+
+from tgbot.bot.filters import IsPrivate
+from tgbot.bot.keyboards.reply import admin_keyboard, back_keyboard
+from tgbot.bot.loader import dp
+from tgbot.bot.states.main import ReminderState
+from tgbot.bot.utils import get_user
+from tgbot.models import ScheduledReminder, TelegramProfile
+
+
+def _reminders_kb():
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton("➕ Yangi qo'shish", callback_data="rem_add"))
+    return kb
+
+
+def _reminder_row_kb(reminder_id):
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("🗑 O'chirish", callback_data=f"rem_del:{reminder_id}"),
+        InlineKeyboardButton(
+            "⏸ Pauza" , callback_data=f"rem_toggle:{reminder_id}"
+        ),
+    )
+    return kb
+
+
+def _is_admin(user) -> bool:
+    return bool(user and user.is_admin)
+
+
+async def _list_reminders_text():
+    rems = await sync_to_async(list)(
+        ScheduledReminder.objects.all().order_by("hour", "minute")
+    )
+    if not rems:
+        return "📋 <b>Eslatmalar</b>\n\nHozircha hech qanday eslatma yo'q."
+
+    lines = ["📋 <b>Eslatmalar</b>\n"]
+    for r in rems:
+        status = "✅" if r.is_active else "⏸"
+        lines.append(
+            f"{status} <code>#{r.id}</code> {r.hour:02d}:{r.minute:02d} — {r.text[:60]}"
+        )
+    return "\n".join(lines)
+
+
+@dp.message_handler(IsPrivate(), Text("📋 Eslatmalar"), state="*")
+async def reminders_menu(message: types.Message, state: FSMContext):
+    user = get_user(message.from_user.id)
+    if not _is_admin(user):
+        await message.answer("Siz admin emassiz!")
+        return
+    await state.finish()
+    text = await _list_reminders_text()
+    await message.answer(text, parse_mode="HTML", reply_markup=_reminders_kb())
+
+
+@dp.callback_query_handler(lambda c: c.data == "rem_add", state="*")
+async def reminder_add_start(call: types.CallbackQuery, state: FSMContext):
+    user = get_user(call.from_user.id)
+    if not _is_admin(user):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    await call.answer()
+    await call.message.answer(
+        "✏️ Eslatma matnini yuboring (ko'p qatorli matn yozsa bo'ladi):",
+        reply_markup=back_keyboard,
+    )
+    await ReminderState.text.set()
+
+
+@dp.message_handler(IsPrivate(), state=ReminderState.text)
+async def reminder_text_received(message: types.Message, state: FSMContext):
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("Matn bo'sh bo'lmasligi kerak. Qaytadan yuboring:")
+        return
+    if len(text) > 4000:
+        await message.answer("Matn 4000 belgidan oshmasligi kerak. Qisqartiring:")
+        return
+    await state.update_data(text=text)
+    await message.answer(
+        "🕒 Yuboriladigan vaqtni kiriting (HH:MM, masalan: <code>09:00</code> yoki <code>21:30</code>):",
+        parse_mode="HTML",
+    )
+    await ReminderState.time.set()
+
+
+@dp.message_handler(IsPrivate(), state=ReminderState.time)
+async def reminder_time_received(message: types.Message, state: FSMContext):
+    raw = (message.text or "").strip()
+    m = re.fullmatch(r"(\d{1,2}):(\d{2})", raw)
+    if not m:
+        await message.answer("Format noto'g'ri. <code>HH:MM</code> shaklida yuboring (masalan <code>09:00</code>):", parse_mode="HTML")
+        return
+    hour, minute = int(m.group(1)), int(m.group(2))
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        await message.answer("Vaqt noto'g'ri (00:00 — 23:59).")
+        return
+
+    data = await state.get_data()
+    text = data.get("text", "")
+    creator = await sync_to_async(
+        lambda: TelegramProfile.objects.filter(telegram_id=message.from_user.id).first()
+    )()
+    await sync_to_async(ScheduledReminder.objects.create)(
+        text=text, hour=hour, minute=minute, is_active=True, created_by=creator
+    )
+    await state.finish()
+
+    list_text = await _list_reminders_text()
+    await message.answer(
+        f"✅ Eslatma saqlandi: <b>{hour:02d}:{minute:02d}</b>\n\n" + list_text,
+        parse_mode="HTML",
+        reply_markup=admin_keyboard,
+    )
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith("rem_del:"))
+async def reminder_delete(call: types.CallbackQuery):
+    user = get_user(call.from_user.id)
+    if not _is_admin(user):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    rid = int(call.data.split(":", 1)[1])
+    deleted, _ = await sync_to_async(
+        ScheduledReminder.objects.filter(id=rid).delete
+    )()
+    await call.answer("O'chirildi" if deleted else "Topilmadi")
+    text = await _list_reminders_text()
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=_reminders_kb())
+    except Exception:
+        await call.message.answer(text, parse_mode="HTML", reply_markup=_reminders_kb())
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith("rem_toggle:"))
+async def reminder_toggle(call: types.CallbackQuery):
+    user = get_user(call.from_user.id)
+    if not _is_admin(user):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    rid = int(call.data.split(":", 1)[1])
+
+    def _toggle():
+        r = ScheduledReminder.objects.filter(id=rid).first()
+        if r:
+            r.is_active = not r.is_active
+            r.save(update_fields=["is_active"])
+            return r.is_active
+        return None
+
+    new_state = await sync_to_async(_toggle)()
+    if new_state is None:
+        await call.answer("Topilmadi")
+    else:
+        await call.answer("Faollashtirildi" if new_state else "To'xtatildi")
+    text = await _list_reminders_text()
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=_reminders_kb())
+    except Exception:
+        pass

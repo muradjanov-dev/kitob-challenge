@@ -10,8 +10,9 @@ from . import admin_panel
 from . import payment
 from . import send_message_from_bot
 from . import restart
-from . import contest
-from . import admin_quiz
-from . import quiz_answer
 from . import cabinet
 from . import check_subscription
+from . import reminders
+from . import polls_admin
+from . import contact_admin
+from . import menu_router

@@ -246,16 +246,6 @@ ADMIN_REORDER = (
             'tgbot.RequiredGroup',
         )
     },
-    {
-        'app': 'tgbot',
-        'label': 'Tanlovlar (Contests)',
-        'models': (
-            'tgbot.Contest',
-            'tgbot.Question',
-            'tgbot.ContestParticipant',
-            'tgbot.ContestSubmission',
-        )
-    },
 {
         'app': 'tgbot',
         'label': 'Kitoblar (Books)',

@@ -1,12 +1,12 @@
 from django.core.management.base import BaseCommand
 from auditlog.models import LogEntry
 from django.contrib.contenttypes.models import ContentType
-from tgbot.models import TelegramProfile, Habit
+from tgbot.models import TelegramProfile
 import json
 
 
 class Command(BaseCommand):
-    help = 'Restores deleted TelegramProfile objects and Habits from AuditLog'
+    help = 'Restores deleted TelegramProfile objects from AuditLog'
 
     def handle(self, *args, **options):
         # 1. Restore Users
@@ -76,53 +76,3 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(
             f"Restored {restored_users_count} users. Skipped {skipped_users_count}."))
-
-        # 2. Restore Habits
-        ct_habit = ContentType.objects.get_for_model(Habit)
-        deleted_habits = LogEntry.objects.filter(
-            content_type=ct_habit, action=2)
-        self.stdout.write(
-            f"Found {deleted_habits.count()} deleted Habits in AuditLog.")
-
-        restored_habits = 0
-        for entry in deleted_habits:
-            try:
-                changes = entry.changes
-                if not changes:
-                    continue
-
-                data = {}
-                user_pk_str = None
-
-                for field, values in changes.items():
-                    val = values[0]
-                    if field == 'id':
-                        continue
-                    if field == 'user':
-                        user_pk_str = val  # This is likely the PK ID as string '46'
-
-                    if field in ['name', 'duration', 'reminders_per_day', 'status', 'completed_days', 'notification_must_be_sent']:
-                        data[field] = val
-
-                if user_pk_str:
-                    try:
-                        user_id = int(user_pk_str)
-                        # Find the user. They SHOULD exist now.
-                        user = TelegramProfile.objects.filter(
-                            id=user_id).first()
-                        if user:
-                            Habit.objects.create(user=user, **data)
-                            restored_habits += 1
-                        else:
-                            self.stdout.write(self.style.WARNING(
-                                f"Habit {entry.id} skipped: User {user_id} not found."))
-                    except ValueError:
-                        self.stdout.write(self.style.ERROR(
-                            f"Habit {entry.id} skipped: Invalid User ID {user_pk_str}"))
-
-            except Exception as e:
-                self.stdout.write(self.style.ERROR(
-                    f"Failed to restore habit {entry.id}: {e}"))
-
-        self.stdout.write(self.style.SUCCESS(
-            f"Restored {restored_habits} habits."))

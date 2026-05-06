@@ -1,0 +1,20 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block object-tools-items %}
+    <li>
+        <a href="{% url 'admin:tgbot_telegramprofile_export_all' %}"
+           class="historylink"
+           style="background:#417690;color:#fff;">
+            📦 Export all users data (zip)
+        </a>
+    </li>
+    <li>
+        <a href="{% url 'admin:tgbot_telegramprofile_send_total_pages' %}"
+           class="historylink"
+           style="background:#417690;color:#fff;">
+            📚 Send total pages (DM admin)
+        </a>
+    </li>
+    {{ block.super }}
+{% endblock %}

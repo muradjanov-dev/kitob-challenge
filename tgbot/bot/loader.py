@@ -9,7 +9,23 @@ from .middlewares.localization import Localization
 os.makedirs(settings.LOCALES_DIR, exist_ok=True)
 
 bot = Bot(token=API_TOKEN, parse_mode=types.ParseMode.HTML)
-storage = MemoryStorage()
+
+# FSM state must persist across gunicorn workers + bg threads.
+# Redis is shared; in-memory is per-process and loses state on every other request.
+try:
+    from aiogram.contrib.fsm_storage.redis import RedisStorage2
+    _redis_password = os.environ.get("REDIS_PASSWORD") or None
+    storage = RedisStorage2(
+        host=REDIS_HOST,
+        port=REDIS_PORT,
+        db=REDIS_DB,
+        password=_redis_password,
+        prefix="fsm",
+    )
+except Exception as _e:
+    print(f"RedisStorage2 init failed, falling back to MemoryStorage: {_e}")
+    storage = MemoryStorage()
+
 dp = Dispatcher(bot, storage=storage)
 
 # Setup i18n middleware

@@ -2,8 +2,39 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardBu
 from aiogram.types.chat_member import ChatMemberStatus
 from django.conf import settings
 from tgbot.bot.loader import bot
-from tgbot.models import RequiredGroup, TelegramProfile
+from tgbot.models import RequiredGroup, TelegramProfile, Region
 from tgbot.bot.loader import gettext as _
+
+
+def gender_inline_kb(language: str = "uz") -> InlineKeyboardMarkup:
+    if language == "ru":
+        male, female = "🤵 Мужчины", "👩 Девушки и Женщины"
+    else:
+        male, female = "🤵 Erkaklar", "👩 Qizlar va Ayollar"
+    return InlineKeyboardMarkup(row_width=1).add(
+        InlineKeyboardButton(male, callback_data="reg_gender:male"),
+        InlineKeyboardButton(female, callback_data="reg_gender:female"),
+    )
+
+
+def region_inline_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardMarkup(row_width=2)
+    for r in Region.objects.all().order_by("name"):
+        kb.add(InlineKeyboardButton(r.name, callback_data=f"reg_region:{r.id}"))
+    return kb
+
+
+def age_inline_kb() -> InlineKeyboardMarkup:
+    options = [
+        ("u18", "🧒 < 18"),
+        ("18_25", "🧑 18 — 25"),
+        ("26_35", "🧔 26 — 35"),
+        ("36p", "👴 36+"),
+    ]
+    kb = InlineKeyboardMarkup(row_width=2)
+    for code, label in options:
+        kb.insert(InlineKeyboardButton(label, callback_data=f"reg_age:{code}"))
+    return kb
 
 
 languages_markup = ReplyKeyboardMarkup(

@@ -1,4 +1,7 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import (
+    ReplyKeyboardMarkup, KeyboardButton,
+    InlineKeyboardMarkup, InlineKeyboardButton,
+)
 from tgbot.bot.loader import gettext as _
 from tgbot.models import TelegramButton, Group, Region
 from utils.bot import get_object_value
@@ -33,34 +36,50 @@ def region_markup():
     return button
 
 
-def main_markup(language="uz"):
-    if language == "uz":
-        content = "📚 Kitob hisoboti"
-        premium = "💎 Premium obuna"
-        lang = "🌐 Tilni o'zgartirish"
-        message_to_admin = "📞 Adminga bilan bog'lanish"
-    elif language == "ru":
-        content = "📚 Отчет о книге"
-        premium = "💎 Подписка"
-        lang = "🌐 Изменить язык"
-        message_to_admin = "📞 Напишите администратору"
+def main_markup(language="uz", is_admin=False):
+    """Inline main menu. callback_data uses `menu:<action>` namespace."""
+    if language == "ru":
+        labels = {
+            "report": "📚 Отчет о книге",
+            "cabinet": "👤 Кабинет",
+            "premium": "💎 Подписка",
+            "achievements": "🏆 Мои достижения",
+            "contact": "📞 Написать администратору",
+            "lang": "🌐 Изменить язык",
+            "admin": "👑 Админ панель",
+        }
     else:
-        content = "📚 Kitob hisoboti"
-        premium = "💎 Premium obuna"
-        lang = "🌐 Tilni o'zgartirish"
-        message_to_admin = "📞 Adminga bilan bog'lanish"
+        labels = {
+            "report": "📚 Kitob hisoboti",
+            "cabinet": "👤 Kabinet",
+            "premium": "💎 Premium obuna",
+            "achievements": "🏆 Yutuqlarim",
+            "contact": "📞 Admin bilan bog'lanish",
+            "lang": "🌐 Tilni o'zgartirish",
+            "admin": "👑 Admin panel",
+        }
 
-    button = ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    button.add(
-        KeyboardButton(text=content),
-        KeyboardButton(text="👤 Kabinet"),
-        KeyboardButton(text=premium),
-        KeyboardButton(text=message_to_admin),
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.row(
+        InlineKeyboardButton(text=labels["report"], callback_data="menu:report"),
+        InlineKeyboardButton(text=labels["cabinet"], callback_data="menu:cabinet"),
     )
-    button.row(
-        KeyboardButton(text=lang)
+    kb.row(
+        InlineKeyboardButton(text=labels["premium"], callback_data="menu:premium"),
+        InlineKeyboardButton(text=labels["achievements"], callback_data="menu:achievements"),
     )
-    return button
+    kb.row(InlineKeyboardButton(text=labels["contact"], callback_data="menu:contact"))
+    kb.row(InlineKeyboardButton(text=labels["lang"], callback_data="menu:language"))
+    if is_admin:
+        kb.row(InlineKeyboardButton(text=labels["admin"], callback_data="menu:admin"))
+    return kb
+
+
+def main_markup_for_user(user):
+    """Pick the right main menu for a TelegramProfile (handles language + admin)."""
+    lang = (user.language if user else None) or "uz"
+    is_admin = bool(user and getattr(user, "is_admin", False))
+    return main_markup(language=lang, is_admin=is_admin)
 
 
 main_menu_markup = ReplyKeyboardMarkup(
@@ -120,8 +139,15 @@ admin_keyboard = ReplyKeyboardMarkup(
             KeyboardButton(text=_("👨‍👩‍👦‍👦 Barcha foydalanuvchilar")),
             KeyboardButton(text=_("📊 Statistikani ko'rish"))
         ],
-        [KeyboardButton(text="✉️ Habar yuborish"),
-         KeyboardButton(text="📥 Viktorina yuklash")]
+        [
+            KeyboardButton(text="✉️ Habar yuborish"),
+            KeyboardButton(text="📋 Eslatmalar"),
+        ],
+        [
+            KeyboardButton(text="📊 So'rovnoma"),
+            KeyboardButton(text="📊 So'rovnoma natijalari"),
+        ],
+        [KeyboardButton(text=_("🔙 Orqaga"))],
     ],
     resize_keyboard=True,
 )

@@ -11,11 +11,17 @@ from tgbot.bot.utils import get_user
 from tgbot.bot.loader import gettext as _
 
 
-@dp.message_handler(IsPrivate(), commands=["admin"])
-async def admin_commands(message: types.Message):
+@dp.message_handler(IsPrivate(), commands=["admin"], state="*")
+@dp.message_handler(IsPrivate(), Text(equals=["👑 Admin panel", "👑 Админ панель"]), state="*")
+async def admin_commands(message: types.Message, state: FSMContext = None):
     telegram_id = message.from_user.id
     user = get_user(telegram_id)
-    if user.is_admin:
+    if user and user.is_admin:
+        if state is not None:
+            try:
+                await state.finish()
+            except Exception:
+                pass
         await message.answer("Menudan birini tanlang:", reply_markup=admin_keyboard)
     else:
         await message.answer("Siz admin emassiz!")
@@ -195,6 +201,63 @@ async def all_users(message: types.Message):
 
 
 @dp.message_handler(IsPrivate(), Text("📊 Statistikani ko'rish"))
+async def show_global_statistics(message: types.Message):
+    from django.db.models import Sum, Count, F
+    from django.db.models.functions import TruncDate
+    from django.utils import timezone
+    from tgbot.models import ConfirmationReport, BooksToRead
+
+    today = timezone.localdate()
+
+    total_users = TelegramProfile.objects.count()
+    registered = TelegramProfile.objects.filter(is_registered=True).count()
+    active_today_users = (
+        ConfirmationReport.objects
+        .annotate(_d=TruncDate("date"))
+        .filter(_d=today)
+        .values("user").distinct().count()
+    )
+    total_pages_today = (
+        ConfirmationReport.objects
+        .annotate(_d=TruncDate("date"))
+        .filter(_d=today)
+        .aggregate(s=Sum("pages_read"))["s"] or 0
+    )
+    total_pages_alltime = (
+        ConfirmationReport.objects.aggregate(s=Sum("pages_read"))["s"] or 0
+    )
+    total_book_reports = ConfirmationReport.objects.count()
+
+    in_progress = BooksToRead.objects.filter(
+        current_page__lt=F("total_pages"), total_pages__gt=0
+    )
+    titles = list(
+        in_progress.values_list("title", flat=True).distinct()[:30]
+    )
+    in_progress_count = in_progress.count()
+
+    lines = [
+        "📊 <b>Umumiy statistika</b>",
+        "",
+        f"👥 Foydalanuvchilar: <b>{total_users}</b> (ro'yxatdan o'tgan: {registered})",
+        f"📖 Bugun hisobot yuborgan: <b>{active_today_users}</b>",
+        f"📄 Bugun o'qilgan jami betlar: <b>{total_pages_today}</b>",
+        f"📚 Jami hisobotlar: <b>{total_book_reports}</b>",
+        f"📈 Hammavaqt o'qilgan jami betlar: <b>{total_pages_alltime}</b>",
+        f"📕 Hozir o'qilayotgan kitoblar: <b>{in_progress_count}</b>",
+    ]
+    if titles:
+        lines.append("")
+        lines.append("<b>Kitoblar ro'yxati:</b>")
+        for t in titles:
+            lines.append(f"  • {t}")
+        if in_progress_count > len(titles):
+            lines.append(f"  … va yana {in_progress_count - len(titles)} ta")
+
+    await message.answer("\n".join(lines), parse_mode="HTML")
+
+
+@dp.message_handler(IsPrivate(), Text("👤 Foydalanuvchi izlash"))
 async def get_book_info_start(message: types.Message):
     await message.answer("Iltimos, foydalanuvchi ID'sini kiriting:", reply_markup=types.ReplyKeyboardRemove())
     await StatisticState.input_user_id.set()

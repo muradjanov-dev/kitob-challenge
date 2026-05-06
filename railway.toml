@@ -1,6 +1,7 @@
 [build]
-builder = "nixpacks"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "chmod +x entrypoint.sh && ./entrypoint.sh"
 restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5

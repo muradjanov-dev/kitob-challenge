@@ -4,9 +4,9 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 class AdmissionState(StatesGroup):
     language = State()
     full_name = State()
-    region = State()
     gender = State()
-    phone_number = State()
+    region = State()
+    age = State()
 
 
 class NotificationState(StatesGroup):
@@ -59,8 +59,16 @@ class AnswerMessageState(StatesGroup):
     message = State()
 
 
-class QuizUploadState(StatesGroup):
-    select_contest = State()
-    choose_action = State()
-    quiz_name = State()
-    upload_file = State()
+class ReminderState(StatesGroup):
+    text = State()
+    time = State()
+
+
+class PollAdminState(StatesGroup):
+    question = State()
+    options = State()
+    confirm = State()
+
+
+class ContactAdminState(StatesGroup):
+    message = State()

@@ -57,8 +57,13 @@ def generate_calendar_markup(user_id, year, month):
     return markup
 
 
-@dp.message_handler(Text(equals=["👤 Kabinet", "👤 Cabinet", "👤 Кабинет"]))
-async def show_user_cabinet(message: types.Message):
+@dp.message_handler(Text(equals=["👤 Kabinet", "👤 Cabinet", "👤 Кабинет"]), state="*")
+async def show_user_cabinet(message: types.Message, state=None):
+    if state is not None:
+        try:
+            await state.finish()
+        except Exception:
+            pass
     user_id = message.from_user.id
 
     # Get user profile

@@ -15,14 +15,13 @@ from django.utils import timezone
 # ── Card & pricing config ────────────────────────────────────────────────────
 CARD_NUMBER = "5614 6830 0539 3277"
 CARD_OWNER  = "N. Murodjonov"
-MONTHLY_PRICE = 50_000   # UZS
+MONTHLY_PRICE = 17_000   # UZS
 
 # ── Premium features list shown to user ─────────────────────────────────────
 PREMIUM_FEATURES_UZ = (
     "💎 <b>Premium obuna imtiyozlari:</b>\n\n"
     "✅ Kunlik kitob hisobotlarini cheksiz yuborish\n"
     "✅ Haftalik va oylik reyting jadvallarida qatnashish\n"
-    "✅ Konkurs va viktorinalarda ishtirok etish\n"
     "✅ Maxsus premium badge va unvon\n"
     "✅ Admin bilan bevosita aloqa\n\n"
     f"💳 Narx: <b>{MONTHLY_PRICE:,} UZS / oy</b>"
@@ -32,7 +31,6 @@ PREMIUM_FEATURES_RU = (
     "💎 <b>Преимущества Premium подписки:</b>\n\n"
     "✅ Неограниченная отправка ежедневных отчётов о книгах\n"
     "✅ Участие в еженедельных и ежемесячных рейтингах\n"
-    "✅ Участие в конкурсах и викторинах\n"
     "✅ Специальный Premium значок и звание\n"
     "✅ Прямая связь с администратором\n\n"
     f"💳 Цена: <b>{MONTHLY_PRICE:,} UZS / месяц</b>"

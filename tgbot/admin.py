@@ -1,8 +1,16 @@
-from django import forms
+import io
 import json
+import os
+import zipfile
+from datetime import datetime
+
+import requests
 from django.contrib import admin, messages
 from django.contrib.auth.models import User, Group
-from django.db.models import Count
+from django.core import serializers
+from django.db.models import Count, Sum
+from django.http import HttpResponse, HttpResponseRedirect
+from django.urls import path, reverse
 
 from . import models
 from tgbot.tasks import weekly_report_for_general, run_total_pages, \
@@ -45,6 +53,8 @@ class ReferralCountFilter(admin.SimpleListFilter):
 
 @admin.register(models.TelegramProfile)
 class TelegramProfileAdmin(admin.ModelAdmin):
+    change_list_template = "admin/tgbot/telegramprofile/change_list.html"
+
     list_display = ("id", "full_name", "username",
                     "language", "ball", "referral_count", "referral_code", "is_admin", "is_registered", "created_at", "updated_at")
     list_display_links = ("id", "full_name")
@@ -120,6 +130,130 @@ class TelegramProfileAdmin(admin.ModelAdmin):
         )
 
     trigger_weekly_top_read_user_action_button.short_description = "Send top 20 pages in week to Telegram group"
+
+    # ── Custom admin URLs (export + send-total-pages) ───────────────────────
+    def get_urls(self):
+        urls = super().get_urls()
+        info = self.model._meta.app_label, self.model._meta.model_name
+        custom = [
+            path("export-all-users/",
+                 self.admin_site.admin_view(self.export_all_users_view),
+                 name="%s_%s_export_all" % info),
+            path("send-total-pages/",
+                 self.admin_site.admin_view(self.send_total_pages_view),
+                 name="%s_%s_send_total_pages" % info),
+        ]
+        return custom + urls
+
+    @staticmethod
+    def _user_export_dict(user):
+        """Return a JSON-serializable dict with user profile + all related rows."""
+        related_managers = [
+            ("books", "bookstoread_set"),
+            ("book_reports", "bookreport_set"),
+            ("confirmation_reports", "confirmationreport_set"),
+            ("payments", "payment_set"),
+            ("referrals_made", "referrals"),
+        ]
+        try:
+            profile = serializers.serialize("python", [user])[0]
+        except Exception as e:
+            profile = {"_error": f"profile serialize failed: {e}"}
+        related = {}
+        for label, mgr_attr in related_managers:
+            try:
+                mgr = getattr(user, mgr_attr, None)
+                if mgr is None:
+                    related[label] = []
+                    continue
+                qs = mgr.all() if hasattr(mgr, "all") else mgr
+                related[label] = serializers.serialize("python", qs)
+            except Exception as e:
+                related[label] = {"_error": str(e)}
+        return {"profile": profile, "related": related}
+
+    def export_all_users_view(self, request):
+        users = (
+            models.TelegramProfile.objects
+            .all()
+            .select_related("region", "group")
+        )
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for u in users:
+                payload = self._user_export_dict(u)
+                fname = f"user_{u.telegram_id or u.id}.json"
+                zf.writestr(
+                    fname,
+                    json.dumps(payload, ensure_ascii=False, indent=2, default=str),
+                )
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        resp = HttpResponse(buf.getvalue(), content_type="application/zip")
+        resp["Content-Disposition"] = f'attachment; filename="kitob_users_{ts}.zip"'
+        return resp
+
+    def send_total_pages_view(self, request):
+        confirm_total = (
+            models.ConfirmationReport.objects.aggregate(s=Sum("pages_read"))["s"] or 0
+        )
+        report_total = (
+            models.BookReport.objects.aggregate(s=Sum("pages_read"))["s"] or 0
+        )
+        user_count = models.TelegramProfile.objects.count()
+
+        text = (
+            "📚 <b>Kitob Challenge — Statistika</b>\n\n"
+            f"👥 Foydalanuvchilar: <b>{user_count}</b>\n"
+            f"📖 ConfirmationReport jami: <b>{confirm_total}</b> bet\n"
+            f"📕 BookReport jami: <b>{report_total}</b> bet\n"
+            f"📊 Jami: <b>{confirm_total + report_total}</b> bet"
+        )
+
+        token = os.environ.get("API_TOKEN")
+        admins_raw = os.environ.get("ADMINS", "")
+        admin_ids = [a.strip() for a in admins_raw.split(",") if a.strip()]
+        sent, failed = 0, []
+        if token and admin_ids:
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            for chat_id in admin_ids:
+                try:
+                    r = requests.post(
+                        url,
+                        data={
+                            "chat_id": chat_id,
+                            "text": text,
+                            "parse_mode": "HTML",
+                        },
+                        timeout=5,
+                    )
+                    if r.ok:
+                        sent += 1
+                    else:
+                        failed.append(f"{chat_id}: {r.status_code}")
+                except Exception as e:
+                    failed.append(f"{chat_id}: {e}")
+
+        if sent:
+            self.message_user(
+                request,
+                f"Statistics sent to {sent} admin(s). Total: {confirm_total + report_total} pages.",
+                messages.SUCCESS,
+            )
+        if failed:
+            self.message_user(
+                request,
+                f"Failed for: {', '.join(failed)}",
+                messages.WARNING,
+            )
+        if not sent and not failed:
+            self.message_user(
+                request,
+                "No admins configured (ADMINS env var is empty).",
+                messages.ERROR,
+            )
+        return HttpResponseRedirect(
+            reverse("admin:tgbot_telegramprofile_changelist")
+        )
 
 
 @admin.register(models.UserReferal)
@@ -200,108 +334,6 @@ class ConfirmationReportAdmin(admin.ModelAdmin):
     def display_books(self, obj):
         return ", ".join([book.title for book in obj.books.all()])
     display_books.short_description = "Books"
-
-
-################################################################################
-#                               CONTEST SYSTEM                                 #
-################################################################################
-
-class QuestionInline(admin.StackedInline):
-    model = models.Question
-    extra = 1
-    fields = ("question", "options", "correct_option", "explanation", "order")
-
-
-class ContestAdminForm(forms.ModelForm):
-    json_questions = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 10, 'cols': 80}),
-        required=False,
-        help_text="Paste JSON list of questions here. Example: [{'question': '...', 'options': ['...'], 'correct_option': 0, 'explanation': '...'}]",
-        label="Import Questions from JSON"
-    )
-
-    class Meta:
-        model = models.Contest
-        fields = '__all__'
-
-
-@admin.register(models.Contest)
-class ContestAdmin(admin.ModelAdmin):
-    form = ContestAdminForm
-    list_display = ("id", "name", "start_date",
-                    "is_active", "is_started", "created_by")
-    list_filter = ("is_active", "is_started", "start_date")
-    list_editable = ("is_active", "is_started")
-    search_fields = ("name",)
-    inlines = [QuestionInline]
-
-    fieldsets = (
-        (None, {
-            "fields": ("name", "start_date", "req_referrals", "created_by")
-        }),
-        ("Status (Holati)", {
-            "fields": ("is_active", "is_started", "is_notified", "is_finished")
-        }),
-        ("Import Questions", {
-            "fields": ("json_questions",),
-            "classes": ("collapse",)
-        }),
-    )
-
-    def save_model(self, request, obj, form, change):
-        super().save_model(request, obj, form, change)
-        json_questions = form.cleaned_data.get('json_questions')
-        if json_questions:
-            try:
-                questions_data = json.loads(json_questions)
-                if isinstance(questions_data, list):
-                    for q_data in questions_data:
-                        models.Question.objects.create(
-                            contest=obj,
-                            question=q_data.get('question'),
-                            options=q_data.get('options', []),
-                            correct_option=q_data.get('correct_option', 0),
-                            explanation=q_data.get('explanation', ''),
-                            order=q_data.get('order', 1)
-                        )
-                    self.message_user(
-                        request, f"{len(questions_data)} questions imported successfully.", messages.SUCCESS)
-                else:
-                    self.message_user(
-                        request, "Invalid JSON format. Expected a list of questions.", messages.ERROR)
-            except json.JSONDecodeError:
-                self.message_user(
-                    request, "Invalid JSON format.", messages.ERROR)
-
-
-@admin.register(models.Question)
-class QuestionAdmin(admin.ModelAdmin):
-    list_display = ("id", "contest", "question", "correct_option", "order")
-    list_filter = ("contest",)
-    search_fields = ("question", "contest__name")
-    ordering = ("contest", "order")
-
-
-@admin.register(models.ContestParticipant)
-class ContestParticipantAdmin(admin.ModelAdmin):
-    list_display = ("contest", "user", "total_score",
-                    "total_time", "is_finished", "current_question_index")
-    list_filter = ("contest", "is_finished")
-    search_fields = ("user__full_name", "user__username", "contest__name")
-
-
-@admin.register(models.ContestSubmission)
-class ContestSubmissionAdmin(admin.ModelAdmin):
-    list_display = ("get_user", "question", "selected_option",
-                    "is_correct", "time_taken", "created_at")
-    list_filter = ("is_correct", "participant__contest", "participant__user")
-    search_fields = ("participant__user__full_name", "question__question")
-    readonly_fields = ("created_at",)
-
-    def get_user(self, obj):
-        return obj.participant.user
-    get_user.short_description = 'User'
-    get_user.admin_order_field = 'participant__user'
 
 
 ################################################################################

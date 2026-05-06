@@ -7,7 +7,6 @@ from tgbot.bot.loader import dp, bot, gettext as _
 from tgbot.models import Payment
 from tgbot.bot.utils import get_user
 from tgbot.bot.keyboards.reply import main_markup
-from tgbot.bot.handlers.users.habit_notification import MONTHLY_PAYMENT
 from tgbot.bot.consts import ADMIN_GROUP_ID
 from tgbot.bot.states.main import AnswerMessageState
 
