@@ -8,7 +8,7 @@ from celery import shared_task
 
 from tgbot.models import (
     DailyMessage, ConfirmationReport, TelegramProfile, ScheduledReminder,
-    BotPoll, UserAchievement, ScheduledMessageDeletion,
+    BotPoll, UserAchievement, ScheduledMessageDeletion, Congratulation,
 )
 
 from django.utils import timezone
@@ -479,9 +479,8 @@ def check_user_achievements(user_id: int):
     if not newly:
         return
 
-    name = escape(user.full_name or user.username or "Foydalanuvchi")
+    plain_name = escape(user.full_name or user.username or "Foydalanuvchi")
     tg_id = user.telegram_id
-    user_link = f"<a href='tg://user?id={tg_id}'>{name}</a>"
 
     for ach in newly:
         title = ach.get("title_uz") or ach.get("title_ru") or ach["code"]
@@ -495,17 +494,37 @@ def check_user_achievements(user_id: int):
                 print(f"award kitobcha for achievement {ach['code']} failed: {e}")
 
         points_line = f"\n🪙 <b>+{points} Kitobcha</b>" if points else ""
-        text = (
+
+        # 1) Group congrats — auto-delete after 10 minutes.
+        group_text = (
             "🎉 <b>Tabriklaymiz!</b>\n\n"
-            f"{user_link} yangi yutuqni qo'lga kiritdi:\n\n"
+            f"<a href='tg://user?id={tg_id}'>{plain_name}</a> yangi yutuqni qo'lga kiritdi:\n\n"
             f"{ach['emoji']} <b>{title}</b>"
             f"{points_line}\n\n"
             "Davom etamiz! 📚🔥"
         )
         try:
-            send_message(GENERAL_GROUP_ID, text)
+            url_send = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+            resp = requests.post(
+                url_send,
+                data={
+                    "chat_id": GENERAL_GROUP_ID,
+                    "text": group_text,
+                    "parse_mode": "HTML",
+                },
+                timeout=5,
+            )
+            if resp.ok:
+                msg_id = resp.json().get("result", {}).get("message_id")
+                if msg_id:
+                    ScheduledMessageDeletion.objects.create(
+                        chat_id=GENERAL_GROUP_ID,
+                        message_id=msg_id,
+                        delete_at=timezone.now() + timezone.timedelta(minutes=10),
+                    )
         except Exception as e:
-            print(f"tabriklash broadcast failed for {tg_id}/{ach['code']}: {e}")
+            print(f"tabriklash group broadcast failed for {tg_id}/{ach['code']}: {e}")
+
         try:
             UserAchievement.objects.filter(
                 user=user, code=ach["code"]
@@ -513,7 +532,7 @@ def check_user_achievements(user_id: int):
         except Exception as e:
             print(f"mark congratulated failed: {e}")
 
-        # Personal DM to the user.
+        # 2) Personal DM to the achiever (kept, no auto-delete).
         try:
             dm_text = (
                 f"🎉 <b>Yangi yutuq!</b>\n\n"
@@ -524,6 +543,89 @@ def check_user_achievements(user_id: int):
             send_notification(chat_id=user.telegram_id, text=dm_text)
         except Exception as e:
             print(f"achievement DM failed for {tg_id}: {e}")
+
+        # 3) Broadcast to other users with Tabriklash inline button.
+        try:
+            ua = UserAchievement.objects.filter(user=user, code=ach["code"]).first()
+            if ua:
+                broadcast_congrats_to_others.delay(ua.id, points)
+        except Exception as e:
+            print(f"dispatch broadcast_congrats_to_others failed: {e}")
+
+
+def _gender_match(achiever, recipient) -> bool:
+    """Recipient gets the broadcast iff:
+       - recipient is willing to congratulate achiever's gender, AND
+       - achiever accepts congrats from recipient's gender.
+    Empty/unknown genders default to 'any'."""
+    a_g = achiever.gender or ""
+    r_g = recipient.gender or ""
+    sender_pref = recipient.send_congrats_to or "any"
+    accept_pref = achiever.accept_congrats_from or "any"
+    if sender_pref != "any" and sender_pref != a_g:
+        return False
+    if accept_pref != "any" and accept_pref != r_g:
+        return False
+    return True
+
+
+@shared_task
+def broadcast_congrats_to_others(user_achievement_id: int, points: int):
+    """For a freshly-unlocked UserAchievement, send a Tabriklash invitation
+    DM to every OTHER eligible registered user. Filtering by gender prefs."""
+    from tgbot.services.achievements import find_achievement
+
+    ua = UserAchievement.objects.filter(id=user_achievement_id).first()
+    if not ua:
+        return
+    achiever = ua.user
+    ach = find_achievement(ua.code)
+    if not ach:
+        return
+
+    title = ach.get("title_uz") or ach["code"]
+    plain_name = escape(achiever.full_name or "Kitobxon")
+    points_line = f"🪙 +{points} Kitobcha\n" if points else ""
+
+    text = (
+        f"🌟 <b>{plain_name}</b> yutuqqa erishdi!\n\n"
+        f"{ach['emoji']} <b>{title}</b>\n"
+        f"{points_line}\n"
+        "Keling, kitobxonni tabriklaymiz! 🎉"
+    )
+    keyboard = json.dumps({
+        "inline_keyboard": [[{
+            "text": "🎉 Tabriklash",
+            "callback_data": f"congrats:{ua.id}",
+        }]]
+    })
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    qs = (
+        TelegramProfile.objects
+        .filter(is_registered=True, is_blocked=False)
+        .exclude(id=achiever.id)
+    )
+    sent = 0
+    for recipient in qs.iterator():
+        try:
+            if not _gender_match(achiever, recipient):
+                continue
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": recipient.telegram_id,
+                    "text": text,
+                    "parse_mode": "HTML",
+                    "reply_markup": keyboard,
+                },
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+        except Exception as e:
+            print(f"broadcast_congrats_to_others to {recipient.id} failed: {e}")
+    print(f"broadcast_congrats_to_others ua={user_achievement_id}: sent={sent}")
 
 
 @shared_task
@@ -690,59 +792,115 @@ def _award_level_rewards(user: TelegramProfile, pages: int):
                 print(f"level award {code} failed for {user.id}: {e}")
 
 
-@shared_task
-def daily_progress_broadcast():
-    """Send a personal progress-bar message to every registered user, try to
-    pin it in their DM, and award any newly-crossed level kitobcha."""
+def _send_and_pin_progress(user) -> int:
+    """Send fresh progress message to a user, unpin the previous, pin the new
+    one, persist the new message_id to user.last_progress_msg_id. Returns the
+    new message_id (or 0 on failure)."""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     pin_url = f"https://api.telegram.org/bot{BOT_TOKEN}/pinChatMessage"
     unpin_url = f"https://api.telegram.org/bot{BOT_TOKEN}/unpinChatMessage"
 
+    pages = (
+        ConfirmationReport.objects.filter(user=user)
+        .aggregate(s=Sum("pages_read"))["s"] or 0
+    )
+    _award_level_rewards(user, pages)
+
+    text = _progress_bar_text(pages)
+    resp = requests.post(
+        url,
+        data={
+            "chat_id": user.telegram_id,
+            "text": text,
+            "parse_mode": "HTML",
+        },
+        timeout=5,
+    )
+    if not resp.ok:
+        return 0
+    msg_id = resp.json().get("result", {}).get("message_id")
+    if not msg_id:
+        return 0
+
+    # Unpin previous (best-effort), pin the new one.
+    if user.last_progress_msg_id:
+        try:
+            requests.post(
+                unpin_url,
+                data={
+                    "chat_id": user.telegram_id,
+                    "message_id": user.last_progress_msg_id,
+                },
+                timeout=3,
+            )
+        except Exception:
+            pass
+    try:
+        requests.post(
+            pin_url,
+            data={
+                "chat_id": user.telegram_id,
+                "message_id": msg_id,
+                "disable_notification": True,
+            },
+            timeout=3,
+        )
+    except Exception:
+        pass
+
+    try:
+        TelegramProfile.objects.filter(id=user.id).update(last_progress_msg_id=msg_id)
+        user.last_progress_msg_id = msg_id
+    except Exception as e:
+        print(f"failed to save last_progress_msg_id for {user.id}: {e}")
+    return msg_id
+
+
+@shared_task
+def daily_progress_broadcast():
+    """At 00:01 Tashkent: refresh each user's pinned progress bar."""
     users = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
     sent = 0
     for user in users.iterator():
         try:
-            pages = (
-                ConfirmationReport.objects.filter(user=user)
-                .aggregate(s=Sum("pages_read"))["s"] or 0
-            )
-            _award_level_rewards(user, pages)
-
-            text = _progress_bar_text(pages)
-            resp = requests.post(
-                url,
-                data={
-                    "chat_id": user.telegram_id,
-                    "text": text,
-                    "parse_mode": "HTML",
-                },
-                timeout=5,
-            )
-            if not resp.ok:
-                continue
-            msg_id = resp.json().get("result", {}).get("message_id")
-            if msg_id:
-                # Best-effort: unpin previous, then pin the new one.
-                try:
-                    requests.post(unpin_url, data={"chat_id": user.telegram_id}, timeout=3)
-                except Exception:
-                    pass
-                try:
-                    requests.post(
-                        pin_url,
-                        data={
-                            "chat_id": user.telegram_id,
-                            "message_id": msg_id,
-                            "disable_notification": True,
-                        },
-                        timeout=3,
-                    )
-                except Exception:
-                    pass
-            sent += 1
+            if _send_and_pin_progress(user):
+                sent += 1
         except Exception as e:
             print(f"daily_progress_broadcast failed for {user.id}: {e}")
     print(f"daily_progress_broadcast: sent={sent}")
+
+
+@shared_task
+def ensure_progress_pin():
+    """Hourly safety net: if a user's progress message was deleted/unpinned by
+    accident, repin (or resend & pin) so the progress board never disappears.
+    We try pinning the stored message_id; if Telegram rejects (message gone),
+    we send a fresh one."""
+    pin_url = f"https://api.telegram.org/bot{BOT_TOKEN}/pinChatMessage"
+    users = TelegramProfile.objects.filter(
+        is_registered=True, is_blocked=False, last_progress_msg_id__isnull=False,
+    )
+    repinned = resent = 0
+    for user in users.iterator():
+        try:
+            resp = requests.post(
+                pin_url,
+                data={
+                    "chat_id": user.telegram_id,
+                    "message_id": user.last_progress_msg_id,
+                    "disable_notification": True,
+                },
+                timeout=3,
+            )
+            if resp.ok:
+                repinned += 1
+            else:
+                # Most likely: message was deleted by user. Resend.
+                if _send_and_pin_progress(user):
+                    resent += 1
+        except Exception as e:
+            print(f"ensure_progress_pin failed for {user.id}: {e}")
+    print(f"ensure_progress_pin: repinned={repinned} resent={resent}")
 
 
 # Heuristic mapping — pages-vs-world-population percentile.

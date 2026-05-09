@@ -511,6 +511,7 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
     except Exception:
         pass
 
+    admin_id = call.from_user.id
     if action == "registered":
         await registered_lists(msg)
     elif action == "unregistered":
@@ -523,12 +524,12 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
         await send_notification_text_handler(msg)
     elif action == "reminders":
         from tgbot.bot.handlers.users.reminders import reminders_menu
-        await reminders_menu(msg, state)
+        await reminders_menu(msg, state, _admin_id=admin_id)
     elif action == "poll_new":
         from tgbot.bot.handlers.users.polls_admin import poll_admin_start
-        await poll_admin_start(msg, state)
+        await poll_admin_start(msg, state, _admin_id=admin_id)
     elif action == "poll_results":
         from tgbot.bot.handlers.users.polls_admin import poll_results_list
-        await poll_results_list(msg, state)
+        await poll_results_list(msg, state, _admin_id=admin_id)
     else:
         await msg.answer("Noma'lum amal.")

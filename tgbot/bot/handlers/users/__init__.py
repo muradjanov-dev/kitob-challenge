@@ -15,4 +15,5 @@ from . import check_subscription
 from . import reminders
 from . import polls_admin
 from . import contact_admin
+from . import congrats
 from . import menu_router

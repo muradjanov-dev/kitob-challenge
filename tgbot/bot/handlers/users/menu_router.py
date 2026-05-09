@@ -307,12 +307,16 @@ async def _menu_cabinet(call, user, state: FSMContext):
         f"\n<i>Ma'lumotlar avtomatik yangilanib boradi.</i>"
     )
 
-    now = timezone.now()
-    calendar_markup = await sync_to_async(generate_calendar_markup)(
-        user_id, now.year, now.month
-    )
-    await call.message.answer(response_text, parse_mode="HTML",
-                              reply_markup=calendar_markup)
+    show_cal = bool(user and getattr(user, "show_calendar", False))
+    if show_cal:
+        now = timezone.now()
+        calendar_markup = await sync_to_async(generate_calendar_markup)(
+            user_id, now.year, now.month
+        )
+        await call.message.answer(response_text, parse_mode="HTML",
+                                  reply_markup=calendar_markup)
+    else:
+        await call.message.answer(response_text, parse_mode="HTML")
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -444,73 +448,152 @@ async def _menu_achievements(call, user, state: FSMContext):
 # ──────────────────────────────────────────────────────────────────────────
 # Settings — currently: per-user reminder count (0–3).
 # ──────────────────────────────────────────────────────────────────────────
-def _settings_markup(user, lang: str) -> InlineKeyboardMarkup:
-    current = getattr(user, "reminder_count", 3) if user else 3
+def _settings_markup(user) -> InlineKeyboardMarkup:
+    rc = getattr(user, "reminder_count", 3) if user else 3
+    show_cal = bool(getattr(user, "show_calendar", False)) if user else False
+    accept = (getattr(user, "accept_congrats_from", "any") or "any") if user else "any"
+    send_to = (getattr(user, "send_congrats_to", "any") or "any") if user else "any"
+
     kb = InlineKeyboardMarkup(row_width=4)
+    # Reminder count row
+    kb.insert(InlineKeyboardButton(text="🔔 Eslatma:", callback_data="noop"))
     for n in range(0, 4):
-        marker = "●" if n == current else "○"
+        marker = "●" if n == rc else "○"
         kb.insert(InlineKeyboardButton(
-            text=f"{marker} {n}", callback_data=f"settings:reminders:{n}",
+            text=f"{marker}{n}", callback_data=f"settings:reminders:{n}",
+        ))
+    # Calendar toggle
+    cal_label = "✅ Kalendar yoqilgan" if show_cal else "⚪️ Kalendar o'chirilgan"
+    kb.row(InlineKeyboardButton(text=cal_label, callback_data="settings:cal_toggle"))
+
+    # Accept congrats from
+    kb.row(InlineKeyboardButton("Tabriklarni qabul qilish:", callback_data="noop"))
+    for code, label in (("any", "Hammadan"), ("male", "Erkak"), ("female", "Ayol")):
+        marker = "●" if accept == code else "○"
+        kb.insert(InlineKeyboardButton(
+            text=f"{marker} {label}", callback_data=f"settings:accept:{code}",
+        ))
+    # Send congrats to
+    kb.row(InlineKeyboardButton("Tabriklash yuborish:", callback_data="noop"))
+    for code, label in (("any", "Hammaga"), ("male", "Erkak"), ("female", "Ayol")):
+        marker = "●" if send_to == code else "○"
+        kb.insert(InlineKeyboardButton(
+            text=f"{marker} {label}", callback_data=f"settings:send:{code}",
         ))
     return kb
+
+
+def _settings_text(user, lang: str) -> str:
+    rc = getattr(user, "reminder_count", 3) if user else 3
+    show_cal = bool(getattr(user, "show_calendar", False)) if user else False
+    accept = (getattr(user, "accept_congrats_from", "any") or "any") if user else "any"
+    send_to = (getattr(user, "send_congrats_to", "any") or "any") if user else "any"
+
+    label = {"any": "Hammadan/Hammaga", "male": "Erkak", "female": "Ayol"}
+    return _t(
+        lang,
+        (
+            "⚙️ <b>Sozlamalar</b>\n\n"
+            "🔔 <b>Kunlik eslatmalar:</b>\n"
+            "  0 — yo'q · 1 — kechqurun · 2 — ertalab + kechqurun · 3 — uch marta\n"
+            f"  Joriy: <b>{rc}</b>\n\n"
+            f"📅 <b>Kalendar (streak):</b> {'yoqilgan' if show_cal else 'o’chirilgan'}\n"
+            "  Yoqsangiz, kabinetda kunlar ko'rsatiladi va kunni bossangiz o'sha kuni o'qigan kitobi va hisoboti ochiladi.\n\n"
+            f"🎉 <b>Tabriklash filtri:</b>\n"
+            f"  Qabul qilish: <b>{label.get(accept, accept)}</b>\n"
+            f"  Yuborish: <b>{label.get(send_to, send_to)}</b>"
+        ),
+        (
+            "⚙️ <b>Настройки</b>\n\n"
+            "🔔 <b>Ежедневные напоминания:</b>\n"
+            "  0 — нет · 1 — вечер · 2 — утро+вечер · 3 — три раза\n"
+            f"  Текущее: <b>{rc}</b>\n\n"
+            f"📅 <b>Календарь (streak):</b> {'включен' if show_cal else 'выключен'}\n\n"
+            f"🎉 <b>Поздравления:</b>\n"
+            f"  Принимаю: <b>{label.get(accept, accept)}</b>\n"
+            f"  Отправляю: <b>{label.get(send_to, send_to)}</b>"
+        ),
+    )
 
 
 async def _menu_settings(call, user, state: FSMContext):
     await call.answer()
     lang = _user_lang(user)
-    current = getattr(user, "reminder_count", 3) if user else 3
-    text = _t(
-        lang,
-        (
-            "⚙️ <b>Sozlamalar</b>\n\n"
-            "🔔 Kunlik eslatmalar soni:\n"
-            "<i>0</i> — eslatma yo'q\n"
-            "<i>1</i> — kuniga 1 marta (kechqurun)\n"
-            "<i>2</i> — kuniga 2 marta (ertalab + kechqurun)\n"
-            "<i>3</i> — kuniga 3 marta (tushlik ham)\n\n"
-            f"Joriy: <b>{current}</b>"
-        ),
-        (
-            "⚙️ <b>Настройки</b>\n\n"
-            "🔔 Количество ежедневных напоминаний:\n"
-            "<i>0</i> — без напоминаний\n"
-            "<i>1</i> — один раз (вечером)\n"
-            "<i>2</i> — два раза (утро + вечер)\n"
-            "<i>3</i> — три раза (плюс днём)\n\n"
-            f"Текущее: <b>{current}</b>"
-        ),
+    await call.message.answer(
+        _settings_text(user, lang),
+        parse_mode="HTML",
+        reply_markup=_settings_markup(user),
     )
-    await call.message.answer(text, parse_mode="HTML",
-                              reply_markup=_settings_markup(user, lang))
 
 
 @dp.callback_query_handler(
-    lambda c: c.data and c.data.startswith("settings:reminders:"),
+    lambda c: c.data and c.data.startswith("settings:"),
     state="*",
 )
-async def settings_reminder_pick(call: types.CallbackQuery, state: FSMContext):
+async def settings_pick(call: types.CallbackQuery, state: FSMContext):
     user = get_user(call.from_user.id)
     if not user:
         await call.answer("Avval /start bosing", show_alert=True)
         return
-    n = int(call.data.split(":")[2])
-    n = max(0, min(3, n))
+    parts = call.data.split(":")
+    action = parts[1] if len(parts) > 1 else ""
 
-    await sync_to_async(
-        TelegramProfile.objects.filter(id=user.id).update
-    )(reminder_count=n)
-    user.reminder_count = n  # local for keyboard rebuild
+    if action == "reminders":
+        n = max(0, min(3, int(parts[2])))
+        await sync_to_async(
+            TelegramProfile.objects.filter(id=user.id).update
+        )(reminder_count=n)
+        user.reminder_count = n
+        await call.answer(f"✅ Eslatma: {n}")
+    elif action == "cal_toggle":
+        new_val = not bool(getattr(user, "show_calendar", False))
+        await sync_to_async(
+            TelegramProfile.objects.filter(id=user.id).update
+        )(show_calendar=new_val)
+        user.show_calendar = new_val
+        await call.answer(
+            "✅ Kalendar yoqildi" if new_val else "⚪️ Kalendar o'chirildi"
+        )
+    elif action == "accept" and len(parts) > 2:
+        choice = parts[2]
+        if choice in ("any", "male", "female"):
+            await sync_to_async(
+                TelegramProfile.objects.filter(id=user.id).update
+            )(accept_congrats_from=choice)
+            user.accept_congrats_from = choice
+            await call.answer("✅ Saqlandi")
+        else:
+            await call.answer()
+            return
+    elif action == "send" and len(parts) > 2:
+        choice = parts[2]
+        if choice in ("any", "male", "female"):
+            await sync_to_async(
+                TelegramProfile.objects.filter(id=user.id).update
+            )(send_congrats_to=choice)
+            user.send_congrats_to = choice
+            await call.answer("✅ Saqlandi")
+        else:
+            await call.answer()
+            return
+    else:
+        await call.answer()
+        return
 
     lang = _user_lang(user)
-    await call.answer(
-        _t(lang, f"✅ Saqlandi: {n} ta", f"✅ Сохранено: {n}"),
-    )
     try:
-        await call.message.edit_reply_markup(
-            reply_markup=_settings_markup(user, lang)
+        await call.message.edit_text(
+            _settings_text(user, lang),
+            parse_mode="HTML",
+            reply_markup=_settings_markup(user),
         )
     except Exception:
         pass
+
+
+@dp.callback_query_handler(lambda c: c.data == "noop", state="*")
+async def menu_noop(call: types.CallbackQuery):
+    await call.answer()
 
 
 # ──────────────────────────────────────────────────────────────────────────

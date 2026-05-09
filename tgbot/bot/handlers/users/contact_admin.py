@@ -38,18 +38,16 @@ async def contact_admin_entry(message: types.Message, state: FSMContext):
     await ContactAdminState.message.set()
 
 
-@dp.message_handler(IsPrivate(), state=ContactAdminState.message, content_types=types.ContentTypes.TEXT)
+@dp.message_handler(
+    IsPrivate(),
+    state=ContactAdminState.message,
+    content_types=types.ContentType.ANY,
+)
 async def contact_admin_forward(message: types.Message, state: FSMContext):
-    text = (message.text or "").strip()
     user = get_user(message.from_user.id)
     lang = _user_lang(user)
 
     # "🔙 Orqaga" is handled globally by back_handler — won't reach here.
-    if not text:
-        await message.answer(
-            _t(lang, "Iltimos, matn yuboring.", "Пожалуйста, отправьте текст.")
-        )
-        return
 
     admins_raw = os.environ.get("ADMINS", "")
     admin_ids = [a.strip() for a in admins_raw.split(",") if a.strip()]
@@ -58,12 +56,11 @@ async def contact_admin_forward(message: types.Message, state: FSMContext):
     full_name = (user.full_name if user else None) or message.from_user.full_name or "—"
     username_str = f"@{username}" if username else "—"
 
-    forwarded = (
+    header = (
         "📩 <b>Foydalanuvchidan xabar</b>\n\n"
         f"👤 <b>{full_name}</b>\n"
         f"🆔 <code>{message.from_user.id}</code>\n"
-        f"📱 {username_str}\n\n"
-        f"<i>Xabar:</i>\n{text}"
+        f"📱 {username_str}"
     )
 
     reply_kb = InlineKeyboardMarkup().add(
@@ -76,10 +73,11 @@ async def contact_admin_forward(message: types.Message, state: FSMContext):
     sent_count = 0
     for chat_id in admin_ids:
         try:
-            await bot.send_message(
-                chat_id=chat_id, text=forwarded, parse_mode="HTML",
-                reply_markup=reply_kb,
-            )
+            # Always send the header first so admin sees who/what.
+            await bot.send_message(chat_id=chat_id, text=header, parse_mode="HTML")
+            # Then forward the user's content (text/photo/video/voice/file/etc.)
+            # using copy_to so the message looks native.
+            await message.copy_to(chat_id=int(chat_id), reply_markup=reply_kb)
             sent_count += 1
         except Exception as e:
             print(f"contact_admin: forward to {chat_id} failed: {e}")
@@ -104,19 +102,6 @@ async def contact_admin_forward(message: types.Message, state: FSMContext):
     await state.finish()
 
 
-@dp.message_handler(IsPrivate(), state=ContactAdminState.message)
-async def contact_admin_invalid(message: types.Message):
-    user = get_user(message.from_user.id)
-    lang = _user_lang(user)
-    await message.answer(
-        _t(
-            lang,
-            "❌ Faqat matn yuboring (rasm/fayl emas).",
-            "❌ Отправьте только текст (без фото/файлов).",
-        )
-    )
-
-
 # ──────────────────────────────────────────────────────────────────────
 # Admin → User reply flow.
 # Admin clicks "✉️ Javob berish" inline button on a forwarded message
@@ -130,11 +115,15 @@ def _is_admin(telegram_id: int) -> bool:
 
 
 @dp.callback_query_handler(
-    IsPrivate(),
     lambda c: c.data and c.data.startswith("admin_reply:"),
     state="*",
 )
 async def admin_reply_start(call: types.CallbackQuery, state: FSMContext):
+    # Only allow inside private chat with admin (BoundFilter IsPrivate doesn't
+    # work on CallbackQuery — check manually).
+    if call.message and call.message.chat.type != types.ChatType.PRIVATE:
+        await call.answer()
+        return
     if not _is_admin(call.from_user.id):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return
@@ -147,18 +136,20 @@ async def admin_reply_start(call: types.CallbackQuery, state: FSMContext):
     except Exception:
         pass
     await call.message.answer(
-        f"✍️ Javobingizni yozing (foydalanuvchi: <code>{target_user_id}</code>):",
+        f"✍️ Javobingizni yozing (foydalanuvchi: <code>{target_user_id}</code>):\n"
+        f"<i>Matn, rasm, video, fayl — istalgan format</i>",
         parse_mode="HTML",
     )
     await AdminReplyState.message.set()
 
 
 @dp.message_handler(
-    IsPrivate(),
     state=AdminReplyState.message,
     content_types=types.ContentType.ANY,
 )
 async def admin_reply_send(message: types.Message, state: FSMContext):
+    if message.chat.type != types.ChatType.PRIVATE:
+        return
     if not _is_admin(message.from_user.id):
         await state.finish()
         return

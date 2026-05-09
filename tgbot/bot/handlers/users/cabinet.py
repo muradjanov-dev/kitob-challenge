@@ -48,13 +48,55 @@ def generate_calendar_markup(user_id, year, month):
                     text=" ", callback_data="ignore"))
             else:
                 text = str(day)
+                cb = "ignore"
                 if day in reported_days:
                     text += " ✅"
-                row_buttons.append(InlineKeyboardButton(
-                    text=text, callback_data="ignore"))
+                    cb = f"cal_day:{year}-{month:02d}-{day:02d}"
+                row_buttons.append(InlineKeyboardButton(text=text, callback_data=cb))
         markup.row(*row_buttons)
 
     return markup
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith("cal_day:"), state="*")
+async def calendar_day_detail(call: types.CallbackQuery):
+    """Show what the user read on a specific day — title + pages + conclusion."""
+    try:
+        date_str = call.data.split(":", 1)[1]
+        year, month, day = (int(x) for x in date_str.split("-"))
+    except Exception:
+        await call.answer()
+        return
+
+    user_id = call.from_user.id
+    reports = ConfirmationReport.objects.filter(
+        user__telegram_id=user_id,
+        date__year=year, date__month=month, date__day=day,
+    ).prefetch_related("books")
+    reports_list = list(reports)
+    if not reports_list:
+        await call.answer("Bu kunda hisobot yo'q", show_alert=True)
+        return
+
+    lines = [f"📅 <b>{day:02d}.{month:02d}.{year}</b>\n"]
+    for r in reports_list:
+        title = (r.book or "").strip()
+        if not title:
+            m2m_titles = list(r.books.values_list("title", flat=True))
+            title = ", ".join(m2m_titles) if m2m_titles else "—"
+        conclusion = (r.conclusion or "").strip()
+        lines.append(
+            f"📖 <b>Kitob:</b> {title}\n"
+            f"📄 <b>Betlar:</b> {r.pages_read}\n"
+            f"💡 <b>Xulosa:</b> {conclusion or '—'}"
+        )
+    await call.answer()
+    await call.message.answer("\n\n".join(lines), parse_mode="HTML")
+
+
+@dp.callback_query_handler(lambda c: c.data == "ignore", state="*")
+async def calendar_ignore(call: types.CallbackQuery):
+    await call.answer()
 
 
 @dp.message_handler(Text(equals=["👤 Kabinet", "👤 Cabinet", "👤 Кабинет"]), state="*")

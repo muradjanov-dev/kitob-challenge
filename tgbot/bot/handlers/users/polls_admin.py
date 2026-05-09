@@ -37,8 +37,9 @@ def _vote_kb(poll: BotPoll):
 
 
 @dp.message_handler(IsPrivate(), Text("📊 So'rovnoma"), state="*")
-async def poll_admin_start(message: types.Message, state: FSMContext):
-    user = get_user(message.from_user.id)
+async def poll_admin_start(message: types.Message, state: FSMContext, _admin_id=None):
+    actor_id = _admin_id or message.from_user.id
+    user = get_user(actor_id)
     if not _is_admin(user):
         await message.answer("Siz admin emassiz!")
         return
@@ -179,8 +180,9 @@ async def poll_vote(call: types.CallbackQuery):
 
 
 @dp.message_handler(IsPrivate(), Text("📊 So'rovnoma natijalari"), state="*")
-async def poll_results_list(message: types.Message, state: FSMContext):
-    user = get_user(message.from_user.id)
+async def poll_results_list(message: types.Message, state: FSMContext, _admin_id=None):
+    actor_id = _admin_id or message.from_user.id
+    user = get_user(actor_id)
     if not _is_admin(user):
         await message.answer("Siz admin emassiz!")
         return

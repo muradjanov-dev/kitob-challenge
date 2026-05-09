@@ -87,10 +87,16 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=21, minute=0),
     },
 
-    # Daily progress bar (pinned in DM) at 08:00 Tashkent.
+    # Daily progress bar — refreshed at 00:01 Tashkent.
     'daily-progress-broadcast': {
         'task': 'tgbot.tasks.daily_progress_broadcast',
-        'schedule': crontab(hour=8, minute=0),
+        'schedule': crontab(hour=0, minute=1),
+    },
+
+    # Safety net — every hour, repin (or resend if deleted) the latest progress.
+    'ensure-progress-pin': {
+        'task': 'tgbot.tasks.ensure_progress_pin',
+        'schedule': crontab(minute=15),
     },
 
     # Reminder for users who haven't reported by 12:00 Tashkent.

@@ -52,8 +52,9 @@ async def _list_reminders_text():
 
 
 @dp.message_handler(IsPrivate(), Text("📋 Eslatmalar"), state="*")
-async def reminders_menu(message: types.Message, state: FSMContext):
-    user = get_user(message.from_user.id)
+async def reminders_menu(message: types.Message, state: FSMContext, _admin_id=None):
+    actor_id = _admin_id or message.from_user.id
+    user = get_user(actor_id)
     if not _is_admin(user):
         await message.answer("Siz admin emassiz!")
         return

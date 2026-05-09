@@ -164,6 +164,26 @@ class TelegramProfile(BaseModel):
         help_text="Daily inspirational reminders this user wants. 0=off, max=3.",
         verbose_name=_("Daily reminders"),
     )
+    last_progress_msg_id = models.BigIntegerField(
+        null=True, blank=True,
+        help_text="Most recent pinned daily-progress message id, used to repin/restore."
+    )
+    show_calendar = models.BooleanField(
+        default=False,
+        help_text="When True, the cabinet shows a clickable streak calendar.",
+    )
+    accept_congrats_from = models.CharField(
+        max_length=10,
+        default="any",
+        choices=[("any", "Hammadan"), ("male", "Erkaklardan"), ("female", "Ayollardan")],
+        help_text="Whose congratulations the user accepts.",
+    )
+    send_congrats_to = models.CharField(
+        max_length=10,
+        default="any",
+        choices=[("any", "Hammaga"), ("male", "Erkaklarga"), ("female", "Ayollarga")],
+        help_text="Whom the user is willing to congratulate.",
+    )
 
     def update_ball(self, is_completed: bool, ball: int) -> None:
         ball = Decimal(str(ball))
@@ -500,6 +520,25 @@ class UserAchievement(BaseModel):
 
     def __str__(self):
         return f"{self.user_id}/{self.code}"
+
+
+class Congratulation(models.Model):
+    """One row per (achievement-unlock event, congratulator) tuple.
+    The achievement-unlock event is identified by the UserAchievement row."""
+    achievement = models.ForeignKey(
+        UserAchievement, on_delete=models.CASCADE,
+        related_name="congratulations",
+    )
+    congratulator = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE,
+        related_name="congratulations_sent",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "congratulations"
+        unique_together = (("achievement", "congratulator"),)
+        ordering = ("-created_at",)
 
 
 class ScheduledMessageDeletion(models.Model):
