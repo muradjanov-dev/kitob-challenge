@@ -313,10 +313,42 @@ async def _menu_cabinet(call, user, state: FSMContext):
         calendar_markup = await sync_to_async(generate_calendar_markup)(
             user_id, now.year, now.month
         )
+        # Append a 'hide' toggle row so user can collapse from inside cabinet.
+        calendar_markup.row(
+            InlineKeyboardButton(
+                "📅 Streak kalendarni yashirish",
+                callback_data="cab:cal_toggle",
+            )
+        )
         await call.message.answer(response_text, parse_mode="HTML",
                                   reply_markup=calendar_markup)
     else:
-        await call.message.answer(response_text, parse_mode="HTML")
+        kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton(
+                "📅 Streak kalendarni ko'rsatish",
+                callback_data="cab:cal_toggle",
+            )
+        )
+        await call.message.answer(response_text, parse_mode="HTML",
+                                  reply_markup=kb)
+
+
+@dp.callback_query_handler(lambda c: c.data == "cab:cal_toggle", state="*")
+async def cabinet_toggle_calendar(call: types.CallbackQuery, state: FSMContext):
+    user = get_user(call.from_user.id)
+    if not user:
+        await call.answer("Avval /start bosing", show_alert=True)
+        return
+    new_val = not bool(getattr(user, "show_calendar", False))
+    await sync_to_async(
+        TelegramProfile.objects.filter(id=user.id).update
+    )(show_calendar=new_val)
+    user.show_calendar = new_val
+    await call.answer(
+        "✅ Kalendar yoqildi" if new_val else "⚪️ Kalendar o'chirildi"
+    )
+    # Re-render cabinet with updated state.
+    await _menu_cabinet(call, user, state)
 
 
 # ──────────────────────────────────────────────────────────────────────────
