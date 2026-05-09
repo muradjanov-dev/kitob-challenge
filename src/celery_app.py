@@ -68,9 +68,15 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=0, minute=17, day_of_month='*/3')
     },
 
-    'check-and-dispatch-reminders': {
-        'task': 'tgbot.tasks.check_and_dispatch_reminders',
-        'schedule': crontab(),  # every minute
+    # Pool-based admin reminders — fire 09:00 and 21:00 (Tashkent), each time
+    # the worker picks a random text from the active ScheduledReminder pool.
+    'admin-reminder-pool-09': {
+        'task': 'tgbot.tasks.broadcast_random_pool_reminder',
+        'schedule': crontab(hour=9, minute=0),
+    },
+    'admin-reminder-pool-21': {
+        'task': 'tgbot.tasks.broadcast_random_pool_reminder',
+        'schedule': crontab(hour=21, minute=0),
     },
 
     # Daily 3x random inspiration with "Hisobot jo'natish" CTA button (Tashkent).

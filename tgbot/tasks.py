@@ -421,16 +421,10 @@ def send_random_inspiration():
 
 
 @shared_task
-def check_and_dispatch_reminders():
-    """Beat-driven: every minute, if any reminder is due, broadcast ONE random
-    text from the pool of all active reminders. Schedules act as triggers; the
-    text sent is independent of which reminder fired."""
-    now = timezone.localtime()
-    due_exists = ScheduledReminder.objects.filter(
-        is_active=True, hour=now.hour, minute=now.minute
-    ).exists()
-    if not due_exists:
-        return
+def broadcast_random_pool_reminder():
+    """Pick ONE random text from all active ScheduledReminder rows and
+    broadcast it. Designed to fire at fixed times (09:00, 21:00) via celery
+    beat — the per-reminder hour/minute fields are now legacy/ignored."""
     pool = list(
         ScheduledReminder.objects
         .filter(is_active=True)

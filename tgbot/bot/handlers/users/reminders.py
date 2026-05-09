@@ -1,5 +1,3 @@
-import re
-
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
@@ -7,7 +5,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
 
 from tgbot.bot.filters import IsPrivate
-from tgbot.bot.keyboards.reply import admin_keyboard, back_keyboard
+from tgbot.bot.keyboards.reply import back_keyboard
 from tgbot.bot.loader import dp
 from tgbot.bot.states.main import ReminderState
 from tgbot.bot.utils import get_user
@@ -78,7 +76,11 @@ async def reminder_add_start(call: types.CallbackQuery, state: FSMContext):
         return
     await call.answer()
     await call.message.answer(
-        "✏️ Eslatma matnini yuboring (ko'p qatorli matn yozsa bo'ladi):",
+        "✏️ Eslatma matnini yuboring.\n\n"
+        "<i>Eslatma poolga qo'shiladi — sistema har kuni "
+        "<b>09:00</b> va <b>21:00</b> da poolda mavjud bo'lgan eslatmalardan "
+        "tasodifiy birini userlarga yuboradi.</i>",
+        parse_mode="HTML",
         reply_markup=back_keyboard,
     )
     await ReminderState.text.set()
@@ -93,40 +95,18 @@ async def reminder_text_received(message: types.Message, state: FSMContext):
     if len(text) > 4000:
         await message.answer("Matn 4000 belgidan oshmasligi kerak. Qisqartiring:")
         return
-    await state.update_data(text=text)
-    await message.answer(
-        "🕒 Yuboriladigan vaqtni kiriting (HH:MM, masalan: <code>09:00</code> yoki <code>21:30</code>):",
-        parse_mode="HTML",
-    )
-    await ReminderState.time.set()
 
-
-@dp.message_handler(IsPrivate(), state=ReminderState.time)
-async def reminder_time_received(message: types.Message, state: FSMContext):
-    raw = (message.text or "").strip()
-    m = re.fullmatch(r"(\d{1,2}):(\d{2})", raw)
-    if not m:
-        await message.answer("Format noto'g'ri. <code>HH:MM</code> shaklida yuboring (masalan <code>09:00</code>):", parse_mode="HTML")
-        return
-    hour, minute = int(m.group(1)), int(m.group(2))
-    if not (0 <= hour <= 23 and 0 <= minute <= 59):
-        await message.answer("Vaqt noto'g'ri (00:00 — 23:59).")
-        return
-
-    data = await state.get_data()
-    text = data.get("text", "")
     creator = await sync_to_async(
         lambda: TelegramProfile.objects.filter(telegram_id=message.from_user.id).first()
     )()
+    # hour/minute are kept as zeros (legacy field) — broadcast time is now
+    # fixed at 09:00 and 21:00 via celery beat, not per-reminder.
     await sync_to_async(ScheduledReminder.objects.create)(
-        text=text, hour=hour, minute=minute, is_active=True, created_by=creator
+        text=text, hour=0, minute=0, is_active=True, created_by=creator
     )
     await state.finish()
 
-    await message.answer(
-        f"✅ Eslatma saqlandi: <b>{hour:02d}:{minute:02d}</b>",
-        parse_mode="HTML",
-    )
+    await message.answer("✅ Eslatma poolga qo'shildi.")
     list_text, kb = await _build_reminders_view()
     await message.answer(list_text, parse_mode="HTML", reply_markup=kb)
 
