@@ -127,14 +127,58 @@ async def show_user_cabinet(message: types.Message, state=None):
             book_title = report.book if report.book else "Noma'lum kitob"
             conclusion_text += f"{i}. <i>{book_title}</i> ({report.pages_read} bet)\n"
 
+    # 6. Ranking — % ahead/behind by total pages read.
+    rank_text = ""
+    pages_to_overtake_text = ""
+    try:
+        all_user_pages = list(
+            ConfirmationReport.objects
+            .values('user_id')
+            .annotate(total=Sum('pages_read'))
+            .values_list('total', flat=True)
+        )
+        # Include users with zero pages so ranking reflects whole population.
+        active_user_ids = {row[0] for row in ConfirmationReport.objects.values_list('user_id').distinct()}
+        zero_count = max(
+            TelegramProfile.objects.filter(is_registered=True).count() - len(active_user_ids),
+            0,
+        )
+        all_user_pages.extend([0] * zero_count)
+        total_users = len(all_user_pages)
+        my_pages = total_pages_read or 0
+
+        if total_users > 1:
+            behind_me = sum(1 for p in all_user_pages if (p or 0) < my_pages)
+            ahead_of_me = sum(1 for p in all_user_pages if (p or 0) > my_pages)
+            pct_ahead = round(behind_me * 100 / max(total_users - 1, 1))
+            pct_behind = round(ahead_of_me * 100 / max(total_users - 1, 1))
+            rank_text = (
+                f"\n📈 <b>Sizdan orqada:</b> {pct_ahead}% kitobxonlar\n"
+                f"📉 <b>Sizdan oldinda:</b> {pct_behind}% kitobxonlar\n"
+            )
+            pages_above = sorted([p or 0 for p in all_user_pages if (p or 0) > my_pages])
+            if pages_above:
+                next_pages = pages_above[0]
+                diff = next_pages - my_pages + 1
+                pages_to_overtake_text = (
+                    f"🎯 Yana <b>{diff}</b> bet o'qisangiz, keyingi kitobxondan o'tib ketasiz!\n"
+                )
+    except Exception as e:
+        print(f"cabinet ranking calc failed: {e}")
+
+    kitobcha_balance = int(user.ball or 0)
+
     # Construct the message
     response_text = (
         f"👤 <b>Sizning shaxsiy kabinetingiz</b>\n\n"
+        f"🪙 <b>Kitobcha balansi:</b> {kitobcha_balance}\n"
         f"📚 <b>O'qilgan kitoblar:</b> {completed_books_count} ta\n"
         f"📄 <b>Jami o'qilgan sahifalar:</b> {total_pages_read}\n"
         f"⚡️ <b>O'rtacha kunlik o'qish:</b> {int(avg_pages_per_day)} bet\n"
         f"📅 <b>Eng faol kuningiz:</b> {most_active_day}\n"
         f"⏰ <b>Sevimli vaqtingiz:</b> {active_hour}\n"
+        f"{rank_text}"
+        f"{pages_to_overtake_text}"
         f"{conclusion_text}"
         f"\n<i>Ma'lumotlar avtomatik yangilanib boradi.</i>"
     )

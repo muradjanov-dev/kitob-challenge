@@ -468,10 +468,21 @@ def check_user_achievements(user_id: int):
 
     for ach in newly:
         title = ach.get("title_uz") or ach.get("title_ru") or ach["code"]
+        points = ach.get("points", 0)
+
+        # Award kitobcha for this unlock.
+        if points:
+            try:
+                user.update_ball(True, points)
+            except Exception as e:
+                print(f"award kitobcha for achievement {ach['code']} failed: {e}")
+
+        points_line = f"\n🪙 <b>+{points} Kitobcha</b>" if points else ""
         text = (
             "🎉 <b>Tabriklaymiz!</b>\n\n"
             f"{user_link} yangi yutuqni qo'lga kiritdi:\n\n"
-            f"{ach['emoji']} <b>{title}</b>\n\n"
+            f"{ach['emoji']} <b>{title}</b>"
+            f"{points_line}\n\n"
             "Davom etamiz! 📚🔥"
         )
         try:
@@ -489,12 +500,54 @@ def check_user_achievements(user_id: int):
         try:
             dm_text = (
                 f"🎉 <b>Yangi yutuq!</b>\n\n"
-                f"{ach['emoji']} <b>{title}</b>\n\n"
+                f"{ach['emoji']} <b>{title}</b>"
+                f"{points_line}\n\n"
                 "Tabriklaymiz! Davom eting 🚀"
             )
             send_notification(chat_id=user.telegram_id, text=dm_text)
         except Exception as e:
             print(f"achievement DM failed for {tg_id}: {e}")
+
+
+@shared_task
+def daily_top_readers_reward():
+    """Kun oxirida bugungi top kitobxonlarga kitobcha mukofoti beradi.
+    1-o'rin: 50, 2-o'rin: 30, 3-o'rin: 15, qolganlari: 5 tadan."""
+    today = timezone.localdate()
+    reports = (
+        ConfirmationReport.objects.filter(date__date=today)
+        .values('user_id')
+        .annotate(total_pages=Sum('pages_read'))
+        .order_by('-total_pages')
+    )
+    reports = list(reports)
+    if not reports:
+        return
+
+    rewards_by_rank = {1: 50, 2: 30, 3: 15}
+    for rank, row in enumerate(reports, start=1):
+        user_id = row['user_id']
+        kitobcha = rewards_by_rank.get(rank, 5)
+        try:
+            user = TelegramProfile.objects.filter(id=user_id).first()
+            if not user:
+                continue
+            user.update_ball(True, kitobcha)
+            try:
+                pages = row['total_pages'] or 0
+                place_emoji = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, "🏅")
+                dm_text = (
+                    f"{place_emoji} <b>Bugungi reyting natijangiz!</b>\n\n"
+                    f"O'rningiz: <b>{rank}</b>\n"
+                    f"O'qigan betlaringiz: <b>{pages}</b>\n"
+                    f"🪙 Mukofot: <b>+{kitobcha} Kitobcha</b>\n\n"
+                    f"Joriy balans: <b>{int(user.ball)}</b>"
+                )
+                send_notification(chat_id=user.telegram_id, text=dm_text)
+            except Exception as e:
+                print(f"daily reward DM failed for {user_id}: {e}")
+        except Exception as e:
+            print(f"daily reward award failed for {user_id}: {e}")
 
 
 @shared_task

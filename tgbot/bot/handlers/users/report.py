@@ -581,6 +581,16 @@ async def _do_confirm_report(message, user, state: FSMContext):
         disable_web_page_preview=True,
     )
 
+    # Award 25 kitobcha for the submitted report.
+    try:
+        await sync_to_async(user.update_ball)(True, 25)
+        await message.answer(
+            f"🪙 +25 Kitobcha qo'shildi! Joriy balans: <b>{int(user.ball)}</b>",
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        print(f"award kitobcha for report failed: {e}")
+
     # Trigger achievement evaluation + Tabriklash broadcast (fire-and-forget).
     try:
         from tgbot.tasks import check_user_achievements

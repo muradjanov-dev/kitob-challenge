@@ -103,49 +103,50 @@ def _all_others_unlocked(awarded_codes: set) -> Callable[[Stats], bool]:
 
 
 # Listed without "yulduz" — added at runtime so it can reference others.
+# `points` = kitobcha awarded on unlock.
 ACHIEVEMENTS_RAW = [
     # — Reports —
-    {"code": "rep_1",   "emoji": "🐣", "title_uz": "Birinchi qadam",        "title_ru": "Первый шаг",            "cond": _at_least("reports", 1)},
-    {"code": "rep_5",   "emoji": "🌱", "title_uz": "Yashil kurtak",          "title_ru": "Зелёный росток",        "cond": _at_least("reports", 5)},
-    {"code": "rep_10",  "emoji": "🥉", "title_uz": "O'n hisobot",            "title_ru": "Десять отчётов",        "cond": _at_least("reports", 10)},
-    {"code": "rep_30",  "emoji": "🥈", "title_uz": "O'ttiz hisobot",         "title_ru": "Тридцать отчётов",      "cond": _at_least("reports", 30)},
-    {"code": "rep_100", "emoji": "🥇", "title_uz": "Yuz hisobot — donishmand", "title_ru": "Сто отчётов — мудрец","cond": _at_least("reports", 100)},
-    {"code": "rep_365", "emoji": "🏔", "title_uz": "Yil bo'yi — gigant",     "title_ru": "Целый год — гигант",    "cond": _at_least("reports", 365)},
+    {"code": "rep_1",   "emoji": "🐣", "title_uz": "Birinchi qadam",        "title_ru": "Первый шаг",            "cond": _at_least("reports", 1),   "points": 10},
+    {"code": "rep_5",   "emoji": "🌱", "title_uz": "Yashil kurtak",          "title_ru": "Зелёный росток",        "cond": _at_least("reports", 5),   "points": 20},
+    {"code": "rep_10",  "emoji": "🥉", "title_uz": "O'n hisobot",            "title_ru": "Десять отчётов",        "cond": _at_least("reports", 10),  "points": 35},
+    {"code": "rep_30",  "emoji": "🥈", "title_uz": "O'ttiz hisobot",         "title_ru": "Тридцать отчётов",      "cond": _at_least("reports", 30),  "points": 75},
+    {"code": "rep_100", "emoji": "🥇", "title_uz": "Yuz hisobot — donishmand", "title_ru": "Сто отчётов — мудрец","cond": _at_least("reports", 100), "points": 150},
+    {"code": "rep_365", "emoji": "🏔", "title_uz": "Yil bo'yi — gigant",     "title_ru": "Целый год — гигант",    "cond": _at_least("reports", 365), "points": 400},
 
     # — Pages —
-    {"code": "pg_50",    "emoji": "📖", "title_uz": "Boshlovchi mutolaachi",  "title_ru": "Начинающий читатель",   "cond": _at_least("pages", 50)},
-    {"code": "pg_100",   "emoji": "📚", "title_uz": "Yuz bet",                "title_ru": "Сто страниц",           "cond": _at_least("pages", 100)},
-    {"code": "pg_500",   "emoji": "📕", "title_uz": "Yarim ming bet",         "title_ru": "Полтысячи страниц",     "cond": _at_least("pages", 500)},
-    {"code": "pg_1000",  "emoji": "📘", "title_uz": "Ming bet",               "title_ru": "Тысяча страниц",        "cond": _at_least("pages", 1000)},
-    {"code": "pg_5000",  "emoji": "📗", "title_uz": "Besh ming bet",          "title_ru": "Пять тысяч страниц",    "cond": _at_least("pages", 5000)},
-    {"code": "pg_10000", "emoji": "📙", "title_uz": "O'n ming bet — usta",    "title_ru": "Десять тысяч — мастер", "cond": _at_least("pages", 10000)},
+    {"code": "pg_50",    "emoji": "📖", "title_uz": "Boshlovchi mutolaachi",  "title_ru": "Начинающий читатель",   "cond": _at_least("pages", 50),    "points": 10},
+    {"code": "pg_100",   "emoji": "📚", "title_uz": "Yuz bet",                "title_ru": "Сто страниц",           "cond": _at_least("pages", 100),   "points": 20},
+    {"code": "pg_500",   "emoji": "📕", "title_uz": "Yarim ming bet",         "title_ru": "Полтысячи страниц",     "cond": _at_least("pages", 500),   "points": 50},
+    {"code": "pg_1000",  "emoji": "📘", "title_uz": "Ming bet",               "title_ru": "Тысяча страниц",        "cond": _at_least("pages", 1000),  "points": 100},
+    {"code": "pg_5000",  "emoji": "📗", "title_uz": "Besh ming bet",          "title_ru": "Пять тысяч страниц",    "cond": _at_least("pages", 5000),  "points": 250},
+    {"code": "pg_10000", "emoji": "📙", "title_uz": "O'n ming bet — usta",    "title_ru": "Десять тысяч — мастер", "cond": _at_least("pages", 10000), "points": 500},
 
     # — Books finished —
-    {"code": "bk_1",  "emoji": "🏁", "title_uz": "Birinchi kitob tugadi",   "title_ru": "Первая книга прочитана", "cond": _at_least("books_finished", 1)},
-    {"code": "bk_3",  "emoji": "🏆", "title_uz": "Uch kitob",                "title_ru": "Три книги",             "cond": _at_least("books_finished", 3)},
-    {"code": "bk_5",  "emoji": "👑", "title_uz": "Beshta kitob",             "title_ru": "Пять книг",             "cond": _at_least("books_finished", 5)},
-    {"code": "bk_10", "emoji": "💎", "title_uz": "O'n kitob",                "title_ru": "Десять книг",           "cond": _at_least("books_finished", 10)},
-    {"code": "bk_20", "emoji": "🦄", "title_uz": "Yigirma kitob — afsona",   "title_ru": "Двадцать книг — легенда","cond": _at_least("books_finished", 20)},
+    {"code": "bk_1",  "emoji": "🏁", "title_uz": "Birinchi kitob tugadi",   "title_ru": "Первая книга прочитана", "cond": _at_least("books_finished", 1),  "points": 30},
+    {"code": "bk_3",  "emoji": "🏆", "title_uz": "Uch kitob",                "title_ru": "Три книги",             "cond": _at_least("books_finished", 3),  "points": 75},
+    {"code": "bk_5",  "emoji": "👑", "title_uz": "Beshta kitob",             "title_ru": "Пять книг",             "cond": _at_least("books_finished", 5),  "points": 150},
+    {"code": "bk_10", "emoji": "💎", "title_uz": "O'n kitob",                "title_ru": "Десять книг",           "cond": _at_least("books_finished", 10), "points": 300},
+    {"code": "bk_20", "emoji": "🦄", "title_uz": "Yigirma kitob — afsona",   "title_ru": "Двадцать книг — легенда","cond": _at_least("books_finished", 20), "points": 600},
 
     # — Streak —
-    {"code": "st_3",   "emoji": "🔥",   "title_uz": "3 kunlik streak",       "title_ru": "Серия 3 дня",          "cond": _at_least("max_streak", 3)},
-    {"code": "st_7",   "emoji": "🔥🔥", "title_uz": "7 kunlik streak",       "title_ru": "Серия 7 дней",         "cond": _at_least("max_streak", 7)},
-    {"code": "st_14",  "emoji": "⚡",   "title_uz": "14 kunlik streak",      "title_ru": "Серия 14 дней",        "cond": _at_least("max_streak", 14)},
-    {"code": "st_30",  "emoji": "🔥🔥🔥", "title_uz": "30 kunlik streak",   "title_ru": "Серия 30 дней",        "cond": _at_least("max_streak", 30)},
-    {"code": "st_100", "emoji": "🦾",   "title_uz": "100 kunlik streak — temir iroda", "title_ru": "100 дней — железная воля", "cond": _at_least("max_streak", 100)},
+    {"code": "st_3",   "emoji": "🔥",   "title_uz": "3 kunlik streak",       "title_ru": "Серия 3 дня",          "cond": _at_least("max_streak", 3),   "points": 30},
+    {"code": "st_7",   "emoji": "🔥🔥", "title_uz": "7 kunlik streak",       "title_ru": "Серия 7 дней",         "cond": _at_least("max_streak", 7),   "points": 70},
+    {"code": "st_14",  "emoji": "⚡",   "title_uz": "14 kunlik streak",      "title_ru": "Серия 14 дней",        "cond": _at_least("max_streak", 14),  "points": 150},
+    {"code": "st_30",  "emoji": "🔥🔥🔥", "title_uz": "30 kunlik streak",   "title_ru": "Серия 30 дней",        "cond": _at_least("max_streak", 30),  "points": 300},
+    {"code": "st_100", "emoji": "🦾",   "title_uz": "100 kunlik streak — temir iroda", "title_ru": "100 дней — железная воля", "cond": _at_least("max_streak", 100), "points": 1000},
 
     # — Long conclusions —
-    {"code": "wr_1",  "emoji": "✍️", "title_uz": "Mazmunli xulosa",          "title_ru": "Содержательный вывод",  "cond": _at_least("long_conclusions", 1)},
-    {"code": "wr_5",  "emoji": "📝", "title_uz": "Yozuvchi",                  "title_ru": "Писатель",              "cond": _at_least("long_conclusions", 5)},
-    {"code": "wr_20", "emoji": "🖋", "title_uz": "Mualif — yigirma xulosa",   "title_ru": "Автор — двадцать выводов","cond": _at_least("long_conclusions", 20)},
+    {"code": "wr_1",  "emoji": "✍️", "title_uz": "Mazmunli xulosa",          "title_ru": "Содержательный вывод",  "cond": _at_least("long_conclusions", 1),  "points": 20},
+    {"code": "wr_5",  "emoji": "📝", "title_uz": "Yozuvchi",                  "title_ru": "Писатель",              "cond": _at_least("long_conclusions", 5),  "points": 75},
+    {"code": "wr_20", "emoji": "🖋", "title_uz": "Mualif — yigirma xulosa",   "title_ru": "Автор — двадцать выводов","cond": _at_least("long_conclusions", 20), "points": 250},
 
     # — Referrals —
-    {"code": "rf_1",  "emoji": "👥", "title_uz": "Birinchi do'st",           "title_ru": "Первый друг",           "cond": _at_least("referrals", 1)},
-    {"code": "rf_5",  "emoji": "🤝", "title_uz": "Beshta referral",          "title_ru": "Пять рефералов",        "cond": _at_least("referrals", 5)},
-    {"code": "rf_10", "emoji": "🌍", "title_uz": "O'n referral — elchi",     "title_ru": "Десять рефералов — посол","cond": _at_least("referrals", 10)},
+    {"code": "rf_1",  "emoji": "👥", "title_uz": "Birinchi do'st",           "title_ru": "Первый друг",           "cond": _at_least("referrals", 1),  "points": 50},
+    {"code": "rf_5",  "emoji": "🤝", "title_uz": "Beshta referral",          "title_ru": "Пять рефералов",        "cond": _at_least("referrals", 5),  "points": 200},
+    {"code": "rf_10", "emoji": "🌍", "title_uz": "O'n referral — elchi",     "title_ru": "Десять рефералов — посол","cond": _at_least("referrals", 10), "points": 500},
 
     # — Speed —
-    {"code": "spd_30", "emoji": "🚀", "title_uz": "Tezkor o'qish (30+ bet/kun)", "title_ru": "Скоростное чтение (30+ стр)", "cond": lambda s: s.get("avg_pages", 0) >= 30 and s.get("reports", 0) >= 5},
+    {"code": "spd_30", "emoji": "🚀", "title_uz": "Tezkor o'qish (30+ bet/kun)", "title_ru": "Скоростное чтение (30+ стр)", "cond": lambda s: s.get("avg_pages", 0) >= 30 and s.get("reports", 0) >= 5, "points": 100},
 ]
 
 
@@ -164,6 +165,7 @@ ACHIEVEMENTS = ACHIEVEMENTS_RAW + [
         "title_uz": "Yulduz — barcha yutuqlar",
         "title_ru": "Звезда — все достижения",
         "cond": None,  # filled per-call (depends on awarded_codes)
+        "points": 2000,
     }
 ]
 

@@ -38,6 +38,11 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=23, minute=35),
     },
 
+    'daily-top-readers-kitobcha-reward': {
+        'task': 'tgbot.tasks.daily_top_readers_reward',
+        'schedule': crontab(hour=23, minute=55),
+    },
+
     'send-weekly-top-read-pages-user': {
         'task': 'tgbot.tasks.weekly_top_read_user',
         'schedule': crontab(hour=23, minute=5, day_of_week=6),
