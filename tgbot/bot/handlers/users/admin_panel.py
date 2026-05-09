@@ -1,8 +1,10 @@
 from aiogram.utils.markdown import hlink
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from django.utils import timezone
 from tgbot.bot.keyboards.reply import admin_keyboard, confirm_markup, main_markup, yes_or_no_markup, back_keyboard
 from aiogram.dispatcher.filters import Text
 from tgbot.bot import dp
-from tgbot.models import TelegramProfile, BookReport
+from tgbot.models import TelegramProfile, BookReport, ConfirmationReport, BooksToRead, UserAchievement
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from tgbot.bot.states.main import StatisticState, NotificationState
@@ -173,51 +175,212 @@ async def unregistered_lists(message: types.Message):
     await message.answer(response, parse_mode="HTML")
 
 
-@dp.message_handler(IsPrivate(), Text(contains="‍👩‍👦‍👦 Barcha foydalanuvchilar"))
-async def all_users(message: types.Message):
-    all_users_qs = TelegramProfile.objects.all().order_by('id')
-    total_users_count = all_users_qs.count()
-    registered_count = all_users_qs.filter(is_registered=True).count()
-    unregistered_count = total_users_count - registered_count
+USERS_PER_PAGE = 50
 
-    response = (
+
+def _users_page_markup(page: int, total_pages: int, page_users):
+    """Inline kb: per-user 'detail' buttons + page navigation."""
+    kb = InlineKeyboardMarkup(row_width=2)
+    for u in page_users:
+        flag = "✅" if u.is_registered else "🚫"
+        label = u.full_name or (("@" + u.username) if u.username else "Ism yo'q")
+        if len(label) > 30:
+            label = label[:28] + "…"
+        kb.insert(
+            InlineKeyboardButton(
+                text=f"{flag} {u.id} · {label}",
+                callback_data=f"adm_userd:{u.id}",
+            )
+        )
+    nav = []
+    if page > 1:
+        nav.append(InlineKeyboardButton(
+            text="⬅️", callback_data=f"adm_userp:{page - 1}"
+        ))
+    nav.append(InlineKeyboardButton(
+        text=f"{page}/{total_pages}", callback_data="noop"
+    ))
+    if page < total_pages:
+        nav.append(InlineKeyboardButton(
+            text="➡️", callback_data=f"adm_userp:{page + 1}"
+        ))
+    if nav:
+        kb.row(*nav)
+    return kb
+
+
+def _build_users_overview(page: int):
+    """Returns (text, markup) for the all-users overview page."""
+    qs = TelegramProfile.objects.all().order_by("id")
+    total = qs.count()
+    registered = qs.filter(is_registered=True).count()
+    unregistered = total - registered
+    total_pages = max(1, (total + USERS_PER_PAGE - 1) // USERS_PER_PAGE)
+    page = max(1, min(page, total_pages))
+
+    offset = (page - 1) * USERS_PER_PAGE
+    page_users = list(qs[offset:offset + USERS_PER_PAGE])
+
+    text = (
         "👨‍👩‍👦‍👦 <b>Barcha foydalanuvchilar</b>\n\n"
-        f"📊 Jami: <b>{total_users_count}</b>\n"
-        f"✅ Ro'yxatdan to'liq o'tgan: <b>{registered_count}</b>\n"
-        f"🚫 Ro'yxatdan to'liq o'tmagan: <b>{unregistered_count}</b>\n\n"
-        "<i>Belgilar:</i>\n"
-        "✅ — registratsiyani to'liq tugatgan (ism, jins, hudud, yosh tanlagan)\n"
-        "🚫 — boshlagan-u tugatmagan, yoki /restart bosgan\n"
-        "-----------------------------------------------\n"
-        "<code>ID  |  User</code>\n"
-        "-----------------------------------------------\n"
+        f"📊 Jami: <b>{total}</b>\n"
+        f"✅ Ro'yxatdan to'liq o'tgan: <b>{registered}</b>\n"
+        f"🚫 Ro'yxatdan to'liq o'tmagan: <b>{unregistered}</b>\n\n"
+        f"📄 Sahifa: <b>{page}/{total_pages}</b> · {USERS_PER_PAGE} tadan\n\n"
+        "<i>Tugmalar:</i>\n"
+        "Foydalanuvchini bosing — batafsil ma'lumot ko'rinadi\n"
+        "✅ ro'yxatdan o'tgan · 🚫 o'tmagan"
+    )
+    markup = _users_page_markup(page, total_pages, page_users)
+    return text, markup
+
+
+def _build_user_detail(user_id: int) -> str:
+    """Returns full HTML detail for a single TelegramProfile (admin view)."""
+    from django.db.models import Count, Avg, Sum, F
+    from django.db.models.functions import ExtractWeekDay, ExtractHour, TruncDate
+
+    user = TelegramProfile.objects.filter(id=user_id).first()
+    if not user:
+        return "❌ Foydalanuvchi topilmadi."
+
+    total_pages = (
+        BookReport.objects.filter(user=user).aggregate(s=Sum("pages_read"))["s"] or 0
+    )
+    avg_pages = (
+        BookReport.objects.filter(user=user).aggregate(a=Avg("pages_read"))["a"] or 0
+    )
+    completed_books = BooksToRead.objects.filter(
+        user=user, current_page__gte=F("total_pages"), total_pages__gt=0
+    ).count()
+    in_progress_books = BooksToRead.objects.filter(
+        user=user, current_page__lt=F("total_pages"), total_pages__gt=0
+    ).count()
+
+    distinct_days = (
+        ConfirmationReport.objects.filter(user=user)
+        .annotate(_d=TruncDate("date"))
+        .values("_d").distinct().count()
+    )
+    reports_count = ConfirmationReport.objects.filter(user=user).count()
+
+    weekday_stats = list(
+        BookReport.objects.filter(user=user)
+        .annotate(weekday=ExtractWeekDay("created_at"))
+        .values("weekday").annotate(c=Count("id")).order_by("-c")
+    )
+    hour_stats = list(
+        BookReport.objects.filter(user=user)
+        .annotate(hour=ExtractHour("created_at"))
+        .values("hour").annotate(c=Count("id")).order_by("-c")
     )
 
-    for user in all_users_qs:
-        user_id = user.telegram_id
-        if user.full_name:
-            mention = hlink(user.full_name, f"tg://user?id={user_id}")
-        elif user.username:
-            mention = hlink("@" + user.username, f"tg://user?id={user_id}")
-        else:
-            mention = hlink("Ism qo'yilmagan", f"tg://user?id={user_id}")
-
-        flag = "✅" if user.is_registered else "🚫"
-        response += f"{user.id}  |  {mention} {flag}\n"
-
-    # Telegram message limit is 4096 — split if needed.
-    MAX = 4000
-    if len(response) <= MAX:
-        await message.answer(response, parse_mode="HTML")
+    weekday_map = {
+        1: "Yakshanba", 2: "Dushanba", 3: "Seshanba", 4: "Chorshanba",
+        5: "Payshanba", 6: "Juma", 7: "Shanba",
+    }
+    most_active_day = (
+        weekday_map.get(weekday_stats[0]["weekday"], "—") if weekday_stats else "—"
+    )
+    if hour_stats:
+        h = hour_stats[0]["hour"]
+        active_hour = f"{h:02d}:00–{h+1:02d}:00"
     else:
-        chunk = ""
-        for line in response.split("\n"):
-            if len(chunk) + len(line) + 1 > MAX:
-                await message.answer(chunk, parse_mode="HTML")
-                chunk = ""
-            chunk += line + "\n"
-        if chunk:
-            await message.answer(chunk, parse_mode="HTML")
+        active_hour = "—"
+
+    achievements = list(
+        UserAchievement.objects.filter(user=user).values_list("code", flat=True)
+    )
+    ach_count = len(achievements)
+
+    region_name = user.region.name if user.region else "—"
+    gender_label = {"male": "Erkak", "female": "Ayol"}.get(user.gender or "", "—")
+    age_label = {
+        "u18": "<18", "18_25": "18–25", "26_35": "26–35", "36p": "36+",
+    }.get(user.age_range or "", "—")
+
+    username_str = f"@{user.username}" if user.username else "—"
+    full_name = user.full_name or "—"
+    reg_status = "✅ Ro'yxatdan to'liq o'tgan" if user.is_registered else "🚫 Tugatmagan"
+    blocked = "🚫 Bloklangan" if user.is_blocked else ""
+    admin_flag = "👑 Admin" if user.is_admin else ""
+    days_since_join = (timezone.now() - user.created_at).days if user.created_at else 0
+
+    ach_text = ""
+    if achievements:
+        from tgbot.services.achievements import find_achievement
+        items = []
+        for code in achievements:
+            ach = find_achievement(code)
+            if ach:
+                items.append(f"{ach['emoji']} {ach['title_uz']}")
+        ach_text = "\n\n🏆 <b>Yutuqlar (" + str(ach_count) + "):</b>\n" + "\n".join(items)
+
+    return (
+        f"👤 <b>{full_name}</b>\n"
+        f"🆔 <code>{user.telegram_id}</code> · DB id: {user.id}\n"
+        f"📱 {username_str}\n"
+        f"🌐 Til: {(user.language or '—').upper()}\n"
+        f"🚻 Jins: {gender_label}\n"
+        f"🗺 Hudud: {region_name}\n"
+        f"🎂 Yosh: {age_label}\n"
+        f"📅 A'zo bo'lgan: {days_since_join} kun oldin\n"
+        f"{reg_status}{(' · ' + blocked) if blocked else ''}{(' · ' + admin_flag) if admin_flag else ''}\n\n"
+        f"🪙 <b>Kitobcha balansi:</b> {int(user.ball or 0)}\n"
+        f"📚 Hisobotlar: <b>{reports_count}</b>\n"
+        f"📄 Jami betlar: <b>{total_pages}</b>\n"
+        f"⚡️ O'rtacha: <b>{int(avg_pages)} bet/hisobot</b>\n"
+        f"📅 Faol kunlar (uniq): <b>{distinct_days}</b>\n"
+        f"📖 Tugatgan kitoblar: <b>{completed_books}</b>\n"
+        f"📕 O'qilayotgan: <b>{in_progress_books}</b>\n"
+        f"🗓 Eng faol kun: <b>{most_active_day}</b>\n"
+        f"⏰ Eng faol vaqt: <b>{active_hour}</b>"
+        f"{ach_text}"
+    )
+
+
+@dp.message_handler(IsPrivate(), Text(contains="‍👩‍👦‍👦 Barcha foydalanuvchilar"))
+async def all_users(message: types.Message):
+    text, markup = _build_users_overview(page=1)
+    await message.answer(text, parse_mode="HTML", reply_markup=markup)
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("adm_userp:"), state="*")
+async def adm_user_page(call: types.CallbackQuery):
+    user = get_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    page = int(call.data.split(":", 1)[1])
+    text, markup = _build_users_overview(page=page)
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    except Exception:
+        await call.message.answer(text, parse_mode="HTML", reply_markup=markup)
+    await call.answer()
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("adm_userd:"), state="*")
+async def adm_user_detail(call: types.CallbackQuery):
+    actor = get_user(call.from_user.id)
+    if not (actor and actor.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    target_id = int(call.data.split(":", 1)[1])
+    text = _build_user_detail(target_id)
+    back_kb = InlineKeyboardMarkup().add(
+        InlineKeyboardButton("⬅️ Ro'yxatga qaytish", callback_data="adm_userp:1")
+    )
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=back_kb)
+    except Exception:
+        await call.message.answer(text, parse_mode="HTML", reply_markup=back_kb)
+    await call.answer()
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data == "noop", state="*")
+async def adm_noop(call: types.CallbackQuery):
+    await call.answer()
 
 
 @dp.message_handler(IsPrivate(), Text("📊 Statistikani ko'rish"))

@@ -23,7 +23,7 @@ from tgbot.bot.states.main import (
     ContactAdminState, ChangeLanguageState, ReportState,
 )
 from tgbot.models import (
-    BookReport, ConfirmationReport, BooksToRead, Payment,
+    BookReport, ConfirmationReport, BooksToRead, Payment, TelegramProfile,
 )
 
 
@@ -214,11 +214,34 @@ async def _menu_cabinet(call, user, state: FSMContext):
             .annotate(length=Length("conclusion"))
             .order_by("-length")[:3]
         )
+        # M2M titles for fallback when ConfirmationReport.book CharField is empty.
+        conclusion_titles = {}
+        for r in top_conclusions:
+            titles = list(r.books.values_list("title", flat=True))
+            if titles:
+                conclusion_titles[r.id] = ", ".join(titles)
+
+        # Ranking — ahead/behind percentages.
+        all_user_pages = list(
+            ConfirmationReport.objects
+            .values("user_id")
+            .annotate(total=Sum("pages_read"))
+            .values_list("total", flat=True)
+        )
+        active_user_count = ConfirmationReport.objects.values_list(
+            "user_id"
+        ).distinct().count()
+        registered_total = TelegramProfile.objects.filter(is_registered=True).count()
+        zero_count = max(registered_total - active_user_count, 0)
+        all_user_pages.extend([0] * zero_count)
+
         return (completed_books_count, total_pages_read, avg_pages_per_day,
-                weekday_stats, hour_stats, top_conclusions)
+                weekday_stats, hour_stats, top_conclusions, conclusion_titles,
+                all_user_pages)
 
     (completed_books_count, total_pages_read, avg_pages_per_day,
-     weekday_stats, hour_stats, top_conclusions) = await sync_to_async(_stats)()
+     weekday_stats, hour_stats, top_conclusions, conclusion_titles,
+     all_user_pages) = await sync_to_async(_stats)()
 
     active_days_map = {
         1: "Yakshanba", 2: "Dushanba", 3: "Seshanba", 4: "Chorshanba",
@@ -237,16 +260,47 @@ async def _menu_cabinet(call, user, state: FSMContext):
     if top_conclusions:
         conclusion_text = "\n\n✍️ <b>Eng mazmunli xulosalaringiz:</b>\n"
         for i, report in enumerate(top_conclusions, 1):
-            book_title = report.book if report.book else "Noma'lum kitob"
+            book_title = (
+                (report.book or "").strip()
+                or conclusion_titles.get(report.id)
+                or "Tanlanmagan kitob"
+            )
             conclusion_text += f"{i}. <i>{book_title}</i> ({report.pages_read} bet)\n"
+
+    # Ranking text.
+    rank_text = ""
+    overtake_text = ""
+    my_pages = total_pages_read or 0
+    total_users = len(all_user_pages)
+    if total_users > 1:
+        behind = sum(1 for p in all_user_pages if (p or 0) < my_pages)
+        ahead = sum(1 for p in all_user_pages if (p or 0) > my_pages)
+        denom = max(total_users - 1, 1)
+        pct_ahead = round(behind * 100 / denom)
+        pct_behind = round(ahead * 100 / denom)
+        rank_text = (
+            f"\n📈 <b>Sizdan orqada:</b> {pct_ahead}% kitobxonlar\n"
+            f"📉 <b>Sizdan oldinda:</b> {pct_behind}% kitobxonlar\n"
+        )
+        higher = sorted([p or 0 for p in all_user_pages if (p or 0) > my_pages])
+        if higher:
+            diff = higher[0] - my_pages + 1
+            overtake_text = (
+                f"🎯 Yana <b>{diff}</b> bet o'qisangiz, keyingi kitobxondan o'tib ketasiz!\n"
+            )
+
+    kitobcha_balance = int(user.ball or 0)
 
     response_text = (
         f"👤 <b>Sizning shaxsiy kabinetingiz</b>\n\n"
+        f"🪙 <b>Kitobcha balansi:</b> {kitobcha_balance}\n"
         f"📚 <b>O'qilgan kitoblar:</b> {completed_books_count} ta\n"
         f"📄 <b>Jami o'qilgan sahifalar:</b> {total_pages_read}\n"
         f"⚡️ <b>O'rtacha kunlik o'qish:</b> {int(avg_pages_per_day)} bet\n"
         f"📅 <b>Eng faol kuningiz:</b> {most_active_day}\n"
         f"⏰ <b>Sevimli vaqtingiz:</b> {active_hour}\n"
+        f"{rank_text}"
+        f"{overtake_text}"
         f"{conclusion_text}"
         f"\n<i>Ma'lumotlar avtomatik yangilanib boradi.</i>"
     )

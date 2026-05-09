@@ -49,12 +49,13 @@ def get_confirmation_report_exists(user, date):
 
 
 @sync_to_async
-def create_confirmation_report(user, pages_read, date, conclusion, book_ids):
+def create_confirmation_report(user, pages_read, date, conclusion, book_ids, book_title=None):
     report = ConfirmationReport.objects.create(
         user=user,
         pages_read=pages_read,
         date=date,
-        conclusion=conclusion
+        conclusion=conclusion,
+        book=(book_title or "")[:255] or None,
     )
     if book_ids:
         report.books.set(book_ids)
@@ -478,7 +479,8 @@ async def _do_confirm_report(message, user, state: FSMContext):
         pages_read=pages_read,
         date=datetime_now,
         conclusion=conclusion,
-        book_ids=book_ids
+        book_ids=book_ids,
+        book_title=book,
     )
 
     # Process individual book updates

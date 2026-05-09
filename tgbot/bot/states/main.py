@@ -72,3 +72,7 @@ class PollAdminState(StatesGroup):
 
 class ContactAdminState(StatesGroup):
     message = State()
+
+
+class AdminReplyState(StatesGroup):
+    message = State()

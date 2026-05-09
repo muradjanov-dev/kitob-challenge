@@ -124,7 +124,13 @@ async def show_user_cabinet(message: types.Message, state=None):
     if top_conclusions:
         conclusion_text = "\n\n✍️ <b>Eng mazmunli xulosalaringiz:</b>\n"
         for i, report in enumerate(top_conclusions, 1):
-            book_title = report.book if report.book else "Noma'lum kitob"
+            book_title = (report.book or "").strip()
+            if not book_title:
+                m2m_titles = list(report.books.values_list("title", flat=True))
+                if m2m_titles:
+                    book_title = ", ".join(m2m_titles)
+                else:
+                    book_title = "Tanlanmagan kitob"
             conclusion_text += f"{i}. <i>{book_title}</i> ({report.pages_read} bet)\n"
 
     # 6. Ranking — % ahead/behind by total pages read.
