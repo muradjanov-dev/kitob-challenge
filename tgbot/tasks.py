@@ -8,7 +8,7 @@ from celery import shared_task
 
 from tgbot.models import (
     DailyMessage, ConfirmationReport, TelegramProfile, ScheduledReminder,
-    BotPoll, UserAchievement, ScheduledMessageDeletion, Congratulation,
+    BotPoll, UserAchievement, ScheduledMessageDeletion,
 )
 
 from django.utils import timezone
@@ -872,35 +872,41 @@ def daily_progress_broadcast():
 
 @shared_task
 def ensure_progress_pin():
-    """Hourly safety net: if a user's progress message was deleted/unpinned by
-    accident, repin (or resend & pin) so the progress board never disappears.
-    We try pinning the stored message_id; if Telegram rejects (message gone),
-    we send a fresh one."""
+    """Hourly safety net: every registered user must have a pinned progress.
+    - If they already have a stored message_id, try to repin it; on failure
+      (message was deleted/unpinned), send a fresh one.
+    - If they have no stored message_id yet (first run for this user),
+      send-and-pin a fresh one."""
     pin_url = f"https://api.telegram.org/bot{BOT_TOKEN}/pinChatMessage"
-    users = TelegramProfile.objects.filter(
-        is_registered=True, is_blocked=False, last_progress_msg_id__isnull=False,
-    )
-    repinned = resent = 0
+    users = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    repinned = resent = bootstrapped = 0
     for user in users.iterator():
         try:
-            resp = requests.post(
-                pin_url,
-                data={
-                    "chat_id": user.telegram_id,
-                    "message_id": user.last_progress_msg_id,
-                    "disable_notification": True,
-                },
-                timeout=3,
-            )
-            if resp.ok:
-                repinned += 1
-            else:
-                # Most likely: message was deleted by user. Resend.
+            if user.last_progress_msg_id:
+                resp = requests.post(
+                    pin_url,
+                    data={
+                        "chat_id": user.telegram_id,
+                        "message_id": user.last_progress_msg_id,
+                        "disable_notification": True,
+                    },
+                    timeout=3,
+                )
+                if resp.ok:
+                    repinned += 1
+                    continue
+                # Telegram rejected — most likely message was deleted.
                 if _send_and_pin_progress(user):
                     resent += 1
+            else:
+                if _send_and_pin_progress(user):
+                    bootstrapped += 1
         except Exception as e:
             print(f"ensure_progress_pin failed for {user.id}: {e}")
-    print(f"ensure_progress_pin: repinned={repinned} resent={resent}")
+    print(
+        f"ensure_progress_pin: repinned={repinned} "
+        f"resent={resent} bootstrapped={bootstrapped}"
+    )
 
 
 # Heuristic mapping — pages-vs-world-population percentile.
