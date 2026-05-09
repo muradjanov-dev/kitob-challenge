@@ -14,41 +14,48 @@ from tgbot.bot.utils import get_user
 from tgbot.models import ScheduledReminder, TelegramProfile
 
 
-def _reminders_kb():
-    kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(InlineKeyboardButton("➕ Yangi qo'shish", callback_data="rem_add"))
-    return kb
-
-
-def _reminder_row_kb(reminder_id):
-    kb = InlineKeyboardMarkup(row_width=2)
-    kb.add(
-        InlineKeyboardButton("🗑 O'chirish", callback_data=f"rem_del:{reminder_id}"),
-        InlineKeyboardButton(
-            "⏸ Pauza" , callback_data=f"rem_toggle:{reminder_id}"
-        ),
-    )
-    return kb
-
-
 def _is_admin(user) -> bool:
     return bool(user and user.is_admin)
 
 
-async def _list_reminders_text():
+async def _build_reminders_view():
+    """Build (text, keyboard) for the admin reminders panel.
+    Each reminder gets its own row with toggle and delete buttons."""
     rems = await sync_to_async(list)(
         ScheduledReminder.objects.all().order_by("hour", "minute")
     )
-    if not rems:
-        return "📋 <b>Eslatmalar</b>\n\nHozircha hech qanday eslatma yo'q."
 
-    lines = ["📋 <b>Eslatmalar</b>\n"]
+    if not rems:
+        text = "📋 <b>Eslatmalar</b>\n\nHozircha hech qanday eslatma yo'q."
+    else:
+        lines = [
+            "📋 <b>Eslatmalar</b>\n",
+            f"<i>Jami: {len(rems)} ta · ✅ faol · ⏸ to'xtatilgan</i>\n",
+        ]
+        for r in rems:
+            status = "✅" if r.is_active else "⏸"
+            preview = (r.text or "").replace("\n", " ")
+            if len(preview) > 80:
+                preview = preview[:77] + "…"
+            lines.append(
+                f"{status} <b>{r.hour:02d}:{r.minute:02d}</b> · #{r.id}\n"
+                f"   <i>{preview}</i>"
+            )
+        text = "\n".join(lines)
+
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.row(InlineKeyboardButton("➕ Yangi qo'shish", callback_data="rem_add"))
     for r in rems:
-        status = "✅" if r.is_active else "⏸"
-        lines.append(
-            f"{status} <code>#{r.id}</code> {r.hour:02d}:{r.minute:02d} — {r.text[:60]}"
+        toggle_label = "⏸ To'xtatish" if r.is_active else "▶️ Yoqish"
+        kb.row(
+            InlineKeyboardButton(
+                f"#{r.id} {r.hour:02d}:{r.minute:02d}",
+                callback_data="noop",
+            ),
+            InlineKeyboardButton(toggle_label, callback_data=f"rem_toggle:{r.id}"),
+            InlineKeyboardButton("🗑", callback_data=f"rem_del:{r.id}"),
         )
-    return "\n".join(lines)
+    return text, kb
 
 
 @dp.message_handler(IsPrivate(), Text("📋 Eslatmalar"), state="*")
@@ -59,8 +66,8 @@ async def reminders_menu(message: types.Message, state: FSMContext, _admin_id=No
         await message.answer("Siz admin emassiz!")
         return
     await state.finish()
-    text = await _list_reminders_text()
-    await message.answer(text, parse_mode="HTML", reply_markup=_reminders_kb())
+    text, kb = await _build_reminders_view()
+    await message.answer(text, parse_mode="HTML", reply_markup=kb)
 
 
 @dp.callback_query_handler(lambda c: c.data == "rem_add", state="*")
@@ -116,12 +123,12 @@ async def reminder_time_received(message: types.Message, state: FSMContext):
     )
     await state.finish()
 
-    list_text = await _list_reminders_text()
     await message.answer(
-        f"✅ Eslatma saqlandi: <b>{hour:02d}:{minute:02d}</b>\n\n" + list_text,
+        f"✅ Eslatma saqlandi: <b>{hour:02d}:{minute:02d}</b>",
         parse_mode="HTML",
-        reply_markup=admin_keyboard,
     )
+    list_text, kb = await _build_reminders_view()
+    await message.answer(list_text, parse_mode="HTML", reply_markup=kb)
 
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("rem_del:"))
@@ -135,11 +142,11 @@ async def reminder_delete(call: types.CallbackQuery):
         ScheduledReminder.objects.filter(id=rid).delete
     )()
     await call.answer("O'chirildi" if deleted else "Topilmadi")
-    text = await _list_reminders_text()
+    text, kb = await _build_reminders_view()
     try:
-        await call.message.edit_text(text, parse_mode="HTML", reply_markup=_reminders_kb())
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
     except Exception:
-        await call.message.answer(text, parse_mode="HTML", reply_markup=_reminders_kb())
+        await call.message.answer(text, parse_mode="HTML", reply_markup=kb)
 
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("rem_toggle:"))
@@ -163,8 +170,8 @@ async def reminder_toggle(call: types.CallbackQuery):
         await call.answer("Topilmadi")
     else:
         await call.answer("Faollashtirildi" if new_state else "To'xtatildi")
-    text = await _list_reminders_text()
+    text, kb = await _build_reminders_view()
     try:
-        await call.message.edit_text(text, parse_mode="HTML", reply_markup=_reminders_kb())
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
     except Exception:
         pass

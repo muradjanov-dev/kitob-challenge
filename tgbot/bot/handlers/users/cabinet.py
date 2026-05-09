@@ -164,7 +164,7 @@ async def show_user_cabinet(message: types.Message, state=None):
 
     conclusion_text = ""
     if top_conclusions:
-        conclusion_text = "\n\n✍️ <b>Eng mazmunli xulosalaringiz:</b>\n"
+        conclusion_text = "\n\n✍️ <b>Eng uzun xulosalaringiz</b> (matn uzunligi bo'yicha):\n"
         for i, report in enumerate(top_conclusions, 1):
             book_title = (report.book or "").strip()
             if not book_title:

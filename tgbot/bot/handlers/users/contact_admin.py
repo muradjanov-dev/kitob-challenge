@@ -38,52 +38,124 @@ async def contact_admin_entry(message: types.Message, state: FSMContext):
     await ContactAdminState.message.set()
 
 
+def _confirm_kb(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(row_width=2).add(
+        InlineKeyboardButton(
+            _t(lang, "✅ Yuborish", "✅ Отправить"),
+            callback_data="contact_send",
+        ),
+        InlineKeyboardButton(
+            _t(lang, "❌ Bekor qilish", "❌ Отмена"),
+            callback_data="contact_cancel",
+        ),
+    )
+
+
 @dp.message_handler(
     IsPrivate(),
     state=ContactAdminState.message,
     content_types=types.ContentType.ANY,
 )
-async def contact_admin_forward(message: types.Message, state: FSMContext):
+async def contact_admin_preview(message: types.Message, state: FSMContext):
+    """Step 1: capture the user's draft and show a Yuborish / Bekor preview."""
     user = get_user(message.from_user.id)
     lang = _user_lang(user)
 
-    # "🔙 Orqaga" is handled globally by back_handler — won't reach here.
+    # Stash the source message so we can copy_to the admin later.
+    await state.update_data(
+        draft_chat_id=message.chat.id,
+        draft_message_id=message.message_id,
+    )
+    await message.answer(
+        _t(
+            lang,
+            "Yuqoridagi xabarni adminga yubormoqchimisiz?",
+            "Отправить это сообщение администратору?",
+        ),
+        reply_markup=_confirm_kb(lang),
+    )
+    await ContactAdminState.confirm.set()
+
+
+@dp.callback_query_handler(
+    lambda c: c.data == "contact_cancel",
+    state=ContactAdminState.confirm,
+)
+async def contact_admin_cancel(call: types.CallbackQuery, state: FSMContext):
+    user = get_user(call.from_user.id)
+    lang = _user_lang(user)
+    await call.answer()
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await call.message.answer(
+        _t(lang, "❌ Bekor qilindi.", "❌ Отменено.")
+    )
+    await state.finish()
+
+
+@dp.callback_query_handler(
+    lambda c: c.data == "contact_send",
+    state=ContactAdminState.confirm,
+)
+async def contact_admin_confirm_send(call: types.CallbackQuery, state: FSMContext):
+    user = get_user(call.from_user.id)
+    lang = _user_lang(user)
+
+    data = await state.get_data()
+    draft_chat_id = data.get("draft_chat_id")
+    draft_message_id = data.get("draft_message_id")
+
+    await call.answer()
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+    if not draft_chat_id or not draft_message_id:
+        await call.message.answer(
+            _t(lang, "❌ Xabar topilmadi.", "❌ Сообщение не найдено.")
+        )
+        await state.finish()
+        return
 
     admins_raw = os.environ.get("ADMINS", "")
     admin_ids = [a.strip() for a in admins_raw.split(",") if a.strip()]
 
-    username = message.from_user.username
-    full_name = (user.full_name if user else None) or message.from_user.full_name or "—"
+    username = call.from_user.username
+    full_name = (user.full_name if user else None) or call.from_user.full_name or "—"
     username_str = f"@{username}" if username else "—"
 
     header = (
         "📩 <b>Foydalanuvchidan xabar</b>\n\n"
         f"👤 <b>{full_name}</b>\n"
-        f"🆔 <code>{message.from_user.id}</code>\n"
+        f"🆔 <code>{call.from_user.id}</code>\n"
         f"📱 {username_str}"
     )
-
     reply_kb = InlineKeyboardMarkup().add(
         InlineKeyboardButton(
             "✉️ Javob berish",
-            callback_data=f"admin_reply:{message.from_user.id}",
+            callback_data=f"admin_reply:{call.from_user.id}",
         )
     )
 
     sent_count = 0
     for chat_id in admin_ids:
         try:
-            # Always send the header first so admin sees who/what.
             await bot.send_message(chat_id=chat_id, text=header, parse_mode="HTML")
-            # Then forward the user's content (text/photo/video/voice/file/etc.)
-            # using copy_to so the message looks native.
-            await message.copy_to(chat_id=int(chat_id), reply_markup=reply_kb)
+            await bot.copy_message(
+                chat_id=int(chat_id),
+                from_chat_id=draft_chat_id,
+                message_id=draft_message_id,
+                reply_markup=reply_kb,
+            )
             sent_count += 1
         except Exception as e:
             print(f"contact_admin: forward to {chat_id} failed: {e}")
 
     if sent_count > 0:
-        await message.answer(
+        await call.message.answer(
             _t(
                 lang,
                 "✅ Xabaringiz adminga yuborildi. Tez orada javob beramiz!",
@@ -91,14 +163,13 @@ async def contact_admin_forward(message: types.Message, state: FSMContext):
             )
         )
     else:
-        await message.answer(
+        await call.message.answer(
             _t(
                 lang,
                 "❌ Adminga yuborib bo'lmadi. Keyinroq urinib ko'ring.",
                 "❌ Не удалось отправить администратору. Попробуйте позже.",
             )
         )
-
     await state.finish()
 
 
@@ -143,21 +214,78 @@ async def admin_reply_start(call: types.CallbackQuery, state: FSMContext):
     await AdminReplyState.message.set()
 
 
+def _admin_reply_confirm_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(row_width=2).add(
+        InlineKeyboardButton("✅ Yuborish", callback_data="ar_send"),
+        InlineKeyboardButton("❌ Bekor qilish", callback_data="ar_cancel"),
+    )
+
+
 @dp.message_handler(
     state=AdminReplyState.message,
     content_types=types.ContentType.ANY,
 )
-async def admin_reply_send(message: types.Message, state: FSMContext):
+async def admin_reply_preview(message: types.Message, state: FSMContext):
+    """Step 1 of admin's reply: capture draft, ask for confirmation."""
     if message.chat.type != types.ChatType.PRIVATE:
         return
     if not _is_admin(message.from_user.id):
         await state.finish()
         return
 
+    await state.update_data(
+        ar_draft_chat_id=message.chat.id,
+        ar_draft_message_id=message.message_id,
+    )
+    data = await state.get_data()
+    target_user_id = data.get("reply_target_user_id") or "—"
+    await message.answer(
+        f"Yuqoridagi javobni foydalanuvchiga (<code>{target_user_id}</code>) yuboraylikmi?",
+        parse_mode="HTML",
+        reply_markup=_admin_reply_confirm_kb(),
+    )
+    await AdminReplyState.confirm.set()
+
+
+@dp.callback_query_handler(
+    lambda c: c.data == "ar_cancel",
+    state=AdminReplyState.confirm,
+)
+async def admin_reply_cancel(call: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(call.from_user.id):
+        await call.answer()
+        return
+    await call.answer()
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await call.message.answer("❌ Bekor qilindi.")
+    await state.finish()
+
+
+@dp.callback_query_handler(
+    lambda c: c.data == "ar_send",
+    state=AdminReplyState.confirm,
+)
+async def admin_reply_confirm_send(call: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(call.from_user.id):
+        await call.answer()
+        return
+
     data = await state.get_data()
     target_user_id = data.get("reply_target_user_id")
-    if not target_user_id:
-        await message.answer("❌ Foydalanuvchi ID topilmadi.")
+    draft_chat_id = data.get("ar_draft_chat_id")
+    draft_message_id = data.get("ar_draft_message_id")
+
+    await call.answer()
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+    if not (target_user_id and draft_chat_id and draft_message_id):
+        await call.message.answer("❌ Javob ma'lumotlari topilmadi.")
         await state.finish()
         return
 
@@ -172,10 +300,14 @@ async def admin_reply_send(message: types.Message, state: FSMContext):
         await bot.send_message(
             chat_id=target_user_id, text=header, parse_mode="HTML",
         )
-        await message.copy_to(chat_id=int(target_user_id))
-        await message.answer("✅ Javob foydalanuvchiga yuborildi.")
+        await bot.copy_message(
+            chat_id=int(target_user_id),
+            from_chat_id=draft_chat_id,
+            message_id=draft_message_id,
+        )
+        await call.message.answer("✅ Javob foydalanuvchiga yuborildi.")
     except Exception as e:
         print(f"admin_reply: send to {target_user_id} failed: {e}")
-        await message.answer(f"❌ Yuborib bo'lmadi: {e}")
+        await call.message.answer(f"❌ Yuborib bo'lmadi: {e}")
 
     await state.finish()
