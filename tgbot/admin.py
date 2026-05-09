@@ -274,24 +274,17 @@ class GroupAdmin(TabbedTranslationAdmin):
     list_display = ("id", "title", "created_at")
     list_display_links = ("id", "title")
 
-    actions = ["trigger_three_days_challenge"]
+    actions = ["trigger_top_readers_report"]
 
-    def trigger_three_days_challenge(self, request, queryset):
-        if queryset.exists():
-            weekly_report_for_general.delay()
-            self.message_user(
-                request,
-                "Weekly report task has been triggered successfully!",
-                messages.SUCCESS
-            )
-        else:
-            self.message_user(
-                request,
-                "Weekly report task has not been triggered successfully!",
-                messages.WARNING
-            )
+    def trigger_top_readers_report(self, request, queryset):
+        weekly_report_for_general.delay()
+        self.message_user(
+            request,
+            "Top readers report (3/7/30 kun) has been triggered.",
+            messages.SUCCESS
+        )
 
-    trigger_three_days_challenge.short_description = "Trigger weekly report for selected groups"
+    trigger_top_readers_report.short_description = "Send 3/7/30-day top readers report to channel"
 
 
 @admin.register(models.RequiredGroup)

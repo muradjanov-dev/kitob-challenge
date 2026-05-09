@@ -6,7 +6,7 @@ import json
 
 from celery import shared_task
 
-from tgbot.models import DailyMessage, ConfirmationReport, TelegramProfile, Group, ScheduledReminder, BotPoll, UserAchievement
+from tgbot.models import DailyMessage, ConfirmationReport, TelegramProfile, ScheduledReminder, BotPoll, UserAchievement
 
 from django.utils import timezone
 from django.db.models import Sum, Window, F
@@ -261,55 +261,50 @@ def users_unread_book():
         send_message(chat_id, message)
 
 
-def weekly_report_for_group(group: Group):
-    end_date = timezone.now()
-    start_date = end_date - timezone.timedelta(days=3)
-
-    message = f"📚 Oxirgi 3 kunda eng ko'p kitob o'qigan {group.title} guruhining a'zolari:\n\n"
-
+def _build_top_readers_message(start_date, end_date, period_label, limit=20):
+    """Top kitobxonlar (period bo'yicha) va 'Jami: X bet' bilan."""
     reports = ConfirmationReport.objects.filter(
-        date__gte=start_date,
-        date__lte=end_date,
-        user__group=group
+        date__date__gte=start_date,
+        date__date__lte=end_date,
     ).values(
-        'user__full_name',
         'user__telegram_id',
+        'user__full_name',
     ).annotate(
-        total_page=Sum('pages_read')
-    ).order_by('-total_page')
+        total_pages=Sum('pages_read')
+    ).order_by('-total_pages')[:limit]
 
-    group_total_pages = 0
+    reports = list(reports)
+    if not reports:
+        return None
 
-    for index, report in enumerate(iterable=reports, start=1):
-        telegram_id = report.get('user__telegram_id')
-        full_name = report.get('user__full_name', 'No fullname')
-        total_pages = report.get('total_page', 0)
-
-        group_total_pages += total_pages
-
-        message += f"{index}. <b><a href='tg://user?id={telegram_id}'>{full_name}</a></b>: {total_pages} bet 📚\n"
-
-    return (group_total_pages, group.title, message)
+    grand_total = sum((r['total_pages'] or 0) for r in reports)
+    message = f"📚 {period_label} eng ko'p kitob o'qigan Kitobxonlar:\n\n"
+    for index, report in enumerate(reports, start=1):
+        full_name = escape(report['user__full_name'] or "Foydalanuvchi")
+        tg_id = report['user__telegram_id']
+        total_pages = report['total_pages'] or 0
+        message += f"{index}. <b><a href='tg://user?id={tg_id}'>{full_name}</a></b>: {total_pages} bet 📚\n"
+    message += f"\n📊 Jami: <b>{grand_total} bet</b>"
+    return message
 
 
 @shared_task
 def weekly_report_for_general():
-    groups = Group.objects.all()
-
-    groups_sorted = sorted(
-        [weekly_report_for_group(group) for group in groups],
-        key=lambda x: x[0],
-        reverse=True
-    )
-
-    message = "📚 Oxirgi 3 kunda eng ko'p kitob o'qigan guruhlar:\n\n"
-    for index, group in enumerate(iterable=groups_sorted, start=1):
-        if group[0] != 0:
-            message += f"{index}. <b>{group[1]}</b>. Jami {group[0]} bet\n"
-
+    """3 kunlik, 7 kunlik va 30 kunlik top kitobxonlarni umumiy kanalga yuboradi."""
+    end_date = timezone.localdate()
     general_id = -1002237773868
-    send_message(general_id, message)
-    send_message(general_id, groups_sorted[0][2])
+
+    periods = [
+        (end_date - timezone.timedelta(days=2), end_date, "Oxirgi 3 kunda"),
+        (end_date - timezone.timedelta(days=6), end_date, "Oxirgi 7 kunda"),
+        (end_date - timezone.timedelta(days=29), end_date, "Oxirgi 30 kunda"),
+    ]
+
+    for start_date, period_end, label in periods:
+        message = _build_top_readers_message(start_date, period_end, label)
+        if message is None:
+            message = f"📚 {label} kitob o'qigan foydalanuvchilar yo'q."
+        send_message(general_id, message)
 
 
 INSPIRATION_POOL = [
