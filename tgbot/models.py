@@ -159,6 +159,11 @@ class TelegramProfile(BaseModel):
         ],
         verbose_name=_("Age Range"),
     )
+    reminder_count = models.PositiveSmallIntegerField(
+        default=3,
+        help_text="Daily inspirational reminders this user wants. 0=off, max=3.",
+        verbose_name=_("Daily reminders"),
+    )
 
     def update_ball(self, is_completed: bool, ball: int) -> None:
         ball = Decimal(str(ball))
@@ -495,3 +500,17 @@ class UserAchievement(BaseModel):
 
     def __str__(self):
         return f"{self.user_id}/{self.code}"
+
+
+class ScheduledMessageDeletion(models.Model):
+    """A queued auto-delete: a periodic task scans this table and deletes
+    messages whose delete_at has passed. Used for end-of-day percentile
+    messages (72h TTL) and future congratulation messages (12h TTL)."""
+    chat_id = models.BigIntegerField(db_index=True)
+    message_id = models.BigIntegerField()
+    delete_at = models.DateTimeField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "scheduled_message_deletions"
+        ordering = ("delete_at",)

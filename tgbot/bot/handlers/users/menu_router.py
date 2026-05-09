@@ -99,6 +99,8 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
         await _menu_contact(call, user, state)
     elif action == "language":
         await _menu_language(call, user, state)
+    elif action == "settings":
+        await _menu_settings(call, user, state)
     elif action == "admin":
         await _menu_admin(call, user, state)
     else:
@@ -437,6 +439,78 @@ async def _menu_achievements(call, user, state: FSMContext):
             chunk += line + "\n"
         if chunk:
             await call.message.answer(chunk, parse_mode="HTML")
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Settings — currently: per-user reminder count (0–3).
+# ──────────────────────────────────────────────────────────────────────────
+def _settings_markup(user, lang: str) -> InlineKeyboardMarkup:
+    current = getattr(user, "reminder_count", 3) if user else 3
+    kb = InlineKeyboardMarkup(row_width=4)
+    for n in range(0, 4):
+        marker = "●" if n == current else "○"
+        kb.insert(InlineKeyboardButton(
+            text=f"{marker} {n}", callback_data=f"settings:reminders:{n}",
+        ))
+    return kb
+
+
+async def _menu_settings(call, user, state: FSMContext):
+    await call.answer()
+    lang = _user_lang(user)
+    current = getattr(user, "reminder_count", 3) if user else 3
+    text = _t(
+        lang,
+        (
+            "⚙️ <b>Sozlamalar</b>\n\n"
+            "🔔 Kunlik eslatmalar soni:\n"
+            "<i>0</i> — eslatma yo'q\n"
+            "<i>1</i> — kuniga 1 marta (kechqurun)\n"
+            "<i>2</i> — kuniga 2 marta (ertalab + kechqurun)\n"
+            "<i>3</i> — kuniga 3 marta (tushlik ham)\n\n"
+            f"Joriy: <b>{current}</b>"
+        ),
+        (
+            "⚙️ <b>Настройки</b>\n\n"
+            "🔔 Количество ежедневных напоминаний:\n"
+            "<i>0</i> — без напоминаний\n"
+            "<i>1</i> — один раз (вечером)\n"
+            "<i>2</i> — два раза (утро + вечер)\n"
+            "<i>3</i> — три раза (плюс днём)\n\n"
+            f"Текущее: <b>{current}</b>"
+        ),
+    )
+    await call.message.answer(text, parse_mode="HTML",
+                              reply_markup=_settings_markup(user, lang))
+
+
+@dp.callback_query_handler(
+    lambda c: c.data and c.data.startswith("settings:reminders:"),
+    state="*",
+)
+async def settings_reminder_pick(call: types.CallbackQuery, state: FSMContext):
+    user = get_user(call.from_user.id)
+    if not user:
+        await call.answer("Avval /start bosing", show_alert=True)
+        return
+    n = int(call.data.split(":")[2])
+    n = max(0, min(3, n))
+
+    await sync_to_async(
+        TelegramProfile.objects.filter(id=user.id).update
+    )(reminder_count=n)
+    user.reminder_count = n  # local for keyboard rebuild
+
+    lang = _user_lang(user)
+    await call.answer(
+        _t(lang, f"✅ Saqlandi: {n} ta", f"✅ Сохранено: {n}"),
+    )
+    try:
+        await call.message.edit_reply_markup(
+            reply_markup=_settings_markup(user, lang)
+        )
+    except Exception:
+        pass
 
 
 # ──────────────────────────────────────────────────────────────────────────

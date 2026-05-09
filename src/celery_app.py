@@ -86,6 +86,30 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.send_random_inspiration',
         'schedule': crontab(hour=21, minute=0),
     },
+
+    # Daily progress bar (pinned in DM) at 08:00 Tashkent.
+    'daily-progress-broadcast': {
+        'task': 'tgbot.tasks.daily_progress_broadcast',
+        'schedule': crontab(hour=8, minute=0),
+    },
+
+    # Reminder for users who haven't reported by 12:00 Tashkent.
+    'daily-no-report-reminder': {
+        'task': 'tgbot.tasks.daily_no_report_reminder',
+        'schedule': crontab(hour=12, minute=0),
+    },
+
+    # End-of-day percentile DM with 72h TTL — runs after daily_top_readers_reward.
+    'end-of-day-percentile': {
+        'task': 'tgbot.tasks.end_of_day_percentile',
+        'schedule': crontab(hour=23, minute=58),
+    },
+
+    # Scrub auto-delete queue every minute.
+    'process-scheduled-deletions': {
+        'task': 'tgbot.tasks.process_scheduled_deletions',
+        'schedule': crontab(),
+    },
 }
 
 # Use Tashkent local time for crontab schedules (matches admin-set HH:MM).

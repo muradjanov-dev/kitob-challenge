@@ -6,7 +6,10 @@ import json
 
 from celery import shared_task
 
-from tgbot.models import DailyMessage, ConfirmationReport, TelegramProfile, ScheduledReminder, BotPoll, UserAchievement
+from tgbot.models import (
+    DailyMessage, ConfirmationReport, TelegramProfile, ScheduledReminder,
+    BotPoll, UserAchievement, ScheduledMessageDeletion,
+)
 
 from django.utils import timezone
 from django.db.models import Sum, Window, F
@@ -376,10 +379,24 @@ def _cta_reply_markup():
 @shared_task
 def send_random_inspiration():
     """Pick a random inspirational text from INSPIRATION_POOL and broadcast to
-    all registered users with a 'Hisobot jo'natish' inline CTA button."""
+    all registered users with a 'Hisobot jo'natish' inline CTA button.
+    Respects per-user `reminder_count`:
+      count=0 → never; count=1 → only 21:00;
+      count=2 → 07:00 + 21:00; count=3 → all three slots.
+    """
+    hour = timezone.localtime().hour
+    if hour < 10:
+        threshold = 2  # 07:00 slot
+    elif hour < 17:
+        threshold = 3  # 13:30 slot
+    else:
+        threshold = 1  # 21:00 slot
+
     text = random.choice(INSPIRATION_POOL)
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    qs = TelegramProfile.objects.filter(
+        is_registered=True, is_blocked=False, reminder_count__gte=threshold,
+    )
     sent, failed = 0, 0
     reply_markup = _cta_reply_markup()
     for chat_id in qs.values_list("telegram_id", flat=True).iterator():
@@ -586,3 +603,282 @@ def broadcast_poll(poll_id: int):
         except Exception:
             failed += 1
     print(f"broadcast_poll #{poll_id}: sent={sent} failed={failed}")
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Phase 3: progress bar, percentile & reminders.
+# ────────────────────────────────────────────────────────────────────────
+LEVELS = [
+    (1000,    "🥉", "Bronza",     100),
+    (2000,    "🥈", "Kumush",     200),
+    (4000,    "🥇", "Oltin",      400),
+    (8000,    "🏆", "Chempion",   800),
+    (10000,   "💎", "Olmos",     1000),
+    (20000,   "🦄", "Afsona",    2000),
+    (50000,   "⭐", "Magistr",   5000),
+    (100000,  "👑", "Usta",     10000),
+]
+
+
+def _level_for(pages: int):
+    """Return (current_idx, current_threshold, current_emoji, current_name,
+    next_threshold_or_None) for the given page count."""
+    current_idx = -1
+    for i, (thr, _, _, _) in enumerate(LEVELS):
+        if pages >= thr:
+            current_idx = i
+        else:
+            break
+    if current_idx == -1:
+        prev_thr = 0
+        next_thr = LEVELS[0][0]
+        emoji = "📖"
+        name = "Yo'lboshi"
+    else:
+        prev_thr = LEVELS[current_idx][0]
+        emoji = LEVELS[current_idx][1]
+        name = LEVELS[current_idx][2]
+        next_thr = LEVELS[current_idx + 1][0] if current_idx + 1 < len(LEVELS) else None
+    return current_idx, prev_thr, emoji, name, next_thr
+
+
+def _progress_bar_text(pages: int) -> str:
+    idx, prev_thr, emoji, name, next_thr = _level_for(pages)
+    if next_thr is None:
+        bar = "▰" * 12
+        line = f"{bar} 100%"
+        return (
+            f"{emoji} <b>Daraja: {name}</b> (eng yuqori!)\n\n"
+            f"{line}\n"
+            f"📄 Jami: <b>{pages}</b> bet\n"
+            f"🏁 Barcha marralar bosib o'tildi! 👑"
+        )
+    span = next_thr - prev_thr
+    progress = max(0, pages - prev_thr)
+    pct = min(100, int(progress * 100 / span))
+    filled = int(pct / 100 * 12)
+    bar = "▰" * filled + "▱" * (12 - filled)
+    return (
+        f"{emoji} <b>Daraja: {name}</b>\n\n"
+        f"{bar} {pct}%\n"
+        f"📄 Sizning betlaringiz: <b>{pages}</b>\n"
+        f"🎯 Keyingi marra: <b>{next_thr}</b> bet (yana {next_thr - pages} bet)"
+    )
+
+
+def _award_level_rewards(user: TelegramProfile, pages: int):
+    """Award one-time kitobcha for each level threshold the user crosses.
+    Levels are tracked as UserAchievement codes lvl_<threshold>."""
+    awarded = set(
+        UserAchievement.objects.filter(user=user, code__startswith="lvl_")
+        .values_list("code", flat=True)
+    )
+    for thr, emoji, name, points in LEVELS:
+        code = f"lvl_{thr}"
+        if pages >= thr and code not in awarded:
+            try:
+                UserAchievement.objects.create(user=user, code=code, congratulated=True)
+                user.update_ball(True, points)
+                dm = (
+                    f"{emoji} <b>Yangi daraja: {name}!</b>\n\n"
+                    f"📄 {thr} bet marrasini bosib o'tdingiz!\n"
+                    f"🪙 <b>+{points} Kitobcha</b>\n\n"
+                    f"Joriy balans: <b>{int(user.ball)}</b>"
+                )
+                send_notification(chat_id=user.telegram_id, text=dm)
+            except Exception as e:
+                print(f"level award {code} failed for {user.id}: {e}")
+
+
+@shared_task
+def daily_progress_broadcast():
+    """Send a personal progress-bar message to every registered user, try to
+    pin it in their DM, and award any newly-crossed level kitobcha."""
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    pin_url = f"https://api.telegram.org/bot{BOT_TOKEN}/pinChatMessage"
+    unpin_url = f"https://api.telegram.org/bot{BOT_TOKEN}/unpinChatMessage"
+
+    users = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent = 0
+    for user in users.iterator():
+        try:
+            pages = (
+                ConfirmationReport.objects.filter(user=user)
+                .aggregate(s=Sum("pages_read"))["s"] or 0
+            )
+            _award_level_rewards(user, pages)
+
+            text = _progress_bar_text(pages)
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": user.telegram_id,
+                    "text": text,
+                    "parse_mode": "HTML",
+                },
+                timeout=5,
+            )
+            if not resp.ok:
+                continue
+            msg_id = resp.json().get("result", {}).get("message_id")
+            if msg_id:
+                # Best-effort: unpin previous, then pin the new one.
+                try:
+                    requests.post(unpin_url, data={"chat_id": user.telegram_id}, timeout=3)
+                except Exception:
+                    pass
+                try:
+                    requests.post(
+                        pin_url,
+                        data={
+                            "chat_id": user.telegram_id,
+                            "message_id": msg_id,
+                            "disable_notification": True,
+                        },
+                        timeout=3,
+                    )
+                except Exception:
+                    pass
+            sent += 1
+        except Exception as e:
+            print(f"daily_progress_broadcast failed for {user.id}: {e}")
+    print(f"daily_progress_broadcast: sent={sent}")
+
+
+# Heuristic mapping — pages-vs-world-population percentile.
+WORLD_PCTILE = [
+    (5,   70),
+    (10,  80),
+    (30,  90),
+    (50,  95),
+    (100, 98),
+    (200, 99),
+]
+
+
+@shared_task
+def daily_no_report_reminder():
+    """For every registered user who has NOT yet reported today, send a fun
+    'X bet o'qisangiz dunyoning Y% aholisidan oldinda bo'lasiz' nudge."""
+    today = timezone.localdate()
+    reported_ids = set(
+        ConfirmationReport.objects.filter(date__date=today)
+        .values_list("user_id", flat=True)
+    )
+
+    suggestion = random.choice(WORLD_PCTILE)
+    pages, percentile = suggestion
+    text = (
+        "🌍 <b>Bilasizmi?</b>\n\n"
+        f"Bugun atigi <b>{pages} bet</b> kitob o'qisangiz, dunyoning "
+        f"<b>{percentile}%</b> aholisidan ko'p o'qigan bo'lasiz!\n\n"
+        f"Hisobotni tashlash uchun pastdagi tugmani bosing 👇"
+    )
+
+    qs = TelegramProfile.objects.filter(
+        is_registered=True, is_blocked=False, reminder_count__gte=1,
+    ).exclude(id__in=reported_ids)
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    reply_markup = _cta_reply_markup()
+    sent = 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": chat_id,
+                    "text": text,
+                    "parse_mode": "HTML",
+                    "reply_markup": reply_markup,
+                },
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+        except Exception as e:
+            print(f"no_report_reminder failed for {chat_id}: {e}")
+    print(f"daily_no_report_reminder: sent={sent}")
+
+
+@shared_task
+def end_of_day_percentile():
+    """For every user who reported today, send a personal '% of users you
+    out-read' message; auto-deletes 72h later via process_scheduled_deletions."""
+    today = timezone.localdate()
+    rows = list(
+        ConfirmationReport.objects.filter(date__date=today)
+        .values("user_id")
+        .annotate(total=Sum("pages_read"))
+        .order_by("-total")
+    )
+    if not rows:
+        return
+
+    pages_by_user = {r["user_id"]: r["total"] or 0 for r in rows}
+    all_pages = sorted(pages_by_user.values())
+    n = len(all_pages)
+
+    delete_at = timezone.now() + timezone.timedelta(hours=72)
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    sent = 0
+    for user_id, pages in pages_by_user.items():
+        try:
+            user = TelegramProfile.objects.filter(id=user_id).first()
+            if not user:
+                continue
+            behind = sum(1 for p in all_pages if p < pages)
+            denom = max(n - 1, 1)
+            pct = round(behind * 100 / denom)
+
+            text = (
+                "📊 <b>Bugungi natijangiz!</b>\n\n"
+                f"📄 O'qigan betlaringiz: <b>{pages}</b>\n"
+                f"📈 Bugun siz boshqa <b>{pct}%</b> kitobxonlardan ko'p o'qidingiz!\n\n"
+                "Davom etamiz! 🚀\n\n"
+                "<i>Bu xabar 72 soatdan keyin avtomatik o'chiriladi.</i>"
+            )
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": user.telegram_id,
+                    "text": text,
+                    "parse_mode": "HTML",
+                },
+                timeout=5,
+            )
+            if resp.ok:
+                msg_id = resp.json().get("result", {}).get("message_id")
+                if msg_id:
+                    ScheduledMessageDeletion.objects.create(
+                        chat_id=user.telegram_id,
+                        message_id=msg_id,
+                        delete_at=delete_at,
+                    )
+                sent += 1
+        except Exception as e:
+            print(f"end_of_day_percentile failed for {user_id}: {e}")
+    print(f"end_of_day_percentile: sent={sent}")
+
+
+@shared_task
+def process_scheduled_deletions():
+    """Every minute: delete any messages whose delete_at has passed."""
+    now = timezone.now()
+    due = ScheduledMessageDeletion.objects.filter(delete_at__lte=now)[:200]
+    if not due:
+        return
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/deleteMessage"
+    deleted_ids = []
+    for row in due:
+        try:
+            requests.post(
+                url,
+                data={"chat_id": row.chat_id, "message_id": row.message_id},
+                timeout=3,
+            )
+        except Exception:
+            pass
+        deleted_ids.append(row.id)
+    if deleted_ids:
+        ScheduledMessageDeletion.objects.filter(id__in=deleted_ids).delete()
