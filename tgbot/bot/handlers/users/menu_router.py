@@ -512,6 +512,20 @@ def _settings_markup(user) -> InlineKeyboardMarkup:
         kb.insert(InlineKeyboardButton(
             text=f"{marker} {label}", callback_data=f"settings:send:{code}",
         ))
+
+    # Restart & Full reset buttons
+    kb.row(
+        InlineKeyboardButton(
+            text="🔄 Qayta boshlash (ma'lumotlar saqlanadi)",
+            callback_data="settings:restart_ask",
+        )
+    )
+    kb.row(
+        InlineKeyboardButton(
+            text="🗑 Barcha ma'lumotlarni o'chirish",
+            callback_data="settings:reset_ask",
+        )
+    )
     return kb
 
 
@@ -533,7 +547,9 @@ def _settings_text(user, lang: str) -> str:
             "  Yoqsangiz, kabinetda kunlar ko'rsatiladi va kunni bossangiz o'sha kuni o'qigan kitobi va hisoboti ochiladi.\n\n"
             f"🎉 <b>Tabriklash filtri:</b>\n"
             f"  Qabul qilish: <b>{label.get(accept, accept)}</b>\n"
-            f"  Yuborish: <b>{label.get(send_to, send_to)}</b>"
+            f"  Yuborish: <b>{label.get(send_to, send_to)}</b>\n\n"
+            "🔄 <b>Qayta boshlash</b> — faqat roʼyxatdan oʼtish jarayonini qaytaradi, ma’lumotlar saqlanadi.\n"
+            "🗑 <b>Ma’lumotlarni oʼchirish</b> — barcha ma’lumotlaringiz butunlay oʼchiriladi va yangi foydalanuvchi sifatida boshlaysiz."
         ),
         (
             "⚙️ <b>Настройки</b>\n\n"
@@ -543,7 +559,9 @@ def _settings_text(user, lang: str) -> str:
             f"📅 <b>Календарь (streak):</b> {'включен' if show_cal else 'выключен'}\n\n"
             f"🎉 <b>Поздравления:</b>\n"
             f"  Принимаю: <b>{label.get(accept, accept)}</b>\n"
-            f"  Отправляю: <b>{label.get(send_to, send_to)}</b>"
+            f"  Отправляю: <b>{label.get(send_to, send_to)}</b>\n\n"
+            "🔄 <b>Перезапуск</b> — только регистрация заново, данные сохраняются.\n"
+            "🗑 <b>Удаление данных</b> — все данные удаляются, начинаете как новый пользователь."
         ),
     )
 
@@ -608,6 +626,124 @@ async def settings_pick(call: types.CallbackQuery, state: FSMContext):
         else:
             await call.answer()
             return
+
+    # -- Step-1: ask restart
+    elif action == "restart_ask":
+        confirm_kb = InlineKeyboardMarkup(row_width=2)
+        confirm_kb.row(
+            InlineKeyboardButton(text="✅ Ha, qayta boshlash",
+                                 callback_data="settings:restart_confirm"),
+            InlineKeyboardButton(text="❌ Bekor qilish",
+                                 callback_data="settings:cancel_action"),
+        )
+        await call.answer(
+            "⚠️ Diqqat! Bu amal faqat ro'yxatdan o'tish jarayonini qaytaradi. "
+            "Hisobotlaringiz, kitoblaringiz va ballaringiz saqlanib qoladi.",
+            show_alert=True,
+        )
+        try:
+            await call.message.edit_reply_markup(reply_markup=confirm_kb)
+        except Exception:
+            pass
+        return
+
+    # -- Step-2: confirm restart
+    elif action == "restart_confirm":
+        await sync_to_async(
+            TelegramProfile.objects.filter(id=user.id).update
+        )(is_registered=False, full_name=None, gender=None, region_id=None,
+          age_range=None, group_id=None)
+        await state.finish()
+        await call.answer("✅ Qayta boshlash amalga oshirildi.", show_alert=True)
+        try:
+            await call.message.delete()
+        except Exception:
+            pass
+        await call.message.answer(
+            "🔄 Siz qayta ro'yxatdan o'tish uchun /start ni bosing.\n\n"
+            "(Barcha hisobotlaringiz va ma'lumotlaringiz saqlanib qoldi.)"
+        )
+        return
+
+    # -- Step-1: ask full reset
+    elif action == "reset_ask":
+        confirm_kb = InlineKeyboardMarkup(row_width=2)
+        confirm_kb.row(
+            InlineKeyboardButton(text="⚠️ Tasdiqlayman — o'chirish",
+                                 callback_data="settings:reset_confirm"),
+            InlineKeyboardButton(text="❌ Bekor qilish",
+                                 callback_data="settings:cancel_action"),
+        )
+        await call.answer(
+            "🚨 OGOH! Barcha ma'lumotlaringiz (hisobotlar, kitoblar, ballar, yutuqlar) "
+            "butunlay o'chiriladi va tiklash imkoni bo'lmaydi! "
+            "Davom etishni xohlaysizmi?",
+            show_alert=True,
+        )
+        try:
+            await call.message.edit_reply_markup(reply_markup=confirm_kb)
+        except Exception:
+            pass
+        return
+
+    # -- Step-2: confirm full reset
+    elif action == "reset_confirm":
+        @sync_to_async
+        def _do_full_reset(uid):
+            from tgbot.models import (
+                BookReport, ConfirmationReport, BooksToRead,
+                UserAchievement, Congratulation, UserReferal, Payment,
+            )
+            profile = TelegramProfile.objects.filter(id=uid).first()
+            if not profile:
+                return
+            Congratulation.objects.filter(achievement__user=profile).delete()
+            Congratulation.objects.filter(congratulator=profile).delete()
+            UserAchievement.objects.filter(user=profile).delete()
+            ConfirmationReport.objects.filter(user=profile).delete()
+            BookReport.objects.filter(user=profile).delete()
+            BooksToRead.objects.filter(user=profile).delete()
+            Payment.objects.filter(user=profile).delete()
+            UserReferal.objects.filter(referrer=profile).delete()
+            UserReferal.objects.filter(referred_user=profile).delete()
+            TelegramProfile.objects.filter(id=uid).update(
+                full_name=None, gender=None, region_id=None, age_range=None,
+                group_id=None, ball=0, is_registered=False,
+                last_progress_msg_id=None, show_calendar=False,
+                reminder_count=3, accept_congrats_from="any",
+                send_congrats_to="any",
+            )
+
+        await _do_full_reset(user.id)
+        await state.finish()
+        await call.answer(
+            "✅ Barcha ma'lumotlaringiz o'chirildi. Endi /start bosib qayta ro'yxatdan o'ting.",
+            show_alert=True,
+        )
+        try:
+            await call.message.delete()
+        except Exception:
+            pass
+        await call.message.answer(
+            "🗑 Barcha ma'lumotlaringiz o'chirildi.\n\n"
+            "Yangi foydalanuvchi sifatida /start ni bosing."
+        )
+        return
+
+    # -- Cancel two-step action
+    elif action == "cancel_action":
+        await call.answer("❌ Bekor qilindi")
+        lang = _user_lang(user)
+        try:
+            await call.message.edit_text(
+                _settings_text(user, lang),
+                parse_mode="HTML",
+                reply_markup=_settings_markup(user),
+            )
+        except Exception:
+            pass
+        return
+
     else:
         await call.answer()
         return

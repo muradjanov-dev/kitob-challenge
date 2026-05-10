@@ -25,8 +25,8 @@ from tgbot.models import (
 
 @sync_to_async
 def _record_congrats(ua_id: int, congratulator_id: int):
-    """Returns (created, count_before, achiever_telegram_id, achiever_full_name,
-    achievement_code)."""
+    """Returns (created, count_before, count_total, achiever_telegram_id,
+    achiever_full_name, achievement_code)."""
     ua = UserAchievement.objects.filter(id=ua_id).select_related("user").first()
     if not ua:
         return False, 0, None, None, None
@@ -36,7 +36,7 @@ def _record_congrats(ua_id: int, congratulator_id: int):
     count = Congratulation.objects.filter(achievement=ua).count()
     count_before = max(count - 1, 0) if created else count
     return (
-        created, count_before,
+        created, count_before, count,
         ua.user.telegram_id, ua.user.full_name or "Kitobxon",
         ua.code,
     )
@@ -62,7 +62,7 @@ async def congrats_handler(call: types.CallbackQuery, state: FSMContext):
         await call.answer("Avval /start bosing", show_alert=True)
         return
 
-    created, count_before, achiever_tg_id, achiever_name, ach_code = (
+    created, count_before, count_total, achiever_tg_id, achiever_name, ach_code = (
         await _record_congrats(ua_id, user.id)
     )
     if achiever_tg_id is None:
@@ -70,29 +70,11 @@ async def congrats_handler(call: types.CallbackQuery, state: FSMContext):
         return
 
     if not created:
-        await call.answer("Siz allaqachon tabrikladingiz 🙂", show_alert=True)
+        await call.answer(
+            f"Siz allaqachon tabrikladingiz 🙂  (Jami: {count_total} ta tabriklash)",
+            show_alert=True,
+        )
         return
-
-    # 1) Ephemeral 1-min count message to the clicker.
-    try:
-        ephemeral_text = (
-            f"🎉 <b>Rahmat! Siz tabrikladingiz.</b>\n\n"
-            f"Sizdan oldin <b>{count_before}</b> kishi tabriklagan.\n\n"
-            "<i>Bu xabar 1 daqiqadan keyin avtomatik o'chiriladi.</i>"
-        )
-        sent = await bot.send_message(
-            chat_id=user.telegram_id, text=ephemeral_text, parse_mode="HTML",
-        )
-        try:
-            await sync_to_async(ScheduledMessageDeletion.objects.create)(
-                chat_id=user.telegram_id,
-                message_id=sent.message_id,
-                delete_at=timezone.now() + timezone.timedelta(minutes=1),
-            )
-        except Exception as e:
-            print(f"congrats: ephemeral schedule failed: {e}")
-    except Exception as e:
-        print(f"congrats: ephemeral send failed: {e}")
 
     # 2) 12-hour TTL DM to the achiever.
     try:
@@ -122,10 +104,17 @@ async def congrats_handler(call: types.CallbackQuery, state: FSMContext):
     except Exception as e:
         print(f"congrats: achiever DM failed: {e}")
 
-    # 3) Disable the button on the broadcast DM so user can't click twice.
+    # 3) Update button on broadcast DM to show live congrats count.
     try:
-        await call.message.edit_reply_markup(reply_markup=None)
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        new_kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton(
+                text=f"🎉 Tabriklash ({count_total})",
+                callback_data=f"congrats:{ua_id}",
+            )
+        )
+        await call.message.edit_reply_markup(reply_markup=new_kb)
     except Exception:
         pass
 
-    await call.answer("✅ Tabriklash yuborildi!")
+    await call.answer(f"✅ Tabrikladingiz! (Jami: {count_total} ta)")

@@ -514,7 +514,7 @@ def check_user_achievements(user_id: int):
                     ScheduledMessageDeletion.objects.create(
                         chat_id=GENERAL_GROUP_ID,
                         message_id=msg_id,
-                        delete_at=timezone.now() + timezone.timedelta(minutes=10),
+                        delete_at=timezone.now() + timezone.timedelta(hours=12),
                     )
         except Exception as e:
             print(f"tabriklash group broadcast failed for {tg_id}/{ach['code']}: {e}")
