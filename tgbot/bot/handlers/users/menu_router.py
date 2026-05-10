@@ -13,7 +13,8 @@ from django.db.models import Count, Avg, Sum, F
 from django.db.models.functions import ExtractWeekDay, ExtractHour, Length, TruncDate
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from tgbot.bot.loader import dp
+import os
+from tgbot.bot.loader import dp, bot
 from tgbot.bot.utils import get_user
 from tgbot.bot.keyboards.reply import (
     main_markup_for_user, admin_keyboard, back_keyboard, report_reply_keyboard,
@@ -33,6 +34,18 @@ def _t(lang, uz, ru):
 
 def _user_lang(user):
     return (user.language if user else None) or "uz"
+
+
+async def _notify_admins(text: str):
+    admins_raw = os.environ.get("ADMINS", "")
+    for raw in admins_raw.split(","):
+        chat_id = raw.strip()
+        if not chat_id:
+            continue
+        try:
+            await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML")
+        except Exception as e:
+            print(f"admin notify failed for {chat_id}: {e}")
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -663,6 +676,13 @@ async def settings_pick(call: types.CallbackQuery, state: FSMContext):
             "🔄 Siz qayta ro'yxatdan o'tish uchun /start ni bosing.\n\n"
             "(Barcha hisobotlaringiz va ma'lumotlaringiz saqlanib qoldi.)"
         )
+        uname = f"@{call.from_user.username}" if call.from_user.username else "—"
+        await _notify_admins(
+            f"🔄 <b>Qayta boshlash</b>\n"
+            f"👤 {user.full_name or '—'} | {uname}\n"
+            f"🆔 <code>{call.from_user.id}</code>\n"
+            f"<i>Ma'lumotlar saqlanib qoldi.</i>"
+        )
         return
 
     # -- Step-1: ask full reset
@@ -727,6 +747,13 @@ async def settings_pick(call: types.CallbackQuery, state: FSMContext):
         await call.message.answer(
             "🗑 Barcha ma'lumotlaringiz o'chirildi.\n\n"
             "Yangi foydalanuvchi sifatida /start ni bosing."
+        )
+        uname = f"@{call.from_user.username}" if call.from_user.username else "—"
+        await _notify_admins(
+            f"🗑 <b>To'liq o'chirish</b>\n"
+            f"👤 {user.full_name or '—'} | {uname}\n"
+            f"🆔 <code>{call.from_user.id}</code>\n"
+            f"<i>Barcha ma'lumotlari o'chirildi.</i>"
         )
         return
 
