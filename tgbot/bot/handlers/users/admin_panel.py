@@ -531,5 +531,11 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "poll_results":
         from tgbot.bot.handlers.users.polls_admin import poll_results_list
         await poll_results_list(msg, state, _admin_id=admin_id)
+    elif action == "top_readers":
+        from tgbot.tasks import broadcast_top_readers_to_all
+        await call.message.answer(
+            "⏳ Top kitobxonlar barcha foydalanuvchilarga yuborilmoqda (fon rejimida)..."
+        )
+        broadcast_top_readers_to_all.delay()
     else:
         await msg.answer("Noma'lum amal.")

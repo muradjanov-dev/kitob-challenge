@@ -310,6 +310,35 @@ def weekly_report_for_general():
         send_message(general_id, message)
 
 
+@shared_task
+def broadcast_top_readers_to_all():
+    """Admin-triggered: send weekly top-20 readers DM to every registered user."""
+    end_date = timezone.localdate()
+    start_date = end_date - timezone.timedelta(days=6)
+    msg = _build_top_readers_message(start_date, end_date, "Bu hafta", limit=20)
+    if not msg:
+        print("broadcast_top_readers_to_all: no data")
+        return
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent, failed = 0, 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={"chat_id": chat_id, "text": msg, "parse_mode": "HTML",
+                      "disable_web_page_preview": "true"},
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    print(f"broadcast_top_readers_to_all: sent={sent} failed={failed}")
+
+
 INSPIRATION_POOL = [
     "📚 Bir bet — bir qadam. Bugungi qadamingni tashladingmi?",
     "🚀 Kitob o'qiganingni unutma — hisobotni jo'natsang, ball ham, faxr ham seniki!",
@@ -715,6 +744,9 @@ LEVELS = [
     (100000,  "👑", "Usta",     10000),
 ]
 
+# All progress milestones in order (100 and 500 added before level thresholds).
+MILESTONES = [100, 500] + [thr for thr, _, _, _ in LEVELS]
+
 
 def _level_for(pages: int):
     """Return (current_idx, current_threshold, current_emoji, current_name,
@@ -739,26 +771,34 @@ def _level_for(pages: int):
 
 
 def _progress_bar_text(pages: int) -> str:
-    idx, prev_thr, emoji, name, next_thr = _level_for(pages)
-    if next_thr is None:
+    _, __, emoji, name, _ = _level_for(pages)
+
+    # Find the nearest upcoming milestone (100, 500, then level thresholds).
+    next_ms = None
+    prev_ms = 0
+    for m in MILESTONES:
+        if pages < m:
+            next_ms = m
+            break
+        prev_ms = m
+
+    if next_ms is None:
         bar = "▰" * 12
-        line = f"{bar} 100%"
         return (
             f"{emoji} <b>Daraja: {name}</b> (eng yuqori!)\n\n"
-            f"{line}\n"
+            f"{bar} 100%\n"
             f"📄 Jami: <b>{pages}</b> bet\n"
             f"🏁 Barcha marralar bosib o'tildi! 👑"
         )
-    span = next_thr - prev_thr
-    progress = max(0, pages - prev_thr)
-    pct = min(100, int(progress * 100 / span))
+    span = next_ms - prev_ms
+    pct = min(100, int(max(0, pages - prev_ms) * 100 / span))
     filled = int(pct / 100 * 12)
     bar = "▰" * filled + "▱" * (12 - filled)
     return (
         f"{emoji} <b>Daraja: {name}</b>\n\n"
         f"{bar} {pct}%\n"
         f"📄 Sizning betlaringiz: <b>{pages}</b>\n"
-        f"🎯 Keyingi marra: <b>{next_thr}</b> bet (yana {next_thr - pages} bet)"
+        f"🎯 Keyingi marra: <b>{next_ms}</b> bet (yana {next_ms - pages} bet)"
     )
 
 

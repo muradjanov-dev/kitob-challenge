@@ -108,6 +108,8 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
         await _menu_premium(call, user, state)
     elif action == "achievements":
         await _menu_achievements(call, user, state)
+    elif action == "reyting":
+        await _menu_reyting(call, user, state)
     elif action == "contact":
         await _menu_contact(call, user, state)
     elif action == "language":
@@ -488,6 +490,125 @@ async def _menu_achievements(call, user, state: FSMContext):
             chunk += line + "\n"
         if chunk:
             await call.message.answer(chunk, parse_mode="HTML")
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Reyting — top readers for 4 periods, user-selectable via inline buttons.
+# ──────────────────────────────────────────────────────────────────────────
+def _reyting_kb(lang: str, active: str) -> InlineKeyboardMarkup:
+    periods = [
+        ("today",   _t(lang, "Bugun",    "Сегодня")),
+        ("week",    _t(lang, "Bu hafta", "Эта неделя")),
+        ("month",   _t(lang, "Bu oy",    "Этот месяц")),
+        ("3months", _t(lang, "3 oy",     "3 месяца")),
+    ]
+    kb = InlineKeyboardMarkup(row_width=2)
+    btns = []
+    for code, label in periods:
+        marker = "●" if code == active else "○"
+        btns.append(InlineKeyboardButton(
+            text=f"{marker} {label}",
+            callback_data=f"reyting:{code}",
+        ))
+    kb.add(*btns)
+    return kb
+
+
+@sync_to_async
+def _top_readers_text(period: str, lang: str) -> str:
+    from django.db.models import Sum
+    end = timezone.localdate()
+    if period == "today":
+        start = end
+        label = _t(lang, "Bugun", "Сегодня")
+        limit = 20
+    elif period == "week":
+        start = end - timezone.timedelta(days=6)
+        label = _t(lang, "Bu hafta", "Эта неделя")
+        limit = 20
+    elif period == "month":
+        start = end - timezone.timedelta(days=29)
+        label = _t(lang, "Bu oy", "Этот месяц")
+        limit = 30
+    else:  # 3months
+        start = end - timezone.timedelta(days=89)
+        label = _t(lang, "3 oy", "3 месяца")
+        limit = 30
+
+    rows = (
+        ConfirmationReport.objects
+        .filter(date__date__gte=start, date__date__lte=end)
+        .values("user__telegram_id", "user__full_name")
+        .annotate(total=Sum("pages_read"))
+        .order_by("-total")[:limit]
+    )
+    rows = list(rows)
+    if not rows:
+        return _t(lang, "📭 Hali ma'lumot yo'q.", "📭 Данных пока нет.")
+
+    grand = sum(r["total"] or 0 for r in rows)
+    header = _t(
+        lang,
+        f"📊 <b>Top kitobxonlar — {label}</b>\n\n",
+        f"📊 <b>Топ читателей — {label}</b>\n\n",
+    )
+    lines = []
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    for i, r in enumerate(rows, 1):
+        name = r["user__full_name"] or "Kitobxon"
+        tg_id = r["user__telegram_id"]
+        pages = r["total"] or 0
+        medal = medals.get(i, f"{i}.")
+        lines.append(
+            f"{medal} <a href='tg://user?id={tg_id}'>{name}</a>: <b>{pages}</b> bet"
+        )
+    footer = _t(
+        lang,
+        f"\n\n📚 Jami: <b>{grand} bet</b>",
+        f"\n\n📚 Всего: <b>{grand} стр.</b>",
+    )
+    return header + "\n".join(lines) + footer
+
+
+async def _menu_reyting(call, user, _state: FSMContext):
+    await call.answer()
+    lang = _user_lang(user)
+    text = await _top_readers_text("week", lang)
+    await call.message.answer(
+        text,
+        parse_mode="HTML",
+        reply_markup=_reyting_kb(lang, "week"),
+        disable_web_page_preview=True,
+    )
+
+
+@dp.callback_query_handler(
+    lambda c: c.data and c.data.startswith("reyting:"),
+    state="*",
+)
+async def reyting_period_pick(call: types.CallbackQuery, _state: FSMContext):
+    period = call.data.split(":", 1)[1]
+    if period not in ("today", "week", "month", "3months"):
+        await call.answer()
+        return
+    user = get_user(call.from_user.id)
+    lang = _user_lang(user)
+    await call.answer()
+    text = await _top_readers_text(period, lang)
+    try:
+        await call.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=_reyting_kb(lang, period),
+            disable_web_page_preview=True,
+        )
+    except Exception:
+        await call.message.answer(
+            text,
+            parse_mode="HTML",
+            reply_markup=_reyting_kb(lang, period),
+            disable_web_page_preview=True,
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────

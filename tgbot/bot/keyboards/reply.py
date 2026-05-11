@@ -43,11 +43,11 @@ def main_markup(language="uz", is_admin=False):
     blank padding row above and below the title."""
     if language == "ru":
         labels = {
-            # Multi-line text → Telegram renders the button taller.
             "report_big": "📚\n\n📚 Отчет о книге 📚\n\n📚",
             "cabinet": "👤 Кабинет",
             "premium": "💎 Подписка",
             "achievements": "🏆 Мои достижения",
+            "reyting": "📊 Рейтинг",
             "contact": "📞 Написать администратору",
             "lang": "🌐 Изменить язык",
             "settings": "⚙️ Настройки",
@@ -59,6 +59,7 @@ def main_markup(language="uz", is_admin=False):
             "cabinet": "👤 Kabinet",
             "premium": "💎 Premium obuna",
             "achievements": "🏆 Yutuqlarim",
+            "reyting": "📊 Reyting",
             "contact": "📞 Admin bilan bog'lanish",
             "lang": "🌐 Tilni o'zgartirish",
             "settings": "⚙️ Sozlamalar",
@@ -66,13 +67,15 @@ def main_markup(language="uz", is_admin=False):
         }
 
     kb = InlineKeyboardMarkup(row_width=2)
-    # Hero row — single full-width tall button.
     kb.row(InlineKeyboardButton(text=labels["report_big"], callback_data="menu:report"))
     kb.row(
         InlineKeyboardButton(text=labels["cabinet"], callback_data="menu:cabinet"),
         InlineKeyboardButton(text=labels["achievements"], callback_data="menu:achievements"),
     )
-    kb.row(InlineKeyboardButton(text=labels["premium"], callback_data="menu:premium"))
+    kb.row(
+        InlineKeyboardButton(text=labels["reyting"], callback_data="menu:reyting"),
+        InlineKeyboardButton(text=labels["premium"], callback_data="menu:premium"),
+    )
     kb.row(InlineKeyboardButton(text=labels["contact"], callback_data="menu:contact"))
     kb.row(
         InlineKeyboardButton(text=labels["settings"], callback_data="menu:settings"),
@@ -168,6 +171,9 @@ admin_keyboard.row(
 admin_keyboard.row(
     InlineKeyboardButton(text="📊 So'rovnoma", callback_data="admin:poll_new"),
     InlineKeyboardButton(text="📊 So'rovnoma natijalari", callback_data="admin:poll_results"),
+)
+admin_keyboard.row(
+    InlineKeyboardButton(text="🏆 Top kitobxonlar (broadcast)", callback_data="admin:top_readers"),
 )
 
 # The deprecated reply-keyboard version (kept for any legacy callers).
