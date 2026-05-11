@@ -78,3 +78,23 @@ class ContactAdminState(StatesGroup):
 class AdminReplyState(StatesGroup):
     message = State()
     confirm = State()
+
+
+class QuizCreateState(StatesGroup):
+    title = State()
+    description = State()
+    q_text = State()
+    q_options = State()
+    q_hint = State()
+    time_limit = State()
+
+
+class QuizEditState(StatesGroup):
+    choose = State()
+    title = State()
+    description = State()
+    time = State()
+
+
+class QuizBattleState(StatesGroup):
+    start_time = State()

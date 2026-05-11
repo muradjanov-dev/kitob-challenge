@@ -1059,6 +1059,186 @@ def end_of_day_percentile():
     print(f"end_of_day_percentile: sent={sent}")
 
 
+# ────────────────────────────────────────────────────────────────────────
+# Quiz Celery tasks
+# ────────────────────────────────────────────────────────────────────────
+
+@shared_task
+def broadcast_vizov_invite(session_id, quiz_title, quiz_desc, q_count, time_secs, time_label):
+    """Send Vizov join-invite DM to every registered user."""
+    from tgbot.models import QuizSession
+    import json as _j
+
+    text = (
+        f"🏆 <b>JONLI QUIZ — Vizov!</b>\n\n"
+        f"📝 <b>{quiz_title}</b>\n"
+        f"{quiz_desc + chr(10) if quiz_desc else ''}"
+        f"❓ {q_count} ta savol · ⏱ {time_secs} son/savol\n\n"
+        f"⏰ {time_label.replace('<b>', '').replace('</b>', '')}\n\n"
+        f"Qatnashish uchun quyidagi tugmani bosing 👇"
+    )
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    kb = _j.dumps({
+        "inline_keyboard": [[{
+            "text": "🎮 Qatnashish",
+            "callback_data": f"qjoin:{session_id}",
+        }]]
+    })
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            requests.post(
+                url,
+                data={"chat_id": chat_id, "text": text,
+                      "parse_mode": "HTML", "reply_markup": kb},
+                timeout=5,
+            )
+        except Exception:
+            pass
+
+
+@shared_task
+def quiz_start_session(session_id: int):
+    """Start a waiting Vizov session: send first question to all participants."""
+    from tgbot.models import QuizSession, QuizParticipant, QuizQuestion, QuizOption
+    import json as _j, random as _r
+
+    session = QuizSession.objects.select_related("quiz").filter(id=session_id).first()
+    if not session or session.status != "waiting":
+        return
+
+    QuizSession.objects.filter(id=session_id).update(status="active")
+    session.status = "active"
+
+    q_ids = _j.loads(session.question_order)
+    if not q_ids:
+        QuizSession.objects.filter(id=session_id).update(status="finished")
+        return
+
+    _quiz_send_question_to_all(session_id, 0)
+
+
+@shared_task
+def quiz_advance_question(session_id: int, question_idx: int):
+    """Called when a question's time limit expires: tally answers, send next."""
+    from tgbot.models import QuizSession
+    import json as _j
+
+    session = QuizSession.objects.filter(id=session_id).first()
+    if not session or session.status != "active":
+        return
+    if session.current_question_idx != question_idx:
+        return  # already advanced
+
+    q_ids = _j.loads(session.question_order)
+    next_idx = question_idx + 1
+    if next_idx >= len(q_ids):
+        quiz_finish_session(session_id)
+    else:
+        _quiz_send_question_to_all(session_id, next_idx)
+
+
+def _quiz_send_question_to_all(session_id: int, q_idx: int):
+    """Send question q_idx to every participant of the session (via DM)."""
+    from tgbot.models import QuizSession, QuizParticipant, QuizQuestion, QuizOption
+    import json as _j, random as _r
+
+    session = QuizSession.objects.select_related("quiz").filter(id=session_id).first()
+    if not session:
+        return
+
+    q_ids = _j.loads(session.question_order)
+    if q_idx >= len(q_ids):
+        quiz_finish_session(session_id)
+        return
+
+    question = QuizQuestion.objects.prefetch_related("options").filter(id=q_ids[q_idx]).first()
+    if not question:
+        return
+
+    opts = list(question.options.all())
+    if session.quiz.shuffle:
+        _r.shuffle(opts)
+
+    total = len(q_ids)
+    text = (
+        f"❓ <b>Savol {q_idx+1}/{total}</b>\n\n"
+        f"{question.text}\n\n"
+        f"⏱ <i>{session.quiz.time_per_question} soniya</i>"
+    )
+    kb_data = _j.dumps({
+        "inline_keyboard": [[{
+            "text": opt.text,
+            "callback_data": f"qans:{session_id}:{question.id}:{opt.id}",
+        }] for opt in opts]
+    })
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    participants = QuizParticipant.objects.filter(session_id=session_id).select_related("user")
+    for p in participants:
+        try:
+            requests.post(
+                url,
+                data={"chat_id": p.user.telegram_id, "text": text,
+                      "parse_mode": "HTML", "reply_markup": kb_data},
+                timeout=5,
+            )
+        except Exception:
+            pass
+
+    QuizSession.objects.filter(id=session_id).update(current_question_idx=q_idx)
+    quiz_advance_question.apply_async(
+        (session_id, q_idx),
+        countdown=session.quiz.time_per_question,
+    )
+
+
+def quiz_finish_session(session_id: int):
+    """Finalize a Vizov session and DM results to all participants."""
+    from tgbot.models import QuizSession, QuizParticipant
+
+    QuizSession.objects.filter(id=session_id).update(status="finished")
+    session = QuizSession.objects.select_related("quiz").filter(id=session_id).first()
+    if not session:
+        return
+
+    participants = (
+        QuizParticipant.objects
+        .filter(session_id=session_id)
+        .select_related("user")
+        .order_by("-score")
+    )
+    total_q = len(session.question_order.replace("[", "").replace("]", "").split(",")) if session.question_order != "[]" else 0
+
+    lines = []
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    for i, p in enumerate(participants, 1):
+        pct = int(p.score * 100 / total_q) if total_q else 0
+        medal = medals.get(i, f"{i}.")
+        lines.append(f"{medal} {p.user.full_name or 'Kitobxon'}: {p.score}/{total_q} ({pct}%)")
+
+    result_text = (
+        f"🏆 <b>{session.quiz.title} — Natijalar</b>\n\n"
+        + "\n".join(lines) if lines else "Hech kim qatnashmadi."
+    )
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    for p in participants:
+        my_score = p.score
+        my_pct = int(my_score * 100 / total_q) if total_q else 0
+        personal = f"\n\n<b>Sizning natijangiz: {my_score}/{total_q} ({my_pct}%)</b>"
+        try:
+            requests.post(
+                url,
+                data={"chat_id": p.user.telegram_id,
+                      "text": result_text + personal,
+                      "parse_mode": "HTML"},
+                timeout=5,
+            )
+        except Exception:
+            pass
+
+
 @shared_task
 def process_scheduled_deletions():
     """Every minute: delete any messages whose delete_at has passed."""

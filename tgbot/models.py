@@ -553,3 +553,109 @@ class ScheduledMessageDeletion(models.Model):
     class Meta:
         db_table = "scheduled_message_deletions"
         ordering = ("delete_at",)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Quiz system
+# ─────────────────────────────────────────────────────────────────────────────
+import random as _random
+import string as _string
+
+
+def _quiz_code():
+    return ''.join(_random.choices(_string.ascii_lowercase + _string.digits, k=8))
+
+
+class Quiz(models.Model):
+    creator = models.ForeignKey(
+        'TelegramProfile', on_delete=models.CASCADE, related_name='quizzes'
+    )
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    time_per_question = models.IntegerField(default=30)
+    shuffle = models.BooleanField(default=True)
+    link_code = models.CharField(max_length=16, unique=True, default=_quiz_code)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'quizzes'
+        ordering = ('-created_at',)
+
+
+class QuizQuestion(models.Model):
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='questions')
+    text = models.TextField()
+    hint = models.TextField(blank=True)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = 'quiz_questions'
+        ordering = ('order',)
+
+
+class QuizOption(models.Model):
+    question = models.ForeignKey(
+        QuizQuestion, on_delete=models.CASCADE, related_name='options'
+    )
+    text = models.CharField(max_length=500)
+    is_correct = models.BooleanField(default=False)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = 'quiz_options'
+        ordering = ('order',)
+
+
+class QuizSession(models.Model):
+    WAITING = 'waiting'
+    ACTIVE = 'active'
+    FINISHED = 'finished'
+
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='sessions')
+    creator = models.ForeignKey(
+        'TelegramProfile', on_delete=models.CASCADE, related_name='quiz_sessions_led'
+    )
+    chat_id = models.BigIntegerField(db_index=True)
+    join_message_id = models.BigIntegerField(null=True, blank=True)
+    status = models.CharField(max_length=20, default='waiting')
+    scheduled_start = models.DateTimeField(null=True, blank=True)
+    current_question_idx = models.IntegerField(default=0)
+    question_order = models.TextField(default='[]')  # JSON list of question IDs
+    is_group = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'quiz_sessions'
+
+
+class QuizParticipant(models.Model):
+    session = models.ForeignKey(
+        QuizSession, on_delete=models.CASCADE, related_name='participants'
+    )
+    user = models.ForeignKey(
+        'TelegramProfile', on_delete=models.CASCADE, related_name='quiz_participations'
+    )
+    score = models.IntegerField(default=0)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'quiz_participants'
+        unique_together = ('session', 'user')
+
+
+class QuizUserAnswer(models.Model):
+    participant = models.ForeignKey(
+        QuizParticipant, on_delete=models.CASCADE, related_name='answers'
+    )
+    question = models.ForeignKey(
+        QuizQuestion, on_delete=models.CASCADE, related_name='user_answers'
+    )
+    option = models.ForeignKey(
+        QuizOption, on_delete=models.CASCADE, null=True, blank=True
+    )
+    is_correct = models.BooleanField(default=False)
+    answered_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'quiz_user_answers'
+        unique_together = ('participant', 'question')

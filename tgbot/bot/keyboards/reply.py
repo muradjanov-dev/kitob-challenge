@@ -175,6 +175,9 @@ admin_keyboard.row(
 admin_keyboard.row(
     InlineKeyboardButton(text="🏆 Top kitobxonlar (broadcast)", callback_data="admin:top_readers"),
 )
+admin_keyboard.row(
+    InlineKeyboardButton(text="📝 Quizlar", callback_data="admin:quizzes"),
+)
 
 # The deprecated reply-keyboard version (kept for any legacy callers).
 _admin_reply_keyboard_legacy = ReplyKeyboardMarkup(

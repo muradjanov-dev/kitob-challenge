@@ -537,5 +537,8 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
             "⏳ Top kitobxonlar barcha foydalanuvchilarga yuborilmoqda (fon rejimida)..."
         )
         broadcast_top_readers_to_all.delay()
+    elif action == "quizzes":
+        from tgbot.bot.handlers.users.quiz_admin import show_quiz_list
+        await show_quiz_list(call.message, user)
     else:
         await msg.answer("Noma'lum amal.")

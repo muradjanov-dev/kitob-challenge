@@ -50,6 +50,20 @@ async def do_start(message: types.Message, state: FSMContext):
     already_registered = bool(
         user and (user.is_registered or (user.full_name and user.gender))
     )
+
+    # Handle quiz deep link: /start quiz_<code>
+    if args and args.startswith("quiz_"):
+        if already_registered:
+            if user and not user.is_registered:
+                user.is_registered = True
+                await sync_to_async(user.save)(update_fields=["is_registered"])
+            await state.finish()
+            from tgbot.bot.handlers.users.quiz_play import start_solo_quiz
+            await start_solo_quiz(message, args[len("quiz_"):])
+            return
+        # Not registered yet — save code for after registration
+        await state.update_data(pending_quiz_code=args[len("quiz_"):])
+
     if already_registered:
         if user and not user.is_registered:
             user.is_registered = True

@@ -17,3 +17,5 @@ from . import polls_admin
 from . import contact_admin
 from . import congrats
 from . import menu_router
+from . import quiz_admin
+from . import quiz_play
