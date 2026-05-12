@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.builtin import ChatTypeFilter
@@ -408,7 +408,7 @@ async def spent_time_handler(message: types.Message, state: FSMContext):
         f"<b><a href='tg://user?id={user.telegram_id}'>{user.full_name}</a></b>:\n\n"
         f"📊#kun - {reading_day}  ({today})\n\n"
         f"<b>Kitob nomi:</b> {book}\n\n"
-        f"<b>✅O‘qilgan betlar:</b> {pages_read}+ bet\n\n"
+        f"<b>✅O'qilgan betlar:</b> {pages_read}+ bet\n\n"
         f"<b>💡Olingan xulosa:</b> {conclusion}\n\n"
         f"<b>Haqiqiy peshqadam 🏆</b>\n\n"
         "Tasdiqlaysizmi?"
@@ -521,10 +521,10 @@ async def _do_confirm_report(message, user, state: FSMContext):
     prem_badge = "💎 " if await _check_premium() else ""
 
     report_message = (
-        f"<b><a href=’tg://user?id={user.telegram_id}’>{prem_badge}{user.full_name}</a></b>:\n\n"
-        f"📊#kun - {reading_day}  ({report.date.strftime(‘%Y-%m-%d’)})\n\n"
+        f"<b><a href='tg://user?id={user.telegram_id}'>{prem_badge}{user.full_name}</a></b>:\n\n"
+        f"📊#kun - {reading_day}  ({report.date.strftime('%Y-%m-%d')})\n\n"
         f"<b>Kitob nomi:</b> {book}\n\n"
-        f"<b>✅O’qilgan betlar:</b> {pages_read}+ bet\n\n"
+        f"<b>✅O'qilgan betlar:</b> {pages_read}+ bet\n\n"
         f"<b>💡Olingan xulosa:</b> {conclusion}\n\n"
         f"<b>Haqiqiy peshqadam 🏆</b>"
     )

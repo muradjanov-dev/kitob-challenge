@@ -1,4 +1,4 @@
-from django.db import models
+﻿from django.db import models
 from django.utils.translation import gettext_lazy as _
 from solo.models import SingletonModel
 
@@ -446,7 +446,7 @@ class Payment(BaseModel):
     )
 
     def mark_as_paid(self):
-        """To‘lovni `paid` holatiga o‘tkazish."""
+        """To'lovni `paid` holatiga o'tkazish."""
         self.status = 'paid'
         self.save()
 

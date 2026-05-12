@@ -1,4 +1,4 @@
-"""
+﻿"""
 Central inline-menu callback router.
 
 Every main-menu inline button has callback_data `menu:<action>`. This module
@@ -907,23 +907,23 @@ def _settings_text(user, lang: str) -> str:
     send_to = (getattr(user, "send_congrats_to", "any") or "any") if user else "any"
 
     label = {"any": "Hammadan/Hammaga", "male": "Erkak", "female": "Ayol"}
-    cal_uz = "yoqilgan" if show_cal else "o’chirilgan"
+    cal_uz = "yoqilgan" if show_cal else "o'chirilgan"
     cal_ru = "включён" if show_cal else "выключен"
     return _t(
         lang,
         (
             "⚙️ <b>Sozlamalar</b>\n\n"
             "🔔 <b>Kunlik eslatmalar:</b>\n"
-            "  0 — yo’q · 1 — kechqurun · 2 — ertalab + kechqurun · 3 — uch marta\n"
+            "  0 — yo'q · 1 — kechqurun · 2 — ertalab + kechqurun · 3 — uch marta\n"
             f"  Joriy: <b>{rc}</b>\n\n"
             f"📅 <b>Kalendar (streak):</b> {cal_uz}\n"
-            "  Kabinetda kunlik streak ko’rsatiladi.\n\n"
+            "  Kabinetda kunlik streak ko'rsatiladi.\n\n"
             f"🎉 <b>Tabriklash filtri:</b>\n"
             f"  Qabul qilish: <b>{label.get(accept, accept)}</b>\n"
             f"  Yuborish: <b>{label.get(send_to, send_to)}</b>\n\n"
-            "🌐 <b>Til:</b> sozlamalar orqali o’zgartiring.\n\n"
-            "🔄 <b>Qayta boshlash</b> — faqat ro’yxatdan o’tish jarayonini qaytaradi.\n"
-            "🗑 <b>Ma’lumotlarni o’chirish</b> — barcha ma’lumotlaringiz o’chiriladi."
+            "🌐 <b>Til:</b> sozlamalar orqali o'zgartiring.\n\n"
+            "🔄 <b>Qayta boshlash</b> — faqat ro'yxatdan o'tish jarayonini qaytaradi.\n"
+            "🗑 <b>Ma'lumotlarni o'chirish</b> — barcha ma'lumotlaringiz o'chiriladi."
         ),
         (
             "⚙️ <b>Настройки</b>\n\n"

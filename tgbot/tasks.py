@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import random
 import requests
 import environ
@@ -110,7 +110,7 @@ async def _user_total_pages_read():
     )
 
     if total_pages_by_user:
-        message = f"Shu kungacha Kitob Challenge loyihasi doirasida jami {total_pages_by_user['total_pages']} bet o‘qildi! 📚✨📖\nAjoyib natija! ⚡️⚡️⚡️ Davom etamiz! 🚀"
+        message = f"Shu kungacha Kitob Challenge loyihasi doirasida jami {total_pages_by_user['total_pages']} bet o'qildi! 📚✨📖\nAjoyib natija! ⚡️⚡️⚡️ Davom etamiz! 🚀"
     else:
         message = "📚 Kecha uchun kitob o'qigan foydalanuvchilar yo'q."
 
@@ -305,7 +305,7 @@ def users_unread_book():
                 if user.telegram_id != 631751797:
                     message += f"-@{user.username} (<b>{user.full_name}</b>)\n"
 
-        message += "\nKuniga 5-10 daqiqa va siz yana safdasiz 🚀 \n\n *Bizdan qolib ketmysiz degan umiddamiz xurmatli do’stlar"
+        message += "\nKuniga 5-10 daqiqa va siz yana safdasiz 🚀 \n\n *Bizdan qolib ketmysiz degan umiddamiz xurmatli do'stlar"
 
         for _cid in _group_chat_ids():
             send_message(_cid, message)
