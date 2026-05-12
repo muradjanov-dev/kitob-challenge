@@ -58,6 +58,18 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=23, minute=59, day_of_month='31', month_of_year='12'),
     },
 
+    # 3-monthly top (1st of Jan/Apr/Jul/Oct at 00:10).
+    'send-3-monthly-top-read-pages-user': {
+        'task': 'tgbot.tasks.three_months_top_read_user',
+        'schedule': crontab(hour=0, minute=10, day_of_month=1, month_of_year='1,4,7,10'),
+    },
+
+    # Daily features overview — sent once at 11:00 Tashkent.
+    'send-daily-features': {
+        'task': 'tgbot.tasks.send_daily_features',
+        'schedule': crontab(hour=11, minute=0),
+    },
+
     'send-daily-users-unread-book': {
         'task': 'tgbot.tasks.users_unread_book',
         'schedule': crontab(hour=22, minute=0)

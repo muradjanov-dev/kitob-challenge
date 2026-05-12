@@ -117,6 +117,8 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
         await _menu_language(call, user, state)
     elif action == "settings":
         await _menu_settings(call, user, state)
+    elif action == "how":
+        await _menu_how_it_works(call, user, state)
     elif action == "admin":
         await _menu_admin(call, user, state)
     else:
@@ -494,14 +496,94 @@ async def _menu_achievements(call, user, state: FSMContext):
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# Reyting — top readers for 4 periods, user-selectable via inline buttons.
+# How it works — bot features explanation.
 # ──────────────────────────────────────────────────────────────────────────
+_HOW_IT_WORKS_UZ = (
+    "❓ <b>Bot qanday ishlaydi?</b>\n\n"
+    "📚 <b>1. Har kuni o'qing va hisobot yuboring</b>\n"
+    "   «Kitob hisoboti» tugmasi → o'qigan sahifalar soni → kitob → xulosa\n\n"
+    "📊 <b>2. Reytingda kurashing</b>\n"
+    "   Kunlik, haftalik, oylik va yillik top kitobxonlar e'lon qilinadi\n\n"
+    "🏆 <b>3. Yutuqlar yuting</b>\n"
+    "   30+ yutuq: hisobotlar, betlar, streak, referrallar va boshqalar\n\n"
+    "🪙 <b>4. Kitobcha to'plang</b>\n"
+    "   Har yutuq va top o'rin uchun Kitobcha beriladi\n\n"
+    "📈 <b>5. Darajangizni oshiring</b>\n"
+    "   100 → 500 → 1000 → ... bet bosib o'tganda yangi daraja va mukofot!\n\n"
+    "👥 <b>6. Do'stlarni taklif qiling</b>\n"
+    "   Referral kod orqali do'stingizni qo'shing va bonus oling\n\n"
+    "⚙️ <b>7. Sozlamalar</b>\n"
+    "   Eslatmalar, til, tabriqlash filtrlari — hammasini sozlang"
+)
+
+_HOW_IT_WORKS_RU = (
+    "❓ <b>Как работает бот?</b>\n\n"
+    "📚 <b>1. Читайте и отправляйте отчёт каждый день</b>\n"
+    "   «Отчёт о книге» → количество страниц → книга → вывод\n\n"
+    "📊 <b>2. Соревнуйтесь в рейтинге</b>\n"
+    "   Ежедневные, еженедельные, ежемесячные и годовые топы\n\n"
+    "🏆 <b>3. Зарабатывайте достижения</b>\n"
+    "   30+ достижений: отчёты, страницы, серии, рефералы и другие\n\n"
+    "🪙 <b>4. Копите Kitobcha</b>\n"
+    "   За каждое достижение и место в топе начисляется Kitobcha\n\n"
+    "📈 <b>5. Повышайте уровень</b>\n"
+    "   100 → 500 → 1000 → ... страниц — новый уровень и награда!\n\n"
+    "👥 <b>6. Приглашайте друзей</b>\n"
+    "   Реферальный код → друг регистрируется → бонус вам\n\n"
+    "⚙️ <b>7. Настройки</b>\n"
+    "   Напоминания, язык, фильтры поздравлений — настройте под себя"
+)
+
+
+def _how_it_works_kb(lang: str) -> InlineKeyboardMarkup:
+    if lang == "ru":
+        rows = [
+            ("📚 Отчёт",       "cta_send_report"),
+            ("👤 Кабинет",     "menu:cabinet"),
+            ("🏆 Достижения",  "menu:achievements"),
+            ("📊 Рейтинг",     "menu:reyting"),
+            ("💎 Подписка",    "menu:premium"),
+            ("⚙️ Настройки",  "menu:settings"),
+        ]
+    else:
+        rows = [
+            ("📚 Hisobot",      "cta_send_report"),
+            ("👤 Kabinet",      "menu:cabinet"),
+            ("🏆 Yutuqlar",     "menu:achievements"),
+            ("📊 Reyting",      "menu:reyting"),
+            ("💎 Premium",      "menu:premium"),
+            ("⚙️ Sozlamalar",  "menu:settings"),
+        ]
+    kb = InlineKeyboardMarkup(row_width=2)
+    for label, cb in rows:
+        kb.insert(InlineKeyboardButton(text=label, callback_data=cb))
+    return kb
+
+
+async def _show_how_it_works(message, user):
+    lang = _user_lang(user)
+    text = _HOW_IT_WORKS_RU if lang == "ru" else _HOW_IT_WORKS_UZ
+    await message.answer(text, parse_mode="HTML", reply_markup=_how_it_works_kb(lang))
+
+
+async def _menu_how_it_works(call, user, _state: FSMContext):
+    await call.answer()
+    await _show_how_it_works(call.message, user)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Reyting — top readers for 5 periods, user-selectable via inline buttons.
+# ──────────────────────────────────────────────────────────────────────────
+_VALID_PERIODS = ("today", "week", "month", "3months", "yearly")
+
+
 def _reyting_kb(lang: str, active: str) -> InlineKeyboardMarkup:
     periods = [
         ("today",   _t(lang, "Bugun",    "Сегодня")),
         ("week",    _t(lang, "Bu hafta", "Эта неделя")),
         ("month",   _t(lang, "Bu oy",    "Этот месяц")),
         ("3months", _t(lang, "3 oy",     "3 месяца")),
+        ("yearly",  _t(lang, "Yillik",   "Годовой")),
     ]
     kb = InlineKeyboardMarkup(row_width=2)
     btns = []
@@ -517,33 +599,37 @@ def _reyting_kb(lang: str, active: str) -> InlineKeyboardMarkup:
 
 @sync_to_async
 def _top_readers_text(period: str, lang: str) -> str:
-    from django.db.models import Sum
+    import datetime as _dt
     end = timezone.localdate()
     if period == "today":
         start = end
         label = _t(lang, "Bugun", "Сегодня")
         limit = 20
     elif period == "week":
-        start = end - timezone.timedelta(days=6)
+        start = end - _dt.timedelta(days=6)
         label = _t(lang, "Bu hafta", "Эта неделя")
         limit = 20
     elif period == "month":
-        start = end - timezone.timedelta(days=29)
+        start = end - _dt.timedelta(days=29)
         label = _t(lang, "Bu oy", "Этот месяц")
         limit = 30
-    else:  # 3months
-        start = end - timezone.timedelta(days=89)
+    elif period == "3months":
+        start = end - _dt.timedelta(days=89)
         label = _t(lang, "3 oy", "3 месяца")
-        limit = 30
+        limit = 40
+    else:  # yearly
+        start = end - _dt.timedelta(days=364)
+        label = _t(lang, "Yillik", "Годовой")
+        limit = 60
 
-    rows = (
+    from django.db.models import Sum
+    rows = list(
         ConfirmationReport.objects
         .filter(date__date__gte=start, date__date__lte=end)
         .values("user__telegram_id", "user__full_name")
         .annotate(total=Sum("pages_read"))
         .order_by("-total")[:limit]
     )
-    rows = list(rows)
     if not rows:
         return _t(lang, "📭 Hali ma'lumot yo'q.", "📭 Данных пока нет.")
 
@@ -589,13 +675,18 @@ async def _menu_reyting(call, user, _state: FSMContext):
 )
 async def reyting_period_pick(call: types.CallbackQuery, _state: FSMContext):
     period = call.data.split(":", 1)[1]
-    if period not in ("today", "week", "month", "3months"):
+    if period not in _VALID_PERIODS:
         await call.answer()
         return
     user = get_user(call.from_user.id)
     lang = _user_lang(user)
     await call.answer()
-    text = await _top_readers_text(period, lang)
+    try:
+        text = await _top_readers_text(period, lang)
+    except Exception as e:
+        print(f"reyting_period_pick error for {period}: {e}")
+        await call.message.answer(_t(lang, "❌ Xato yuz berdi, qayta urining.", "❌ Ошибка, попробуйте ещё раз."))
+        return
     try:
         await call.message.edit_text(
             text,
@@ -604,12 +695,42 @@ async def reyting_period_pick(call: types.CallbackQuery, _state: FSMContext):
             disable_web_page_preview=True,
         )
     except Exception:
-        await call.message.answer(
-            text,
-            parse_mode="HTML",
-            reply_markup=_reyting_kb(lang, period),
-            disable_web_page_preview=True,
-        )
+        try:
+            await call.message.answer(
+                text,
+                parse_mode="HTML",
+                reply_markup=_reyting_kb(lang, period),
+                disable_web_page_preview=True,
+            )
+        except Exception as e2:
+            print(f"reyting fallback answer failed: {e2}")
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Top-list congratulations (from scheduled broadcast Tabriklash buttons).
+# ──────────────────────────────────────────────────────────────────────────
+@dp.callback_query_handler(
+    lambda c: c.data and c.data.startswith("toplist_congrats:"),
+    state="*",
+)
+async def toplist_congrats_handler(call: types.CallbackQuery, _state: FSMContext):
+    user = get_user(call.from_user.id)
+    if not user:
+        await call.answer("Avval /start bosing", show_alert=True)
+        return
+
+    parts = call.data.split(":")
+    if len(parts) < 3:
+        await call.answer()
+        return
+
+    period = parts[1]
+    date_str = parts[2]
+
+    await call.answer("🎉 Tabrikladingiz! Xabarlar jo'natilmoqda...", show_alert=False)
+
+    from tgbot.tasks import process_toplist_congrats
+    process_toplist_congrats.delay(period, date_str, call.from_user.id)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -648,6 +769,12 @@ def _settings_markup(user) -> InlineKeyboardMarkup:
             text=f"{marker} {label}", callback_data=f"settings:send:{code}",
         ))
 
+    # Language toggle
+    kb.row(InlineKeyboardButton(text="🌐 Tilni o'zgartirish / Изменить язык", callback_data="settings:language"))
+
+    # How it works
+    kb.row(InlineKeyboardButton(text="❓ Qanday ishlaydi?", callback_data="settings:how_it_works"))
+
     # Restart & Full reset buttons
     kb.row(
         InlineKeyboardButton(
@@ -671,32 +798,36 @@ def _settings_text(user, lang: str) -> str:
     send_to = (getattr(user, "send_congrats_to", "any") or "any") if user else "any"
 
     label = {"any": "Hammadan/Hammaga", "male": "Erkak", "female": "Ayol"}
+    cal_uz = "yoqilgan" if show_cal else "o’chirilgan"
+    cal_ru = "включён" if show_cal else "выключен"
     return _t(
         lang,
         (
             "⚙️ <b>Sozlamalar</b>\n\n"
             "🔔 <b>Kunlik eslatmalar:</b>\n"
-            "  0 — yo'q · 1 — kechqurun · 2 — ertalab + kechqurun · 3 — uch marta\n"
+            "  0 — yo’q · 1 — kechqurun · 2 — ertalab + kechqurun · 3 — uch marta\n"
             f"  Joriy: <b>{rc}</b>\n\n"
-            f"📅 <b>Kalendar (streak):</b> {'yoqilgan' if show_cal else 'o’chirilgan'}\n"
-            "  Yoqsangiz, kabinetda kunlar ko'rsatiladi va kunni bossangiz o'sha kuni o'qigan kitobi va hisoboti ochiladi.\n\n"
+            f"📅 <b>Kalendar (streak):</b> {cal_uz}\n"
+            "  Kabinetda kunlik streak ko’rsatiladi.\n\n"
             f"🎉 <b>Tabriklash filtri:</b>\n"
             f"  Qabul qilish: <b>{label.get(accept, accept)}</b>\n"
             f"  Yuborish: <b>{label.get(send_to, send_to)}</b>\n\n"
-            "🔄 <b>Qayta boshlash</b> — faqat roʼyxatdan oʼtish jarayonini qaytaradi, ma’lumotlar saqlanadi.\n"
-            "🗑 <b>Ma’lumotlarni oʼchirish</b> — barcha ma’lumotlaringiz butunlay oʼchiriladi va yangi foydalanuvchi sifatida boshlaysiz."
+            "🌐 <b>Til:</b> sozlamalar orqali o’zgartiring.\n\n"
+            "🔄 <b>Qayta boshlash</b> — faqat ro’yxatdan o’tish jarayonini qaytaradi.\n"
+            "🗑 <b>Ma’lumotlarni o’chirish</b> — barcha ma’lumotlaringiz o’chiriladi."
         ),
         (
             "⚙️ <b>Настройки</b>\n\n"
             "🔔 <b>Ежедневные напоминания:</b>\n"
             "  0 — нет · 1 — вечер · 2 — утро+вечер · 3 — три раза\n"
             f"  Текущее: <b>{rc}</b>\n\n"
-            f"📅 <b>Календарь (streak):</b> {'включен' if show_cal else 'выключен'}\n\n"
+            f"📅 <b>Календарь (streak):</b> {cal_ru}\n\n"
             f"🎉 <b>Поздравления:</b>\n"
             f"  Принимаю: <b>{label.get(accept, accept)}</b>\n"
             f"  Отправляю: <b>{label.get(send_to, send_to)}</b>\n\n"
+            "🌐 <b>Язык:</b> изменить через кнопку ниже.\n\n"
             "🔄 <b>Перезапуск</b> — только регистрация заново, данные сохраняются.\n"
-            "🗑 <b>Удаление данных</b> — все данные удаляются, начинаете как новый пользователь."
+            "🗑 <b>Удаление данных</b> — все данные удаляются."
         ),
     )
 
@@ -761,6 +892,19 @@ async def settings_pick(call: types.CallbackQuery, state: FSMContext):
         else:
             await call.answer()
             return
+
+    elif action == "language":
+        await call.answer()
+        lang = _user_lang(user)
+        text = _t(lang, "Tilni o'zgartiring", "Измените язык")
+        await call.message.answer(text, reply_markup=languages_markup)
+        await ChangeLanguageState.language_change.set()
+        return
+
+    elif action == "how_it_works":
+        await call.answer()
+        await _show_how_it_works(call.message, user)
+        return
 
     # -- Step-1: ask restart
     elif action == "restart_ask":

@@ -194,52 +194,87 @@ def _send_period_report(start_date, end_date, limit, period_name):
 
 @shared_task
 def daily_top_read_user():
-    today = timezone.now().date()
+    import datetime as _dt
+    today = timezone.localdate()
+    date_str = today.strftime("%Y%m%d")
+    # Send to general channel
     _send_period_report(today, today, 20, "Bugun")
+    # Build message and broadcast to groups + all users
+    msg = _build_top_readers_message(today, today, "Bugun 🔥 Top kitobxonlar", limit=20)
+    if msg:
+        _broadcast_top_to_groups_and_users(msg, "daily", date_str)
 
 
 @shared_task
 def three_days_top_read_user():
-    end_date = timezone.now().date()
-    # Today + 2 previous days = 3 days
-    start_date = end_date - timezone.timedelta(days=2)
+    import datetime as _dt
+    end_date = timezone.localdate()
+    start_date = end_date - _dt.timedelta(days=2)
     _send_period_report(start_date, end_date, 20, "Oxirgi 3 kunda")
 
 
 @shared_task
 def weekly_top_read_user():
-    end_date = timezone.now().date()
-    # Today + 6 previous days = 7 days
-    start_date = end_date - timezone.timedelta(days=6)
+    import datetime as _dt
+    end_date = timezone.localdate()
+    start_date = end_date - _dt.timedelta(days=6)
+    date_str = end_date.strftime("%Y%m%d")
+    # Send to general channel
     _send_period_report(start_date, end_date, 30, "Bu hafta")
+    # Build message and broadcast to groups + all users
+    msg = _build_top_readers_message(start_date, end_date, "Bu hafta 🏆 Top kitobxonlar", limit=30)
+    if msg:
+        _broadcast_top_to_groups_and_users(msg, "weekly", date_str)
 
 
 @shared_task
 def monthly_top_read_user():
-    end_date = timezone.now().date()
-    start_date = end_date - timezone.timedelta(days=29)  # 30 days roughly
+    import datetime as _dt
+    end_date = timezone.localdate()
+    start_date = end_date - _dt.timedelta(days=29)
+    date_str = end_date.strftime("%Y%m%d")
+    # Send to general channel
     _send_period_report(start_date, end_date, 30, "Bu oy")
+    # Build message and broadcast to groups + all users
+    msg = _build_top_readers_message(start_date, end_date, "Bu oy 📅 Top kitobxonlar", limit=30)
+    if msg:
+        _broadcast_top_to_groups_and_users(msg, "monthly", date_str)
 
 
 @shared_task
 def three_months_top_read_user():
-    end_date = timezone.now().date()
-    start_date = end_date - timezone.timedelta(days=90)
+    import datetime as _dt
+    end_date = timezone.localdate()
+    start_date = end_date - _dt.timedelta(days=89)
+    date_str = end_date.strftime("%Y%m%d")
+    # Send to general channel
     _send_period_report(start_date, end_date, 40, "Oxirgi 3 oyda")
+    # Build message and broadcast to groups + all users
+    msg = _build_top_readers_message(start_date, end_date, "3 oylik 📊 Top kitobxonlar", limit=40)
+    if msg:
+        _broadcast_top_to_groups_and_users(msg, "3monthly", date_str)
 
 
 @shared_task
 def six_months_top_read_user():
-    end_date = timezone.now().date()
-    start_date = end_date - timezone.timedelta(days=180)
+    import datetime as _dt
+    end_date = timezone.localdate()
+    start_date = end_date - _dt.timedelta(days=180)
     _send_period_report(start_date, end_date, 50, "Oxirgi 6 oyda")
 
 
 @shared_task
 def yearly_top_read_user():
-    end_date = timezone.now().date()
-    start_date = end_date - timezone.timedelta(days=365)
+    import datetime as _dt
+    end_date = timezone.localdate()
+    start_date = end_date - _dt.timedelta(days=364)
+    date_str = end_date.strftime("%Y%m%d")
+    # Send to general channel
     _send_period_report(start_date, end_date, 60, "Bu yil")
+    # Build message and broadcast to groups + all users
+    msg = _build_top_readers_message(start_date, end_date, "Yillik 🏅 Top kitobxonlar", limit=60)
+    if msg:
+        _broadcast_top_to_groups_and_users(msg, "yearly", date_str)
 
 
 @shared_task
@@ -291,16 +326,125 @@ def _build_top_readers_message(start_date, end_date, period_label, limit=20):
     return message
 
 
+def _toplist_congrats_keyboard(period: str, date_str: str) -> str:
+    """Returns JSON inline keyboard with a Tabriklash button for top lists."""
+    return json.dumps({
+        "inline_keyboard": [[{
+            "text": "🎉 Tabriklash",
+            "callback_data": f"toplist_congrats:{period}:{date_str}",
+        }]]
+    })
+
+
+def _broadcast_top_to_groups_and_users(message: str, period: str, date_str: str):
+    """Send top list to boys/girls groups and to all registered users (with Tabriklash button)."""
+    import os as _os
+    boys_group = _os.environ.get("BOYS_GROUP_ID", "")
+    girls_group = _os.environ.get("GIRLS_GROUP_ID", "")
+
+    keyboard = _toplist_congrats_keyboard(period, date_str)
+
+    for group_id in filter(None, [boys_group, girls_group]):
+        try:
+            send_notification(group_id, message, reply_markup=keyboard)
+        except Exception as e:
+            print(f"group top broadcast failed for {group_id}: {e}")
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent = failed = 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": chat_id,
+                    "text": message,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": "true",
+                    "reply_markup": keyboard,
+                },
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    print(f"_broadcast_top_to_groups_and_users({period}): sent={sent} failed={failed}")
+
+
+@shared_task
+def process_toplist_congrats(period: str, date_str: str, congratulator_tg_id: int):
+    """When a user presses Tabriklash on a top-list broadcast, send
+    a congratulation DM to every user in that period's top list."""
+    import datetime as _dt
+
+    try:
+        end_date = _dt.datetime.strptime(date_str, "%Y%m%d").date()
+    except ValueError:
+        return
+
+    period_map = {
+        "daily":    (_dt.timedelta(days=0),   "Kunlik",   20),
+        "weekly":   (_dt.timedelta(days=6),   "Haftalik", 30),
+        "monthly":  (_dt.timedelta(days=29),  "Oylik",    30),
+        "3monthly": (_dt.timedelta(days=89),  "3 oylik",  40),
+        "yearly":   (_dt.timedelta(days=364), "Yillik",   60),
+    }
+    if period not in period_map:
+        return
+
+    delta, period_label, limit = period_map[period]
+    start_date = end_date - delta
+
+    congratulator = TelegramProfile.objects.filter(telegram_id=congratulator_tg_id).first()
+    if not congratulator:
+        return
+    presser_name = escape(congratulator.full_name or "Kitobxon")
+
+    rows = list(
+        ConfirmationReport.objects
+        .filter(date__date__gte=start_date, date__date__lte=end_date)
+        .values("user__telegram_id", "user__full_name")
+        .annotate(total=Sum("pages_read"))
+        .order_by("-total")[:limit]
+    )
+    if not rows:
+        return
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    for row in rows:
+        tg_id = row["user__telegram_id"]
+        if tg_id == congratulator_tg_id:
+            continue
+        try:
+            text = (
+                f"🎉 <b>{presser_name}</b> sizi tabriklamoqda!\n\n"
+                f"📊 <b>{period_label}</b> top ro'yxatida bo'lganingiz uchun!\n\n"
+                "Zo'r natija! Davom eting 📚🔥"
+            )
+            requests.post(
+                url,
+                data={"chat_id": tg_id, "text": text, "parse_mode": "HTML"},
+                timeout=5,
+            )
+        except Exception as e:
+            print(f"toplist congrats DM failed for {tg_id}: {e}")
+
+
 @shared_task
 def weekly_report_for_general():
     """3 kunlik, 7 kunlik va 30 kunlik top kitobxonlarni umumiy kanalga yuboradi."""
+    import datetime as _dt
     end_date = timezone.localdate()
     general_id = -1002237773868
 
     periods = [
-        (end_date - timezone.timedelta(days=2), end_date, "Oxirgi 3 kunda"),
-        (end_date - timezone.timedelta(days=6), end_date, "Oxirgi 7 kunda"),
-        (end_date - timezone.timedelta(days=29), end_date, "Oxirgi 30 kunda"),
+        (end_date - _dt.timedelta(days=2),  end_date, "Oxirgi 3 kunda"),
+        (end_date - _dt.timedelta(days=6),  end_date, "Oxirgi 7 kunda"),
+        (end_date - _dt.timedelta(days=29), end_date, "Oxirgi 30 kunda"),
     ]
 
     for start_date, period_end, label in periods:
@@ -308,6 +452,71 @@ def weekly_report_for_general():
         if message is None:
             message = f"📚 {label} kitob o'qigan foydalanuvchilar yo'q."
         send_message(general_id, message)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Daily features spotlight broadcast.
+# ──────────────────────────────────────────────────────────────────────────
+_FEATURES_TEXT = (
+    "📣 <b>Kitob Challenge boti imkoniyatlari</b>\n\n"
+    "📚 <b>Kitob hisoboti</b> — har kuni o'qigan sahifalaringizni kiriting va reytingda ko'taring\n\n"
+    "👤 <b>Kabinet</b> — statistika: jami betlar, reytingdagi o'rin, o'qish tezligi, streak kalendar\n\n"
+    "🏆 <b>Yutuqlar</b> — 30+ yutuq: hisobotlar, betlar, streak, referrallar, tezlik va boshqalar\n\n"
+    "📊 <b>Reyting</b> — kunlik, haftalik, oylik, 3 oylik va yillik top kitobxonlar\n\n"
+    "📈 <b>Darajalar</b> — 100 → 500 → 1000 → ... bet bosib o'tganda daraja va Kitobcha mukofoti!\n\n"
+    "💎 <b>Premium</b> — qo'shimcha imkoniyatlar uchun obuna\n\n"
+    "⚙️ <b>Sozlamalar</b> — eslatmalar soni, til, tabriqlash filtrlari\n\n"
+    "👥 <b>Referral</b> — do'stingizni taklif qiling va bonus oling"
+)
+
+
+def _features_keyboard():
+    kb = {
+        "inline_keyboard": [
+            [
+                {"text": "📚 Hisobot", "callback_data": "cta_send_report"},
+                {"text": "👤 Kabinet", "callback_data": "menu:cabinet"},
+            ],
+            [
+                {"text": "🏆 Yutuqlar", "callback_data": "menu:achievements"},
+                {"text": "📊 Reyting",  "callback_data": "menu:reyting"},
+            ],
+            [
+                {"text": "💎 Premium",    "callback_data": "menu:premium"},
+                {"text": "⚙️ Sozlamalar", "callback_data": "menu:settings"},
+            ],
+            [{"text": "❓ Qanday ishlaydi?", "callback_data": "menu:how"}],
+        ]
+    }
+    return json.dumps(kb)
+
+
+@shared_task
+def send_daily_features():
+    """Once a day: send bot features overview with inline navigation buttons to all users."""
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    keyboard = _features_keyboard()
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent = failed = 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": chat_id,
+                    "text": _FEATURES_TEXT,
+                    "parse_mode": "HTML",
+                    "reply_markup": keyboard,
+                },
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    print(f"send_daily_features: sent={sent} failed={failed}")
 
 
 @shared_task
@@ -518,7 +727,7 @@ def check_user_achievements(user_id: int):
 
         points_line = f"\n🪙 <b>+{points} Kitobcha</b>" if points else ""
 
-        # 1) Group congrats — auto-delete after 10 minutes.
+        # 1) Group congrats — auto-delete after 12 hours.
         group_text = (
             "🎉 <b>Tabriklaymiz!</b>\n\n"
             f"<a href='tg://user?id={tg_id}'>{plain_name}</a> yangi yutuqni qo'lga kiritdi:\n\n"
@@ -526,27 +735,36 @@ def check_user_achievements(user_id: int):
             f"{points_line}\n\n"
             "Davom etamiz! 📚🔥"
         )
-        try:
-            url_send = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-            resp = requests.post(
-                url_send,
-                data={
-                    "chat_id": GENERAL_GROUP_ID,
-                    "text": group_text,
-                    "parse_mode": "HTML",
-                },
-                timeout=5,
-            )
-            if resp.ok:
-                msg_id = resp.json().get("result", {}).get("message_id")
-                if msg_id:
-                    ScheduledMessageDeletion.objects.create(
-                        chat_id=GENERAL_GROUP_ID,
-                        message_id=msg_id,
-                        delete_at=timezone.now() + timezone.timedelta(hours=12),
-                    )
-        except Exception as e:
-            print(f"tabriklash group broadcast failed for {tg_id}/{ach['code']}: {e}")
+        import os as _os
+        import datetime as _dt
+        _boys_group = _os.environ.get("BOYS_GROUP_ID", "")
+        url_send = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+        # Send to general group + (for male achievers) also to boys group
+        target_groups = [str(GENERAL_GROUP_ID)]
+        if user.gender == "male" and _boys_group:
+            target_groups.append(_boys_group)
+
+        for _gid in target_groups:
+            try:
+                resp = requests.post(
+                    url_send,
+                    data={"chat_id": _gid, "text": group_text, "parse_mode": "HTML"},
+                    timeout=5,
+                )
+                if resp.ok:
+                    msg_id = resp.json().get("result", {}).get("message_id")
+                    if msg_id:
+                        try:
+                            ScheduledMessageDeletion.objects.create(
+                                chat_id=int(_gid),
+                                message_id=msg_id,
+                                delete_at=timezone.now() + _dt.timedelta(hours=12),
+                            )
+                        except Exception:
+                            pass
+            except Exception as e:
+                print(f"tabriklash group broadcast failed for {_gid}/{ach['code']}: {e}")
 
         try:
             UserAchievement.objects.filter(
@@ -734,18 +952,19 @@ def broadcast_poll(poll_id: int):
 # Phase 3: progress bar, percentile & reminders.
 # ────────────────────────────────────────────────────────────────────────
 LEVELS = [
-    (1000,    "🥉", "Bronza",     100),
-    (2000,    "🥈", "Kumush",     200),
-    (4000,    "🥇", "Oltin",      400),
-    (8000,    "🏆", "Chempion",   800),
-    (10000,   "💎", "Olmos",     1000),
-    (20000,   "🦄", "Afsona",    2000),
-    (50000,   "⭐", "Magistr",   5000),
-    (100000,  "👑", "Usta",     10000),
+    (100,    "🌱", "Yosh kitobxon",  15),
+    (500,    "📗", "Kitobsever",     40),
+    (1000,   "🥉", "Bronza",        100),
+    (2000,   "🥈", "Kumush",        200),
+    (4000,   "🥇", "Oltin",         400),
+    (8000,   "🏆", "Chempion",      800),
+    (10000,  "💎", "Olmos",        1000),
+    (20000,  "🦄", "Afsona",       2000),
+    (50000,  "⭐", "Magistr",      5000),
+    (100000, "👑", "Usta",        10000),
 ]
 
-# All progress milestones in order (100 and 500 added before level thresholds).
-MILESTONES = [100, 500] + [thr for thr, _, _, _ in LEVELS]
+MILESTONES = [thr for thr, _, _, _ in LEVELS]
 
 
 def _level_for(pages: int):
@@ -758,8 +977,9 @@ def _level_for(pages: int):
         else:
             break
     if current_idx == -1:
+        # Below the first level threshold (100 pages) → pre-level "Yo'lboshi"
         prev_thr = 0
-        next_thr = LEVELS[0][0]
+        next_thr = LEVELS[0][0]  # 100
         emoji = "📖"
         name = "Yo'lboshi"
     else:
@@ -771,9 +991,9 @@ def _level_for(pages: int):
 
 
 def _progress_bar_text(pages: int) -> str:
-    _, __, emoji, name, _ = _level_for(pages)
+    _, prev_thr, emoji, name, _ = _level_for(pages)
 
-    # Find the nearest upcoming milestone (100, 500, then level thresholds).
+    # Find the nearest upcoming milestone from MILESTONES list.
     next_ms = None
     prev_ms = 0
     for m in MILESTONES:
@@ -790,7 +1010,7 @@ def _progress_bar_text(pages: int) -> str:
             f"📄 Jami: <b>{pages}</b> bet\n"
             f"🏁 Barcha marralar bosib o'tildi! 👑"
         )
-    span = next_ms - prev_ms
+    span = max(next_ms - prev_ms, 1)
     pct = min(100, int(max(0, pages - prev_ms) * 100 / span))
     filled = int(pct / 100 * 12)
     bar = "▰" * filled + "▱" * (12 - filled)

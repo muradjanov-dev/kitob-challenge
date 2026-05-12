@@ -49,8 +49,8 @@ def main_markup(language="uz", is_admin=False):
             "achievements": "🏆 Мои достижения",
             "reyting": "📊 Рейтинг",
             "contact": "📞 Написать администратору",
-            "lang": "🌐 Изменить язык",
             "settings": "⚙️ Настройки",
+            "how": "❓ Как работает?",
             "admin": "👑 Админ панель",
         }
     else:
@@ -61,8 +61,8 @@ def main_markup(language="uz", is_admin=False):
             "achievements": "🏆 Yutuqlarim",
             "reyting": "📊 Reyting",
             "contact": "📞 Admin bilan bog'lanish",
-            "lang": "🌐 Tilni o'zgartirish",
             "settings": "⚙️ Sozlamalar",
+            "how": "❓ Qanday ishlaydi?",
             "admin": "👑 Admin panel",
         }
 
@@ -79,7 +79,7 @@ def main_markup(language="uz", is_admin=False):
     kb.row(InlineKeyboardButton(text=labels["contact"], callback_data="menu:contact"))
     kb.row(
         InlineKeyboardButton(text=labels["settings"], callback_data="menu:settings"),
-        InlineKeyboardButton(text=labels["lang"], callback_data="menu:language"),
+        InlineKeyboardButton(text=labels["how"], callback_data="menu:how"),
     )
     if is_admin:
         kb.row(InlineKeyboardButton(text=labels["admin"], callback_data="menu:admin"))

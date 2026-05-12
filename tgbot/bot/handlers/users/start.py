@@ -223,6 +223,48 @@ async def age_pick(call: types.CallbackQuery, state: FSMContext):
     )
     await state.finish()
 
+    # Send welcome / how-it-works message immediately after registration.
+    _WELCOME_UZ = (
+        "👋 <b>Xush kelibsiz, {name}!</b>\n\n"
+        "Bu bot bilan kitob o'qishni odatga aylantiring:\n\n"
+        "📚 <b>Hisobot</b> — har kuni o'qigan sahifalaringizni yuboring\n"
+        "📊 <b>Reyting</b> — boshqa kitobxonlar bilan bellashing\n"
+        "🏆 <b>Yutuqlar</b> — 30+ yutuq yutib oling va Kitobcha to'plang\n"
+        "📈 <b>Darajalar</b> — 100 bet dan boshlang, har yangi marra — mukofot!\n"
+        "👥 <b>Referral</b> — do'stingizni taklif qiling va bonus oling\n\n"
+        "Boshlash uchun ⬇️ pastdagi <b>«Kitob hisoboti»</b> tugmasini bosing!"
+    )
+    _WELCOME_RU = (
+        "👋 <b>Добро пожаловать, {name}!</b>\n\n"
+        "С этим ботом сделайте чтение привычкой:\n\n"
+        "📚 <b>Отчёт</b> — отправляйте страницы каждый день\n"
+        "📊 <b>Рейтинг</b> — соревнуйтесь с другими читателями\n"
+        "🏆 <b>Достижения</b> — 30+ наград и Kitobcha за прогресс\n"
+        "📈 <b>Уровни</b> — начните с 100 страниц, каждый уровень — бонус!\n"
+        "👥 <b>Рефералы</b> — пригласите друга и получите награду\n\n"
+        "Нажмите ⬇️ кнопку <b>«Отчёт о книге»</b> чтобы начать!"
+    )
+    display_name = (user.full_name or "").split()[0] if user.full_name else "do'st"
+    welcome_text = (
+        (_WELCOME_RU if lang == "ru" else _WELCOME_UZ).format(name=display_name)
+    )
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    welcome_kb = InlineKeyboardMarkup(row_width=2)
+    if lang == "ru":
+        welcome_kb.add(
+            InlineKeyboardButton("📚 Отчёт о книге", callback_data="cta_send_report"),
+            InlineKeyboardButton("❓ Как работает?", callback_data="menu:how"),
+        )
+    else:
+        welcome_kb.add(
+            InlineKeyboardButton("📚 Kitob hisoboti", callback_data="cta_send_report"),
+            InlineKeyboardButton("❓ Qanday ishlaydi?", callback_data="menu:how"),
+        )
+    try:
+        await call.message.answer(welcome_text, parse_mode="HTML", reply_markup=welcome_kb)
+    except Exception as e:
+        print(f"welcome message failed for {call.from_user.id}: {e}")
+
     # Notify admins (best-effort, doesn't block the user). Always Uzbek for admin.
     try:
         admins_raw = os.environ.get("ADMINS", "")
