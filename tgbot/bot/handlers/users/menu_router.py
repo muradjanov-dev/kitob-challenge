@@ -119,6 +119,8 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
         await _menu_settings(call, user, state)
     elif action == "how":
         await _menu_how_it_works(call, user, state)
+    elif action == "quiz":
+        await _menu_quiz(call, user, state)
     elif action == "admin":
         await _menu_admin(call, user, state)
     else:
@@ -533,6 +535,76 @@ async def _menu_contact(call, user, state: FSMContext):
         reply_markup=back_keyboard,
     )
     await ContactAdminState.message.set()
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Kitob Quiz section (Premium only).
+# ──────────────────────────────────────────────────────────────────────────
+async def _menu_quiz(call, user, state: FSMContext):
+    await call.answer()
+    lang = _user_lang(user)
+    is_premium = _is_premium_user(user)
+
+    if not is_premium:
+        if lang == "ru":
+            text = (
+                "🔒 <b>Книжный Квиз — только для Premium</b>\n\n"
+                "В этом разделе вы сможете:\n\n"
+                "📝 <b>Решать квизы</b> по прочитанным книгам\n"
+                "⚔️ <b>Бросать Визов</b> — вызывать друзей на соревнование\n"
+                "🏆 <b>Соревноваться</b> с другими читателями\n"
+                "⏱ <b>Тест на скорость</b> — отвечайте быстро, пока не кончилось время\n"
+                "📊 <b>Смотреть результаты</b> и сравнивать с другими\n\n"
+                "💎 <i>Оформите Premium подписку, чтобы открыть этот раздел!</i>"
+            )
+            kb = InlineKeyboardMarkup().add(
+                InlineKeyboardButton("💎 Оформить Premium", callback_data="menu:premium")
+            )
+        else:
+            text = (
+                "🔒 <b>Kitob Quiz — faqat Premium foydalanuvchilar uchun</b>\n\n"
+                "Bu bo'limda siz:\n\n"
+                "📝 <b>O'qigan kitoblaringiz bo'yicha quizlar yechishingiz</b>\n"
+                "⚔️ <b>Vizov yuborish</b> — do'stlaringizni musobaqaga chaqirishingiz\n"
+                "🏆 <b>Boshqa kitobxonlar bilan raqobat qilishingiz</b>\n"
+                "⏱ <b>Vaqt sinaladi</b> — tezlik bilan javob bering, vaqt tugashidan oldin!\n"
+                "📊 <b>Natijalaringizni ko'rishingiz</b> va boshqalar bilan solishtirishingiz mumkin\n\n"
+                "💎 <i>Bu imkoniyatlarni ochish uchun Premium oling!</i>"
+            )
+            kb = InlineKeyboardMarkup().add(
+                InlineKeyboardButton("💎 Premium olish", callback_data="menu:premium")
+            )
+        await call.message.answer(text, parse_mode="HTML", reply_markup=kb)
+        return
+
+    # Premium user — show available quizzes
+    from tgbot.models import Quiz as _Quiz
+    quizzes = await sync_to_async(list)(
+        _Quiz.objects.prefetch_related("questions").order_by("-created_at")[:15]
+    )
+
+    if not quizzes:
+        text = _t(
+            lang,
+            "📝 <b>Kitob Quiz</b>\n\nHozircha quizlar yo'q. Tez orada yangilari qo'shiladi!",
+            "📝 <b>Книжный Квиз</b>\n\nПока квизов нет. Скоро появятся новые!",
+        )
+        await call.message.answer(text, parse_mode="HTML")
+        return
+
+    header = _t(
+        lang,
+        "📝 <b>Kitob Quiz</b>\n\nMavjud quizlar — birini tanlang va boshlang:",
+        "📝 <b>Книжный Квиз</b>\n\nДоступные квизы — выберите и начните:",
+    )
+    kb = InlineKeyboardMarkup(row_width=1)
+    for quiz in quizzes:
+        q_count = len(quiz.questions.all())
+        kb.add(InlineKeyboardButton(
+            text=f"📝 {quiz.title} ({q_count} savol · {quiz.time_per_question}s)",
+            callback_data=f"qsolo:{quiz.id}",
+        ))
+    await call.message.answer(header, parse_mode="HTML", reply_markup=kb)
 
 
 # ──────────────────────────────────────────────────────────────────────────
