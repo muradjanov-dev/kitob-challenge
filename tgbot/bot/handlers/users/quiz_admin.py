@@ -12,7 +12,7 @@ from tgbot.bot.utils import get_user
 from tgbot.bot.states.main import QuizCreateState, QuizEditState, QuizBattleState
 from tgbot.models import Quiz, QuizQuestion, QuizOption, QuizSession, TelegramProfile
 
-BOT_USERNAME = os.environ.get("BOT_USERNAME", "kitob_challenge_bot")
+BOT_USERNAME = os.environ.get("BOT_USERNAME", "kitob_challange_bot")
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
 
