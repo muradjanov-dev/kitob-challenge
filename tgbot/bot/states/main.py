@@ -70,6 +70,10 @@ class PollAdminState(StatesGroup):
     confirm = State()
 
 
+class ConfirmDeleteState(StatesGroup):
+    confirm = State()
+
+
 class ContactAdminState(StatesGroup):
     message = State()
     confirm = State()

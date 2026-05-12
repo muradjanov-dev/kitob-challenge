@@ -114,8 +114,8 @@ async def _user_total_pages_read():
     else:
         message = "📚 Kecha uchun kitob o'qigan foydalanuvchilar yo'q."
 
-    chat_id = "-1002237773868"
-    send_notification(chat_id, message)
+    for _cid in _group_chat_ids():
+        send_notification(_cid, message)
 
 
 @shared_task(acks_late=True)
@@ -163,8 +163,8 @@ async def _daily_top_read_user_action_button():
     else:
         message = "📚 Kecha uchun kitob o'qigan foydalanuvchilar yo'q."
 
-    chat_id = "-1002237773868"
-    send_message(chat_id, message)
+    for _cid in _group_chat_ids():
+        send_message(_cid, message)
 
 
 def _send_period_report(start_date, end_date, limit, period_name):
@@ -188,8 +188,8 @@ def _send_period_report(start_date, end_date, limit, period_name):
     else:
         message = f"📚 {period_name} uchun kitob o'qigan foydalanuvchilar yo'q."
 
-    chat_id = "-1002237773868"
-    send_message(chat_id, message)
+    for _cid in _group_chat_ids():
+        send_message(_cid, message)
 
 
 @shared_task
@@ -293,10 +293,10 @@ def users_unread_book():
                 if user.telegram_id != 631751797:
                     message += f"-@{user.username} (<b>{user.full_name}</b>)\n"
 
-        message += "\nKuniga 5-10 daqiqa va siz yana safdasiz 🚀 \n\n *Bizdan qolib ketmysiz degan umiddamiz xurmatli do‘stlar"
+        message += "\nKuniga 5-10 daqiqa va siz yana safdasiz 🚀 \n\n *Bizdan qolib ketmysiz degan umiddamiz xurmatli do’stlar"
 
-        chat_id = "-1002237773868"
-        send_message(chat_id, message)
+        for _cid in _group_chat_ids():
+            send_message(_cid, message)
 
 
 def _build_top_readers_message(start_date, end_date, period_label, limit=20):
@@ -439,7 +439,6 @@ def weekly_report_for_general():
     """3 kunlik, 7 kunlik va 30 kunlik top kitobxonlarni umumiy kanalga yuboradi."""
     import datetime as _dt
     end_date = timezone.localdate()
-    general_id = -1002237773868
 
     periods = [
         (end_date - _dt.timedelta(days=2),  end_date, "Oxirgi 3 kunda"),
@@ -451,7 +450,8 @@ def weekly_report_for_general():
         message = _build_top_readers_message(start_date, period_end, label)
         if message is None:
             message = f"📚 {label} kitob o'qigan foydalanuvchilar yo'q."
-        send_message(general_id, message)
+        for _cid in _group_chat_ids():
+            send_message(_cid, message)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -695,7 +695,82 @@ def broadcast_reminder(text: str):
     print(f"broadcast_reminder: sent={sent} failed={failed}")
 
 
+# ────────────────────────────────────────────────────────────────────────
+# Streak-burning warning — sent at 22:00 to users who haven't reported today.
+# ────────────────────────────────────────────────────────────────────────
+STREAK_WARNING_POOL = [
+    "🔥 Voyyy, streak kuyib ketmoqda! Hali ham hisobot yo'q... 1 bet o'qi, qoqindiq bo'lib qolma!",
+    "😬 Streak — bu qo'lga kiritilmaydi, asrash kerak. Bugun hali 0 bet. Shoshil, kuyib ketadi!",
+    "🚨 OGOHLANTIRISH: Streakin bugun xavf ostida! Bitta bet o'qi, bitta tugma bos. Qoqindiq emassan-ku?",
+    "😤 Boshqalar hisobot yuborib bo'ldi, sen-chi? Streak 1-kundan boshlansa uyalamaysanmi? 1 bet kifoya!",
+    "🫠 Streak = mehnat. Bugun mehnat qilmadingmi? Hech bo'lmasa 1 bet o'qi, qoqindiq bo'lib qolma!",
+    "⚠️ Diqqat! Streak yonmoqda... Yaxshi kitobxonlarga bu xabar kerak emas, lekin sen hali hisobot bermagansan. Tez bo'l!",
+    "🐢 Sekin-sekin bo'lsa ham, lekin bugun hali 0 bet? Streak kuymoqda! 1 bet o'qi, qoqindiq!",
+    "😅 Kech bo'lsa ham kech emas! Hali vaqt bor, 1 bet o'qi va streak'ni qutqar. Qoqindiq bo'lma!",
+    "🤦 Uh, bugun hisobot yo'q... Streak 1-kundan boshlanishini xohlaysanmi? Hech bo'lmasa 1 bet — bitta tugma!",
+    "🔔 Eslatma: Streakin bugun kuyib ketmoqda. Ertaga \"ey nima bo'ldi\" dema. 1 bet o'qi, qoqindiq!",
+    "💀 Streak murdaga aylanmoqda! Uni tiriltirishning yagona yo'li — hisobot. Hoziroq, 1 bet ham yetadi!",
+    "😒 Kuniga 1 bet... 1 ta! Buni qilolmasan — qoqindiqsan, to'g'rimi? Isbotla, streak'ni qutqar!",
+    "🥴 Hisobotsiz kun = yo'qotilgan streak. Bugungi sen ertangi senga xiyonat qilmoqda. 1 bet, 1 tugma!",
+    "🫡 Odam kitob o'qiydi, qoqindiq bahona topadi. Sen qaysi tomondasanda? Streak kutmoqda!",
+    "😩 Streakin bugun halok bo'lishi mumkin. Oilangg, do'stlaring bilsa uyalmasmidin? 1 bet o'qi!",
+    "🧨 BOOM — streak portlab ketmoqda! Hali vaqt bor, 1 bet bilan uni qutqar. Dangasa bo'lma!",
+    "🫵 Ha, sen! Hisobot bermagansan bugun. Streakin 1-kundan boshlanishini xohlaysanmi? 1 bet yetadi!",
+    "🤡 Streak nol bo'lsa? Qiziq ko'rinadi. Bugun 1 bet o'qib, \"Men qoqindiq emasman\" de — isbotla!",
+    "🕙 Soat 22:00, hali ham hisobot yo'q. Streakin kuymoqda. 1 bet o'qi — shu qadar oson!",
+    "🌙 Tun kirib kelmoqda, streak esa kuymoqda... Bugun 1 bet o'qib hisobot yubor, qoqindiq bo'lib qolma!",
+]
+
+
+@shared_task
+def send_streak_warning():
+    """22:00 da hisobot bermaganlarni streak kuyib ketishi haqida ogohlantiradi."""
+    today = timezone.localdate()
+    reported_ids = set(
+        ConfirmationReport.objects.filter(date__date=today)
+        .values_list("user_id", flat=True)
+    )
+
+    qs = TelegramProfile.objects.filter(
+        is_registered=True, is_blocked=False,
+    ).exclude(id__in=reported_ids)
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    reply_markup = _cta_reply_markup()
+    sent = failed = 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            text = random.choice(STREAK_WARNING_POOL)
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": chat_id,
+                    "text": text,
+                    "parse_mode": "HTML",
+                    "reply_markup": reply_markup,
+                },
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    print(f"send_streak_warning: sent={sent} failed={failed}")
+
+
 GENERAL_GROUP_ID = -1002237773868
+
+
+def _group_chat_ids():
+    """Return all group/channel IDs to broadcast to: main group + boys group."""
+    import os as _os
+    ids = [str(GENERAL_GROUP_ID)]
+    boys = _os.environ.get("BOYS_GROUP_ID", "").strip()
+    if boys and boys not in ids:
+        ids.append(boys)
+    return ids
 
 
 @shared_task
@@ -718,14 +793,17 @@ def check_user_achievements(user_id: int):
         title = ach.get("title_uz") or ach.get("title_ru") or ach["code"]
         points = ach.get("points", 0)
 
-        # Award kitobcha for this unlock.
+        # Award kitobcha for this unlock (×2 for premium).
+        awarded_points = 0
         if points:
             try:
-                user.update_ball(True, points)
+                awarded_points = user.update_ball(True, points)
             except Exception as e:
                 print(f"award kitobcha for achievement {ach['code']} failed: {e}")
+                awarded_points = points
 
-        points_line = f"\n🪙 <b>+{points} Kitobcha</b>" if points else ""
+        prem_note = " 💎 ×2!" if awarded_points > points else ""
+        points_line = f"\n🪙 <b>+{awarded_points} Kitobcha</b>{prem_note}" if awarded_points else ""
 
         # 1) Group congrats — auto-delete after 12 hours.
         group_text = (
@@ -735,15 +813,11 @@ def check_user_achievements(user_id: int):
             f"{points_line}\n\n"
             "Davom etamiz! 📚🔥"
         )
-        import os as _os
         import datetime as _dt
-        _boys_group = _os.environ.get("BOYS_GROUP_ID", "")
         url_send = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-        # Send to general group + (for male achievers) also to boys group
-        target_groups = [str(GENERAL_GROUP_ID)]
-        if user.gender == "male" and _boys_group:
-            target_groups.append(_boys_group)
+        # Send achievement congrats to all groups (both main and boys group).
+        target_groups = _group_chat_ids()
 
         for _gid in target_groups:
             try:
@@ -892,15 +966,16 @@ def daily_top_readers_reward():
             user = TelegramProfile.objects.filter(id=user_id).first()
             if not user:
                 continue
-            user.update_ball(True, kitobcha)
+            awarded = user.update_ball(True, kitobcha)
             try:
                 pages = row['total_pages'] or 0
                 place_emoji = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, "🏅")
+                prem_note = " 💎 ×2!" if awarded > kitobcha else ""
                 dm_text = (
                     f"{place_emoji} <b>Bugungi reyting natijangiz!</b>\n\n"
                     f"O'rningiz: <b>{rank}</b>\n"
                     f"O'qigan betlaringiz: <b>{pages}</b>\n"
-                    f"🪙 Mukofot: <b>+{kitobcha} Kitobcha</b>\n\n"
+                    f"🪙 Mukofot: <b>+{awarded} Kitobcha</b>{prem_note}\n\n"
                     f"Joriy balans: <b>{int(user.ball)}</b>"
                 )
                 send_notification(chat_id=user.telegram_id, text=dm_text)
@@ -1034,11 +1109,12 @@ def _award_level_rewards(user: TelegramProfile, pages: int):
         if pages >= thr and code not in awarded:
             try:
                 UserAchievement.objects.create(user=user, code=code, congratulated=True)
-                user.update_ball(True, points)
+                aw = user.update_ball(True, points)
+                prem_note = " 💎 ×2!" if aw > points else ""
                 dm = (
                     f"{emoji} <b>Yangi daraja: {name}!</b>\n\n"
                     f"📄 {thr} bet marrasini bosib o'tdingiz!\n"
-                    f"🪙 <b>+{points} Kitobcha</b>\n\n"
+                    f"🪙 <b>+{aw} Kitobcha</b>{prem_note}\n\n"
                     f"Joriy balans: <b>{int(user.ball)}</b>"
                 )
                 send_notification(chat_id=user.telegram_id, text=dm)

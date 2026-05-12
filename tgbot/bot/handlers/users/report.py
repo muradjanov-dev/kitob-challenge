@@ -583,11 +583,12 @@ async def _do_confirm_report(message, user, state: FSMContext):
         disable_web_page_preview=True,
     )
 
-    # Award 25 kitobcha for the submitted report.
+    # Award 25 kitobcha for the submitted report (×2 for premium users).
     try:
-        await sync_to_async(user.update_ball)(True, 25)
+        awarded = await sync_to_async(user.update_ball)(True, 25)
+        premium_note = " 💎 ×2 premium!" if awarded > 25 else ""
         await message.answer(
-            f"🪙 +25 Kitobcha qo'shildi! Joriy balans: <b>{int(user.ball)}</b>",
+            f"🪙 +{awarded} Kitobcha qo'shildi!{premium_note} Joriy balans: <b>{int(user.ball)}</b>",
             parse_mode="HTML",
         )
     except Exception as e:

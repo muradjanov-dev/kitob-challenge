@@ -134,6 +134,12 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.process_scheduled_deletions',
         'schedule': crontab(),
     },
+
+    # Streak-burning warning at 22:00 for users who haven't reported today.
+    'send-streak-warning': {
+        'task': 'tgbot.tasks.send_streak_warning',
+        'schedule': crontab(hour=22, minute=0),
+    },
 }
 
 # Use Tashkent local time for crontab schedules (matches admin-set HH:MM).

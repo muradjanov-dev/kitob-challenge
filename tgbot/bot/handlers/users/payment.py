@@ -20,7 +20,9 @@ MONTHLY_PRICE = 17_000   # UZS
 # ── Premium features list shown to user ─────────────────────────────────────
 PREMIUM_FEATURES_UZ = (
     "💎 <b>Premium obuna imtiyozlari:</b>\n\n"
-    "✅ Kunlik kitob hisobotlarini cheksiz yuborish\n"
+    "🪙 <b>2× Kitobcha</b> — har bir hisobot, yutuq va reyting mukofoti ikki barobar!\n"
+    "📋 <b>To'liq hisobotlar tarixi</b> — qaysi kuni, qaysi kitob, qanday xulosa yozganingizni ko'ring\n"
+    "📊 <b>O'sish jadvali</b> — kun / hafta / oy / yil kesimida o'sish yoki tushish foizini va grafigini ko'ring\n"
     "✅ Haftalik va oylik reyting jadvallarida qatnashish\n"
     "✅ Maxsus premium badge va unvon\n"
     "✅ Admin bilan bevosita aloqa\n\n"
@@ -29,7 +31,9 @@ PREMIUM_FEATURES_UZ = (
 
 PREMIUM_FEATURES_RU = (
     "💎 <b>Преимущества Premium подписки:</b>\n\n"
-    "✅ Неограниченная отправка ежедневных отчётов о книгах\n"
+    "🪙 <b>Kitobcha ×2</b> — каждый отчёт, достижение и рейтинговая награда удваиваются!\n"
+    "📋 <b>Полная история отчётов</b> — какой день, какая книга, какой вывод\n"
+    "📊 <b>График роста</b> — прирост/спад в % за день/неделю/месяц/год с колонной диаграммой\n"
     "✅ Участие в еженедельных и ежемесячных рейтингах\n"
     "✅ Специальный Premium значок и звание\n"
     "✅ Прямая связь с администратором\n\n"

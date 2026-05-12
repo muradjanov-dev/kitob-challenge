@@ -94,6 +94,76 @@ async def calendar_day_detail(call: types.CallbackQuery):
     await call.message.answer("\n\n".join(lines), parse_mode="HTML")
 
 
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith("cab:history"), state="*")
+async def cabinet_history(call: types.CallbackQuery):
+    """Premium: paginated list of all reports — date, book, pages, conclusion."""
+    from tgbot.models import Payment
+    from django.utils import timezone as _tz
+
+    user_id = call.from_user.id
+    is_prem = Payment.objects.filter(
+        user__telegram_id=user_id,
+        status="paid",
+        end_date__gte=_tz.localdate(),
+    ).exists()
+    if not is_prem:
+        await call.answer("Bu imkoniyat faqat Premium foydalanuvchilar uchun. 💎", show_alert=True)
+        return
+
+    parts = call.data.split(":")
+    try:
+        page = int(parts[2]) if len(parts) > 2 else 0
+    except (ValueError, IndexError):
+        page = 0
+
+    per_page = 10
+    offset = page * per_page
+
+    reports = list(
+        ConfirmationReport.objects.filter(user__telegram_id=user_id)
+        .prefetch_related("books")
+        .order_by("-date")[offset : offset + per_page + 1]
+    )
+
+    has_more = len(reports) > per_page
+    reports = reports[:per_page]
+
+    if not reports:
+        await call.answer("Hisobotlar yo'q", show_alert=True)
+        return
+
+    lines = [f"📋 <b>Hisobotlaringiz tarixi</b> (sahifa {page + 1}):\n"]
+    for r in reports:
+        date_str = r.date.strftime("%d.%m.%Y")
+        title = (r.book or "").strip()
+        if not title:
+            m2m_titles = list(r.books.values_list("title", flat=True))
+            title = ", ".join(m2m_titles) if m2m_titles else "—"
+        conclusion = (r.conclusion or "").strip()
+        entry = (
+            f"📅 <b>{date_str}</b> — {title}\n"
+            f"📄 {r.pages_read} bet"
+        )
+        if conclusion:
+            short = conclusion[:120] + ("…" if len(conclusion) > 120 else "")
+            entry += f"\n💡 {short}"
+        lines.append(entry)
+
+    text = "\n\n".join(lines)
+
+    kb = InlineKeyboardMarkup(row_width=2)
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("⬅️ Oldingi", callback_data=f"cab:history:{page - 1}"))
+    if has_more:
+        nav.append(InlineKeyboardButton("Keyingi ➡️", callback_data=f"cab:history:{page + 1}"))
+    if nav:
+        kb.row(*nav)
+
+    await call.answer()
+    await call.message.answer(text, parse_mode="HTML", reply_markup=kb if nav else None)
+
+
 @dp.callback_query_handler(lambda c: c.data == "ignore", state="*")
 async def calendar_ignore(call: types.CallbackQuery):
     await call.answer()

@@ -22,7 +22,7 @@ from tgbot.bot.keyboards.reply import (
 )
 from tgbot.bot.keyboards.inline import languages_markup
 from tgbot.bot.states.main import (
-    ContactAdminState, ChangeLanguageState, ReportState,
+    ContactAdminState, ChangeLanguageState, ReportState, ConfirmDeleteState,
 )
 from tgbot.models import (
     BookReport, ConfirmationReport, BooksToRead, Payment, TelegramProfile,
@@ -196,6 +196,84 @@ async def _menu_report(call, user, state: FSMContext):
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# Premium helper.
+# ──────────────────────────────────────────────────────────────────────────
+def _is_premium_user(user) -> bool:
+    if not user:
+        return False
+    return Payment.objects.filter(
+        user=user, status="paid", end_date__gte=timezone.localdate()
+    ).exists()
+
+
+def _premium_growth_section(user) -> str:
+    """Compute reading growth stats for premium users. Returns formatted text block."""
+    import datetime as _dt
+    import calendar as _cal
+
+    today = timezone.localdate()
+    yesterday = today - _dt.timedelta(days=1)
+    week_start = today - _dt.timedelta(days=today.weekday())
+    prev_week_start = week_start - _dt.timedelta(weeks=1)
+    prev_week_end = week_start - _dt.timedelta(days=1)
+    this_month_start = today.replace(day=1)
+    if today.month == 1:
+        prev_month_year, prev_month = today.year - 1, 12
+    else:
+        prev_month_year, prev_month = today.year, today.month - 1
+    prev_month_days = _cal.monthrange(prev_month_year, prev_month)[1]
+    prev_month_start = _dt.date(prev_month_year, prev_month, 1)
+    prev_month_end = _dt.date(prev_month_year, prev_month, prev_month_days)
+
+    def _p(start, end):
+        return (
+            ConfirmationReport.objects
+            .filter(user=user, date__date__gte=start, date__date__lte=end)
+            .aggregate(s=Sum("pages_read"))["s"] or 0
+        )
+
+    today_p = _p(today, today)
+    yest_p = _p(yesterday, yesterday)
+    week_p = _p(week_start, today)
+    prev_week_p = _p(prev_week_start, prev_week_end)
+    month_p = _p(this_month_start, today)
+    prev_month_p = _p(prev_month_start, prev_month_end)
+    year_p = _p(today.replace(month=1, day=1), today)
+    prev_year_p = _p(_dt.date(today.year - 1, 1, 1), _dt.date(today.year - 1, 12, 31))
+
+    # Last 7 days for bar chart
+    daily = [_p(today - _dt.timedelta(days=i), today - _dt.timedelta(days=i)) for i in range(6, -1, -1)]
+    day_abbr = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"]
+    day_labels = [day_abbr[(today - _dt.timedelta(days=i)).weekday()] for i in range(6, -1, -1)]
+
+    BAR = " ▁▂▃▄▅▆▇█"
+    max_d = max(daily) if daily else 0
+    bar_str = "".join(BAR[min(8, round(d / max_d * 8))] if max_d > 0 else "▁" for d in daily)
+    label_str = "  ".join(day_labels)
+
+    def _pct(old, new):
+        if old == 0:
+            return "▲ ∞%" if new > 0 else "→ 0%"
+        p = round((new - old) * 100 / old)
+        if p > 0:
+            return f"▲ +{p}%"
+        if p < 0:
+            return f"▼ {p}%"
+        return "→ 0%"
+
+    return (
+        "\n\n🤍 <b>O'sish jadvalingiz</b> (Maxsus, Sizniki):\n\n"
+        f"📅 <b>Bugun</b> ({today_p} bet) vs Kecha ({yest_p} bet): <b>{_pct(yest_p, today_p)}</b>\n"
+        f"📆 <b>Bu hafta</b> ({week_p} bet) vs O'tgan hafta ({prev_week_p} bet): <b>{_pct(prev_week_p, week_p)}</b>\n"
+        f"🗓 <b>Bu oy</b> ({month_p} bet) vs O'tgan oy ({prev_month_p} bet): <b>{_pct(prev_month_p, month_p)}</b>\n"
+        f"📈 <b>Bu yil</b> ({year_p} bet) vs O'tgan yil ({prev_year_p} bet): <b>{_pct(prev_year_p, year_p)}</b>\n\n"
+        f"<b>Oxirgi 7 kun:</b>\n"
+        f"<code>{bar_str}</code>\n"
+        f"<code>{label_str}</code>"
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # Cabinet — replicates show_user_cabinet from cabinet.py.
 # ──────────────────────────────────────────────────────────────────────────
 async def _menu_cabinet(call, user, state: FSMContext):
@@ -311,8 +389,15 @@ async def _menu_cabinet(call, user, state: FSMContext):
 
     kitobcha_balance = int(user.ball or 0)
 
+    # Premium-only: growth chart
+    is_prem = await sync_to_async(_is_premium_user)(user)
+    premium_section = ""
+    if is_prem:
+        premium_section = await sync_to_async(_premium_growth_section)(user)
+
+    prem_badge = " 💎" if is_prem else ""
     response_text = (
-        f"👤 <b>Sizning shaxsiy kabinetingiz</b>\n\n"
+        f"👤 <b>Sizning shaxsiy kabinetingiz</b>{prem_badge}\n\n"
         f"🪙 <b>Kitobcha balansi:</b> {kitobcha_balance}\n"
         f"📚 <b>O'qilgan kitoblar:</b> {completed_books_count} ta\n"
         f"📄 <b>Jami o'qilgan sahifalar:</b> {total_pages_read}\n"
@@ -322,6 +407,7 @@ async def _menu_cabinet(call, user, state: FSMContext):
         f"{rank_text}"
         f"{overtake_text}"
         f"{conclusion_text}"
+        f"{premium_section}"
         f"\n<i>Ma'lumotlar avtomatik yangilanib boradi.</i>"
     )
 
@@ -331,22 +417,26 @@ async def _menu_cabinet(call, user, state: FSMContext):
         calendar_markup = await sync_to_async(generate_calendar_markup)(
             user_id, now.year, now.month
         )
-        # Append a 'hide' toggle row so user can collapse from inside cabinet.
         calendar_markup.row(
             InlineKeyboardButton(
                 "📅 Streak kalendarni yashirish",
                 callback_data="cab:cal_toggle",
             )
         )
+        if is_prem:
+            calendar_markup.row(
+                InlineKeyboardButton("📋 Hisobotlar tarixi", callback_data="cab:history:0")
+            )
         await call.message.answer(response_text, parse_mode="HTML",
                                   reply_markup=calendar_markup)
     else:
-        kb = InlineKeyboardMarkup().add(
-            InlineKeyboardButton(
-                "📅 Streak kalendarni ko'rsatish",
-                callback_data="cab:cal_toggle",
-            )
-        )
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(InlineKeyboardButton(
+            "📅 Streak kalendarni ko'rsatish",
+            callback_data="cab:cal_toggle",
+        ))
+        if is_prem:
+            kb.add(InlineKeyboardButton("📋 Hisobotlar tarixi", callback_data="cab:history:0"))
         await call.message.answer(response_text, parse_mode="HTML",
                                   reply_markup=kb)
 
@@ -951,76 +1041,18 @@ async def settings_pick(call: types.CallbackQuery, state: FSMContext):
         )
         return
 
-    # -- Step-1: ask full reset
+    # -- Step-1: ask full reset — require user to type "Tasdiqlayman"
     elif action == "reset_ask":
-        confirm_kb = InlineKeyboardMarkup(row_width=2)
-        confirm_kb.row(
-            InlineKeyboardButton(text="⚠️ Tasdiqlayman — o'chirish",
-                                 callback_data="settings:reset_confirm"),
-            InlineKeyboardButton(text="❌ Bekor qilish",
-                                 callback_data="settings:cancel_action"),
-        )
-        await call.answer(
-            "🚨 OGOH! Barcha ma'lumotlaringiz (hisobotlar, kitoblar, ballar, yutuqlar) "
-            "butunlay o'chiriladi va tiklash imkoni bo'lmaydi! "
-            "Davom etishni xohlaysizmi?",
-            show_alert=True,
-        )
-        try:
-            await call.message.edit_reply_markup(reply_markup=confirm_kb)
-        except Exception:
-            pass
-        return
-
-    # -- Step-2: confirm full reset
-    elif action == "reset_confirm":
-        @sync_to_async
-        def _do_full_reset(uid):
-            from tgbot.models import (
-                BookReport, ConfirmationReport, BooksToRead,
-                UserAchievement, Congratulation, UserReferal, Payment,
-            )
-            profile = TelegramProfile.objects.filter(id=uid).first()
-            if not profile:
-                return
-            Congratulation.objects.filter(achievement__user=profile).delete()
-            Congratulation.objects.filter(congratulator=profile).delete()
-            UserAchievement.objects.filter(user=profile).delete()
-            ConfirmationReport.objects.filter(user=profile).delete()
-            BookReport.objects.filter(user=profile).delete()
-            BooksToRead.objects.filter(user=profile).delete()
-            Payment.objects.filter(user=profile).delete()
-            UserReferal.objects.filter(referrer=profile).delete()
-            UserReferal.objects.filter(referred_user=profile).delete()
-            TelegramProfile.objects.filter(id=uid).update(
-                full_name=None, gender=None, region_id=None, age_range=None,
-                group_id=None, ball=0, is_registered=False,
-                last_progress_msg_id=None, show_calendar=False,
-                reminder_count=3, accept_congrats_from="any",
-                send_congrats_to="any",
-            )
-
-        await _do_full_reset(user.id)
-        await state.finish()
-        await call.answer(
-            "✅ Barcha ma'lumotlaringiz o'chirildi. Endi /start bosib qayta ro'yxatdan o'ting.",
-            show_alert=True,
-        )
-        try:
-            await call.message.delete()
-        except Exception:
-            pass
+        await call.answer()
         await call.message.answer(
-            "🗑 Barcha ma'lumotlaringiz o'chirildi.\n\n"
-            "Yangi foydalanuvchi sifatida /start ni bosing."
+            "⚠️ <b>DIQQAT!</b> Barcha ma'lumotlaringiz (hisobotlar, kitoblar, ballar, yutuqlar) "
+            "<b>butunlay o'chiriladi</b> va tiklash imkoni bo'lmaydi!\n\n"
+            "Tasdiqlash uchun quyidagi so'zni aynan shu ko'rinishda yozing:\n\n"
+            "<code>Tasdiqlayman</code>\n\n"
+            "<i>Bekor qilish uchun boshqa istalgan matn yozing.</i>",
+            parse_mode="HTML",
         )
-        uname = f"@{call.from_user.username}" if call.from_user.username else "—"
-        await _notify_admins(
-            f"🗑 <b>To'liq o'chirish</b>\n"
-            f"👤 {user.full_name or '—'} | {uname}\n"
-            f"🆔 <code>{call.from_user.id}</code>\n"
-            f"<i>Barcha ma'lumotlari o'chirildi.</i>"
-        )
+        await ConfirmDeleteState.confirm.set()
         return
 
     # -- Cancel two-step action
@@ -1050,6 +1082,65 @@ async def settings_pick(call: types.CallbackQuery, state: FSMContext):
         )
     except Exception:
         pass
+
+
+@dp.message_handler(state=ConfirmDeleteState.confirm)
+async def confirm_delete_handler(message: types.Message, state: FSMContext):
+    """User must type 'Tasdiqlayman' exactly to confirm full data deletion."""
+    user = get_user(message.from_user.id)
+    if not user:
+        await state.finish()
+        return
+
+    if message.text == "Tasdiqlayman":
+        @sync_to_async
+        def _do_full_reset(uid):
+            from tgbot.models import (
+                BookReport, ConfirmationReport, BooksToRead,
+                UserAchievement, Congratulation, UserReferal, Payment,
+            )
+            profile = TelegramProfile.objects.filter(id=uid).first()
+            if not profile:
+                return
+            Congratulation.objects.filter(achievement__user=profile).delete()
+            Congratulation.objects.filter(congratulator=profile).delete()
+            UserAchievement.objects.filter(user=profile).delete()
+            ConfirmationReport.objects.filter(user=profile).delete()
+            BookReport.objects.filter(user=profile).delete()
+            BooksToRead.objects.filter(user=profile).delete()
+            Payment.objects.filter(user=profile).delete()
+            UserReferal.objects.filter(referrer=profile).delete()
+            UserReferal.objects.filter(referred_user=profile).delete()
+            TelegramProfile.objects.filter(id=uid).update(
+                full_name=None, gender=None, region_id=None, age_range=None,
+                group_id=None, ball=0, is_registered=False,
+                last_progress_msg_id=None, show_calendar=False,
+                reminder_count=3, accept_congrats_from="any",
+                send_congrats_to="any",
+            )
+
+        await _do_full_reset(user.id)
+        await state.finish()
+        await message.answer(
+            "🗑 Barcha ma'lumotlaringiz o'chirildi.\n\n"
+            "Yangi foydalanuvchi sifatida /start ni bosing."
+        )
+        uname = f"@{message.from_user.username}" if message.from_user.username else "—"
+        await _notify_admins(
+            f"🗑 <b>To'liq o'chirish</b>\n"
+            f"👤 {user.full_name or '—'} | {uname}\n"
+            f"🆔 <code>{message.from_user.id}</code>\n"
+            f"<i>Barcha ma'lumotlari o'chirildi.</i>"
+        )
+    else:
+        await state.finish()
+        await message.answer("❌ O'chirish bekor qilindi.")
+        lang = _user_lang(user)
+        await message.answer(
+            _settings_text(user, lang),
+            parse_mode="HTML",
+            reply_markup=_settings_markup(user),
+        )
 
 
 @dp.callback_query_handler(lambda c: c.data == "noop", state="*")

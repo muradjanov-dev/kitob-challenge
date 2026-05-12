@@ -185,12 +185,21 @@ class TelegramProfile(BaseModel):
         help_text="Whom the user is willing to congratulate.",
     )
 
-    def update_ball(self, is_completed: bool, ball: int) -> None:
-        ball = Decimal(str(ball))
+    def update_ball(self, is_completed: bool, ball: int) -> int:
+        """Add or subtract Kitobcha. Premium users earn 2× on every add.
+        Returns the effective amount actually applied."""
+        ball_decimal = Decimal(str(ball))
+        if is_completed:
+            # Check active premium subscription; Payment is defined later in this module.
+            if Payment.objects.filter(
+                user=self, status="paid", end_date__gte=timezone.localdate()
+            ).exists():
+                ball_decimal = ball_decimal * 2
         with transaction.atomic():
             self.refresh_from_db()
-            self.ball = self.ball + ball if is_completed else self.ball - ball
+            self.ball = self.ball + ball_decimal if is_completed else self.ball - ball_decimal
             self.save(update_fields=["ball"])
+        return int(ball_decimal)
 
     def __str__(self):
         return f"{self.full_name} - {self.username}"
