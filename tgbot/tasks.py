@@ -195,8 +195,8 @@ def _send_period_report(start_date, end_date, limit, period_name):
             full_name = escape(report['user__full_name'] or "Foydalanuvchi")
             tg_id = report['user__telegram_id']
             total_pages = report['total_pages']
-            badge = " 💎" if tg_id in premium_ids else ""
-            message += f"{index}) <b><a href='tg://user?id={tg_id}'>{full_name}{badge}</a></b>: {total_pages} bet 📚\n\n"
+            badge = "💎 " if tg_id in premium_ids else ""
+            message += f"{index}) <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_pages} bet 📚\n\n"
     else:
         message = f"📚 {period_name} uchun kitob o'qigan foydalanuvchilar yo'q."
 
@@ -334,8 +334,8 @@ def _build_top_readers_message(start_date, end_date, period_label, limit=20):
         full_name = escape(report['user__full_name'] or "Foydalanuvchi")
         tg_id = report['user__telegram_id']
         total_pages = report['total_pages'] or 0
-        badge = " 💎" if tg_id in premium_ids else ""
-        message += f"{index}. <b><a href='tg://user?id={tg_id}'>{full_name}{badge}</a></b>: {total_pages} bet 📚\n"
+        badge = "💎 " if tg_id in premium_ids else ""
+        message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_pages} bet 📚\n"
     message += f"\n📊 Jami: <b>{grand_total} bet</b>"
     return message
 

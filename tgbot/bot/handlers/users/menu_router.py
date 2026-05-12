@@ -394,10 +394,19 @@ async def _menu_cabinet(call, user, state: FSMContext):
     premium_section = ""
     if is_prem:
         premium_section = await sync_to_async(_premium_growth_section)(user)
+    else:
+        premium_section = (
+            "\n\n🔒 <b>Faqat Premium foydalanuvchilar uchun:</b>\n\n"
+            "📋 <b>To'liq hisobotlar tarixi</b> — qaysi kuni, qaysi kitob, qanday xulosa "
+            "yozganingizni ko'ring\n\n"
+            "📊 <b>O'sish jadvali</b> — kun / hafta / oy / yil kesimida o'sish yoki "
+            "tushish foizini va grafigini ko'ring\n\n"
+            "💎 <i>Premium olib, o'qish tarixingizni va o'sishingizni kuzating!</i>"
+        )
 
-    prem_badge = " 💎" if is_prem else ""
+    prem_badge = "💎 " if is_prem else ""
     response_text = (
-        f"👤 <b>Sizning shaxsiy kabinetingiz</b>{prem_badge}\n\n"
+        f"👤 <b>{prem_badge}Sizning shaxsiy kabinetingiz</b>\n\n"
         f"🪙 <b>Kitobcha balansi:</b> {kitobcha_balance}\n"
         f"📚 <b>O'qilgan kitoblar:</b> {completed_books_count} ta\n"
         f"📄 <b>Jami o'qilgan sahifalar:</b> {total_pages_read}\n"
@@ -408,7 +417,7 @@ async def _menu_cabinet(call, user, state: FSMContext):
         f"{overtake_text}"
         f"{conclusion_text}"
         f"{premium_section}"
-        f"\n<i>Ma'lumotlar avtomatik yangilanib boradi.</i>"
+        f"\n\n<i>Ma'lumotlar avtomatik yangilanib boradi.</i>"
     )
 
     show_cal = bool(user and getattr(user, "show_calendar", False))
@@ -427,6 +436,13 @@ async def _menu_cabinet(call, user, state: FSMContext):
             calendar_markup.row(
                 InlineKeyboardButton("📋 Hisobotlar tarixi", callback_data="cab:history:0")
             )
+        else:
+            calendar_markup.row(
+                InlineKeyboardButton("🔒 Hisobotlar tarixi (Premium)", callback_data="menu:premium")
+            )
+            calendar_markup.row(
+                InlineKeyboardButton("🔒 O'sish jadvali (Premium)", callback_data="menu:premium")
+            )
         await call.message.answer(response_text, parse_mode="HTML",
                                   reply_markup=calendar_markup)
     else:
@@ -437,6 +453,9 @@ async def _menu_cabinet(call, user, state: FSMContext):
         ))
         if is_prem:
             kb.add(InlineKeyboardButton("📋 Hisobotlar tarixi", callback_data="cab:history:0"))
+        else:
+            kb.add(InlineKeyboardButton("🔒 Hisobotlar tarixi (Premium)", callback_data="menu:premium"))
+            kb.add(InlineKeyboardButton("🔒 O'sish jadvali (Premium)", callback_data="menu:premium"))
         await call.message.answer(response_text, parse_mode="HTML",
                                   reply_markup=kb)
 

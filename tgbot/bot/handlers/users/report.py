@@ -518,10 +518,10 @@ async def _do_confirm_report(message, user, state: FSMContext):
             user=user, status="paid", end_date__gte=timezone.localdate()
         ).exists()
 
-    prem_badge = " 💎" if await _check_premium() else ""
+    prem_badge = "💎 " if await _check_premium() else ""
 
     report_message = (
-        f"<b><a href=’tg://user?id={user.telegram_id}’>{user.full_name}{prem_badge}</a></b>:\n\n"
+        f"<b><a href=’tg://user?id={user.telegram_id}’>{prem_badge}{user.full_name}</a></b>:\n\n"
         f"📊#kun - {reading_day}  ({report.date.strftime(‘%Y-%m-%d’)})\n\n"
         f"<b>Kitob nomi:</b> {book}\n\n"
         f"<b>✅O’qilgan betlar:</b> {pages_read}+ bet\n\n"
