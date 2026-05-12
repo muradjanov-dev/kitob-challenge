@@ -1,4 +1,5 @@
 """Quiz play: join Vizov, solo play via deep link, answer questions."""
+import asyncio
 import json
 import random
 
@@ -13,6 +14,9 @@ from tgbot.models import (
     Quiz, QuizQuestion, QuizOption, QuizSession, QuizParticipant, QuizUserAnswer,
 )
 
+# session_id -> running countdown task
+_active_timers: dict[int, asyncio.Task] = {}
+
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -24,6 +28,21 @@ def _answer_kb(session_id: int, question_id: int, options) -> InlineKeyboardMark
             callback_data=f"qans:{session_id}:{question_id}:{opt.id}",
         ))
     return kb
+
+
+def _bar(elapsed: int, total: int, width: int = 10) -> str:
+    remaining = max(0, total - elapsed)
+    filled = round(remaining / total * width) if total else 0
+    warn = " ⚠️" if remaining <= max(1, total // 5) else ""
+    return f"{'▓' * filled}{'░' * (width - filled)} {remaining}s{warn}"
+
+
+def _q_text(q_idx: int, total: int, text: str, timer_str: str) -> str:
+    return (
+        f"❓ <b>Savol {q_idx + 1}/{total}</b>\n\n"
+        f"{text}\n\n"
+        f"⏱ {timer_str}"
+    )
 
 
 @sync_to_async
@@ -77,6 +96,83 @@ def _record_answer(session_id: int, user_id: int, question_id: int, option_id: i
         question.hint if question else "",
         participant,
     )
+
+
+# ─── Countdown timer ──────────────────────────────────────────────────────────
+
+async def _question_timer(
+    chat_id: int, session_id: int, q_idx: int, msg_id: int,
+    q_text: str, total: int, kb, time_limit: int,
+):
+    """Edits question message at 50% and 80% elapsed; auto-advances on expiry."""
+    try:
+        half = max(1, time_limit // 2)
+        eight = max(half + 1, int(time_limit * 0.8))
+
+        await asyncio.sleep(half)
+        try:
+            await bot.edit_message_text(
+                chat_id=chat_id, message_id=msg_id,
+                text=_q_text(q_idx, total, q_text, _bar(half, time_limit)),
+                parse_mode="HTML", reply_markup=kb,
+            )
+        except Exception:
+            pass
+
+        await asyncio.sleep(eight - half)
+        try:
+            await bot.edit_message_text(
+                chat_id=chat_id, message_id=msg_id,
+                text=_q_text(q_idx, total, q_text, _bar(eight, time_limit)),
+                parse_mode="HTML", reply_markup=kb,
+            )
+        except Exception:
+            pass
+
+        await asyncio.sleep(time_limit - eight)
+        try:
+            await bot.edit_message_text(
+                chat_id=chat_id, message_id=msg_id,
+                text=_q_text(q_idx, total, q_text, "⌛ Vaqt tugadi!"),
+                parse_mode="HTML", reply_markup=None,
+            )
+        except Exception:
+            pass
+
+        await _advance_after_timeout(chat_id, session_id, q_idx)
+
+    except asyncio.CancelledError:
+        pass
+    finally:
+        _active_timers.pop(session_id, None)
+
+
+@sync_to_async
+def _try_advance_session(session_id: int, q_idx: int):
+    """Atomically advances if still on q_idx; returns (session, next_idx) or (None, 0)."""
+    session = QuizSession.objects.filter(id=session_id).first()
+    if not session or session.current_question_idx != q_idx:
+        return None, 0
+    next_idx = q_idx + 1
+    QuizSession.objects.filter(id=session_id).update(current_question_idx=next_idx)
+    return session, next_idx
+
+
+async def _advance_after_timeout(chat_id: int, session_id: int, q_idx: int):
+    session, next_idx = await _try_advance_session(session_id, q_idx)
+    if not session:
+        return
+    q_ids = json.loads(session.question_order)
+    if next_idx >= len(q_ids):
+        await _finish_session_solo(session_id, chat_id)
+    else:
+        await _send_question(chat_id, session_id, next_idx)
+
+
+def _cancel_timer(session_id: int):
+    task = _active_timers.pop(session_id, None)
+    if task:
+        task.cancel()
 
 
 # ─── Solo play (deep link: /start quiz_CODE) ──────────────────────────────────
@@ -207,14 +303,15 @@ async def answer_question(call: types.CallbackQuery, state: FSMContext):
             msg += f"\n\n💡 {hint}"
         await call.answer(msg, show_alert=True)
 
-    # For solo sessions: auto-advance to next question after answer
+    # For solo sessions: cancel timer and auto-advance
     session = await sync_to_async(QuizSession.objects.filter(id=session_id).first)()
     if session and not session.is_group:
+        _cancel_timer(session_id)
+
         q_ids = json.loads(session.question_order)
         next_idx = session.current_question_idx + 1
 
         if next_idx >= len(q_ids):
-            # Solo session finished — show results immediately
             await _finish_session_solo(session_id, user.telegram_id)
         else:
             await sync_to_async(QuizSession.objects.filter(id=session_id).update)(
@@ -230,30 +327,40 @@ async def _send_question(chat_id: int, session_id: int, q_idx: int):
     def _load():
         session = QuizSession.objects.select_related("quiz").filter(id=session_id).first()
         if not session:
-            return None, None, None, 0
+            return None, None, None, 0, 0
         q_ids = json.loads(session.question_order)
         if q_idx >= len(q_ids):
-            return None, None, None, len(q_ids)
+            return None, None, None, len(q_ids), 0
         question = QuizQuestion.objects.prefetch_related("options").filter(id=q_ids[q_idx]).first()
         opts = list(question.options.all())
         if session.quiz.shuffle:
             random.shuffle(opts)
-        return session, question, opts, len(q_ids)
+        return session, question, opts, len(q_ids), session.quiz.time_per_question
 
-    session, question, opts, total = await _load()
+    session, question, opts, total, time_limit = await _load()
     if not session or not question:
         return
 
-    text = (
-        f"❓ <b>Savol {q_idx+1}/{total}</b>\n\n"
-        f"{question.text}\n\n"
-        f"⏱ <i>{session.quiz.time_per_question} soniya</i>"
-    )
     kb = _answer_kb(session_id, question.id, opts)
-    await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML", reply_markup=kb)
+    initial_bar = _bar(0, time_limit)
+    msg = await bot.send_message(
+        chat_id=chat_id,
+        text=_q_text(q_idx, total, question.text, initial_bar),
+        parse_mode="HTML",
+        reply_markup=kb,
+    )
+
+    # Cancel any previous timer then start a fresh one
+    _cancel_timer(session_id)
+    task = asyncio.create_task(
+        _question_timer(chat_id, session_id, q_idx, msg.message_id, question.text, total, kb, time_limit)
+    )
+    _active_timers[session_id] = task
 
 
 async def _finish_session_solo(session_id: int, chat_id: int):
+    _cancel_timer(session_id)
+
     @sync_to_async
     def _results():
         session = QuizSession.objects.filter(id=session_id).first()
