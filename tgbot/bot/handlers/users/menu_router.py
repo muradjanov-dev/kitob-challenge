@@ -782,7 +782,7 @@ async def _menu_reyting(call, user, _state: FSMContext):
     lambda c: c.data and c.data.startswith("reyting:"),
     state="*",
 )
-async def reyting_period_pick(call: types.CallbackQuery, _state: FSMContext):
+async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
     period = call.data.split(":", 1)[1]
     if period not in _VALID_PERIODS:
         await call.answer()
@@ -822,7 +822,7 @@ async def reyting_period_pick(call: types.CallbackQuery, _state: FSMContext):
     lambda c: c.data and c.data.startswith("toplist_congrats:"),
     state="*",
 )
-async def toplist_congrats_handler(call: types.CallbackQuery, _state: FSMContext):
+async def toplist_congrats_handler(call: types.CallbackQuery, state: FSMContext):
     user = get_user(call.from_user.id)
     if not user:
         await call.answer("Avval /start bosing", show_alert=True)

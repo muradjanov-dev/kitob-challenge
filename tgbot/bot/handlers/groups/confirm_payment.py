@@ -1,4 +1,4 @@
-import os
+﻿import os
 
 from aiogram import types
 from aiogram.dispatcher.filters.builtin import ChatTypeFilter
@@ -18,6 +18,19 @@ from tgbot.bot.consts import ADMIN_GROUP_ID
 def _is_admin(telegram_id: int) -> bool:
     ids = [a.strip() for a in os.environ.get("ADMINS", "").split(",") if a.strip()]
     return str(telegram_id) in ids
+
+
+def _build_premium_welcome(start_date, end_date) -> str:
+    return (
+        "🎉 <b>Tabriklaymiz! Premium faollashtirildi!</b>\n\n"
+        f"📅 Muddati: <b>{start_date.strftime('%d.%m.%Y')}</b> — <b>{end_date.strftime('%d.%m.%Y')}</b>\n\n"
+        "Sizga quyidagi imkoniyatlar ochildi:\n\n"
+        "🪙 <b>2x Kitobcha</b> — har bir hisobot, yutuq va reyting mukofoti ikki barobar!\n"
+        "📋 <b>To'liq hisobotlar tarixi</b> — qaysi kuni, qaysi kitob, qanday xulosa yozganingizni ko'ring\n"
+        "📊 <b>O'sish jadvali</b> — kun / hafta / oy / yil kesimida o'sish va tushish foizini ko'ring\n"
+        "💎 <b>Premium badge</b> — guruh hisobotlari va reyting ro'yxatlarida 💎 belgisi bilan ajralib turing\n\n"
+        "Kabinetingizni oching va barcha imkoniyatlardan bahramand bo'ling! 🚀"
+    )
 
 
 @dp.callback_query_handler(ChatTypeFilter((ChatType.GROUP, ChatType.SUPERGROUP)), lambda c: "accept" in c.data)
@@ -42,11 +55,7 @@ async def confirm_payment_message_handler(call: types.CallbackQuery, state: FSMC
             status="paid"
         )
 
-        message_to_user = _(
-            "Tabriklaymiz! 🎉 \n\n"
-            "Siz 1 oylik to‘lovni muvaffaqiyatli amalga oshirdingiz. "
-            "Endi botdan bemalol 1 oy davomida foydalanishingiz mumkin."
-        )
+        message_to_user = _build_premium_welcome(start_date, end_date)
         data = await state.get_data()
         username_or_telegram_id = f"""<a href="https://{user.username}.t.me">@{user.username}</a>""" if user.username else user.telegram_id
         message_to_admin = f"""✅To'lov tasdiqlandi!\n👤FISH: {user.full_name}[{username_or_telegram_id}]\n🧾Qiymat: {MONTHLY_PAYMENT} UZS\n📅Davr: {start_date.strftime("%d.%m.%Y")} -> {end_date.strftime("%d.%m.%Y")}\n\n#paid #monthly"""
@@ -64,7 +73,7 @@ async def confirm_payment_message_handler(call: types.CallbackQuery, state: FSMC
             await call.message.answer(message_to_admin)
 
         # await call.message.delete()
-        await bot.send_message(chat_id=user_telegram_id, text=message_to_user)
+        await bot.send_message(chat_id=user_telegram_id, text=message_to_user, parse_mode="HTML")
 
     except Exception as e:
         print(f"To'lovni tasdiqlashda xatolik: {e}")
@@ -177,11 +186,7 @@ async def padmin_accept(call: types.CallbackQuery):
     try:
         await bot.send_message(
             chat_id=user_telegram_id,
-            text=(
-                "🎉 <b>Tabriklaymiz!</b>\n\n"
-                "Siz 1 oylik Premium obunani muvaffaqiyatli aktivlashtiringiz.\n"
-                f"📅 Muddati: <b>{start_date.strftime('%d.%m.%Y')}</b> — <b>{end_date.strftime('%d.%m.%Y')}</b>"
-            ),
+            text=_build_premium_welcome(start_date, end_date),
             parse_mode="HTML",
         )
     except Exception as e:
