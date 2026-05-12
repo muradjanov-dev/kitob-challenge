@@ -14,6 +14,7 @@ from django.db.models.functions import ExtractWeekDay, ExtractHour, Length, Trun
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 import os
+from html import escape
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.utils import get_user
 from tgbot.bot.keyboards.reply import (
@@ -555,7 +556,7 @@ def _top_readers_text(period: str, lang: str) -> str:
     lines = []
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
     for i, r in enumerate(rows, 1):
-        name = r["user__full_name"] or "Kitobxon"
+        name = escape(r["user__full_name"] or "Kitobxon")
         tg_id = r["user__telegram_id"]
         pages = r["total"] or 0
         medal = medals.get(i, f"{i}.")
