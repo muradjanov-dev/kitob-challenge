@@ -189,6 +189,9 @@ async def payment_receipt_photo_handler(message: types.Message, state: FSMContex
         f"Botdan foydalanishga ruxsat berilsinmi?"
     )
 
+    import os as _os
+    admin_ids = [a.strip() for a in _os.environ.get("ADMINS", "").split(",") if a.strip()]
+
     try:
         photo_message = await bot.send_photo(
             chat_id=ADMIN_GROUP_ID,
@@ -210,6 +213,29 @@ async def payment_receipt_photo_handler(message: types.Message, state: FSMContex
                 message_id=photo_message.message_id
             )
         )
+
+        # Also DM every admin so they never miss a receipt
+        dm_kb = InlineKeyboardMarkup(row_width=2).add(
+            InlineKeyboardButton(
+                "✅ Ruxsat berish",
+                callback_data=f"padmin_accept:{user.telegram_id}",
+            ),
+            InlineKeyboardButton(
+                "❌ Rad etish",
+                callback_data=f"padmin_reject:{user.telegram_id}",
+            ),
+        )
+        for admin_id in admin_ids:
+            try:
+                await bot.send_photo(
+                    chat_id=admin_id,
+                    photo=message.photo[-1].file_id,
+                    caption=caption,
+                    parse_mode="HTML",
+                    reply_markup=dm_kb,
+                )
+            except Exception as dm_err:
+                print(f"payment DM to admin {admin_id} failed: {dm_err}")
 
         if lang == "ru":
             text = "✅ Ваш чек отправлен на проверку. Мы уведомим вас в ближайшее время!"

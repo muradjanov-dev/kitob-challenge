@@ -82,6 +82,7 @@ class ContactAdminState(StatesGroup):
 class AdminReplyState(StatesGroup):
     message = State()
     confirm = State()
+    padmin_reject_reason = State()
 
 
 class QuizCreateState(StatesGroup):
