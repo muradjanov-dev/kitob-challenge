@@ -268,11 +268,23 @@ async def vizov_join(call: types.CallbackQuery, state: FSMContext):
         return
     session, created, count = result
 
+    joined_kb = InlineKeyboardMarkup().add(
+        InlineKeyboardButton(text="✅ Qo'shildim!", callback_data="noop")
+    )
+
     if not created:
         await call.answer(f"Siz allaqachon ro'yxatdasiz! (Jami: {count} ishtirokchi)", show_alert=True)
+        try:
+            await call.message.edit_reply_markup(reply_markup=joined_kb)
+        except Exception:
+            pass
         return
 
     await call.answer(f"✅ Ro'yxatdan o'tdingiz! Jami {count} ishtirokchi.", show_alert=True)
+    try:
+        await call.message.edit_reply_markup(reply_markup=joined_kb)
+    except Exception:
+        pass
 
 
 # ─── Answer a question ─────────────────────────────────────────────────────────
