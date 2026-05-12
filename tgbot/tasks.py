@@ -364,6 +364,7 @@ def _broadcast_top_to_groups_and_users(message: str, period: str, date_str: str)
         except Exception as e:
             print(f"group top broadcast failed for {group_id}: {e}")
 
+    import time as _time
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
     sent = failed = 0
@@ -378,14 +379,18 @@ def _broadcast_top_to_groups_and_users(message: str, period: str, date_str: str)
                     "disable_web_page_preview": "true",
                     "reply_markup": keyboard,
                 },
-                timeout=5,
+                timeout=10,
             )
             if resp.ok:
                 sent += 1
             else:
                 failed += 1
+                if resp.status_code == 429:
+                    retry_after = resp.json().get("parameters", {}).get("retry_after", 5)
+                    _time.sleep(retry_after)
         except Exception:
             failed += 1
+        _time.sleep(0.05)  # stay under Telegram's 30 msg/sec global limit
     print(f"_broadcast_top_to_groups_and_users({period}): sent={sent} failed={failed}")
 
 
@@ -402,6 +407,7 @@ def process_toplist_congrats(period: str, date_str: str, congratulator_tg_id: in
 
     period_map = {
         "daily":    (_dt.timedelta(days=0),   "Kunlik",   20),
+        "3days":    (_dt.timedelta(days=2),   "3 kunlik", 20),
         "weekly":   (_dt.timedelta(days=6),   "Haftalik", 30),
         "monthly":  (_dt.timedelta(days=29),  "Oylik",    30),
         "3monthly": (_dt.timedelta(days=89),  "3 oylik",  40),
@@ -560,6 +566,31 @@ def broadcast_top_readers_to_all():
         except Exception:
             failed += 1
     print(f"broadcast_top_readers_to_all: sent={sent} failed={failed}")
+
+
+@shared_task
+def broadcast_period_top(period_key: str):
+    """Admin-triggered: broadcast top readers for a specific period to all users."""
+    import datetime as _dt
+    today = timezone.localdate()
+    period_cfg = {
+        "daily":    (today,                           today, "Bugun 🔥 Top kitobxonlar",    20),
+        "3days":    (today - _dt.timedelta(days=2),   today, "3 kunlik Top kitobxonlar",    20),
+        "weekly":   (today - _dt.timedelta(days=6),   today, "Bu hafta 🏆 Top kitobxonlar", 30),
+        "monthly":  (today - _dt.timedelta(days=29),  today, "Bu oy 📅 Top kitobxonlar",    30),
+        "3monthly": (today - _dt.timedelta(days=89),  today, "3 oylik 📊 Top kitobxonlar",  40),
+        "yearly":   (today - _dt.timedelta(days=364), today, "Yillik 🏅 Top kitobxonlar",   60),
+    }
+    if period_key not in period_cfg:
+        print(f"broadcast_period_top: unknown period {period_key!r}")
+        return
+    start_date, end_date, label, limit = period_cfg[period_key]
+    date_str = end_date.strftime("%Y%m%d")
+    msg = _build_top_readers_message(start_date, end_date, label, limit=limit)
+    if not msg:
+        print(f"broadcast_period_top({period_key}): no data")
+        return
+    _broadcast_top_to_groups_and_users(msg, period_key, date_str)
 
 
 INSPIRATION_POOL = [

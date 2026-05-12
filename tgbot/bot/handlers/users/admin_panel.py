@@ -1,4 +1,4 @@
-from aiogram.utils.markdown import hlink
+﻿from aiogram.utils.markdown import hlink
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from django.utils import timezone
 from tgbot.bot.keyboards.reply import admin_keyboard, confirm_markup, main_markup, yes_or_no_markup, back_keyboard
@@ -74,7 +74,7 @@ async def check_picture_for_notification_handler(message: types.Message, state: 
         await message.answer("Habar tasdiqlansinmi?", reply_markup=confirm_markup())
         await NotificationState.confirm_text.set()
     else:
-        await message.answer("Iltimos, faqat 'Ha' yoki 'Yo‘q' yozing.", reply_markup=yes_or_no_markup())
+        await message.answer("Iltimos, faqat 'Ha' yoki 'Yo'q' yozing.", reply_markup=yes_or_no_markup())
         return
 
 
@@ -532,11 +532,27 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
         from tgbot.bot.handlers.users.polls_admin import poll_results_list
         await poll_results_list(msg, state, _admin_id=admin_id)
     elif action == "top_readers":
-        from tgbot.tasks import broadcast_top_readers_to_all
-        await call.message.answer(
-            "⏳ Top kitobxonlar barcha foydalanuvchilarga yuborilmoqda (fon rejimida)..."
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        kb = InlineKeyboardMarkup(row_width=2)
+        kb.add(
+            InlineKeyboardButton("📅 Bugun",    callback_data="admin:top_readers:daily"),
+            InlineKeyboardButton("📅 3 kun",    callback_data="admin:top_readers:3days"),
+            InlineKeyboardButton("📅 Hafta",    callback_data="admin:top_readers:weekly"),
+            InlineKeyboardButton("📅 Oy",       callback_data="admin:top_readers:monthly"),
+            InlineKeyboardButton("📅 3 oy",     callback_data="admin:top_readers:3monthly"),
+            InlineKeyboardButton("📅 Yil",      callback_data="admin:top_readers:yearly"),
         )
-        broadcast_top_readers_to_all.delay()
+        await call.message.answer(
+            "📊 Qaysi davr uchun yuborish?",
+            reply_markup=kb,
+        )
+    elif action.startswith("top_readers:"):
+        period_key = action.split(":", 1)[1]
+        from tgbot.tasks import broadcast_period_top
+        await call.message.answer(
+            f"⏳ Top kitobxonlar ({period_key}) barcha foydalanuvchilarga yuborilmoqda (fon rejimida)..."
+        )
+        broadcast_period_top.delay(period_key)
     elif action == "quizzes":
         from tgbot.bot.handlers.users.quiz_admin import show_quiz_list
         await show_quiz_list(call.message, user)
