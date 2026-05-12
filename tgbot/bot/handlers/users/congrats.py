@@ -1,45 +1,58 @@
 """Tabriklash inline-button flow.
 
-When a user clicks 🎉 Tabriklash on a broadcast DM (sent by
-broadcast_congrats_to_others), this module:
-
+When a user clicks 🎉 Tabriklash on a broadcast DM:
     1. Records a Congratulation row (idempotent — one per user/event).
-    2. Sends an ephemeral 1-minute message back to the clicker with the
-       count of people who congratulated BEFORE them.
-    3. Sends a 12-hour-TTL DM to the achiever ("kim sizni tabrikladi").
-    4. Disables the Tabriklash button on the clicker's message.
+    2. Updates the button on the clicker's message to show live count.
+    3. Shows a brief inspiring toast to the clicker (auto-disappears ~3 s).
+    4. Removes the inline keyboard from the clicker's message after 1 minute.
 """
+import asyncio
+import random
+
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from asgiref.sync import sync_to_async
-from django.utils import timezone
-from html import escape
 
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.utils import get_user
-from tgbot.models import (
-    UserAchievement, Congratulation, ScheduledMessageDeletion,
-    TelegramProfile,
-)
+from tgbot.models import UserAchievement, Congratulation
+
+
+_CONGRATS_TOASTS = [
+    "Tabrikladingiz! 🎉",
+    "Yana bir kitobxonga ilhom berdingiz! ✨",
+    "Qo'llab-quvvatladingiz! 💪",
+    "Bir tabrik — mingta kuch! Kitobxonni ruhlantirdingiz 🌟",
+    "Hamjihatlik — gala kuchi! Rahmat sizga! ⚡",
+    "Sizning tabrigingiz ularni oldinga undaydi! 🚀",
+    "Barakalla! Birga o'samiz! 🌱",
+    "Sizning qo'llab-quvvatlashingiz bebaho! 🏆",
+    "Bir so'z — katta motivatsiya! 🔥",
+    "Kitobxonlar bir-birini ko'taradi! 📚",
+]
 
 
 @sync_to_async
 def _record_congrats(ua_id: int, congratulator_id: int):
-    """Returns (created, count_before, count_total, achiever_telegram_id,
-    achiever_full_name, achievement_code)."""
+    """Returns (created, count_total, achiever_telegram_id)."""
     ua = UserAchievement.objects.filter(id=ua_id).select_related("user").first()
     if not ua:
-        return False, 0, None, None, None
-    obj, created = Congratulation.objects.get_or_create(
+        return False, 0, None
+    _, created = Congratulation.objects.get_or_create(
         achievement=ua, congratulator_id=congratulator_id,
     )
     count = Congratulation.objects.filter(achievement=ua).count()
-    count_before = max(count - 1, 0) if created else count
-    return (
-        created, count_before, count,
-        ua.user.telegram_id, ua.user.full_name or "Kitobxon",
-        ua.code,
-    )
+    return created, count, ua.user.telegram_id
+
+
+async def _remove_keyboard_after(chat_id: int, message_id: int, delay: int = 60):
+    await asyncio.sleep(delay)
+    try:
+        await bot.edit_message_reply_markup(
+            chat_id=chat_id, message_id=message_id, reply_markup=None
+        )
+    except Exception:
+        pass
 
 
 @dp.callback_query_handler(
@@ -62,9 +75,8 @@ async def congrats_handler(call: types.CallbackQuery, state: FSMContext):
         await call.answer("Avval /start bosing", show_alert=True)
         return
 
-    created, count_before, count_total, achiever_tg_id, achiever_name, ach_code = (
-        await _record_congrats(ua_id, user.id)
-    )
+    created, count_total, achiever_tg_id = await _record_congrats(ua_id, user.id)
+
     if achiever_tg_id is None:
         await call.answer("❌ Yutuq topilmadi", show_alert=True)
         return
@@ -76,35 +88,7 @@ async def congrats_handler(call: types.CallbackQuery, state: FSMContext):
         )
         return
 
-    # 2) 12-hour TTL DM to the achiever.
-    try:
-        from tgbot.services.achievements import find_achievement
-        ach = find_achievement(ach_code) or {}
-        title = ach.get("title_uz") or ach_code
-        emoji = ach.get("emoji", "🏆")
-        congratulator_name = escape(user.full_name or user.username or "Kitobxon")
-        achiever_text = (
-            f"🎉 <b>Sizni tabrikladilar!</b>\n\n"
-            f"<b>{congratulator_name}</b> sizni "
-            f"<b>{emoji} {title}</b> yutug'ingiz bilan tabrikladi.\n\n"
-            "Davom etamiz! 🚀\n\n"
-            "<i>Bu xabar 12 soatdan keyin avtomatik o'chiriladi.</i>"
-        )
-        sent2 = await bot.send_message(
-            chat_id=achiever_tg_id, text=achiever_text, parse_mode="HTML",
-        )
-        try:
-            await sync_to_async(ScheduledMessageDeletion.objects.create)(
-                chat_id=achiever_tg_id,
-                message_id=sent2.message_id,
-                delete_at=timezone.now() + timezone.timedelta(hours=12),
-            )
-        except Exception as e:
-            print(f"congrats: achiever schedule failed: {e}")
-    except Exception as e:
-        print(f"congrats: achiever DM failed: {e}")
-
-    # 3) Update button on broadcast DM to show live congrats count.
+    # Update button to show live congrats count.
     try:
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
         new_kb = InlineKeyboardMarkup().add(
@@ -117,4 +101,10 @@ async def congrats_handler(call: types.CallbackQuery, state: FSMContext):
     except Exception:
         pass
 
-    await call.answer(f"✅ Tabrikladingiz! (Jami: {count_total} ta)")
+    # Brief inspiring toast (auto-disappears in ~3 s, no modal).
+    await call.answer(random.choice(_CONGRATS_TOASTS))
+
+    # Remove the keyboard 1 minute after clicking.
+    asyncio.create_task(
+        _remove_keyboard_after(call.message.chat.id, call.message.message_id, delay=60)
+    )
