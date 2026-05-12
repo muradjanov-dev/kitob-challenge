@@ -167,6 +167,16 @@ async def _daily_top_read_user_action_button():
         send_message(_cid, message)
 
 
+def _get_premium_tg_ids() -> set:
+    """Return set of telegram_ids that currently have an active premium subscription."""
+    from tgbot.models import Payment
+    return set(
+        Payment.objects.filter(
+            status="paid", end_date__gte=timezone.localdate()
+        ).values_list("user__telegram_id", flat=True)
+    )
+
+
 def _send_period_report(start_date, end_date, limit, period_name):
     reports = ConfirmationReport.objects.filter(
         date__date__gte=start_date,
@@ -179,12 +189,14 @@ def _send_period_report(start_date, end_date, limit, period_name):
 
     reports = list(reports)
     if reports:
+        premium_ids = _get_premium_tg_ids()
         message = f"📚 {period_name} eng ko'p kitob o'qigan {limit}ta Peshqadam foydalanuvchilar: \n\n"
         for index, report in enumerate(reports, start=1):
             full_name = escape(report['user__full_name'] or "Foydalanuvchi")
             tg_id = report['user__telegram_id']
             total_pages = report['total_pages']
-            message += f"{index}) <b><a href='tg://user?id={tg_id}'>{full_name}</a></b>: {total_pages} bet 📚\n\n"
+            badge = " 💎" if tg_id in premium_ids else ""
+            message += f"{index}) <b><a href='tg://user?id={tg_id}'>{full_name}{badge}</a></b>: {total_pages} bet 📚\n\n"
     else:
         message = f"📚 {period_name} uchun kitob o'qigan foydalanuvchilar yo'q."
 
@@ -315,13 +327,15 @@ def _build_top_readers_message(start_date, end_date, period_label, limit=20):
     if not reports:
         return None
 
+    premium_ids = _get_premium_tg_ids()
     grand_total = sum((r['total_pages'] or 0) for r in reports)
     message = f"📚 {period_label} eng ko'p kitob o'qigan Kitobxonlar:\n\n"
     for index, report in enumerate(reports, start=1):
         full_name = escape(report['user__full_name'] or "Foydalanuvchi")
         tg_id = report['user__telegram_id']
         total_pages = report['total_pages'] or 0
-        message += f"{index}. <b><a href='tg://user?id={tg_id}'>{full_name}</a></b>: {total_pages} bet 📚\n"
+        badge = " 💎" if tg_id in premium_ids else ""
+        message += f"{index}. <b><a href='tg://user?id={tg_id}'>{full_name}{badge}</a></b>: {total_pages} bet 📚\n"
     message += f"\n📊 Jami: <b>{grand_total} bet</b>"
     return message
 

@@ -155,6 +155,16 @@ async def contact_admin_confirm_send(call: types.CallbackQuery, state: FSMContex
             print(f"contact_admin: forward to {chat_id} failed: {e}")
 
     if sent_count > 0:
+        if user:
+            from django.db.models import F as _F
+            from tgbot.models import TelegramProfile as _TP
+            from asgiref.sync import sync_to_async
+            await sync_to_async(_TP.objects.filter(id=user.id).update)(contact_count=_F('contact_count') + 1)
+            try:
+                from tgbot.tasks import check_user_achievements
+                check_user_achievements.delay(user.id)
+            except Exception as _e:
+                print(f"contact achievements check failed: {_e}")
         await call.message.answer(
             _t(
                 lang,

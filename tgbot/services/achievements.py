@@ -34,6 +34,7 @@ class Stats(TypedDict):
     long_conclusions: int
     referrals: int
     avg_pages: float
+    contact_messages: int
 
 
 def compute_user_stats(user: TelegramProfile) -> Stats:
@@ -55,6 +56,7 @@ def compute_user_stats(user: TelegramProfile) -> Stats:
 
     referrals = UserReferal.objects.filter(referrer=user).count()
     max_streak = _max_consecutive_days(user)
+    contact_messages = getattr(user, "contact_count", 0) or 0
 
     return {
         "reports": reports_count,
@@ -64,6 +66,7 @@ def compute_user_stats(user: TelegramProfile) -> Stats:
         "long_conclusions": long_conclusions,
         "referrals": referrals,
         "avg_pages": float(avg_pages or 0),
+        "contact_messages": contact_messages,
     }
 
 
@@ -147,6 +150,14 @@ ACHIEVEMENTS_RAW = [
 
     # — Speed —
     {"code": "spd_30", "emoji": "🚀", "title_uz": "Tezkor o'qish (30+ bet/kun)", "title_ru": "Скоростное чтение (30+ стр)", "cond": lambda s: s.get("avg_pages", 0) >= 30 and s.get("reports", 0) >= 5, "points": 100},
+
+    # — Contact admin —
+    {"code": "ca_1",  "emoji": "💬",   "title_uz": "Birinchi murojaat",          "title_ru": "Первое обращение",          "cond": _at_least("contact_messages", 1),  "points": 15},
+    {"code": "ca_3",  "emoji": "📞",   "title_uz": "Uch murojaat",               "title_ru": "Три обращения",             "cond": _at_least("contact_messages", 3),  "points": 35},
+    {"code": "ca_5",  "emoji": "📬",   "title_uz": "Faol muloqot",               "title_ru": "Активное общение",          "cond": _at_least("contact_messages", 5),  "points": 60},
+    {"code": "ca_10", "emoji": "🗨",   "title_uz": "O'n murojaat",               "title_ru": "Десять обращений",          "cond": _at_least("contact_messages", 10), "points": 120},
+    {"code": "ca_20", "emoji": "🔊",   "title_uz": "Aktiv muloqotchi",           "title_ru": "Активный собеседник",       "cond": _at_least("contact_messages", 20), "points": 250},
+    {"code": "ca_30", "emoji": "🤝",   "title_uz": "Bot do'sti — 30 murojaat",   "title_ru": "Друг бота — 30 обращений", "cond": _at_least("contact_messages", 30), "points": 400},
 ]
 
 

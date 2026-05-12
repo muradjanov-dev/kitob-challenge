@@ -184,6 +184,11 @@ class TelegramProfile(BaseModel):
         choices=[("any", "Hammaga"), ("male", "Erkaklarga"), ("female", "Ayollarga")],
         help_text="Whom the user is willing to congratulate.",
     )
+    contact_count = models.PositiveIntegerField(
+        default=0,
+        verbose_name=_("Admin contact count"),
+        help_text="Number of times the user has successfully messaged the admin.",
+    )
 
     def update_ball(self, is_completed: bool, ball: int) -> int:
         """Add or subtract Kitobcha. Premium users earn 2× on every add.

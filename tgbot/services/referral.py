@@ -1,5 +1,6 @@
 import string
 import random
+from datetime import timedelta
 from asgiref.sync import sync_to_async
 from tgbot.models import UserReferal, TelegramProfile
 from tgbot.bot.loader import bot
@@ -74,9 +75,47 @@ class ReferralService:
             referred_user=user
         )
 
+        # Count referrals AFTER creating this one
+        ref_count = await sync_to_async(
+            UserReferal.objects.filter(referrer=referrer).count
+        )()
+
+        # Award rewards to referrer
+        @sync_to_async
+        def _award(count):
+            from tgbot.models import Payment
+            from django.utils import timezone as _tz
+
+            # Base reward: 90 Kitobcha per referral
+            referrer.update_ball(True, 90)
+
+            # Milestone bonus: +500 Kitobcha on every 10th referral
+            if count % 10 == 0:
+                referrer.update_ball(True, 500)
+
+            # Premium grant: +3 days on every 20th referral
+            if count % 20 == 0:
+                today = _tz.localdate()
+                active = Payment.objects.filter(
+                    user=referrer, status="paid", end_date__gte=today
+                ).first()
+                if active:
+                    active.end_date = active.end_date + timedelta(days=3)
+                    active.save(update_fields=["end_date"])
+                else:
+                    Payment.objects.create(
+                        user=referrer,
+                        amount=0,
+                        start_date=today,
+                        end_date=today + timedelta(days=3),
+                        status="paid",
+                    )
+
+        await _award(ref_count)
+
         # Notify parties
         await ReferralService._notify_admin(referrer, user, referral_code)
-        await ReferralService._notify_referrer(referrer, user)
+        await ReferralService._notify_referrer(referrer, user, ref_count)
 
         return True
 
@@ -99,13 +138,20 @@ class ReferralService:
             print(f"Failed to send referral notification to admin: {e}")
 
     @staticmethod
-    async def _notify_referrer(referrer: TelegramProfile, new_user: TelegramProfile):
+    async def _notify_referrer(referrer: TelegramProfile, new_user: TelegramProfile, ref_count: int = 0):
         try:
+            reward_lines = [f"🪙 <b>+90 Kitobcha</b> qo'shildi!"]
+            if ref_count % 10 == 0:
+                reward_lines.append(f"🎁 <b>+500 Kitobcha</b> bonus! ({ref_count}-referral milestone)")
+            if ref_count % 20 == 0:
+                reward_lines.append(f"💎 <b>+3 kun Premium</b> qo'shildi! ({ref_count}-referral milestone)")
+
             referrer_notification = (
                 f"🎉 <b>Yangi Referal!</b>\n\n"
                 f"👤 <b>Yangi a'zo:</b> {new_user.full_name}\n"
-                f"🆔 <b>ID:</b> <code>{new_user.telegram_id}</code>\n\n"
-                f"✅ Sizning referalingiz muvaffaqiyatli ro'yxatdan o'tdi!"
+                f"🆔 <b>ID:</b> <code>{new_user.telegram_id}</code>\n"
+                f"📊 <b>Jami referallar:</b> {ref_count}\n\n"
+                + "\n".join(reward_lines)
             )
             await bot.send_message(
                 chat_id=referrer.telegram_id,

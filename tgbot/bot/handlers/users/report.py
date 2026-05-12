@@ -509,11 +509,22 @@ async def _do_confirm_report(message, user, state: FSMContext):
         except Exception as e:
             print(f"Error updating book {bid}: {e}")
 
+    # Check premium for badge
+    from tgbot.models import Payment
+
+    @sync_to_async
+    def _check_premium():
+        return Payment.objects.filter(
+            user=user, status="paid", end_date__gte=timezone.localdate()
+        ).exists()
+
+    prem_badge = " 💎" if await _check_premium() else ""
+
     report_message = (
-        f"<b><a href='tg://user?id={user.telegram_id}'>{user.full_name}</a></b>:\n\n"
-        f"📊#kun - {reading_day}  ({report.date.strftime('%Y-%m-%d')})\n\n"
+        f"<b><a href=’tg://user?id={user.telegram_id}’>{user.full_name}{prem_badge}</a></b>:\n\n"
+        f"📊#kun - {reading_day}  ({report.date.strftime(‘%Y-%m-%d’)})\n\n"
         f"<b>Kitob nomi:</b> {book}\n\n"
-        f"<b>✅O‘qilgan betlar:</b> {pages_read}+ bet\n\n"
+        f"<b>✅O’qilgan betlar:</b> {pages_read}+ bet\n\n"
         f"<b>💡Olingan xulosa:</b> {conclusion}\n\n"
         f"<b>Haqiqiy peshqadam 🏆</b>"
     )
