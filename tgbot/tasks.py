@@ -353,19 +353,32 @@ def _toplist_congrats_keyboard(period: str, date_str: str) -> str:
 def _broadcast_top_to_groups_and_users(message: str, period: str, date_str: str):
     """Send top list to all groups and to all registered users (with Tabriklash button)."""
     keyboard = _toplist_congrats_keyboard(period, date_str)
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-    # Send to all groups (general + boys + girls via _group_chat_ids)
+    # Build group list: general group + boys + girls
     import os as _os
     girls_group = _os.environ.get("GIRLS_GROUP_ID", "").strip()
     group_ids = list(_group_chat_ids())
     if girls_group and girls_group not in group_ids:
         group_ids.append(girls_group)
 
+    print(f"_broadcast_top_to_groups_and_users: sending to groups {group_ids}")
     for group_id in group_ids:
         try:
-            send_notification(group_id, message, reply_markup=keyboard)
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": group_id,
+                    "text": message,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": "true",
+                    "reply_markup": keyboard,
+                },
+                timeout=10,
+            )
+            print(f"group send {group_id}: {resp.status_code} {resp.text[:200]}")
         except Exception as e:
-            print(f"group top broadcast failed for {group_id}: {e}")
+            print(f"group send {group_id} exception: {e}")
 
     import time as _time
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
