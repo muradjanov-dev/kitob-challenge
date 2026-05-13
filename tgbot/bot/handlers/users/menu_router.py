@@ -1,4 +1,5 @@
-﻿"""
+﻿
+"""
 Central inline-menu callback router.
 
 Every main-menu inline button has callback_data `menu:<action>`. This module
@@ -119,8 +120,6 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
         await _menu_settings(call, user, state)
     elif action == "how":
         await _menu_how_it_works(call, user, state)
-    elif action == "quiz":
-        await _menu_quiz(call, user, state)
     elif action == "admin":
         await _menu_admin(call, user, state)
     else:
@@ -538,76 +537,6 @@ async def _menu_contact(call, user, state: FSMContext):
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# Kitob Quiz section (Premium only).
-# ──────────────────────────────────────────────────────────────────────────
-async def _menu_quiz(call, user, state: FSMContext):
-    await call.answer()
-    lang = _user_lang(user)
-    is_premium = _is_premium_user(user)
-
-    if not is_premium:
-        if lang == "ru":
-            text = (
-                "🔒 <b>Книжный Квиз — только для Premium</b>\n\n"
-                "В этом разделе вы сможете:\n\n"
-                "📝 <b>Решать квизы</b> по прочитанным книгам\n"
-                "⚔️ <b>Бросать Визов</b> — вызывать друзей на соревнование\n"
-                "🏆 <b>Соревноваться</b> с другими читателями\n"
-                "⏱ <b>Тест на скорость</b> — отвечайте быстро, пока не кончилось время\n"
-                "📊 <b>Смотреть результаты</b> и сравнивать с другими\n\n"
-                "💎 <i>Оформите Premium подписку, чтобы открыть этот раздел!</i>"
-            )
-            kb = InlineKeyboardMarkup().add(
-                InlineKeyboardButton("💎 Оформить Premium", callback_data="menu:premium")
-            )
-        else:
-            text = (
-                "🔒 <b>Kitob Quiz — faqat Premium foydalanuvchilar uchun</b>\n\n"
-                "Bu bo'limda siz:\n\n"
-                "📝 <b>O'qigan kitoblaringiz bo'yicha quizlar yechishingiz</b>\n"
-                "⚔️ <b>Vizov yuborish</b> — do'stlaringizni musobaqaga chaqirishingiz\n"
-                "🏆 <b>Boshqa kitobxonlar bilan raqobat qilishingiz</b>\n"
-                "⏱ <b>Vaqt sinaladi</b> — tezlik bilan javob bering, vaqt tugashidan oldin!\n"
-                "📊 <b>Natijalaringizni ko'rishingiz</b> va boshqalar bilan solishtirishingiz mumkin\n\n"
-                "💎 <i>Bu imkoniyatlarni ochish uchun Premium oling!</i>"
-            )
-            kb = InlineKeyboardMarkup().add(
-                InlineKeyboardButton("💎 Premium olish", callback_data="menu:premium")
-            )
-        await call.message.answer(text, parse_mode="HTML", reply_markup=kb)
-        return
-
-    # Premium user — show available quizzes
-    from tgbot.models import Quiz as _Quiz
-    quizzes = await sync_to_async(list)(
-        _Quiz.objects.prefetch_related("questions").order_by("-created_at")[:15]
-    )
-
-    if not quizzes:
-        text = _t(
-            lang,
-            "📝 <b>Kitob Quiz</b>\n\nHozircha quizlar yo'q. Tez orada yangilari qo'shiladi!",
-            "📝 <b>Книжный Квиз</b>\n\nПока квизов нет. Скоро появятся новые!",
-        )
-        await call.message.answer(text, parse_mode="HTML")
-        return
-
-    header = _t(
-        lang,
-        "📝 <b>Kitob Quiz</b>\n\nMavjud quizlar — birini tanlang va boshlang:",
-        "📝 <b>Книжный Квиз</b>\n\nДоступные квизы — выберите и начните:",
-    )
-    kb = InlineKeyboardMarkup(row_width=1)
-    for quiz in quizzes:
-        q_count = len(quiz.questions.all())
-        kb.add(InlineKeyboardButton(
-            text=f"📝 {quiz.title} ({q_count} savol · {quiz.time_per_question}s)",
-            callback_data=f"qsolo:{quiz.id}",
-        ))
-    await call.message.answer(header, parse_mode="HTML", reply_markup=kb)
-
-
-# ──────────────────────────────────────────────────────────────────────────
 # Language switch.
 # ──────────────────────────────────────────────────────────────────────────
 async def _menu_language(call, user, state: FSMContext):
@@ -854,7 +783,7 @@ async def _menu_reyting(call, user, _state: FSMContext):
     lambda c: c.data and c.data.startswith("reyting:"),
     state="*",
 )
-async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
+async def reyting_period_pick(call: types.CallbackQuery, _state: FSMContext):
     period = call.data.split(":", 1)[1]
     if period not in _VALID_PERIODS:
         await call.answer()
@@ -910,8 +839,74 @@ async def toplist_congrats_handler(call: types.CallbackQuery, state: FSMContext)
 
     await call.answer("🎉 Tabrikladingiz! Xabarlar jo'natilmoqda...", show_alert=False)
 
-    from tgbot.tasks import process_toplist_congrats
-    process_toplist_congrats.delay(period, date_str, call.from_user.id)
+    import asyncio as _asyncio
+    import datetime as _dt
+    import requests as _req
+    import time as _time
+    from asgiref.sync import sync_to_async
+    from django.utils.html import escape as _esc
+    from tgbot.models import TelegramProfile as _TP, ConfirmationReport as _CR
+    from django.db.models import Sum as _Sum
+    from tgbot.tasks import BOT_TOKEN
+
+    congratulator_tg_id = call.from_user.id
+    presser_name = _esc(user.full_name or "Kitobxon")
+
+    period_map = {
+        "daily":    (_dt.timedelta(days=0),   "Kunlik",   20),
+        "3days":    (_dt.timedelta(days=2),   "3 kunlik", 20),
+        "weekly":   (_dt.timedelta(days=6),   "Haftalik", 30),
+        "monthly":  (_dt.timedelta(days=29),  "Oylik",    30),
+        "3monthly": (_dt.timedelta(days=89),  "3 oylik",  40),
+        "yearly":   (_dt.timedelta(days=364), "Yillik",   60),
+    }
+    if period not in period_map:
+        return
+
+    delta, period_label, limit = period_map[period]
+    try:
+        end_date = _dt.datetime.strptime(date_str, "%Y%m%d").date()
+    except ValueError:
+        return
+    start_date = end_date - delta
+
+    rows = await sync_to_async(lambda: list(
+        _CR.objects
+        .filter(date__date__gte=start_date, date__date__lte=end_date)
+        .values("user__telegram_id", "user__full_name")
+        .annotate(total=_Sum("pages_read"))
+        .order_by("-total")[:limit]
+    ))()
+
+    if not rows:
+        return
+
+    async def _send_congrats(rows, presser_name, period_label, congratulator_tg_id, token):
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+        def _do():
+            for row in rows:
+                tg_id = row["user__telegram_id"]
+                if tg_id == congratulator_tg_id:
+                    continue
+                try:
+                    _req.post(url, data={
+                        "chat_id": tg_id,
+                        "text": (
+                            f"🎉 <b>{presser_name}</b> sizi tabriklamoqda!\n\n"
+                            f"📊 <b>{period_label}</b> top ro'yxatida bo'lganingiz uchun!\n\n"
+                            "Zo'r natija! Davom eting 📚🔥"
+                        ),
+                        "parse_mode": "HTML",
+                    }, timeout=5)
+                except Exception as e:
+                    print(f"congrats DM failed {tg_id}: {e}")
+                _time.sleep(0.05)
+
+        loop = _asyncio.get_event_loop()
+        await loop.run_in_executor(None, _do)
+
+    _asyncio.create_task(_send_congrats(rows, presser_name, period_label, congratulator_tg_id, BOT_TOKEN))
 
 
 # ──────────────────────────────────────────────────────────────────────────

@@ -555,7 +555,8 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
         from tgbot.bot.consts import BOYS_GROUP_ID, GIRLS_GROUP_ID
 
         period_key = action.split(":", 1)[1]
-        today = __import__('django.utils.timezone', fromlist=['timezone']).timezone.localdate()
+        from django.utils import timezone as _tz
+        today = _tz.localdate()
         period_cfg = {
             "daily":    (today,                              today, "Bugun 🔥 Top kitobxonlar",    20),
             "3days":    (today - _dt.timedelta(days=2),     today, "3 kunlik Top kitobxonlar",    20),
@@ -589,8 +590,8 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
 
                 for group_id, thread_id in [
                     (GENERAL_GROUP_ID, general_thread),
-                    (BOYS_GROUP_ID, None),
-                    (GIRLS_GROUP_ID, None),
+                    (int(BOYS_GROUP_ID), None),
+                    (int(GIRLS_GROUP_ID), None),
                 ]:
                     try:
                         await bot.send_message(
