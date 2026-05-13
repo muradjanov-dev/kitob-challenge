@@ -18,6 +18,7 @@ class NotificationState(StatesGroup):
 
 class ReportState(StatesGroup):
     reading_day = State()
+    book_type = State()       # select: Jonli kitob or Audiokitob
     select_book = State()
     enter_book_name = State()
     enter_book_pages = State()

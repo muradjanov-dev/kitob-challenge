@@ -130,6 +130,8 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
 # Report (book selection) — opens fresh book picker for the user.
 # ──────────────────────────────────────────────────────────────────────────
 async def _menu_report(call, user, state: FSMContext):
+    from tgbot.bot.handlers.users.report import send_book_type_menu
+
     lang = _user_lang(user)
     await call.answer()
     if not user:
@@ -167,33 +169,7 @@ async def _menu_report(call, user, state: FSMContext):
 
     await state.finish()
     await state.update_data(reading_day=reading_day, selected_book_ids=[])
-    await ReportState.select_book.set()
-
-    books = await sync_to_async(list)(
-        BooksToRead.objects.filter(user=user).order_by("-created_at")[:10]
-    )
-    markup = InlineKeyboardMarkup(row_width=1)
-    for book in books:
-        percent = 0
-        if book.total_pages > 0:
-            percent = int((book.current_page / book.total_pages) * 100)
-        markup.add(InlineKeyboardButton(
-            text=f"{book.title} ({percent}%)",
-            callback_data=f"select_book:{book.id}:1",
-        ))
-    markup.add(InlineKeyboardButton(
-        text=_t(lang, "➕ Yangi kitob qo'shish", "➕ Добавить книгу"),
-        callback_data="add_new_book",
-    ))
-
-    await call.message.answer(
-        _t(
-            lang,
-            "Qaysi kitobni o'qiyotganingizni tanlang (bir nechtasini tanlash mumkin):",
-            "Выберите книгу (можно несколько):",
-        ),
-        reply_markup=markup,
-    )
+    await send_book_type_menu(call, state)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -733,38 +709,96 @@ def _top_readers_text(period: str, lang: str) -> str:
         limit = 60
 
     from django.db.models import Sum
-    rows = list(
-        ConfirmationReport.objects
-        .filter(date__date__gte=start, date__date__lte=end)
-        .values("user__telegram_id", "user__full_name")
-        .annotate(total=Sum("pages_read"))
-        .order_by("-total")[:limit]
-    )
-    if not rows:
+
+    try:
+        # Live book readers — ranked by pages
+        live_rows = list(
+            ConfirmationReport.objects
+            .filter(date__date__gte=start, date__date__lte=end, is_audio=False)
+            .values("user__telegram_id", "user__full_name")
+            .annotate(total=Sum("pages_read"))
+            .order_by("-total")[:limit]
+        )
+
+        # Audiobook listeners — ranked by minutes
+        audio_rows = list(
+            ConfirmationReport.objects
+            .filter(date__date__gte=start, date__date__lte=end, is_audio=True)
+            .values("user__telegram_id", "user__full_name")
+            .annotate(total=Sum("minutes_listened"))
+            .filter(total__gt=0)
+            .order_by("-total")[:limit]
+        )
+    except Exception:
+        # Migration 0051 not yet applied — is_audio column missing.
+        # Reset the DB connection and fall back to the original single-list query.
+        from django.db import connection
+        try:
+            connection.close()
+        except Exception:
+            pass
+        live_rows = list(
+            ConfirmationReport.objects
+            .filter(date__date__gte=start, date__date__lte=end)
+            .values("user__telegram_id", "user__full_name")
+            .annotate(total=Sum("pages_read"))
+            .order_by("-total")[:limit]
+        )
+        audio_rows = []
+
+    if not live_rows and not audio_rows:
         return _t(lang, "📭 Hali ma'lumot yo'q.", "📭 Данных пока нет.")
 
-    grand = sum(r["total"] or 0 for r in rows)
     header = _t(
         lang,
         f"📊 <b>Top kitobxonlar — {label}</b>\n\n",
         f"📊 <b>Топ читателей — {label}</b>\n\n",
     )
-    lines = []
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-    for i, r in enumerate(rows, 1):
-        name = escape(r["user__full_name"] or "Kitobxon")
-        tg_id = r["user__telegram_id"]
-        pages = r["total"] or 0
-        medal = medals.get(i, f"{i}.")
-        lines.append(
-            f"{medal} <a href='tg://user?id={tg_id}'>{name}</a>: <b>{pages}</b> bet"
-        )
-    footer = _t(
-        lang,
-        f"\n\n📚 Jami: <b>{grand} bet</b>",
-        f"\n\n📚 Всего: <b>{grand} стр.</b>",
-    )
-    return header + "\n".join(lines) + footer
+    parts = [header]
+
+    # ── Jonli kitob section ──
+    if live_rows:
+        parts.append(_t(lang, "📖 <b>Jonli kitob:</b>\n", "📖 <b>Обычные книги:</b>\n"))
+        grand_live = sum(r["total"] or 0 for r in live_rows)
+        lines = []
+        for i, r in enumerate(live_rows, 1):
+            name = escape(r["user__full_name"] or "Kitobxon")
+            tg_id = r["user__telegram_id"]
+            pages = r["total"] or 0
+            medal = medals.get(i, f"{i}.")
+            lines.append(
+                f"{medal} <a href='tg://user?id={tg_id}'>{name}</a>: <b>{pages}</b> bet"
+            )
+        parts.append("\n".join(lines))
+        parts.append(_t(
+            lang,
+            f"\n📚 Jami: <b>{grand_live} bet</b>",
+            f"\n📚 Всего: <b>{grand_live} стр.</b>",
+        ))
+
+    # ── Audiokitob section ──
+    if audio_rows:
+        separator = "\n\n" if live_rows else ""
+        parts.append(separator + _t(lang, "🎧 <b>Audiokitob:</b>\n", "🎧 <b>Аудиокниги:</b>\n"))
+        grand_audio = sum(r["total"] or 0 for r in audio_rows)
+        lines = []
+        for i, r in enumerate(audio_rows, 1):
+            name = escape(r["user__full_name"] or "Kitobxon")
+            tg_id = r["user__telegram_id"]
+            minutes = r["total"] or 0
+            medal = medals.get(i, f"{i}.")
+            lines.append(
+                f"{medal} <a href='tg://user?id={tg_id}'>{name}</a>: <b>{minutes}</b> daqiqa"
+            )
+        parts.append("\n".join(lines))
+        parts.append(_t(
+            lang,
+            f"\n⏱ Jami: <b>{grand_audio} daqiqa</b>",
+            f"\n⏱ Всего: <b>{grand_audio} мин.</b>",
+        ))
+
+    return "".join(parts)
 
 
 async def _menu_reyting(call, user, _state: FSMContext):
@@ -783,7 +817,7 @@ async def _menu_reyting(call, user, _state: FSMContext):
     lambda c: c.data and c.data.startswith("reyting:"),
     state="*",
 )
-async def reyting_period_pick(call: types.CallbackQuery, _state: FSMContext):
+async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
     period = call.data.split(":", 1)[1]
     if period not in _VALID_PERIODS:
         await call.answer()

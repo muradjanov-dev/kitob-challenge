@@ -178,27 +178,69 @@ def _get_premium_tg_ids() -> set:
 
 
 def _send_period_report(start_date, end_date, limit, period_name):
-    reports = ConfirmationReport.objects.filter(
-        date__date__gte=start_date,
-        date__date__lte=end_date
-    ).values(
-        'user__telegram_id', 'user__full_name'
-    ).annotate(
-        total_pages=Sum('pages_read')
-    ).order_by('-total_pages')[:limit]
+    premium_ids = _get_premium_tg_ids()
 
-    reports = list(reports)
-    if reports:
-        premium_ids = _get_premium_tg_ids()
-        message = f"📚 {period_name} eng ko'p kitob o'qigan {limit}ta Peshqadam foydalanuvchilar: \n\n"
-        for index, report in enumerate(reports, start=1):
-            full_name = escape(report['user__full_name'] or "Foydalanuvchi")
-            tg_id = report['user__telegram_id']
-            total_pages = report['total_pages']
-            badge = "💎 " if tg_id in premium_ids else ""
-            message += f"{index}) <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_pages} bet 📚\n\n"
-    else:
+    try:
+        live_reports = list(
+            ConfirmationReport.objects.filter(
+                date__date__gte=start_date,
+                date__date__lte=end_date,
+                is_audio=False,
+            ).values('user__telegram_id', 'user__full_name')
+            .annotate(total_pages=Sum('pages_read'))
+            .order_by('-total_pages')[:limit]
+        )
+        audio_reports = list(
+            ConfirmationReport.objects.filter(
+                date__date__gte=start_date,
+                date__date__lte=end_date,
+                is_audio=True,
+            ).values('user__telegram_id', 'user__full_name')
+            .annotate(total_minutes=Sum('minutes_listened'))
+            .filter(total_minutes__gt=0)
+            .order_by('-total_minutes')[:limit]
+        )
+    except Exception:
+        # Migration 0051 not applied yet — fall back to original query.
+        from django.db import connection
+        try:
+            connection.close()
+        except Exception:
+            pass
+        live_reports = list(
+            ConfirmationReport.objects.filter(
+                date__date__gte=start_date,
+                date__date__lte=end_date,
+            ).values('user__telegram_id', 'user__full_name')
+            .annotate(total_pages=Sum('pages_read'))
+            .order_by('-total_pages')[:limit]
+        )
+        audio_reports = []
+
+    if not live_reports and not audio_reports:
         message = f"📚 {period_name} uchun kitob o'qigan foydalanuvchilar yo'q."
+    else:
+        message = f"📚 {period_name} eng faol kitobxonlar:\n\n"
+
+        if live_reports:
+            message += "📖 <b>Jonli kitob:</b>\n"
+            for index, report in enumerate(live_reports, start=1):
+                full_name = escape(report['user__full_name'] or "Foydalanuvchi")
+                tg_id = report['user__telegram_id']
+                total_pages = report['total_pages']
+                badge = "💎 " if tg_id in premium_ids else ""
+                message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_pages} bet 📚\n"
+
+        if audio_reports:
+            if live_reports:
+                message += "\n"
+            message += "🎧 <b>Audiokitob:</b>\n"
+            for index, report in enumerate(audio_reports, start=1):
+                full_name = escape(report['user__full_name'] or "Foydalanuvchi")
+                tg_id = report['user__telegram_id']
+                total_minutes = report['total_minutes']
+                badge = "💎 " if tg_id in premium_ids else ""
+                message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_minutes} daqiqa 🎧\n"
 
     for _cid in _group_chat_ids():
         send_message(_cid, message)
@@ -312,31 +354,75 @@ def users_unread_book():
 
 
 def _build_top_readers_message(start_date, end_date, period_label, limit=20):
-    """Top kitobxonlar (period bo'yicha) va 'Jami: X bet' bilan."""
-    reports = ConfirmationReport.objects.filter(
-        date__date__gte=start_date,
-        date__date__lte=end_date,
-    ).values(
-        'user__telegram_id',
-        'user__full_name',
-    ).annotate(
-        total_pages=Sum('pages_read')
-    ).order_by('-total_pages')[:limit]
+    """Top kitobxonlar (period bo'yicha): avval jonli kitob, keyin audiokitob."""
+    premium_ids = _get_premium_tg_ids()
 
-    reports = list(reports)
-    if not reports:
+    try:
+        live_reports = list(
+            ConfirmationReport.objects.filter(
+                date__date__gte=start_date,
+                date__date__lte=end_date,
+                is_audio=False,
+            ).values('user__telegram_id', 'user__full_name')
+            .annotate(total_pages=Sum('pages_read'))
+            .order_by('-total_pages')[:limit]
+        )
+        audio_reports = list(
+            ConfirmationReport.objects.filter(
+                date__date__gte=start_date,
+                date__date__lte=end_date,
+                is_audio=True,
+            ).values('user__telegram_id', 'user__full_name')
+            .annotate(total_minutes=Sum('minutes_listened'))
+            .filter(total_minutes__gt=0)
+            .order_by('-total_minutes')[:limit]
+        )
+    except Exception:
+        # Migration 0051 not yet applied — is_audio column missing
+        from django.db import connection
+        try:
+            connection.close()
+        except Exception:
+            pass
+        live_reports = list(
+            ConfirmationReport.objects.filter(
+                date__date__gte=start_date,
+                date__date__lte=end_date,
+            ).values('user__telegram_id', 'user__full_name')
+            .annotate(total_pages=Sum('pages_read'))
+            .order_by('-total_pages')[:limit]
+        )
+        audio_reports = []
+
+    if not live_reports and not audio_reports:
         return None
 
-    premium_ids = _get_premium_tg_ids()
-    grand_total = sum((r['total_pages'] or 0) for r in reports)
-    message = f"📚 {period_label} eng ko'p kitob o'qigan Kitobxonlar:\n\n"
-    for index, report in enumerate(reports, start=1):
-        full_name = escape(report['user__full_name'] or "Foydalanuvchi")
-        tg_id = report['user__telegram_id']
-        total_pages = report['total_pages'] or 0
-        badge = "💎 " if tg_id in premium_ids else ""
-        message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_pages} bet 📚\n"
-    message += f"\n📊 Jami: <b>{grand_total} bet</b>"
+    message = f"📚 {period_label} eng faol Kitobxonlar:\n\n"
+
+    if live_reports:
+        grand_live = sum((r['total_pages'] or 0) for r in live_reports)
+        message += "📖 <b>Jonli kitob:</b>\n"
+        for index, report in enumerate(live_reports, start=1):
+            full_name = escape(report['user__full_name'] or "Foydalanuvchi")
+            tg_id = report['user__telegram_id']
+            total_pages = report['total_pages'] or 0
+            badge = "💎 " if tg_id in premium_ids else ""
+            message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_pages} bet 📚\n"
+        message += f"📊 Jami: <b>{grand_live} bet</b>"
+
+    if audio_reports:
+        grand_audio = sum((r['total_minutes'] or 0) for r in audio_reports)
+        if live_reports:
+            message += "\n\n"
+        message += "🎧 <b>Audiokitob:</b>\n"
+        for index, report in enumerate(audio_reports, start=1):
+            full_name = escape(report['user__full_name'] or "Foydalanuvchi")
+            tg_id = report['user__telegram_id']
+            total_minutes = report['total_minutes'] or 0
+            badge = "💎 " if tg_id in premium_ids else ""
+            message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_minutes} daqiqa 🎧\n"
+        message += f"⏱ Jami: <b>{grand_audio} daqiqa</b>"
+
     return message
 
 
@@ -855,12 +941,15 @@ GENERAL_GROUP_ID = -1002237773868
 
 
 def _group_chat_ids():
-    """Return all group/channel IDs to broadcast to: main group + boys group."""
+    """Return all group/channel IDs to broadcast to: main group + boys group + girls group."""
     import os as _os
     ids = [str(GENERAL_GROUP_ID)]
     boys = _os.environ.get("BOYS_GROUP_ID", "").strip()
     if boys and boys not in ids:
         ids.append(boys)
+    girls = _os.environ.get("GIRLS_GROUP_ID", "").strip()
+    if girls and girls not in ids:
+        ids.append(girls)
     return ids
 
 
@@ -905,10 +994,17 @@ def check_user_achievements(user_id: int):
             "Davom etamiz! 📚🔥"
         )
         import datetime as _dt
+        import os as _os
         url_send = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-        # Send achievement congrats to all groups (both main and boys group).
-        target_groups = _group_chat_ids()
+        # Route achievement congrats to the achiever's gender-specific group only.
+        if user.gender == "male":
+            _gender_group = _os.environ.get("BOYS_GROUP_ID", "").strip()
+        elif user.gender == "female":
+            _gender_group = _os.environ.get("GIRLS_GROUP_ID", "").strip()
+        else:
+            _gender_group = ""
+        target_groups = [_gender_group] if _gender_group else _group_chat_ids()
 
         for _gid in target_groups:
             try:

@@ -393,8 +393,14 @@ class ConfirmationReport(models.Model):
         null=True, verbose_name=_("Spent time (in minutes)"))
     conclusion = models.TextField(
         verbose_name=_("Xulosa"), null=True, blank=True)
+    is_audio = models.BooleanField(
+        default=False, verbose_name=_("Is Audiobook"))
+    minutes_listened = models.IntegerField(
+        null=True, blank=True, verbose_name=_("Minutes listened"))
 
     def __str__(self):
+        if self.is_audio:
+            return f"User {self.user.full_name} listened {self.minutes_listened} minutes"
         return f"User {self.user.full_name} readed {self.pages_read} pages"
 
 
