@@ -1,6 +1,7 @@
 ﻿from aiogram.utils.markdown import hlink
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from django.utils import timezone
+from asgiref.sync import sync_to_async
 from tgbot.bot.keyboards.reply import admin_keyboard, confirm_markup, main_markup, yes_or_no_markup, back_keyboard
 from aiogram.dispatcher.filters import Text
 from tgbot.bot import dp
@@ -240,7 +241,7 @@ def _build_user_detail(user_id: int) -> str:
     from django.db.models import Count, Avg, Sum, F
     from django.db.models.functions import ExtractWeekDay, ExtractHour, TruncDate
 
-    user = TelegramProfile.objects.filter(id=user_id).first()
+    user = TelegramProfile.objects.select_related('region').filter(id=user_id).first()
     if not user:
         return "❌ Foydalanuvchi topilmadi."
 
@@ -367,7 +368,7 @@ async def adm_user_detail(call: types.CallbackQuery):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return
     target_id = int(call.data.split(":", 1)[1])
-    text = _build_user_detail(target_id)
+    text = await sync_to_async(_build_user_detail)(target_id)
     back_kb = InlineKeyboardMarkup().add(
         InlineKeyboardButton("⬅️ Ro'yxatga qaytish", callback_data="adm_userp:1")
     )

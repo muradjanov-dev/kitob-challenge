@@ -18,16 +18,16 @@ class NotificationState(StatesGroup):
 
 class ReportState(StatesGroup):
     reading_day = State()
-    book_type = State()       # select: Jonli kitob or Audiokitob
+    book_type = State()       # select: Jonli kitob / Audiokitob / Ikkalasi ham
     select_book = State()
     enter_book_name = State()
     enter_book_pages = State()
-    # Keeping for compatibility if needed, but likely replaced by M2M logic
     book_title = State()
     pages_read = State()
     spent_time = State()
     conclusion = State()
     enter_pages_loop = State()
+    audio_minutes_combined = State()  # combined flow: audio minutes after live pages
     confirm_report = State()
 
 

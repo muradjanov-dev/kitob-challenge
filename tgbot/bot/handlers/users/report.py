@@ -75,6 +75,9 @@ def _book_type_markup():
         InlineKeyboardButton(text="📖 Jonli kitob", callback_data="book_type:live"),
         InlineKeyboardButton(text="🎧 Audiokitob",  callback_data="book_type:audio"),
     )
+    markup.add(
+        InlineKeyboardButton(text="📖🎧 Ikkalasi ham", callback_data="book_type:both"),
+    )
     return markup
 
 
@@ -93,8 +96,10 @@ async def send_book_type_menu(message_or_call, state: FSMContext):
     state=ReportState.book_type,
 )
 async def book_type_handler(call: CallbackQuery, state: FSMContext):
-    is_audio = call.data == "book_type:audio"
-    await state.update_data(is_audio=is_audio)
+    book_type = call.data.split(":")[1]
+    is_audio = book_type == "audio"
+    is_combined = book_type == "both"
+    await state.update_data(is_audio=is_audio, is_combined=is_combined)
     await call.answer()
     await ReportState.select_book.set()
     await send_book_selection_menu(call, state)
@@ -316,6 +321,7 @@ async def ask_next_book_pages(message, state: FSMContext):
     data = await state.get_data()
     pending_books = data.get("pending_books", [])
     is_audio = data.get("is_audio", False)
+    is_combined = data.get("is_combined", False)
 
     if not pending_books:
         reports = data.get("book_reports", {})
@@ -324,6 +330,13 @@ async def ask_next_book_pages(message, state: FSMContext):
             await state.update_data(minutes_listened=total, pages_read=0)
         else:
             await state.update_data(pages_read=total)
+            if is_combined:
+                await message.answer(
+                    "🎧 Audiokitobdan bugun jami necha daqiqa eshitdingiz?",
+                    reply_markup=back_keyboard,
+                )
+                await ReportState.audio_minutes_combined.set()
+                return
 
         await message.answer(
             _("Kichik xulosa (bugun nima o'rgandingiz)\n\nMasalan: <i>Ilm - bu boylik</i>"),
@@ -374,6 +387,23 @@ async def process_loop_pages(message: types.Message, state: FSMContext):
     await ask_next_book_pages(message, state)
 
 
+@dp.message_handler(state=ReportState.audio_minutes_combined)
+async def process_combined_audio_minutes(message: types.Message, state: FSMContext):
+    if message.text == _("🔙 Orqaga"):
+        await ReportState.select_book.set()
+        await send_book_selection_menu(message, state)
+        return
+    if not message.text.isdigit() or int(message.text) <= 0:
+        await message.answer(_("Iltimos, to'g'ri raqam kiriting."))
+        return
+    await state.update_data(minutes_listened=int(message.text))
+    await message.answer(
+        _("Kichik xulosa (bugun nima o'rgandingiz)\n\nMasalan: <i>Ilm - bu boylik</i>"),
+        reply_markup=back_keyboard,
+    )
+    await ReportState.conclusion.set()
+
+
 @dp.message_handler(state=ReportState.pages_read)
 async def legacy_process_pages_read(message: types.Message, state: FSMContext):
     pass
@@ -419,7 +449,16 @@ async def spent_time_handler(message: types.Message, state: FSMContext):
         else:
             book = "Tanlanmagan"
 
-    if is_audio:
+    is_combined = data.get("is_combined", False)
+    if is_combined:
+        pages_read = data.get("pages_read", 0)
+        minutes_listened = data.get("minutes_listened", 0)
+        value_line = (
+            f"<b>✅ O'qilgan betlar:</b> {pages_read}+ bet\n"
+            f"<b>🎧 Eshitilgan vaqt:</b> {minutes_listened} daqiqa"
+        )
+        type_label = "📖 Jonli kitob + 🎧 Audiokitob"
+    elif is_audio:
         minutes_listened = data.get("minutes_listened", 0)
         value_line = f"<b>🎧 Eshitilgan vaqt:</b> {minutes_listened} daqiqa"
         type_label = "🎧 Audiokitob"
@@ -494,6 +533,7 @@ async def _do_confirm_report(message, user, state: FSMContext):
     reading_day = data.get("reading_day")
     book = data.get("book_title")
     is_audio = data.get("is_audio", False)
+    is_combined = data.get("is_combined", False)
     pages_read = data.get("pages_read", 0)
     minutes_listened = data.get("minutes_listened")
     conclusion = data.get("conclusion")
@@ -511,6 +551,18 @@ async def _do_confirm_report(message, user, state: FSMContext):
         is_audio=is_audio,
         minutes_listened=minutes_listened,
     )
+
+    if is_combined and minutes_listened:
+        await create_confirmation_report(
+            user=user,
+            pages_read=0,
+            date=datetime_now,
+            conclusion=conclusion,
+            book_ids=book_ids,
+            book_title=book,
+            is_audio=True,
+            minutes_listened=minutes_listened,
+        )
 
     data = await state.get_data()
     book_reports = data.get("book_reports", {})
@@ -546,7 +598,13 @@ async def _do_confirm_report(message, user, state: FSMContext):
 
     prem_badge = "💎 " if await _check_premium() else ""
 
-    if is_audio:
+    if is_combined:
+        value_line = (
+            f"<b>✅ O'qilgan betlar:</b> {pages_read}+ bet\n"
+            f"<b>🎧 Eshitilgan vaqt:</b> {minutes_listened} daqiqa"
+        )
+        type_tag = "📖 Jonli kitob + 🎧 Audiokitob"
+    elif is_audio:
         value_line = f"<b>🎧 Eshitilgan vaqt:</b> {minutes_listened} daqiqa"
         type_tag = "🎧 Audiokitob"
     else:

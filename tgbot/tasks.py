@@ -12,8 +12,7 @@ from tgbot.models import (
 )
 
 from django.utils import timezone
-from django.db.models import Sum, Window, F
-from django.db.models.functions.window import Rank
+from django.db.models import Sum
 from django.utils.html import escape
 
 
@@ -147,21 +146,25 @@ def daily_top_read_user_action_button():
 
 async def _daily_top_read_user_action_button():
     today = timezone.now().date()
-    ranked_reports = ConfirmationReport.objects.filter(date__date=today).annotate(
-        total_pages=Sum('pages_read'),
-        rank=Window(
-            expression=Rank(),
-            partition_by=F('user_id'),
-            order_by=F('total_pages').desc()
-        )
-    ).filter(rank=1).order_by('-total_pages')[:20]
+    premium_ids = _get_premium_tg_ids()
 
-    if ranked_reports:
-        message = f"📚 Bugun eng ko'p kitob o'qigan 20ta Peshqadam foydalanuvchilar: \n\n"
-        for index, user in enumerate(ranked_reports, start=1):
-            message += f"{index}) <b><a href='tg://user?id={user.user.telegram_id}'>{escape(user.user.full_name)}</a></b>: {user.pages_read} bet 📚\n\n"
+    reports = list(
+        ConfirmationReport.objects.filter(date__date=today, is_audio=False)
+        .values('user__telegram_id', 'user__full_name')
+        .annotate(total_pages=Sum('pages_read'))
+        .filter(total_pages__gt=0)
+        .order_by('-total_pages')[:20]
+    )
+
+    if reports:
+        message = "📚 Bugun eng ko'p kitob o'qigan 20ta Peshqadam foydalanuvchilar:\n\n"
+        for index, r in enumerate(reports, start=1):
+            tg_id = r['user__telegram_id']
+            name = escape(r['user__full_name'] or "Foydalanuvchi")
+            badge = "💎 " if tg_id in premium_ids else ""
+            message += f"{index}) <b><a href='tg://user?id={tg_id}'>{badge}{name}</a></b>: {r['total_pages']} bet 📚\n\n"
     else:
-        message = "📚 Kecha uchun kitob o'qigan foydalanuvchilar yo'q."
+        message = "📚 Bugun kitob o'qigan foydalanuvchilar yo'q."
 
     for _cid in _group_chat_ids():
         send_message(_cid, message)
@@ -180,67 +183,27 @@ def _get_premium_tg_ids() -> set:
 def _send_period_report(start_date, end_date, limit, period_name):
     premium_ids = _get_premium_tg_ids()
 
-    try:
-        live_reports = list(
-            ConfirmationReport.objects.filter(
-                date__date__gte=start_date,
-                date__date__lte=end_date,
-                is_audio=False,
-            ).values('user__telegram_id', 'user__full_name')
-            .annotate(total_pages=Sum('pages_read'))
-            .order_by('-total_pages')[:limit]
-        )
-        audio_reports = list(
-            ConfirmationReport.objects.filter(
-                date__date__gte=start_date,
-                date__date__lte=end_date,
-                is_audio=True,
-            ).values('user__telegram_id', 'user__full_name')
-            .annotate(total_minutes=Sum('minutes_listened'))
-            .filter(total_minutes__gt=0)
-            .order_by('-total_minutes')[:limit]
-        )
-    except Exception:
-        # Migration 0051 not applied yet — fall back to original query.
-        from django.db import connection
-        try:
-            connection.close()
-        except Exception:
-            pass
-        live_reports = list(
-            ConfirmationReport.objects.filter(
-                date__date__gte=start_date,
-                date__date__lte=end_date,
-            ).values('user__telegram_id', 'user__full_name')
-            .annotate(total_pages=Sum('pages_read'))
-            .order_by('-total_pages')[:limit]
-        )
-        audio_reports = []
+    reports = list(
+        ConfirmationReport.objects.filter(
+            date__date__gte=start_date,
+            date__date__lte=end_date,
+            is_audio=False,
+        ).values('user__telegram_id', 'user__full_name')
+        .annotate(total_pages=Sum('pages_read'))
+        .filter(total_pages__gt=0)
+        .order_by('-total_pages')[:limit]
+    )
 
-    if not live_reports and not audio_reports:
+    if not reports:
         message = f"📚 {period_name} uchun kitob o'qigan foydalanuvchilar yo'q."
     else:
         message = f"📚 {period_name} eng faol kitobxonlar:\n\n"
-
-        if live_reports:
-            message += "📖 <b>Jonli kitob:</b>\n"
-            for index, report in enumerate(live_reports, start=1):
-                full_name = escape(report['user__full_name'] or "Foydalanuvchi")
-                tg_id = report['user__telegram_id']
-                total_pages = report['total_pages']
-                badge = "💎 " if tg_id in premium_ids else ""
-                message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_pages} bet 📚\n"
-
-        if audio_reports:
-            if live_reports:
-                message += "\n"
-            message += "🎧 <b>Audiokitob:</b>\n"
-            for index, report in enumerate(audio_reports, start=1):
-                full_name = escape(report['user__full_name'] or "Foydalanuvchi")
-                tg_id = report['user__telegram_id']
-                total_minutes = report['total_minutes']
-                badge = "💎 " if tg_id in premium_ids else ""
-                message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_minutes} daqiqa 🎧\n"
+        for index, report in enumerate(reports, start=1):
+            full_name = escape(report['user__full_name'] or "Foydalanuvchi")
+            tg_id = report['user__telegram_id']
+            total_pages = report['total_pages']
+            badge = "💎 " if tg_id in premium_ids else ""
+            message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_pages} bet 📚\n"
 
     for _cid in _group_chat_ids():
         send_message(_cid, message)
@@ -354,75 +317,32 @@ def users_unread_book():
 
 
 def _build_top_readers_message(start_date, end_date, period_label, limit=20):
-    """Top kitobxonlar (period bo'yicha): avval jonli kitob, keyin audiokitob."""
+    """Top kitobxonlar (period bo'yicha): jonli kitob o'qiganlar, pages > 0."""
     premium_ids = _get_premium_tg_ids()
 
-    try:
-        live_reports = list(
-            ConfirmationReport.objects.filter(
-                date__date__gte=start_date,
-                date__date__lte=end_date,
-                is_audio=False,
-            ).values('user__telegram_id', 'user__full_name')
-            .annotate(total_pages=Sum('pages_read'))
-            .order_by('-total_pages')[:limit]
-        )
-        audio_reports = list(
-            ConfirmationReport.objects.filter(
-                date__date__gte=start_date,
-                date__date__lte=end_date,
-                is_audio=True,
-            ).values('user__telegram_id', 'user__full_name')
-            .annotate(total_minutes=Sum('minutes_listened'))
-            .filter(total_minutes__gt=0)
-            .order_by('-total_minutes')[:limit]
-        )
-    except Exception:
-        # Migration 0051 not yet applied — is_audio column missing
-        from django.db import connection
-        try:
-            connection.close()
-        except Exception:
-            pass
-        live_reports = list(
-            ConfirmationReport.objects.filter(
-                date__date__gte=start_date,
-                date__date__lte=end_date,
-            ).values('user__telegram_id', 'user__full_name')
-            .annotate(total_pages=Sum('pages_read'))
-            .order_by('-total_pages')[:limit]
-        )
-        audio_reports = []
+    reports = list(
+        ConfirmationReport.objects.filter(
+            date__date__gte=start_date,
+            date__date__lte=end_date,
+            is_audio=False,
+        ).values('user__telegram_id', 'user__full_name')
+        .annotate(total_pages=Sum('pages_read'))
+        .filter(total_pages__gt=0)
+        .order_by('-total_pages')[:limit]
+    )
 
-    if not live_reports and not audio_reports:
+    if not reports:
         return None
 
+    grand_total = sum((r['total_pages'] or 0) for r in reports)
     message = f"📚 {period_label} eng faol Kitobxonlar:\n\n"
-
-    if live_reports:
-        grand_live = sum((r['total_pages'] or 0) for r in live_reports)
-        message += "📖 <b>Jonli kitob:</b>\n"
-        for index, report in enumerate(live_reports, start=1):
-            full_name = escape(report['user__full_name'] or "Foydalanuvchi")
-            tg_id = report['user__telegram_id']
-            total_pages = report['total_pages'] or 0
-            badge = "💎 " if tg_id in premium_ids else ""
-            message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_pages} bet 📚\n"
-        message += f"📊 Jami: <b>{grand_live} bet</b>"
-
-    if audio_reports:
-        grand_audio = sum((r['total_minutes'] or 0) for r in audio_reports)
-        if live_reports:
-            message += "\n\n"
-        message += "🎧 <b>Audiokitob:</b>\n"
-        for index, report in enumerate(audio_reports, start=1):
-            full_name = escape(report['user__full_name'] or "Foydalanuvchi")
-            tg_id = report['user__telegram_id']
-            total_minutes = report['total_minutes'] or 0
-            badge = "💎 " if tg_id in premium_ids else ""
-            message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_minutes} daqiqa 🎧\n"
-        message += f"⏱ Jami: <b>{grand_audio} daqiqa</b>"
-
+    for index, report in enumerate(reports, start=1):
+        full_name = escape(report['user__full_name'] or "Foydalanuvchi")
+        tg_id = report['user__telegram_id']
+        total_pages = report['total_pages'] or 0
+        badge = "💎 " if tg_id in premium_ids else ""
+        message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_pages} bet 📚\n"
+    message += f"\n📊 Jami: <b>{grand_total} bet</b>"
     return message
 
 
