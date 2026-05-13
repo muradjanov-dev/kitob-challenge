@@ -321,8 +321,9 @@ class TelegramButton(BaseModel):
 class BooksToRead(BaseModel):
     user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
-    total_pages = models.PositiveIntegerField(default=1)
-    current_page = models.PositiveIntegerField(default=0)
+    is_audio = models.BooleanField(default=False)
+    total_pages = models.PositiveIntegerField(default=1)  # for audio: total minutes
+    current_page = models.PositiveIntegerField(default=0)  # for audio: minutes listened so far
 
     def __str__(self):
         return f"{self.title} - {self.user}"

@@ -31,8 +31,8 @@ def get_user_books(user, page=1):
 
 
 @sync_to_async
-def create_new_book(user, title, total_pages):
-    return BooksToRead.objects.create(user=user, title=title, total_pages=total_pages)
+def create_new_book(user, title, total_pages, is_audio=False):
+    return BooksToRead.objects.create(user=user, title=title, total_pages=total_pages, is_audio=is_audio)
 
 
 @sync_to_async
@@ -67,44 +67,6 @@ def create_confirmation_report(
     return report
 
 
-# ── Book-type selection ──────────────────────────────────────────────────────
-
-def _book_type_markup():
-    markup = InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        InlineKeyboardButton(text="📖 Jonli kitob", callback_data="book_type:live"),
-        InlineKeyboardButton(text="🎧 Audiokitob",  callback_data="book_type:audio"),
-    )
-    markup.add(
-        InlineKeyboardButton(text="📖🎧 Ikkalasi ham", callback_data="book_type:both"),
-    )
-    return markup
-
-
-async def send_book_type_menu(message_or_call, state: FSMContext):
-    text = "Qanday kitob o'qidingiz / eshitdingiz?"
-    markup = _book_type_markup()
-    if isinstance(message_or_call, types.CallbackQuery):
-        await message_or_call.message.answer(text, reply_markup=markup)
-    else:
-        await message_or_call.answer(text, reply_markup=markup)
-    await ReportState.book_type.set()
-
-
-@dp.callback_query_handler(
-    lambda c: c.data and c.data.startswith("book_type:"),
-    state=ReportState.book_type,
-)
-async def book_type_handler(call: CallbackQuery, state: FSMContext):
-    book_type = call.data.split(":")[1]
-    is_audio = book_type == "audio"
-    is_combined = book_type == "both"
-    await state.update_data(is_audio=is_audio, is_combined=is_combined)
-    await call.answer()
-    await ReportState.select_book.set()
-    await send_book_selection_menu(call, state)
-
-
 # ── Book selection ───────────────────────────────────────────────────────────
 
 async def send_book_selection_menu(message_or_call, state: FSMContext, page=1):
@@ -117,14 +79,16 @@ async def send_book_selection_menu(message_or_call, state: FSMContext, page=1):
     markup = InlineKeyboardMarkup(row_width=1)
 
     for book in books_page:
-        text = book.title
+        label = book.title
+        if book.is_audio:
+            label = f"{label} (🎧 Audiokitob)"
         percent = 0
         if book.total_pages > 0:
             percent = int((book.current_page / book.total_pages) * 100)
-        text = f"{text} ({percent}%)"
+        label = f"{label} ({percent}%)"
         if book.id in selected_book_ids:
-            text = f"✅ {text}"
-        markup.add(InlineKeyboardButton(text=text,
+            label = f"✅ {label}"
+        markup.add(InlineKeyboardButton(text=label,
                    callback_data=f"select_book:{book.id}:{page}"))
 
     nav_buttons = []
@@ -194,7 +158,8 @@ async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
     except Exception:
         pass
 
-    await send_book_type_menu(call, state)
+    await ReportState.select_book.set()
+    await send_book_selection_menu(call, state)
 
 
 # ── Reply-keyboard "📚 Kitob hisoboti" button ────────────────────────────────
@@ -218,7 +183,8 @@ async def send_daily_report_handler(message: types.Message, state: FSMContext):
     )()
     reading_day = distinct_days + 1
     await state.update_data(reading_day=reading_day, selected_book_ids=[])
-    await send_book_type_menu(message, state)
+    await ReportState.select_book.set()
+    await send_book_selection_menu(message, state)
 
 
 # ── Book selection callbacks ──────────────────────────────────────────────────
@@ -226,9 +192,21 @@ async def send_daily_report_handler(message: types.Message, state: FSMContext):
 @dp.callback_query_handler(state=ReportState.select_book)
 async def book_selection_handler(call: CallbackQuery, state: FSMContext):
     if call.data == "add_new_book":
+        type_kb = InlineKeyboardMarkup(row_width=2)
+        type_kb.add(
+            InlineKeyboardButton("📖 Oddiy kitob", callback_data="add_book_type:live"),
+            InlineKeyboardButton("🎧 Audiokitob",  callback_data="add_book_type:audio"),
+        )
+        await call.message.edit_text("Qo'shmoqchi bo'lgan kitob turini tanlang:", reply_markup=type_kb)
+        await call.answer()
+
+    elif call.data.startswith("add_book_type:"):
+        is_audio_new = call.data.split(":")[1] == "audio"
+        await state.update_data(new_book_is_audio=is_audio_new)
         await call.message.delete()
         await call.message.answer(_("Kitob nomini kiriting?"), reply_markup=back_keyboard)
         await ReportState.enter_book_name.set()
+        await call.answer()
 
     elif call.data.startswith("books_page:"):
         page = int(call.data.split(":")[1])
@@ -279,8 +257,8 @@ async def process_new_book_name(message: types.Message, state: FSMContext):
 
     await state.update_data(new_book_title=book_title)
     data = await state.get_data()
-    is_audio = data.get("is_audio", False)
-    question = "Kitob jami necha daqiqa davom etadi?" if is_audio else _("Kitob jami nechi betdan iborat?")
+    new_book_is_audio = data.get("new_book_is_audio", False)
+    question = "Kitob jami necha daqiqa davom etadi?" if new_book_is_audio else _("Kitob jami nechi betdan iborat?")
     await message.answer(question, reply_markup=back_keyboard)
     await ReportState.enter_book_pages.set()
 
@@ -300,9 +278,10 @@ async def process_new_book_pages(message: types.Message, state: FSMContext):
     total_pages = int(pages)
     data = await state.get_data()
     book_title = data.get("new_book_title")
+    new_book_is_audio = data.get("new_book_is_audio", False)
     user = get_user(message.from_user.id)
 
-    new_book = await create_new_book(user, book_title, total_pages)
+    new_book = await create_new_book(user, book_title, total_pages, is_audio=new_book_is_audio)
 
     selected_book_ids = data.get("selected_book_ids", [])
     if new_book.id not in selected_book_ids:
@@ -320,24 +299,27 @@ async def process_new_book_pages(message: types.Message, state: FSMContext):
 async def ask_next_book_pages(message, state: FSMContext):
     data = await state.get_data()
     pending_books = data.get("pending_books", [])
-    is_audio = data.get("is_audio", False)
-    is_combined = data.get("is_combined", False)
 
     if not pending_books:
-        reports = data.get("book_reports", {})
-        total = sum(reports.values())
-        if is_audio:
-            await state.update_data(minutes_listened=total, pages_read=0)
-        else:
-            await state.update_data(pages_read=total)
-            if is_combined:
-                await message.answer(
-                    "🎧 Audiokitobdan bugun jami necha daqiqa eshitdingiz?",
-                    reply_markup=back_keyboard,
-                )
-                await ReportState.audio_minutes_combined.set()
-                return
+        # Loop done — compute live/audio totals from each book's own is_audio flag
+        book_reports = data.get("book_reports", {})
+        live_pages = 0
+        audio_minutes = 0
+        for bid, val in book_reports.items():
+            b = await get_book_by_id(int(bid))
+            if b and b.is_audio:
+                audio_minutes += val
+            else:
+                live_pages += val
 
+        is_combined = live_pages > 0 and audio_minutes > 0
+        is_audio = live_pages == 0 and audio_minutes > 0
+        await state.update_data(
+            pages_read=live_pages,
+            minutes_listened=audio_minutes if audio_minutes > 0 else None,
+            is_audio=is_audio,
+            is_combined=is_combined,
+        )
         await message.answer(
             _("Kichik xulosa (bugun nima o'rgandingiz)\n\nMasalan: <i>Ilm - bu boylik</i>"),
             reply_markup=back_keyboard,
@@ -348,14 +330,16 @@ async def ask_next_book_pages(message, state: FSMContext):
     next_book_id = pending_books[0]
     book = await get_book_by_id(next_book_id)
 
-    if is_audio:
+    if book.is_audio:
+        unit = "daqiqa"
         await message.answer(
-            f"🎧 <b>{book.title}</b> kitobidan bugun necha daqiqa eshitdingiz?",
+            f"🎧 <b>{book.title}</b> — bugun necha daqiqa eshitdingiz?\n"
+            f"(Jami: {book.total_pages} {unit}, Hozirda: {book.current_page}-{unit})",
             parse_mode="HTML",
         )
     else:
         await message.answer(
-            f"📖 <b>{book.title}</b> kitobidan bugun nechi bet o'qidingiz? "
+            f"📖 <b>{book.title}</b> — bugun nechi bet o'qidingiz?\n"
             f"(Jami: {book.total_pages} bet, Hozirda: {book.current_page}-bet)",
             parse_mode="HTML",
         )
@@ -385,23 +369,6 @@ async def process_loop_pages(message: types.Message, state: FSMContext):
 
     await state.update_data(pending_books=pending_books, book_reports=reports)
     await ask_next_book_pages(message, state)
-
-
-@dp.message_handler(state=ReportState.audio_minutes_combined)
-async def process_combined_audio_minutes(message: types.Message, state: FSMContext):
-    if message.text == _("🔙 Orqaga"):
-        await ReportState.select_book.set()
-        await send_book_selection_menu(message, state)
-        return
-    if not message.text.isdigit() or int(message.text) <= 0:
-        await message.answer(_("Iltimos, to'g'ri raqam kiriting."))
-        return
-    await state.update_data(minutes_listened=int(message.text))
-    await message.answer(
-        _("Kichik xulosa (bugun nima o'rgandingiz)\n\nMasalan: <i>Ilm - bu boylik</i>"),
-        reply_markup=back_keyboard,
-    )
-    await ReportState.conclusion.set()
 
 
 @dp.message_handler(state=ReportState.pages_read)
@@ -567,23 +534,22 @@ async def _do_confirm_report(message, user, state: FSMContext):
     data = await state.get_data()
     book_reports = data.get("book_reports", {})
 
-    for bid, p_read in book_reports.items():
+    for bid, value in book_reports.items():
         try:
             book_obj = await get_book_by_id(bid)
             if book_obj:
-                if not is_audio:
-                    # Only update page progress for live books
-                    book_obj.current_page += p_read
-                    if book_obj.current_page > book_obj.total_pages:
-                        book_obj.current_page = book_obj.total_pages
-                    await sync_to_async(book_obj.save)()
+                # Update progress for all book types (pages for live, minutes for audio)
+                book_obj.current_page += value
+                if book_obj.total_pages > 0 and book_obj.current_page > book_obj.total_pages:
+                    book_obj.current_page = book_obj.total_pages
+                await sync_to_async(book_obj.save)()
 
                 from tgbot.models import BookReport
                 await sync_to_async(BookReport.objects.create)(
                     user=user,
                     reading_day=reading_day,
                     book=book_obj.title,
-                    pages_read=p_read,
+                    pages_read=value,
                 )
         except Exception as e:
             print(f"Error updating book {bid}: {e}")

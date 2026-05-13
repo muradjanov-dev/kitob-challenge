@@ -1055,13 +1055,13 @@ def daily_top_readers_reward():
     """Kun oxirida bugungi top kitobxonlarga kitobcha mukofoti beradi.
     1-o'rin: 50, 2-o'rin: 30, 3-o'rin: 15, qolganlari: 5 tadan."""
     today = timezone.localdate()
-    reports = (
-        ConfirmationReport.objects.filter(date__date=today)
+    reports = list(
+        ConfirmationReport.objects.filter(date__date=today, is_audio=False)
         .values('user_id')
         .annotate(total_pages=Sum('pages_read'))
+        .filter(total_pages__gt=0)
         .order_by('-total_pages')
     )
-    reports = list(reports)
     if not reports:
         return
 
@@ -1081,7 +1081,7 @@ def daily_top_readers_reward():
                 dm_text = (
                     f"{place_emoji} <b>Bugungi reyting natijangiz!</b>\n\n"
                     f"O'rningiz: <b>{rank}</b>\n"
-                    f"O'qigan betlaringiz: <b>{pages}</b>\n"
+                    f"📖 O'qigan betlaringiz: <b>{pages} bet</b>\n"
                     f"🪙 Mukofot: <b>+{awarded} Kitobcha</b>{prem_note}\n\n"
                     f"Joriy balans: <b>{int(user.ball)}</b>"
                 )

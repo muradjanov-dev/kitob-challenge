@@ -27,7 +27,6 @@ class ReportState(StatesGroup):
     spent_time = State()
     conclusion = State()
     enter_pages_loop = State()
-    audio_minutes_combined = State()  # combined flow: audio minutes after live pages
     confirm_report = State()
 
 
