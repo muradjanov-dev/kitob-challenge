@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AddField(
-            model_name='bookstoreads',
+            model_name='bookstoread',
             name='is_audio',
             field=models.BooleanField(default=False),
         ),
