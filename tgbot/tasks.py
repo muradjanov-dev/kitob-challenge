@@ -351,14 +351,17 @@ def _toplist_congrats_keyboard(period: str, date_str: str) -> str:
 
 
 def _broadcast_top_to_groups_and_users(message: str, period: str, date_str: str):
-    """Send top list to boys/girls groups and to all registered users (with Tabriklash button)."""
-    import os as _os
-    boys_group = _os.environ.get("BOYS_GROUP_ID", "")
-    girls_group = _os.environ.get("GIRLS_GROUP_ID", "")
-
+    """Send top list to all groups and to all registered users (with Tabriklash button)."""
     keyboard = _toplist_congrats_keyboard(period, date_str)
 
-    for group_id in filter(None, [boys_group, girls_group]):
+    # Send to all groups (general + boys + girls via _group_chat_ids)
+    import os as _os
+    girls_group = _os.environ.get("GIRLS_GROUP_ID", "").strip()
+    group_ids = list(_group_chat_ids())
+    if girls_group and girls_group not in group_ids:
+        group_ids.append(girls_group)
+
+    for group_id in group_ids:
         try:
             send_notification(group_id, message, reply_markup=keyboard)
         except Exception as e:
