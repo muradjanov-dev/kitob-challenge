@@ -547,12 +547,69 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
             reply_markup=kb,
         )
     elif action.startswith("top_readers:"):
+        import datetime as _dt
+        from asgiref.sync import sync_to_async
+        from tgbot.tasks import _build_top_readers_message, _toplist_congrats_keyboard, broadcast_period_top
+        from tgbot.bot.loader import bot
+        from tgbot.bot.consts import BOYS_GROUP_ID, GIRLS_GROUP_ID
+        import os as _os
+
         period_key = action.split(":", 1)[1]
-        from tgbot.tasks import broadcast_period_top
-        await call.message.answer(
-            f"⏳ Top kitobxonlar ({period_key}) barcha foydalanuvchilarga yuborilmoqda (fon rejimida)..."
-        )
-        broadcast_period_top.delay(period_key)
+        today = __import__('django.utils.timezone', fromlist=['timezone']).timezone.localdate()
+        period_cfg = {
+            "daily":    (today,                              today, "Bugun 🔥 Top kitobxonlar",    20),
+            "3days":    (today - _dt.timedelta(days=2),     today, "3 kunlik Top kitobxonlar",    20),
+            "weekly":   (today - _dt.timedelta(days=6),     today, "Bu hafta 🏆 Top kitobxonlar", 30),
+            "monthly":  (today - _dt.timedelta(days=29),    today, "Bu oy 📅 Top kitobxonlar",    30),
+            "3monthly": (today - _dt.timedelta(days=89),    today, "3 oylik 📊 Top kitobxonlar",  40),
+            "yearly":   (today - _dt.timedelta(days=364),   today, "Yillik 🏅 Top kitobxonlar",   60),
+        }
+        if period_key not in period_cfg:
+            await call.message.answer("Noma'lum davr.")
+        else:
+            start_date, end_date, label, limit = period_cfg[period_key]
+            msg_text = await sync_to_async(_build_top_readers_message)(start_date, end_date, label, limit=limit)
+            if not msg_text:
+                await call.message.answer("❌ Bu davr uchun ma'lumot yo'q.")
+            else:
+                date_str = end_date.strftime("%Y%m%d")
+                keyboard_json = _toplist_congrats_keyboard(period_key, date_str)
+                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                import json as _json
+                kb_data = _json.loads(keyboard_json)
+                congrats_kb = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(btn["text"], callback_data=btn["callback_data"])
+                     for btn in row]
+                    for row in kb_data["inline_keyboard"]
+                ])
+
+                # Send to groups immediately (reliable — runs in bot process)
+                GENERAL_GROUP_ID = -1002237773868
+                general_thread = __import__('os').environ.get("MESSAGE_THREAD_ID")
+                general_thread = int(general_thread) if general_thread else None
+
+                for group_id, thread_id in [
+                    (GENERAL_GROUP_ID, general_thread),
+                    (BOYS_GROUP_ID, None),
+                    (GIRLS_GROUP_ID, None),
+                ]:
+                    try:
+                        await bot.send_message(
+                            chat_id=group_id,
+                            text=msg_text,
+                            parse_mode="HTML",
+                            reply_markup=congrats_kb,
+                            message_thread_id=thread_id,
+                            disable_web_page_preview=True,
+                        )
+                    except Exception as e:
+                        print(f"group send {group_id} failed: {e}")
+
+                # Dispatch Celery task for user DMs only
+                broadcast_period_top.delay(period_key)
+                await call.message.answer(
+                    f"✅ Guruhga yuborildi. Foydalanuvchilarga DM fon rejimida yuborilmoqda..."
+                )
     elif action == "quizzes":
         from tgbot.bot.handlers.users.quiz_admin import show_quiz_list
         await show_quiz_list(call.message, user)

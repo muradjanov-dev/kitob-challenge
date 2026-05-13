@@ -606,7 +606,37 @@ def broadcast_period_top(period_key: str):
     if not msg:
         print(f"broadcast_period_top({period_key}): no data")
         return
-    _broadcast_top_to_groups_and_users(msg, period_key, date_str)
+    # Groups are sent immediately from the admin handler (bot process).
+    # Here we only send user DMs.
+    import time as _time
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    keyboard = _toplist_congrats_keyboard(period_key, date_str)
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent = failed = 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": chat_id,
+                    "text": msg,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": "true",
+                    "reply_markup": keyboard,
+                },
+                timeout=10,
+            )
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+                if resp.status_code == 429:
+                    retry_after = resp.json().get("parameters", {}).get("retry_after", 5)
+                    _time.sleep(retry_after)
+        except Exception:
+            failed += 1
+        _time.sleep(0.05)
+    print(f"broadcast_period_top({period_key}): user DMs sent={sent} failed={failed}")
 
 
 INSPIRATION_POOL = [
