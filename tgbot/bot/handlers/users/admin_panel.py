@@ -547,13 +547,10 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
             reply_markup=kb,
         )
     elif action.startswith("top_readers:"):
-        import asyncio as _asyncio
         import datetime as _dt
         import json as _json
-        import requests as _req
-        import time as _time
         from asgiref.sync import sync_to_async
-        from tgbot.tasks import _build_top_readers_message, _toplist_congrats_keyboard, BOT_TOKEN
+        from tgbot.tasks import _build_top_readers_message, _toplist_congrats_keyboard
         from tgbot.bot.loader import bot
         from tgbot.bot.consts import BOYS_GROUP_ID, GIRLS_GROUP_ID
 
@@ -607,45 +604,7 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
                     except Exception as e:
                         print(f"group send {group_id} failed: {e}")
 
-                # ── 2. User DMs: background asyncio task (no Celery needed) ──
-                async def _dm_users(text, kb_json, token):
-                    from tgbot.models import TelegramProfile as _TP
-                    url = f"https://api.telegram.org/bot{token}/sendMessage"
-                    user_ids = await sync_to_async(
-                        lambda: list(_TP.objects.filter(
-                            is_registered=True, is_blocked=False
-                        ).values_list("telegram_id", flat=True))
-                    )()
-
-                    def _send_all():
-                        sent = failed = 0
-                        for chat_id in user_ids:
-                            try:
-                                resp = _req.post(url, data={
-                                    "chat_id": chat_id, "text": text,
-                                    "parse_mode": "HTML",
-                                    "disable_web_page_preview": "true",
-                                    "reply_markup": kb_json,
-                                }, timeout=10)
-                                if resp.ok:
-                                    sent += 1
-                                else:
-                                    failed += 1
-                                    if resp.status_code == 429:
-                                        retry = resp.json().get("parameters", {}).get("retry_after", 5)
-                                        _time.sleep(retry)
-                            except Exception:
-                                failed += 1
-                            _time.sleep(0.05)
-                        print(f"top-readers DM broadcast: sent={sent} failed={failed}")
-
-                    loop = _asyncio.get_event_loop()
-                    await loop.run_in_executor(None, _send_all)
-
-                _asyncio.create_task(_dm_users(msg_text, keyboard_json, BOT_TOKEN))
-                await call.message.answer(
-                    "✅ Guruhga yuborildi. Foydalanuvchilarga DM fon rejimida yuborilmoqda..."
-                )
+                await call.message.answer("✅ Guruhga yuborildi.")
     elif action == "quizzes":
         from tgbot.bot.handlers.users.quiz_admin import show_quiz_list
         await show_quiz_list(call.message, user)
