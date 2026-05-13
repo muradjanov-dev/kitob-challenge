@@ -25,7 +25,15 @@ from tgbot.bot.consts import (
 
 @sync_to_async
 def get_user_books(user, page=1):
-    books_list = BooksToRead.objects.filter(user=user).order_by('-created_at')
+    from django.db.models import Case, When, IntegerField, Value, F
+    books_list = BooksToRead.objects.filter(user=user).annotate(
+        sort_order=Case(
+            When(current_page=0, then=Value(1)),                                        # not started → middle
+            When(total_pages__gt=0, current_page__gte=F('total_pages'), then=Value(2)), # finished → bottom
+            default=Value(0),                                                           # active → top
+            output_field=IntegerField(),
+        )
+    ).order_by('sort_order', '-created_at')
     paginator = Paginator(books_list, 10)
     return paginator.get_page(page)
 
@@ -424,7 +432,7 @@ async def spent_time_handler(message: types.Message, state: FSMContext):
             f"<b>✅ O'qilgan betlar:</b> {pages_read}+ bet\n"
             f"<b>🎧 Eshitilgan vaqt:</b> {minutes_listened} daqiqa"
         )
-        type_label = "📖 Jonli kitob + 🎧 Audiokitob"
+        type_label = "📖 Kitob + 🎧 Audiokitob"
     elif is_audio:
         minutes_listened = data.get("minutes_listened", 0)
         value_line = f"<b>🎧 Eshitilgan vaqt:</b> {minutes_listened} daqiqa"
@@ -432,7 +440,7 @@ async def spent_time_handler(message: types.Message, state: FSMContext):
     else:
         pages_read = data.get("pages_read", 0)
         value_line = f"<b>✅O'qilgan betlar:</b> {pages_read}+ bet"
-        type_label = "📖 Jonli kitob"
+        type_label = "📖 Kitob"
 
     confirmation_message = (
         f"<b><a href='tg://user?id={user.telegram_id}'>{user.full_name}</a></b>:\n\n"
@@ -569,13 +577,13 @@ async def _do_confirm_report(message, user, state: FSMContext):
             f"<b>✅ O'qilgan betlar:</b> {pages_read}+ bet\n"
             f"<b>🎧 Eshitilgan vaqt:</b> {minutes_listened} daqiqa"
         )
-        type_tag = "📖 Jonli kitob + 🎧 Audiokitob"
+        type_tag = "📖 Kitob + 🎧 Audiokitob"
     elif is_audio:
         value_line = f"<b>🎧 Eshitilgan vaqt:</b> {minutes_listened} daqiqa"
         type_tag = "🎧 Audiokitob"
     else:
         value_line = f"<b>✅O'qilgan betlar:</b> {pages_read}+ bet"
-        type_tag = "📖 Jonli kitob"
+        type_tag = "📖 Kitob"
 
     report_message = (
         f"<b><a href='tg://user?id={user.telegram_id}'>{prem_badge}{user.full_name}</a></b>:\n\n"

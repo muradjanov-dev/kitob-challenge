@@ -757,9 +757,9 @@ def _top_readers_text(period: str, lang: str) -> str:
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
     parts = [header]
 
-    # ── Jonli kitob section ──
+    # ── Kitob section ──
     if live_rows:
-        parts.append(_t(lang, "📖 <b>Jonli kitob:</b>\n", "📖 <b>Обычные книги:</b>\n"))
+        parts.append(_t(lang, "📖 <b>Kitob:</b>\n", "📖 <b>Обычные книги:</b>\n"))
         grand_live = sum(r["total"] or 0 for r in live_rows)
         lines = []
         for i, r in enumerate(live_rows, 1):

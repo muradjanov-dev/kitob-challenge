@@ -317,7 +317,7 @@ def users_unread_book():
 
 
 def _build_top_readers_message(start_date, end_date, period_label, limit=20):
-    """Top kitobxonlar (period bo'yicha): jonli kitob o'qiganlar, pages > 0."""
+    """Top kitobxonlar (period bo'yicha): kitob o'qiganlar, pages > 0."""
     premium_ids = _get_premium_tg_ids()
 
     reports = list(
@@ -1053,43 +1053,57 @@ def broadcast_congrats_to_others(user_achievement_id: int, points: int):
 @shared_task
 def daily_top_readers_reward():
     """Kun oxirida bugungi top kitobxonlarga kitobcha mukofoti beradi.
-    1-o'rin: 50, 2-o'rin: 30, 3-o'rin: 15, qolganlari: 5 tadan."""
+    1-o'rin: 50, 2-o'rin: 30, 3-o'rin: 15, qolganlari: 5 tadan.
+    Live readers and audio-only listeners are ranked separately."""
     today = timezone.localdate()
-    reports = list(
+    rewards_by_rank = {1: 50, 2: 30, 3: 15}
+
+    # Track 1: live book readers ranked by pages
+    live_reports = list(
         ConfirmationReport.objects.filter(date__date=today, is_audio=False)
         .values('user_id')
-        .annotate(total_pages=Sum('pages_read'))
-        .filter(total_pages__gt=0)
-        .order_by('-total_pages')
+        .annotate(total=Sum('pages_read'))
+        .filter(total__gt=0)
+        .order_by('-total')
     )
-    if not reports:
-        return
+    live_user_ids = {r['user_id'] for r in live_reports}
 
-    rewards_by_rank = {1: 50, 2: 30, 3: 15}
-    for rank, row in enumerate(reports, start=1):
-        user_id = row['user_id']
-        kitobcha = rewards_by_rank.get(rank, 5)
+    # Track 2: audio-only listeners (not already in live track) ranked by minutes
+    audio_reports = list(
+        ConfirmationReport.objects.filter(date__date=today, is_audio=True)
+        .values('user_id')
+        .annotate(total=Sum('minutes_listened'))
+        .filter(total__gt=0)
+        .exclude(user_id__in=live_user_ids)
+        .order_by('-total')
+    )
+
+    def _send_reward(rank, user_id, kitobcha, stat_line):
         try:
             user = TelegramProfile.objects.filter(id=user_id).first()
             if not user:
-                continue
+                return
             awarded = user.update_ball(True, kitobcha)
-            try:
-                pages = row['total_pages'] or 0
-                place_emoji = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, "🏅")
-                prem_note = " 💎 ×2!" if awarded > kitobcha else ""
-                dm_text = (
-                    f"{place_emoji} <b>Bugungi reyting natijangiz!</b>\n\n"
-                    f"O'rningiz: <b>{rank}</b>\n"
-                    f"📖 O'qigan betlaringiz: <b>{pages} bet</b>\n"
-                    f"🪙 Mukofot: <b>+{awarded} Kitobcha</b>{prem_note}\n\n"
-                    f"Joriy balans: <b>{int(user.ball)}</b>"
-                )
-                send_notification(chat_id=user.telegram_id, text=dm_text)
-            except Exception as e:
-                print(f"daily reward DM failed for {user_id}: {e}")
+            place_emoji = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, "🏅")
+            prem_note = " 💎 ×2!" if awarded > kitobcha else ""
+            dm_text = (
+                f"{place_emoji} <b>Bugungi reyting natijangiz!</b>\n\n"
+                f"O'rningiz: <b>{rank}</b>\n"
+                f"{stat_line}\n"
+                f"🪙 Mukofot: <b>+{awarded} Kitobcha</b>{prem_note}\n\n"
+                f"Joriy balans: <b>{int(user.ball)}</b>"
+            )
+            send_notification(chat_id=user.telegram_id, text=dm_text)
         except Exception as e:
-            print(f"daily reward award failed for {user_id}: {e}")
+            print(f"daily reward failed for {user_id}: {e}")
+
+    for rank, row in enumerate(live_reports, start=1):
+        stat = f"📖 O'qigan betlaringiz: <b>{row['total'] or 0} bet</b>"
+        _send_reward(rank, row['user_id'], rewards_by_rank.get(rank, 5), stat)
+
+    for rank, row in enumerate(audio_reports, start=1):
+        stat = f"🎧 Eshitgan daqiqalaringiz: <b>{row['total'] or 0} daqiqa</b>"
+        _send_reward(rank, row['user_id'], rewards_by_rank.get(rank, 5), stat)
 
 
 @shared_task
