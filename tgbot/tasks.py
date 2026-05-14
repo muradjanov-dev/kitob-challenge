@@ -1907,6 +1907,36 @@ def _finalize_challenge_results(challenge_id: int):
 
     print(f"_finalize_challenge_results: challenge_id={challenge_id}, {len(participants)} processed")
 
+    # Admin summary — podium + stats
+    try:
+        import os as _os
+        admin_gid = _os.environ.get("ADMIN_GROUP_ID", "")
+        if admin_gid:
+            top3 = participants[:3]
+            podium_lines = []
+            for rank, p in enumerate(top3, 1):
+                days = p.days_completed
+                prize = {1: 200, 2: 100, 3: 50}.get(rank, 25)
+                emoji = {1: "🥇", 2: "🥈", 3: "🥉"}[rank]
+                name = (p.user.full_name or f"uid={p.user.id}")[:30]
+                podium_lines.append(f"{emoji} {name} — {days}/3 kun (+{prize} Kitobcha)")
+            done3 = sum(1 for p in participants if p.days_completed >= 3)
+            done2 = sum(1 for p in participants if p.days_completed == 2)
+            done1 = sum(1 for p in participants if p.days_completed == 1)
+            admin_text = (
+                f"📊 <b>Challenge yakunlandi: {challenge.emoji} {challenge.title}</b>\n\n"
+                + ("\n".join(podium_lines) or "—")
+                + f"\n\n👥 Jami: <b>{len(participants)}</b> ishtirokchi\n"
+                f"✅ 3 kun: {done3} | 📊 2 kun: {done2} | 1 kun: {done1}"
+            )
+            requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                data={"chat_id": admin_gid, "text": admin_text, "parse_mode": "HTML"},
+                timeout=5,
+            )
+    except Exception as e:
+        print(f"challenge finalize admin notif failed: {e}")
+
 
 @shared_task
 def announce_challenge():
@@ -1992,6 +2022,28 @@ def announce_challenge():
             pass
         _time.sleep(0.05)
     print(f"announce_challenge: challenge_id={challenge.id} sent={sent}")
+
+    # Admin notification — new challenge summary
+    try:
+        import os as _os
+        admin_gid = _os.environ.get("ADMIN_GROUP_ID", "")
+        if admin_gid:
+            total_users = TelegramProfile.objects.filter(is_registered=True, is_blocked=False).count()
+            admin_text = (
+                f"🚀 <b>Yangi Challenge e'lon qilindi!</b>\n\n"
+                f"{challenge.emoji} <b>{challenge.title}</b>\n"
+                f"📋 {challenge.description}\n"
+                f"📅 {date_range}\n"
+                f"⚙️ Shart turi: <code>{challenge.condition_type}</code> = {challenge.condition_value}\n\n"
+                f"📨 Jo'natildi: <b>{sent}</b> / {total_users} foydalanuvchi"
+            )
+            requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                data={"chat_id": admin_gid, "text": admin_text, "parse_mode": "HTML"},
+                timeout=5,
+            )
+    except Exception as e:
+        print(f"challenge announce admin notif failed: {e}")
 
 
 @shared_task
