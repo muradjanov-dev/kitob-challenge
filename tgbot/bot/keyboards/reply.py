@@ -51,6 +51,7 @@ def main_markup(language="uz", is_admin=False):
             "contact": "📞 Написать администратору",
             "settings": "⚙️ Настройки",
             "quiz": "📝 Книжный Квиз",
+            "referral": "🌟 Yaxshilik ulashuvchi",
             "admin": "👑 Админ панель",
         }
     else:
@@ -63,6 +64,7 @@ def main_markup(language="uz", is_admin=False):
             "contact": "📞 Admin bilan bog'lanish",
             "settings": "⚙️ Sozlamalar",
             "quiz": "📝 Kitob Quiz",
+            "referral": "🌟 Yaxshilik ulashuvchi",
             "admin": "👑 Admin panel",
         }
 
@@ -77,6 +79,7 @@ def main_markup(language="uz", is_admin=False):
         InlineKeyboardButton(text=labels["premium"], callback_data="menu:premium"),
     )
     kb.row(InlineKeyboardButton(text=labels["quiz"], callback_data="menu:quiz"))
+    kb.row(InlineKeyboardButton(text=labels["referral"], callback_data="menu:referral"))
     kb.row(
         InlineKeyboardButton(text=labels["settings"], callback_data="menu:settings"),
         InlineKeyboardButton(text=labels["contact"], callback_data="menu:contact"),

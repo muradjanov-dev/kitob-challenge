@@ -680,3 +680,52 @@ class QuizUserAnswer(models.Model):
     class Meta:
         db_table = 'quiz_user_answers'
         unique_together = ('participant', 'question')
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Kitobxonlik Challenge
+# ──────────────────────────────────────────────────────────────────────────
+
+class Challenge(models.Model):
+    CONDITION_TYPES = [
+        ('pages_daily',     'Kunlik betlar soni'),
+        ('audio_daily',     'Kunlik audio daqiqalari'),
+        ('referrals_daily', 'Kunlik referrallar'),
+        ('review_daily',    'Kunlik xulosa (200+ belgi)'),
+    ]
+    title          = models.CharField(max_length=200)
+    description    = models.TextField()
+    emoji          = models.CharField(max_length=10, default='🏆')
+    condition_type = models.CharField(max_length=30, choices=CONDITION_TYPES)
+    condition_value = models.IntegerField(default=0)
+    start_date     = models.DateField(null=True, blank=True)
+    end_date       = models.DateField(null=True, blank=True)
+    is_active      = models.BooleanField(default=False)
+    announced_at   = models.DateTimeField(null=True, blank=True)
+    created_at     = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Challenge"
+        verbose_name_plural = "Challengelar"
+
+    def __str__(self):
+        return f"{self.title} ({self.start_date} – {self.end_date})"
+
+
+class ChallengeParticipant(models.Model):
+    challenge        = models.ForeignKey(Challenge, on_delete=models.CASCADE, related_name="participants")
+    user             = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="challenge_participations")
+    joined_at        = models.DateTimeField(auto_now_add=True)
+    days_completed   = models.IntegerField(default=0)
+    completed_dates  = models.JSONField(default=list)  # ["YYYY-MM-DD", ...]
+    last_completed_at = models.DateTimeField(null=True, blank=True)  # set when days_completed reaches 3
+    rank             = models.IntegerField(null=True, blank=True)
+    reward_given     = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "Challenge Qatnashchisi"
+        verbose_name_plural = "Challenge Qatnashchilari"
+        unique_together = ('challenge', 'user')
+
+    def __str__(self):
+        return f"{self.user.full_name} — {self.challenge.title} ({self.days_completed}/3)"

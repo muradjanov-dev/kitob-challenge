@@ -122,6 +122,10 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
         await _menu_how_it_works(call, user, state)
     elif action == "admin":
         await _menu_admin(call, user, state)
+    elif action == "quiz":
+        await _menu_quiz(call, user, state)
+    elif action == "referral":
+        await _menu_referral(call, user, state)
     else:
         await call.answer(_t(lang, "Noma'lum amal", "Неизвестное действие"))
 
@@ -130,7 +134,7 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
 # Report (book selection) — opens fresh book picker for the user.
 # ──────────────────────────────────────────────────────────────────────────
 async def _menu_report(call, user, state: FSMContext):
-    from tgbot.bot.handlers.users.report import send_book_type_menu
+    from tgbot.bot.handlers.users.report import send_book_selection_menu
 
     lang = _user_lang(user)
     await call.answer()
@@ -169,7 +173,8 @@ async def _menu_report(call, user, state: FSMContext):
 
     await state.finish()
     await state.update_data(reading_day=reading_day, selected_book_ids=[])
-    await send_book_type_menu(call, state)
+    await ReportState.select_book.set()
+    await send_book_selection_menu(call, state)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -382,6 +387,10 @@ async def _menu_cabinet(call, user, state: FSMContext):
         )
 
     prem_badge = "💎 " if is_prem else ""
+    # Challenge widget
+    from tgbot.bot.handlers.users.challenge import challenge_cabinet_block
+    challenge_text, challenge_btns = await challenge_cabinet_block(user)
+
     response_text = (
         f"👤 <b>{prem_badge}Sizning shaxsiy kabinetingiz</b>\n\n"
         f"🪙 <b>Kitobcha balansi:</b> {kitobcha_balance}\n"
@@ -393,6 +402,7 @@ async def _menu_cabinet(call, user, state: FSMContext):
         f"{rank_text}"
         f"{overtake_text}"
         f"{conclusion_text}"
+        f"{challenge_text}"
         f"{premium_section}"
         f"\n\n<i>Ma'lumotlar avtomatik yangilanib boradi.</i>"
     )
@@ -420,6 +430,8 @@ async def _menu_cabinet(call, user, state: FSMContext):
             calendar_markup.row(
                 InlineKeyboardButton("🔒 O'sish jadvali (Premium)", callback_data="menu:premium")
             )
+        for btn in challenge_btns:
+            calendar_markup.row(btn)
         await call.message.answer(response_text, parse_mode="HTML",
                                   reply_markup=calendar_markup)
     else:
@@ -433,6 +445,8 @@ async def _menu_cabinet(call, user, state: FSMContext):
         else:
             kb.add(InlineKeyboardButton("🔒 Hisobotlar tarixi (Premium)", callback_data="menu:premium"))
             kb.add(InlineKeyboardButton("🔒 O'sish jadvali (Premium)", callback_data="menu:premium"))
+        for btn in challenge_btns:
+            kb.row(btn)
         await call.message.answer(response_text, parse_mode="HTML",
                                   reply_markup=kb)
 
@@ -660,16 +674,17 @@ async def _menu_how_it_works(call, user, _state: FSMContext):
 # ──────────────────────────────────────────────────────────────────────────
 # Reyting — top readers for 5 periods, user-selectable via inline buttons.
 # ──────────────────────────────────────────────────────────────────────────
-_VALID_PERIODS = ("today", "week", "month", "3months", "yearly")
+_VALID_PERIODS = ("today", "week", "month", "3months", "yearly", "referral")
 
 
 def _reyting_kb(lang: str, active: str) -> InlineKeyboardMarkup:
     periods = [
-        ("today",   _t(lang, "Bugun",    "Сегодня")),
-        ("week",    _t(lang, "Bu hafta", "Эта неделя")),
-        ("month",   _t(lang, "Bu oy",    "Этот месяц")),
-        ("3months", _t(lang, "3 oy",     "3 месяца")),
-        ("yearly",  _t(lang, "Yillik",   "Годовой")),
+        ("today",    _t(lang, "Bugun",      "Сегодня")),
+        ("week",     _t(lang, "Bu hafta",   "Эта неделя")),
+        ("month",    _t(lang, "Bu oy",      "Этот месяц")),
+        ("3months",  _t(lang, "3 oy",       "3 месяца")),
+        ("yearly",   _t(lang, "Yillik",     "Годовой")),
+        ("referral", _t(lang, "🌟 Ulashuvchi", "🌟 Улашувчи")),
     ]
     kb = InlineKeyboardMarkup(row_width=2)
     btns = []
@@ -801,6 +816,58 @@ def _top_readers_text(period: str, lang: str) -> str:
     return "".join(parts)
 
 
+@sync_to_async
+def _referral_top_text(lang: str) -> str:
+    from tgbot.models import UserReferal
+    from django.db.models import Count
+
+    rows = list(
+        UserReferal.objects
+        .values("referrer__telegram_id", "referrer__full_name")
+        .annotate(count=Count("id"))
+        .order_by("-count")[:20]
+    )
+    header = _t(
+        lang,
+        "🌟 <b>Yaxshilik ulashuvchilar — Top 20</b>\n\n"
+        "Kitobxonlik odatini tarqatganlar reytingi:\n\n",
+        "🌟 <b>Топ 20 распространителей</b>\n\n"
+        "Рейтинг тех, кто популяризирует чтение:\n\n",
+    )
+    if not rows:
+        return header + _t(lang, "📭 Hali ma'lumot yo'q.", "📭 Данных пока нет.")
+
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    lines = []
+    for i, r in enumerate(rows, 1):
+        name = escape(r["referrer__full_name"] or "Kitobxon")
+        tg_id = r["referrer__telegram_id"]
+        cnt = r["count"]
+        medal = medals.get(i, f"{i}.")
+        lines.append(
+            f"{medal} <a href='tg://user?id={tg_id}'>{name}</a>: <b>{cnt}</b> ta taklif"
+        )
+
+    prizes = _t(
+        lang,
+        (
+            "\n\n🎁 <b>Mukofotlar:</b>\n"
+            "  1-taklif: 20 🪙 | 2-taklif: 25 🪙 | 3-taklif: 30 🪙 …\n"
+            "  Her 2 taklif → 💎 1 kun Premium\n"
+            "  17-taklif dan keyin: doimiy 50 🪙 har bir taklif uchun\n\n"
+            "<i>Do'stingizni taklif qiling — kitobxonlik odatini birga tarqating! 📚</i>"
+        ),
+        (
+            "\n\n🎁 <b>Награды:</b>\n"
+            "  1-е приглашение: 20 🪙 | 2-е: 25 🪙 | 3-е: 30 🪙 …\n"
+            "  Каждые 2 приглашения → 💎 1 день Premium\n"
+            "  С 17-го приглашения: фиксированно 50 🪙\n\n"
+            "<i>Приглашайте друзей — распространяйте привычку читать! 📚</i>"
+        ),
+    )
+    return header + "\n".join(lines) + prizes
+
+
 async def _menu_reyting(call, user, _state: FSMContext):
     await call.answer()
     lang = _user_lang(user)
@@ -826,7 +893,10 @@ async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
     lang = _user_lang(user)
     await call.answer()
     try:
-        text = await _top_readers_text(period, lang)
+        if period == "referral":
+            text = await _referral_top_text(lang)
+        else:
+            text = await _top_readers_text(period, lang)
     except Exception as e:
         print(f"reyting_period_pick error for {period}: {e}")
         await call.message.answer(_t(lang, "❌ Xato yuz berdi, qayta urining.", "❌ Ошибка, попробуйте ещё раз."))
@@ -1266,6 +1336,82 @@ async def confirm_delete_handler(message: types.Message, state: FSMContext):
 @dp.callback_query_handler(lambda c: c.data == "noop", state="*")
 async def menu_noop(call: types.CallbackQuery):
     await call.answer()
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Quiz list — shows all available quizzes for the user to play solo.
+# ──────────────────────────────────────────────────────────────────────────
+async def _menu_quiz(call, user, _state: FSMContext):
+    await call.answer()
+    if not user or not user.is_registered:
+        await call.message.answer("Avval /start bosib ro'yxatdan o'ting.")
+        return
+
+    @sync_to_async
+    def _load():
+        from tgbot.models import Quiz
+        qs = list(Quiz.objects.prefetch_related("questions").all())
+        return [(q.id, q.title, q.questions.count(), q.time_per_question, q.description) for q in qs]
+
+    quizzes = await _load()
+    if not quizzes:
+        await call.message.answer("📭 Hozircha quiz mavjud emas.")
+        return
+
+    kb = InlineKeyboardMarkup(row_width=1)
+    for qid, title, q_count, tpq, _ in quizzes:
+        kb.add(InlineKeyboardButton(
+            text=f"📝 {title} ({q_count} savol · {tpq}s)",
+            callback_data=f"qsolo:{qid}",
+        ))
+    await call.message.answer(
+        "📝 <b>Kitob Quizlar</b>\n\nQuyidagi quizlardan birini tanlang:",
+        parse_mode="HTML",
+        reply_markup=kb,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Referral — shows user's referral link and stats.
+# ──────────────────────────────────────────────────────────────────────────
+async def _menu_referral(call, user, _state: FSMContext):
+    from tgbot.services.referral import ReferralService
+
+    await call.answer()
+    if not user:
+        await call.message.answer("Avval /start bosing.")
+        return
+
+    ref_count = await ReferralService.get_referral_count(user)
+    ref_link = await ReferralService.get_referral_link(user)
+
+    # Per-invite reward: 20, 25, 30, … (grows +5 each invite) until cumulative ≥ 1000, then flat 50
+    # S(n) = 20n + 5*n*(n-1)/2 — first n where S(n) >= 1000 is n=17 (S(17)=1020)
+    BREAKPOINT = 17
+    if ref_count < BREAKPOINT:
+        next_reward = 20 + 5 * ref_count
+        cum_so_far = 20 * ref_count + 5 * ref_count * max(0, ref_count - 1) // 2
+    else:
+        next_reward = 50
+        cum_growing = 20 * BREAKPOINT + 5 * BREAKPOINT * (BREAKPOINT - 1) // 2  # 1020
+        cum_so_far = cum_growing + (ref_count - BREAKPOINT) * 50
+
+    next_prem = 2 - (ref_count % 2) if ref_count % 2 != 0 else 2
+
+    text = (
+        f"🌟 <b>Yaxshilik ulashuvchi</b>\n\n"
+        f"Do'stlaringizni taklif qiling va har yangi a'zo uchun Kitobcha yutib oling!\n\n"
+        f"📊 <b>Sizning referallaringiz:</b> {ref_count} ta\n"
+        f"🪙 <b>Jami topilgan:</b> ~{cum_so_far} Kitobcha\n\n"
+        f"🎁 <b>Keyingi taklif uchun:</b> +{next_reward} Kitobcha\n"
+        f"💎 <b>Premium (1 kun):</b> har 2 ta taklif → 1 kun\n"
+        f"   (Keyingi premiumgacha: {next_prem} ta taklif qoldi)\n\n"
+        f"📈 <b>Mukofot tizimi:</b>\n"
+        f"   1-taklif: 20 · 2-taklif: 25 · 3-taklif: 30 … (+5 har safar)\n"
+        f"   17-taklif dan keyin: doimiy 50 Kitobcha\n\n"
+        f"🔗 <b>Sizning havola:</b>\n<code>{ref_link}</code>"
+    )
+    await call.message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
 
 
 # ──────────────────────────────────────────────────────────────────────────

@@ -21,8 +21,10 @@ MONTHLY_PRICE = 17_000   # UZS
 PREMIUM_FEATURES_UZ = (
     "💎 <b>Premium obuna imtiyozlari:</b>\n\n"
     "🪙 <b>2× Kitobcha</b> — har bir hisobot, yutuq va reyting mukofoti ikki barobar!\n"
+    "📊 <b>Kunlik shaxsiy hisobot (23:57)</b> — bugun vs kecha, 3 kun, hafta, oy, yil taqqoslama "
+    "(%), reytingdagi o'rin va motivatsion xat\n"
     "📋 <b>To'liq hisobotlar tarixi</b> — qaysi kuni, qaysi kitob, qanday xulosa yozganingizni ko'ring\n"
-    "📊 <b>O'sish jadvali</b> — kun / hafta / oy / yil kesimida o'sish yoki tushish foizini va grafigini ko'ring\n"
+    "📈 <b>O'sish jadvali</b> — kun / hafta / oy / yil kesimida o'sish yoki tushish foizi va grafigi\n"
     "✅ Haftalik va oylik reyting jadvallarida qatnashish\n"
     "✅ Maxsus premium badge va unvon\n"
     "✅ Admin bilan bevosita aloqa\n\n"
@@ -32,8 +34,10 @@ PREMIUM_FEATURES_UZ = (
 PREMIUM_FEATURES_RU = (
     "💎 <b>Преимущества Premium подписки:</b>\n\n"
     "🪙 <b>Kitobcha ×2</b> — каждый отчёт, достижение и рейтинговая награда удваиваются!\n"
+    "📊 <b>Ежедневный личный отчёт (23:57)</b> — сегодня vs вчера, 3 дня, неделя, месяц, год (%), "
+    "место в рейтинге и мотивационное письмо\n"
     "📋 <b>Полная история отчётов</b> — какой день, какая книга, какой вывод\n"
-    "📊 <b>График роста</b> — прирост/спад в % за день/неделю/месяц/год с колонной диаграммой\n"
+    "📈 <b>График роста</b> — прирост/спад в % за день/неделю/месяц/год с диаграммой\n"
     "✅ Участие в еженедельных и ежемесячных рейтингах\n"
     "✅ Специальный Premium значок и звание\n"
     "✅ Прямая связь с администратором\n\n"

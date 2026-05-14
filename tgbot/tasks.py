@@ -1657,6 +1657,454 @@ def quiz_finish_session(session_id: int):
 
 
 @shared_task
+def send_daily_personal_report():
+    """23:57 — personalised end-of-day report sent to every user who reported today.
+    Premium: full stats vs yesterday / 3 days / week / month / year + motivation.
+    Free: ranking position, trend direction, total pages, + premium teaser."""
+    import datetime as _dt
+    import time as _time
+    from tgbot.models import Payment as _Pay
+    from django.db.models import Sum as _S
+
+    today = timezone.localdate()
+    yesterday = today - _dt.timedelta(days=1)
+    d3_start = today - _dt.timedelta(days=2)
+    week_start = today - _dt.timedelta(days=6)
+    prev_week_s = today - _dt.timedelta(days=13)
+    prev_week_e = today - _dt.timedelta(days=7)
+    month_start = today - _dt.timedelta(days=29)
+    prev_month_s = today - _dt.timedelta(days=59)
+    prev_month_e = today - _dt.timedelta(days=30)
+    year_start = _dt.date(today.year, 1, 1)
+    prev_year_s = _dt.date(today.year - 1, 1, 1)
+    prev_year_e = _dt.date(today.year - 1, 12, 31)
+
+    premium_user_ids = set(
+        _Pay.objects.filter(status="paid", end_date__gte=today).values_list("user_id", flat=True)
+    )
+
+    # Today's live-book reporters, ranked by pages
+    today_rows = list(
+        ConfirmationReport.objects
+        .filter(date__date=today, is_audio=False)
+        .values("user_id")
+        .annotate(today_pages=_S("pages_read"))
+        .filter(today_pages__gt=0)
+        .order_by("-today_pages")
+    )
+    if not today_rows:
+        return
+
+    user_ids = [r["user_id"] for r in today_rows]
+    total_reporters = len(user_ids)
+    premium_uids_today = {uid for uid in user_ids if uid in premium_user_ids}
+
+    def _bulk(start, end, uids=None):
+        qs = ConfirmationReport.objects.filter(
+            date__date__gte=start, date__date__lte=end, is_audio=False,
+        )
+        if uids:
+            qs = qs.filter(user_id__in=uids)
+        return {r["user_id"]: r["t"] or 0 for r in qs.values("user_id").annotate(t=_S("pages_read"))}
+
+    yest_all = _bulk(yesterday, yesterday, user_ids)
+
+    if premium_uids_today:
+        d3_all = _bulk(d3_start, today, premium_uids_today)
+        week_all = _bulk(week_start, today, premium_uids_today)
+        pw_all = _bulk(prev_week_s, prev_week_e, premium_uids_today)
+        month_all = _bulk(month_start, today, premium_uids_today)
+        pm_all = _bulk(prev_month_s, prev_month_e, premium_uids_today)
+        year_all = _bulk(year_start, today, premium_uids_today)
+        py_all = _bulk(prev_year_s, prev_year_e, premium_uids_today)
+    else:
+        d3_all = week_all = pw_all = month_all = pm_all = year_all = py_all = {}
+
+    total_at_rows = list(
+        ConfirmationReport.objects.filter(is_audio=False, user_id__in=user_ids)
+        .values("user_id").annotate(t=_S("pages_read"))
+    )
+    total_at = {r["user_id"]: r["t"] or 0 for r in total_at_rows}
+
+    def _pct_str(old, new):
+        if old == 0:
+            return "▲ yangi rekord!" if new > 0 else "→ 0%"
+        p = round((new - old) * 100 / old)
+        if p > 0: return f"▲ +{p}%"
+        if p < 0: return f"▼ {p}%"
+        return "→ 0%"
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    sent = 0
+    for rank, row in enumerate(today_rows, start=1):
+        uid = row["user_id"]
+        today_p = row["today_pages"] or 0
+        try:
+            user = TelegramProfile.objects.filter(id=uid).first()
+            if not user:
+                continue
+
+            behind = total_reporters - rank
+            pct_ahead = round(behind * 100 / max(total_reporters - 1, 1))
+            total_p = total_at.get(uid, 0)
+            yest_p = yest_all.get(uid, 0)
+            is_prem = uid in premium_user_ids
+
+            if is_prem:
+                d3_p = d3_all.get(uid, 0)
+                week_p = week_all.get(uid, 0)
+                pw_p = pw_all.get(uid, 0)
+                month_p = month_all.get(uid, 0)
+                pm_p = pm_all.get(uid, 0)
+                year_p = year_all.get(uid, 0)
+                py_p = py_all.get(uid, 0)
+
+                if rank == 1:
+                    motiv = "🥇 Barakalla! Bugun siz BIRINCHI bo'ldingiz! Zo'r natija!"
+                elif rank <= 3:
+                    motiv = f"🏅 Zo'r! Bugun TOP-3 ichida turibsiz ({rank}-o'rin)!"
+                elif pct_ahead >= 75:
+                    motiv = f"📈 Ajoyib! Kitobxonlarning {pct_ahead}% dan ko'p o'qidingiz!"
+                elif today_p > yest_p > 0:
+                    motiv = "📗 Kechagidan ko'proq o'qidingiz! O'sish davom etyapti!"
+                else:
+                    motiv = "📖 Har bir bet — kelajakka investitsiya. Davom eting!"
+
+                text = (
+                    f"💎 <b>Premium Hisobot — {today.strftime('%d.%m.%Y')}</b>\n\n"
+                    f"✨ {motiv}\n\n"
+                    f"📊 <b>Bugungi natijalar:</b>\n"
+                    f"📖 Bugun o'qidingiz: <b>{today_p} bet</b>\n"
+                    f"📅 Kecha: {yest_p} bet → <b>{_pct_str(yest_p, today_p)}</b>\n"
+                    f"📆 Oxirgi 3 kun: <b>{d3_p} bet</b>\n"
+                    f"🗓 Bu hafta: {week_p} bet (o'tgan hafta: {pw_p} bet) → <b>{_pct_str(pw_p, week_p)}</b>\n"
+                    f"🗃 Bu oy: {month_p} bet (o'tgan oy: {pm_p} bet) → <b>{_pct_str(pm_p, month_p)}</b>\n"
+                    f"📈 Bu yil: {year_p} bet (o'tgan yil: {py_p} bet) → <b>{_pct_str(py_p, year_p)}</b>\n\n"
+                    f"🏆 <b>Bugungi reyting:</b>\n"
+                    f"🎯 <b>{rank}-o'rin</b> / {total_reporters} ta kitobxon orasida\n"
+                    f"📉 Bugun <b>{pct_ahead}%</b> kitobxondan ko'p o'qidingiz\n\n"
+                    f"📚 <b>Umumiy:</b> Jami <b>{total_p} bet</b> o'qilgan\n\n"
+                    f"<i>💎 Premium a'zo sifatida bu hisobotni har kuni 23:57 da olasiz.\n"
+                    f"Davom eting — har bet kelajakka investitsiya! 🚀</i>"
+                )
+            else:
+                if today_p > yest_p > 0:
+                    trend = "📈 O'sish! Kechagidan yaxshiroq"
+                elif today_p < yest_p and yest_p > 0:
+                    trend = "📉 Kecha ko'proq o'qigandingiz"
+                else:
+                    trend = "→ Barqaror sur'at"
+
+                text = (
+                    f"📊 <b>Bugungi natijangiz</b>\n\n"
+                    f"🏆 <b>Reyting:</b> <b>{rank}-o'rin</b> / {total_reporters} ta kitobxon orasida\n"
+                    f"📈 <b>Trend:</b> {trend}\n"
+                    f"📚 <b>Jami o'qilgan:</b> <b>{total_p} bet</b>\n\n"
+                    f"💎 <b>Premium a'zolar har kuni quyidagilarni oladi:</b>\n"
+                    f"  • Bugun vs kecha, hafta, oy, yil taqqoslama (%)\n"
+                    f"  • To'liq shaxsiy tahlil va motivatsion xat\n"
+                    f"  • Reyting va o'sish dinamikasi\n\n"
+                    f"<i>Premium obuna: menyudan 💎 Premium tugmasini bosing!</i>"
+                )
+
+            resp = requests.post(
+                url,
+                data={"chat_id": user.telegram_id, "text": text, "parse_mode": "HTML"},
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            elif resp.status_code == 429:
+                _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
+        except Exception as e:
+            print(f"send_daily_personal_report failed uid={uid}: {e}")
+        _time.sleep(0.05)
+
+    print(f"send_daily_personal_report: sent={sent}/{total_reporters}")
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Kitobxonlik Challenge tasks
+# ────────────────────────────────────────────────────────────────────────
+
+CHALLENGE_POOL = [
+    {"emoji": "📖", "title": "50-bet Challenge",        "description": "Har kuni kamida 50 bet kitob o'qing — 3 kun davomida!",                   "condition_type": "pages_daily",     "condition_value": 50},
+    {"emoji": "📗", "title": "60-bet Challenge",        "description": "Har kuni 60 bet o'qing — 3 kunlik qizg'in raqobat!",                      "condition_type": "pages_daily",     "condition_value": 60},
+    {"emoji": "📘", "title": "70-bet Challenge",        "description": "Har kuni 70 bet — mutolaa sur'atini oshiring!",                            "condition_type": "pages_daily",     "condition_value": 70},
+    {"emoji": "💯", "title": "100-bet Challenge",       "description": "Har kuni 100 bet o'qing — yuz betlik marafon!",                            "condition_type": "pages_daily",     "condition_value": 100},
+    {"emoji": "🔥", "title": "150-bet Challenge",       "description": "Har kuni 150 bet — shiddatli mutolaa vaqti!",                              "condition_type": "pages_daily",     "condition_value": 150},
+    {"emoji": "🎧", "title": "5-daqiqa Audio Challenge","description": "Har kuni kamida 5 daqiqa audiokitob eshiting!",                           "condition_type": "audio_daily",     "condition_value": 5},
+    {"emoji": "🎵", "title": "10-daqiqa Audio Challenge","description": "Har kuni 10 daqiqa audiokitob — quloqlaringizga ziyofat!",               "condition_type": "audio_daily",     "condition_value": 10},
+    {"emoji": "🎼", "title": "20-daqiqa Audio Challenge","description": "Har kuni 20 daqiqa audiokitob eshiting — uch kun davomida!",             "condition_type": "audio_daily",     "condition_value": 20},
+    {"emoji": "👥", "title": "Taklif Challenge",        "description": "Har kuni 1 ta do'stingizni Kitob Challengega taklif qiling!",             "condition_type": "referrals_daily", "condition_value": 1},
+    {"emoji": "✍️","title": "Taqriz Challenge",        "description": "Har kuni kamida 200 belgidan iborat mazmunli xulosa bilan hisobot yuboring!", "condition_type": "review_daily",  "condition_value": 200},
+]
+
+
+def _finalize_challenge_results(challenge_id: int):
+    """Award prizes and mark challenge finished. Called before announcing next challenge."""
+    from tgbot.models import Challenge, ChallengeParticipant
+
+    challenge = Challenge.objects.filter(id=challenge_id).first()
+    if not challenge:
+        return
+
+    Challenge.objects.filter(id=challenge_id).update(is_active=False)
+
+    participants = list(
+        ChallengeParticipant.objects
+        .filter(challenge=challenge, reward_given=False)
+        .select_related("user")
+        .order_by("-days_completed", "last_completed_at", "joined_at")
+    )
+    if not participants:
+        return
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    prize_map = {1: 200, 2: 100, 3: 50}
+
+    # Assign ranks sequentially (sorted above)
+    for rank, p in enumerate(participants, start=1):
+        days = p.days_completed
+        if rank <= 3 and days >= 3:
+            kitobcha = prize_map[rank]
+        elif days >= 3:
+            kitobcha = 25
+        elif days == 2:
+            kitobcha = 15
+        elif days == 1:
+            kitobcha = 5
+        else:
+            kitobcha = 0
+
+        ChallengeParticipant.objects.filter(id=p.id).update(rank=rank, reward_given=True)
+
+        if kitobcha > 0:
+            try:
+                p.user.update_ball(True, kitobcha)
+            except Exception as e:
+                print(f"challenge reward failed uid={p.user.id}: {e}")
+
+        if days == 0:
+            continue
+
+        place_emoji = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, "🏅")
+        dm = (
+            f"🏆 <b>{challenge.emoji} {challenge.title} — Natija!</b>\n\n"
+            f"{place_emoji} O'rningiz: <b>{rank}</b>\n"
+            f"✅ Bajargan kunlar: <b>{days}/3</b>\n"
+            + (f"🪙 Mukofot: <b>+{kitobcha} Kitobcha</b>" if kitobcha > 0 else "📭 Mukofot yo'q")
+            + "\n\nKeyingi challengeni kuting! 🚀"
+        )
+        try:
+            requests.post(
+                url,
+                data={"chat_id": p.user.telegram_id, "text": dm, "parse_mode": "HTML"},
+                timeout=5,
+            )
+        except Exception as e:
+            print(f"challenge result DM failed uid={p.user.id}: {e}")
+
+    print(f"_finalize_challenge_results: challenge_id={challenge_id}, {len(participants)} processed")
+
+
+@shared_task
+def announce_challenge():
+    """Every 3 days: finalize previous challenge, pick next, announce to groups + users."""
+    import datetime as _dt
+    import random as _rand
+    import time as _time
+    from tgbot.models import Challenge
+
+    # Finalize any still-active challenge
+    prev = Challenge.objects.filter(is_active=True).first()
+    if prev:
+        _finalize_challenge_results(prev.id)
+
+    # Avoid repeating last 3 challenge titles
+    recent = list(Challenge.objects.order_by("-created_at").values_list("title", flat=True)[:3])
+    pool = [c for c in CHALLENGE_POOL if c["title"] not in recent] or CHALLENGE_POOL
+    template = _rand.choice(pool)
+
+    today = timezone.localdate()
+    end_date = today + _dt.timedelta(days=2)  # 3-day challenge
+
+    challenge = Challenge.objects.create(
+        title=template["title"],
+        description=template["description"],
+        emoji=template["emoji"],
+        condition_type=template["condition_type"],
+        condition_value=template["condition_value"],
+        start_date=today,
+        end_date=end_date,
+        is_active=True,
+        announced_at=timezone.now(),
+    )
+
+    date_range = f"{today.strftime('%d.%m')} – {end_date.strftime('%d.%m.%Y')}"
+    text = (
+        f"🏆 <b>YANGI KITOBXONLIK CHALLENGE!</b>\n\n"
+        f"{challenge.emoji} <b>{challenge.title}</b>\n\n"
+        f"📋 <b>Shart:</b> {challenge.description}\n"
+        f"📅 <b>Muddat:</b> {date_range} (3 kun)\n\n"
+        f"🎁 <b>Mukofotlar:</b>\n"
+        f"🥇 1-o'rin: <b>200 Kitobcha</b>\n"
+        f"🥈 2-o'rin: <b>100 Kitobcha</b>\n"
+        f"🥉 3-o'rin: <b>50 Kitobcha</b>\n"
+        f"✅ 3 kun bajargan (4+): 25 Kitobcha\n"
+        f"📊 2 kun: 15 Kitobcha | 1 kun: 5 Kitobcha\n\n"
+        f"👇 Qatnashish uchun tugmani bosing!"
+    )
+    keyboard = json.dumps({
+        "inline_keyboard": [[{
+            "text": f"🎮 Qatnashaman! {challenge.emoji}",
+            "callback_data": f"join_challenge:{challenge.id}",
+        }]]
+    })
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    for group_id in _group_chat_ids():
+        try:
+            requests.post(
+                url,
+                data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                      "reply_markup": keyboard},
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"challenge announce group {group_id}: {e}")
+
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent = 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                      "reply_markup": keyboard},
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            elif resp.status_code == 429:
+                _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
+        except Exception:
+            pass
+        _time.sleep(0.05)
+    print(f"announce_challenge: challenge_id={challenge.id} sent={sent}")
+
+
+@shared_task
+def daily_challenge_check():
+    """23:50 — auto-verify today's condition for each challenge participant."""
+    from tgbot.models import Challenge, ChallengeParticipant, ConfirmationReport, UserReferal
+    from django.db.models import Sum
+    from django.db.models.functions import Length
+
+    today = timezone.localdate()
+    today_str = today.isoformat()
+
+    challenge = Challenge.objects.filter(is_active=True).first()
+    if not challenge or today < challenge.start_date or today > challenge.end_date:
+        return
+
+    ctype = challenge.condition_type
+    cval = challenge.condition_value
+
+    participants = list(
+        ChallengeParticipant.objects.filter(challenge=challenge).select_related("user")
+    )
+    updated = 0
+    for p in participants:
+        if today_str in (p.completed_dates or []):
+            continue
+
+        user = p.user
+        verified = False
+
+        if ctype == "pages_daily":
+            pages = ConfirmationReport.objects.filter(
+                user=user, date__date=today, is_audio=False
+            ).aggregate(s=Sum("pages_read"))["s"] or 0
+            verified = pages >= cval
+
+        elif ctype == "audio_daily":
+            minutes = ConfirmationReport.objects.filter(
+                user=user, date__date=today, is_audio=True
+            ).aggregate(s=Sum("minutes_listened"))["s"] or 0
+            verified = minutes >= cval
+
+        elif ctype == "referrals_daily":
+            count = UserReferal.objects.filter(referrer=user, created_at__date=today).count()
+            verified = count >= cval
+
+        elif ctype == "review_daily":
+            verified = ConfirmationReport.objects.filter(
+                user=user, date__date=today
+            ).annotate(_l=Length("conclusion")).filter(_l__gte=cval).exists()
+
+        if verified:
+            dates = list(p.completed_dates or [])
+            dates.append(today_str)
+            new_days = len(dates)
+            last_at = timezone.now() if new_days >= 3 else p.last_completed_at
+            ChallengeParticipant.objects.filter(id=p.id).update(
+                completed_dates=dates,
+                days_completed=new_days,
+                last_completed_at=last_at,
+            )
+            updated += 1
+
+    print(f"daily_challenge_check: challenge_id={challenge.id}, verified={updated}/{len(participants)}")
+
+
+@shared_task
+def challenge_reminder():
+    """Daily at 18:00 — remind active challenge participants of today's condition."""
+    from tgbot.models import Challenge, ChallengeParticipant
+
+    today = timezone.localdate()
+    challenge = Challenge.objects.filter(is_active=True).first()
+    if not challenge or today < challenge.start_date or today > challenge.end_date:
+        return
+
+    today_str = today.isoformat()
+    days_left = (challenge.end_date - today).days
+
+    participants = list(
+        ChallengeParticipant.objects.filter(challenge=challenge).select_related("user")
+    )
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    sent = 0
+    for p in participants:
+        if today_str in (p.completed_dates or []):
+            continue  # already done today
+        try:
+            text = (
+                f"⏰ <b>Challenge eslatmasi!</b>\n\n"
+                f"{challenge.emoji} <b>{challenge.title}</b>\n"
+                f"📋 {challenge.description}\n\n"
+                f"✅ Bajarilgan kunlar: {p.days_completed}/3\n"
+                f"📅 Yana {days_left} kun qoldi\n\n"
+                "Shartni bajargach, kabinetingizdan ✅ Bajarldim tugmasini bosing!"
+            )
+            kb = json.dumps({"inline_keyboard": [[
+                {"text": "✅ Bajarldim!", "callback_data": f"challenge_done:{challenge.id}"}
+            ]]})
+            requests.post(
+                url,
+                data={"chat_id": p.user.telegram_id, "text": text,
+                      "parse_mode": "HTML", "reply_markup": kb},
+                timeout=5,
+            )
+            sent += 1
+        except Exception as e:
+            print(f"challenge_reminder failed uid={p.user.id}: {e}")
+
+    print(f"challenge_reminder: challenge_id={challenge.id}, sent={sent}")
+
+
+@shared_task
 def process_scheduled_deletions():
     """Every minute: delete any messages whose delete_at has passed."""
     now = timezone.now()

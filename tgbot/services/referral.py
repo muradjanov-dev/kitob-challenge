@@ -86,28 +86,30 @@ class ReferralService:
             from tgbot.models import Payment
             from django.utils import timezone as _tz
 
-            # Base reward: 90 Kitobcha per referral
-            referrer.update_ball(True, 90)
+            # Growing reward: 20, 25, 30, ... (+5 per invite) until cumulative >= 1000, then flat 50
+            # S(n) = 20n + 5*n*(n-1)/2; first n where S(n) >= 1000 is n=17 (S(17)=1020)
+            BREAKPOINT = 17
+            if count <= BREAKPOINT:
+                kitobcha = 20 + 5 * (count - 1)
+            else:
+                kitobcha = 50
+            referrer.update_ball(True, kitobcha)
 
-            # Milestone bonus: +500 Kitobcha on every 10th referral
-            if count % 10 == 0:
-                referrer.update_ball(True, 500)
-
-            # Premium grant: +3 days on every 20th referral
-            if count % 20 == 0:
+            # Every 2nd invite = 1 day premium
+            if count % 2 == 0:
                 today = _tz.localdate()
                 active = Payment.objects.filter(
                     user=referrer, status="paid", end_date__gte=today
                 ).first()
                 if active:
-                    active.end_date = active.end_date + timedelta(days=3)
+                    active.end_date = active.end_date + timedelta(days=1)
                     active.save(update_fields=["end_date"])
                 else:
                     Payment.objects.create(
                         user=referrer,
                         amount=0,
                         start_date=today,
-                        end_date=today + timedelta(days=3),
+                        end_date=today + timedelta(days=1),
                         status="paid",
                     )
 
@@ -140,11 +142,14 @@ class ReferralService:
     @staticmethod
     async def _notify_referrer(referrer: TelegramProfile, new_user: TelegramProfile, ref_count: int = 0):
         try:
-            reward_lines = [f"🪙 <b>+90 Kitobcha</b> qo'shildi!"]
-            if ref_count % 10 == 0:
-                reward_lines.append(f"🎁 <b>+500 Kitobcha</b> bonus! ({ref_count}-referral milestone)")
-            if ref_count % 20 == 0:
-                reward_lines.append(f"💎 <b>+3 kun Premium</b> qo'shildi! ({ref_count}-referral milestone)")
+            BREAKPOINT = 17
+            if ref_count <= BREAKPOINT:
+                kitobcha = 20 + 5 * (ref_count - 1)
+            else:
+                kitobcha = 50
+            reward_lines = [f"🪙 <b>+{kitobcha} Kitobcha</b> qo'shildi!"]
+            if ref_count % 2 == 0:
+                reward_lines.append(f"💎 <b>+1 kun Premium</b> qo'shildi! (har 2 ta taklif)")
 
             referrer_notification = (
                 f"🎉 <b>Yangi Referal!</b>\n\n"

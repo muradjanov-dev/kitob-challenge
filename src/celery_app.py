@@ -123,6 +123,12 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=12, minute=0),
     },
 
+    # Personalised daily report — premium: full stats; free: rank + trend.
+    'send-daily-personal-report': {
+        'task': 'tgbot.tasks.send_daily_personal_report',
+        'schedule': crontab(hour=23, minute=57),
+    },
+
     # End-of-day percentile DM with 72h TTL — runs after daily_top_readers_reward.
     'end-of-day-percentile': {
         'task': 'tgbot.tasks.end_of_day_percentile',
@@ -133,6 +139,24 @@ app.conf.beat_schedule = {
     'process-scheduled-deletions': {
         'task': 'tgbot.tasks.process_scheduled_deletions',
         'schedule': crontab(),
+    },
+
+    # Kitobxonlik Challenge — announce every 3 days at 09:05.
+    'announce-challenge': {
+        'task': 'tgbot.tasks.announce_challenge',
+        'schedule': crontab(hour=9, minute=5, day_of_month='1,4,7,10,13,16,19,22,25,28'),
+    },
+
+    # Auto-verify condition completion for challenge participants at 23:50.
+    'daily-challenge-check': {
+        'task': 'tgbot.tasks.daily_challenge_check',
+        'schedule': crontab(hour=23, minute=50),
+    },
+
+    # Remind challenge participants at 18:00.
+    'challenge-reminder': {
+        'task': 'tgbot.tasks.challenge_reminder',
+        'schedule': crontab(hour=18, minute=0),
     },
 
     # Streak-burning warning at 22:00 for users who haven't reported today.
