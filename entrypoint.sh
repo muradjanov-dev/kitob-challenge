@@ -69,6 +69,9 @@ PY
     python manage.py shell -c "from tgbot.tasks import send_random_inspiration; send_random_inspiration()" \
       || echo "broadcast failed (non-fatal)"
   fi
+
+  echo "=== Announcing challenge if none active ==="
+  python manage.py announce_first_challenge || echo "announce_first_challenge failed (non-fatal)"
 fi
 
 case "$SERVICE_TYPE" in

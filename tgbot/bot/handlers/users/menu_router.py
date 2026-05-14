@@ -124,8 +124,6 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
         await _menu_admin(call, user, state)
     elif action == "quiz":
         await _menu_quiz(call, user, state)
-    elif action == "referral":
-        await _menu_referral(call, user, state)
     else:
         await call.answer(_t(lang, "Noma'lum amal", "Неизвестное действие"))
 
@@ -695,6 +693,11 @@ def _reyting_kb(lang: str, active: str) -> InlineKeyboardMarkup:
             callback_data=f"reyting:{code}",
         ))
     kb.add(*btns)
+    if active == "referral":
+        kb.row(InlineKeyboardButton(
+            text=_t(lang, "📤 Mening havolam", "📤 Моя ссылка"),
+            callback_data="referral:link",
+        ))
     return kb
 
 
@@ -817,16 +820,17 @@ def _top_readers_text(period: str, lang: str) -> str:
 
 
 @sync_to_async
-def _referral_top_text(lang: str) -> str:
+def _referral_top_text(lang: str, user=None) -> str:
     from tgbot.models import UserReferal
     from django.db.models import Count
 
-    rows = list(
+    ranked = list(
         UserReferal.objects
-        .values("referrer__telegram_id", "referrer__full_name")
+        .values("referrer__id", "referrer__telegram_id", "referrer__full_name")
         .annotate(count=Count("id"))
-        .order_by("-count")[:20]
+        .order_by("-count")
     )
+    rows = ranked[:20]
     header = _t(
         lang,
         "🌟 <b>Yaxshilik ulashuvchilar — Top 20</b>\n\n"
@@ -853,19 +857,36 @@ def _referral_top_text(lang: str) -> str:
         (
             "\n\n🎁 <b>Mukofotlar:</b>\n"
             "  1-taklif: 20 🪙 | 2-taklif: 25 🪙 | 3-taklif: 30 🪙 …\n"
-            "  Her 2 taklif → 💎 1 kun Premium\n"
-            "  17-taklif dan keyin: doimiy 50 🪙 har bir taklif uchun\n\n"
-            "<i>Do'stingizni taklif qiling — kitobxonlik odatini birga tarqating! 📚</i>"
+            "  Har 2 taklif → 💎 1 kun Premium\n"
+            "  17-taklif dan keyin: doimiy 50 🪙 har bir taklif uchun"
         ),
         (
             "\n\n🎁 <b>Награды:</b>\n"
             "  1-е приглашение: 20 🪙 | 2-е: 25 🪙 | 3-е: 30 🪙 …\n"
             "  Каждые 2 приглашения → 💎 1 день Premium\n"
-            "  С 17-го приглашения: фиксированно 50 🪙\n\n"
-            "<i>Приглашайте друзей — распространяйте привычку читать! 📚</i>"
+            "  С 17-го приглашения: фиксированно 50 🪙"
         ),
     )
-    return header + "\n".join(lines) + prizes
+
+    my_block = ""
+    if user:
+        uid = user.id
+        my_rank = next((i + 1 for i, r in enumerate(ranked) if r["referrer__id"] == uid), None)
+        my_cnt = next((r["count"] for r in ranked if r["referrer__id"] == uid), 0)
+        if my_rank:
+            my_block = _t(
+                lang,
+                f"\n\n👤 <b>Sizning o'rningiz: {my_rank}-o'rin ({my_cnt} ta taklif)</b>",
+                f"\n\n👤 <b>Ваше место: {my_rank}-е ({my_cnt} приглашений)</b>",
+            )
+        else:
+            my_block = _t(
+                lang,
+                "\n\n👤 Siz hali hech kimni taklif qilmagansiz.",
+                "\n\n👤 Вы ещё никого не пригласили.",
+            )
+
+    return header + "\n".join(lines) + prizes + my_block
 
 
 async def _menu_reyting(call, user, _state: FSMContext):
@@ -894,7 +915,7 @@ async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
     await call.answer()
     try:
         if period == "referral":
-            text = await _referral_top_text(lang)
+            text = await _referral_top_text(lang, user)
         else:
             text = await _top_readers_text(period, lang)
     except Exception as e:
@@ -918,6 +939,37 @@ async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
             )
         except Exception as e2:
             print(f"reyting fallback answer failed: {e2}")
+
+
+@dp.callback_query_handler(lambda c: c.data == "referral:link", state="*")
+async def referral_link_handler(call: types.CallbackQuery, _state: FSMContext):
+    user = get_user(call.from_user.id)
+    if not user:
+        await call.answer("Avval /start bosing.", show_alert=True)
+        return
+    await call.answer()
+    from tgbot.services.referral import ReferralService
+    lang = _user_lang(user)
+    ref_count = await ReferralService.get_referral_count(user)
+    ref_link = await ReferralService.get_referral_link(user)
+    BREAKPOINT = 17
+    if ref_count < BREAKPOINT:
+        next_reward = 20 + 5 * ref_count
+    else:
+        next_reward = 50
+    next_prem = 2 - (ref_count % 2) if ref_count % 2 != 0 else 2
+    text = _t(
+        lang,
+        f"🔗 <b>Sizning taklif havolangiz:</b>\n<code>{ref_link}</code>\n\n"
+        f"📊 Jami taklif: <b>{ref_count}</b> ta\n"
+        f"🎁 Keyingi taklif uchun: <b>+{next_reward} Kitobcha</b>\n"
+        f"💎 Keyingi premiumgacha: <b>{next_prem} ta</b> taklif qoldi",
+        f"🔗 <b>Ваша реферальная ссылка:</b>\n<code>{ref_link}</code>\n\n"
+        f"📊 Всего приглашений: <b>{ref_count}</b>\n"
+        f"🎁 За следующее: <b>+{next_reward} Kitobcha</b>\n"
+        f"💎 До следующего Premium: <b>{next_prem}</b> приглашений",
+    )
+    await call.message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1369,49 +1421,6 @@ async def _menu_quiz(call, user, _state: FSMContext):
         parse_mode="HTML",
         reply_markup=kb,
     )
-
-
-# ──────────────────────────────────────────────────────────────────────────
-# Referral — shows user's referral link and stats.
-# ──────────────────────────────────────────────────────────────────────────
-async def _menu_referral(call, user, _state: FSMContext):
-    from tgbot.services.referral import ReferralService
-
-    await call.answer()
-    if not user:
-        await call.message.answer("Avval /start bosing.")
-        return
-
-    ref_count = await ReferralService.get_referral_count(user)
-    ref_link = await ReferralService.get_referral_link(user)
-
-    # Per-invite reward: 20, 25, 30, … (grows +5 each invite) until cumulative ≥ 1000, then flat 50
-    # S(n) = 20n + 5*n*(n-1)/2 — first n where S(n) >= 1000 is n=17 (S(17)=1020)
-    BREAKPOINT = 17
-    if ref_count < BREAKPOINT:
-        next_reward = 20 + 5 * ref_count
-        cum_so_far = 20 * ref_count + 5 * ref_count * max(0, ref_count - 1) // 2
-    else:
-        next_reward = 50
-        cum_growing = 20 * BREAKPOINT + 5 * BREAKPOINT * (BREAKPOINT - 1) // 2  # 1020
-        cum_so_far = cum_growing + (ref_count - BREAKPOINT) * 50
-
-    next_prem = 2 - (ref_count % 2) if ref_count % 2 != 0 else 2
-
-    text = (
-        f"🌟 <b>Yaxshilik ulashuvchi</b>\n\n"
-        f"Do'stlaringizni taklif qiling va har yangi a'zo uchun Kitobcha yutib oling!\n\n"
-        f"📊 <b>Sizning referallaringiz:</b> {ref_count} ta\n"
-        f"🪙 <b>Jami topilgan:</b> ~{cum_so_far} Kitobcha\n\n"
-        f"🎁 <b>Keyingi taklif uchun:</b> +{next_reward} Kitobcha\n"
-        f"💎 <b>Premium (1 kun):</b> har 2 ta taklif → 1 kun\n"
-        f"   (Keyingi premiumgacha: {next_prem} ta taklif qoldi)\n\n"
-        f"📈 <b>Mukofot tizimi:</b>\n"
-        f"   1-taklif: 20 · 2-taklif: 25 · 3-taklif: 30 … (+5 har safar)\n"
-        f"   17-taklif dan keyin: doimiy 50 Kitobcha\n\n"
-        f"🔗 <b>Sizning havola:</b>\n<code>{ref_link}</code>"
-    )
-    await call.message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
 
 
 # ──────────────────────────────────────────────────────────────────────────
