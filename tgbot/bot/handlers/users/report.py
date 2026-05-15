@@ -104,13 +104,11 @@ async def send_book_selection_menu(message_or_call, state: FSMContext, page=1):
     markup = InlineKeyboardMarkup(row_width=1)
 
     for book in books_page:
-        label = book.title
-        if book.is_audio:
-            label = f"{label} (🎧 Audiokitob)"
+        type_icon = "🎧" if book.is_audio else "📖"
         percent = 0
         if book.total_pages > 0:
             percent = int((book.current_page / book.total_pages) * 100)
-        label = f"{label} ({percent}%)"
+        label = f"{type_icon} {book.title} ({percent}%)"
         if book.id in selected_book_ids:
             label = f"✅ {label}"
         markup.add(InlineKeyboardButton(text=label,
@@ -318,6 +316,13 @@ async def process_new_book_pages(message: types.Message, state: FSMContext):
     new_book_is_audio = data.get("new_book_is_audio", False)
     user = get_user(message.from_user.id)
 
+    # Smart default: if user picked "Oddiy kitob" but the title obviously
+    # says audiobook, auto-flip — prevents the most common add-flow mistake.
+    title_l = (book_title or "").lower()
+    audio_keywords = ("audio", "аудио", "audiokitob", "audiobook")
+    if not new_book_is_audio and any(kw in title_l for kw in audio_keywords):
+        new_book_is_audio = True
+
     new_book = await create_new_book(user, book_title, total_pages, is_audio=new_book_is_audio)
 
     selected_book_ids = data.get("selected_book_ids", [])
@@ -325,7 +330,12 @@ async def process_new_book_pages(message: types.Message, state: FSMContext):
         selected_book_ids.append(new_book.id)
 
     await state.update_data(selected_book_ids=selected_book_ids)
-    await message.answer(_("Kitob qo'shildi va tanlandi! ✅"))
+    type_icon = "🎧" if new_book_is_audio else "📖"
+    type_label = "Audiokitob" if new_book_is_audio else "Oddiy kitob"
+    await message.answer(
+        f"{type_icon} <b>{book_title}</b> ({type_label}) qo'shildi va tanlandi! ✅",
+        parse_mode="HTML",
+    )
 
     await ReportState.select_book.set()
     await send_book_selection_menu(message, state)
@@ -366,6 +376,16 @@ async def ask_next_book_pages(message, state: FSMContext):
 
     next_book_id = pending_books[0]
     book = await get_book_by_id(next_book_id)
+
+    # Self-heal misclassified audiobooks: if a book has 0 progress and its title
+    # clearly says it's an audiobook, flip is_audio=True silently. This rescues
+    # cases where the user picked the wrong type on the add screen.
+    if book and not book.is_audio and book.current_page == 0:
+        title_l = (book.title or "").lower()
+        audio_keywords = ("audio", "аудио", "audiokitob", "audiobook")
+        if any(kw in title_l for kw in audio_keywords):
+            book.is_audio = True
+            await sync_to_async(book.save)(update_fields=["is_audio"])
 
     if book.is_audio:
         unit = "daqiqa"
