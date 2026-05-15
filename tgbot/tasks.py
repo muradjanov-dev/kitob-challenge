@@ -294,26 +294,86 @@ def yearly_top_read_user():
         _broadcast_top_to_groups_and_users(msg, "yearly", date_str)
 
 
+def _is_user_in_chat(chat_id, user_id) -> bool:
+    """Returns True only if the user is a current member (creator/admin/member/restricted)."""
+    try:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/getChatMember",
+            data={"chat_id": chat_id, "user_id": user_id},
+            timeout=5,
+        ).json()
+        if not resp.get("ok"):
+            return False
+        status = resp.get("result", {}).get("status")
+        return status in ("creator", "administrator", "member", "restricted")
+    except Exception:
+        return False
+
+
 @shared_task
 def users_unread_book():
+    """Per-group reminder: in each gender group, list ONLY members of that
+    specific group who haven't reported today. Users who left the group are
+    skipped — no point pinging strangers."""
+    import os as _os
+    import time as _time
+
     today = timezone.localdate()
-    users = TelegramProfile.objects.exclude(
-        confirmationreport__date__date=today)
+    non_reporters = list(
+        TelegramProfile.objects
+        .exclude(confirmationreport__date__date=today)
+        .filter(is_registered=True, is_blocked=False)
+    )
 
-    if users:
-        users_count = users.count()
-        message = f"‼️ Bugun hisobot yubormaganlar: {users_count}ta\n\n"
-        for user in users:
-            if user.full_name is None:
-                user.delete()
-            else:
-                if user.telegram_id != 631751797:
-                    message += f"-@{user.username} (<b>{user.full_name}</b>)\n"
+    if not non_reporters:
+        return
 
-        message += "\nKuniga 5-10 daqiqa va siz yana safdasiz 🚀 \n\n *Bizdan qolib ketmysiz degan umiddamiz xurmatli do'stlar"
+    boys_chat = _os.environ.get("BOYS_GROUP_ID", "").strip()
+    girls_chat = _os.environ.get("GIRLS_GROUP_ID", "").strip()
+    general_chat = str(GENERAL_GROUP_ID)
 
-        for _cid in _group_chat_ids():
-            send_message(_cid, message)
+    # group_chat_id -> ordered list of users to check membership against this chat
+    targets = []
+    if boys_chat:
+        targets.append((boys_chat, [u for u in non_reporters if u.gender == "male"]))
+    if girls_chat:
+        targets.append((girls_chat, [u for u in non_reporters if u.gender == "female"]))
+    # General group: combined of everyone (we'll dedupe by checking general membership)
+    targets.append((general_chat, list(non_reporters)))
+
+    suffix = (
+        "\nKuniga 5-10 daqiqa va siz yana safdasiz 🚀 \n\n"
+        " *Bizdan qolib ketmysiz degan umiddamiz xurmatli do'stlar"
+    )
+
+    for chat_id, candidate_users in targets:
+        members_present = []
+        for u in candidate_users:
+            if u.full_name is None:
+                try:
+                    u.delete()
+                except Exception:
+                    pass
+                continue
+            if u.telegram_id == 631751797:
+                continue
+            if _is_user_in_chat(chat_id, u.telegram_id):
+                members_present.append(u)
+            _time.sleep(0.04)  # gentle pacing to avoid 429
+
+        if not members_present:
+            continue
+
+        message = f"‼️ Bugun hisobot yubormaganlar: {len(members_present)}ta\n\n"
+        for u in members_present:
+            handle = f"@{u.username}" if u.username else f'<a href="tg://user?id={u.telegram_id}">{u.full_name}</a>'
+            message += f"-{handle} (<b>{u.full_name}</b>)\n"
+        message += suffix
+
+        try:
+            send_message(chat_id, message)
+        except Exception as e:
+            print(f"users_unread_book send to {chat_id} failed: {e}")
 
 
 def _build_top_readers_message(start_date, end_date, period_label, limit=20):
