@@ -428,6 +428,9 @@ async def _menu_cabinet(call, user, state: FSMContext):
             calendar_markup.row(
                 InlineKeyboardButton("🔒 O'sish jadvali (Premium)", callback_data="menu:premium")
             )
+        calendar_markup.row(InlineKeyboardButton(
+            "🌟 Yaxshilik ulashuvchi", callback_data="referral:link",
+        ))
         for btn in challenge_btns:
             calendar_markup.row(btn)
         await call.message.answer(response_text, parse_mode="HTML",
@@ -443,6 +446,9 @@ async def _menu_cabinet(call, user, state: FSMContext):
         else:
             kb.add(InlineKeyboardButton("🔒 Hisobotlar tarixi (Premium)", callback_data="menu:premium"))
             kb.add(InlineKeyboardButton("🔒 O'sish jadvali (Premium)", callback_data="menu:premium"))
+        kb.add(InlineKeyboardButton(
+            "🌟 Yaxshilik ulashuvchi", callback_data="referral:link",
+        ))
         for btn in challenge_btns:
             kb.row(btn)
         await call.message.answer(response_text, parse_mode="HTML",
@@ -838,19 +844,25 @@ def _referral_top_text(lang: str, user=None) -> str:
         "🌟 <b>Топ 20 распространителей</b>\n\n"
         "Рейтинг тех, кто популяризирует чтение:\n\n",
     )
-    if not rows:
-        return header + _t(lang, "📭 Hali ma'lumot yo'q.", "📭 Данных пока нет.")
 
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-    lines = []
-    for i, r in enumerate(rows, 1):
-        name = escape(r["referrer__full_name"] or "Kitobxon")
-        tg_id = r["referrer__telegram_id"]
-        cnt = r["count"]
-        medal = medals.get(i, f"{i}.")
-        lines.append(
-            f"{medal} <a href='tg://user?id={tg_id}'>{name}</a>: <b>{cnt}</b> ta taklif"
+    if not rows:
+        leaderboard = _t(
+            lang,
+            "<i>Reyting hali bo'sh — birinchi bo'lib do'stingizni taklif qiling va 1-o'rinda turing! 🚀</i>",
+            "<i>Рейтинг пуст — пригласите друга первым и займите 1-е место! 🚀</i>",
         )
+    else:
+        lines = []
+        for i, r in enumerate(rows, 1):
+            name = escape(r["referrer__full_name"] or "Kitobxon")
+            tg_id = r["referrer__telegram_id"]
+            cnt = r["count"]
+            medal = medals.get(i, f"{i}.")
+            lines.append(
+                f"{medal} <a href='tg://user?id={tg_id}'>{name}</a>: <b>{cnt}</b> ta taklif"
+            )
+        leaderboard = "\n".join(lines)
 
     prizes = _t(
         lang,
@@ -886,7 +898,7 @@ def _referral_top_text(lang: str, user=None) -> str:
                 "\n\n👤 Вы ещё никого не пригласили.",
             )
 
-    return header + "\n".join(lines) + prizes + my_block
+    return header + leaderboard + prizes + my_block
 
 
 async def _menu_reyting(call, user, _state: FSMContext):
@@ -942,7 +954,8 @@ async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
 
 
 @dp.callback_query_handler(lambda c: c.data == "referral:link", state="*")
-async def referral_link_handler(call: types.CallbackQuery, _state: FSMContext):
+async def referral_link_handler(call: types.CallbackQuery, state: FSMContext):
+    del state  # injected by aiogram, unused here
     user = get_user(call.from_user.id)
     if not user:
         await call.answer("Avval /start bosing.", show_alert=True)
