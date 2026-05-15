@@ -940,7 +940,7 @@ def check_user_achievements(user_id: int):
                             ScheduledMessageDeletion.objects.create(
                                 chat_id=int(_gid),
                                 message_id=msg_id,
-                                delete_at=timezone.now() + _dt.timedelta(hours=12),
+                                delete_at=timezone.now() + _dt.timedelta(minutes=2),
                             )
                         except Exception:
                             pass

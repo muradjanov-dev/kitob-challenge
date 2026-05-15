@@ -4,7 +4,8 @@ When a user clicks 🎉 Tabriklash on a broadcast DM:
     1. Records a Congratulation row (idempotent — one per user/event).
     2. Updates the button on the clicker's message to show live count.
     3. Shows a brief inspiring toast to the clicker (auto-disappears ~3 s).
-    4. Removes the inline keyboard from the clicker's message after 1 minute.
+    4. Deletes the congrats message from the clicker's DM after 1 minute
+       (keeps the DM clean — user already saw it).
 """
 import asyncio
 import random
@@ -45,12 +46,10 @@ def _record_congrats(ua_id: int, congratulator_id: int):
     return created, count, ua.user.telegram_id
 
 
-async def _remove_keyboard_after(chat_id: int, message_id: int, delay: int = 60):
+async def _delete_message_after(chat_id: int, message_id: int, delay: int = 60):
     await asyncio.sleep(delay)
     try:
-        await bot.edit_message_reply_markup(
-            chat_id=chat_id, message_id=message_id, reply_markup=None
-        )
+        await bot.delete_message(chat_id=chat_id, message_id=message_id)
     except Exception:
         pass
 
@@ -104,7 +103,7 @@ async def congrats_handler(call: types.CallbackQuery, state: FSMContext):
     # Brief inspiring toast (auto-disappears in ~3 s, no modal).
     await call.answer(random.choice(_CONGRATS_TOASTS))
 
-    # Remove the keyboard 1 minute after clicking.
+    # Delete the congrats DM 1 minute after clicking — keeps chat clean.
     asyncio.create_task(
-        _remove_keyboard_after(call.message.chat.id, call.message.message_id, delay=60)
+        _delete_message_after(call.message.chat.id, call.message.message_id, delay=60)
     )

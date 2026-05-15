@@ -146,19 +146,29 @@ async def _menu_report(call, user, state: FSMContext):
         return
 
     today = timezone.localdate()
-    already = await sync_to_async(
-        lambda: ConfirmationReport.objects.filter(user=user, date__date=today).exists()
+    already, is_prem = await sync_to_async(
+        lambda: (
+            ConfirmationReport.objects.filter(user=user, date__date=today).exists(),
+            Payment.objects.filter(
+                user=user, status="paid", end_date__gte=today
+            ).exists(),
+        )
     )()
-    if already:
+    if already and not is_prem:
         await call.message.answer(
             _t(
                 lang,
-                "Siz bugungi kun uchun allaqachon hisobotingizni yubordingiz.",
-                "Вы уже отправили сегодняшний отчёт.",
+                "Siz bugungi kun uchun allaqachon hisobotingizni yubordingiz.\n\n"
+                "💎 Premium foydalanuvchilar kuniga bir necha marotaba hisobot yubora oladi — "
+                "barcha hisobotlar avtomatik jamlanadi va guruhdagi xabar yangilanadi.",
+                "Вы уже отправили сегодняшний отчёт.\n\n"
+                "💎 Premium пользователи могут отправлять несколько отчётов в день — все суммируются автоматически.",
             )
         )
         return
 
+    # reading_day is the count of distinct reading days the user already has.
+    # If they reported today already (premium), keep that count; else add 1.
     distinct_days = await sync_to_async(
         lambda: ConfirmationReport.objects
             .filter(user=user)
@@ -167,7 +177,7 @@ async def _menu_report(call, user, state: FSMContext):
             .distinct()
             .count()
     )()
-    reading_day = distinct_days + 1
+    reading_day = distinct_days if already else distinct_days + 1
 
     await state.finish()
     await state.update_data(reading_day=reading_day, selected_book_ids=[])
@@ -870,13 +880,15 @@ def _referral_top_text(lang: str, user=None) -> str:
             "\n\n🎁 <b>Mukofotlar:</b>\n"
             "  1-taklif: 20 🪙 | 2-taklif: 25 🪙 | 3-taklif: 30 🪙 …\n"
             "  Har 2 taklif → 💎 1 kun Premium\n"
-            "  17-taklif dan keyin: doimiy 50 🪙 har bir taklif uchun"
+            "  17-taklif dan keyin: doimiy 50 🪙 har bir taklif uchun\n\n"
+            "<i>(Eslatma: taklif faqat do'stingiz birinchi kitob hisobotini yuborgach hisoblanadi — shunchaki /start bosish yetarli emas.)</i>"
         ),
         (
             "\n\n🎁 <b>Награды:</b>\n"
             "  1-е приглашение: 20 🪙 | 2-е: 25 🪙 | 3-е: 30 🪙 …\n"
             "  Каждые 2 приглашения → 💎 1 день Premium\n"
-            "  С 17-го приглашения: фиксированно 50 🪙"
+            "  С 17-го приглашения: фиксированно 50 🪙\n\n"
+            "<i>(Примечание: приглашение засчитывается только после того, как ваш друг отправит свой первый отчёт о книге — одного /start недостаточно.)</i>"
         ),
     )
 
@@ -976,11 +988,13 @@ async def referral_link_handler(call: types.CallbackQuery, state: FSMContext):
         f"🔗 <b>Sizning taklif havolangiz:</b>\n<code>{ref_link}</code>\n\n"
         f"📊 Jami taklif: <b>{ref_count}</b> ta\n"
         f"🎁 Keyingi taklif uchun: <b>+{next_reward} Kitobcha</b>\n"
-        f"💎 Keyingi premiumgacha: <b>{next_prem} ta</b> taklif qoldi",
+        f"💎 Keyingi premiumgacha: <b>{next_prem} ta</b> taklif qoldi\n\n"
+        f"<i>(Eslatma: taklif faqat do'stingiz birinchi kitob hisobotini yuborgach hisoblanadi — shunchaki /start bosish yetarli emas.)</i>",
         f"🔗 <b>Ваша реферальная ссылка:</b>\n<code>{ref_link}</code>\n\n"
         f"📊 Всего приглашений: <b>{ref_count}</b>\n"
         f"🎁 За следующее: <b>+{next_reward} Kitobcha</b>\n"
-        f"💎 До следующего Premium: <b>{next_prem}</b> приглашений",
+        f"💎 До следующего Premium: <b>{next_prem}</b> приглашений\n\n"
+        f"<i>(Примечание: приглашение засчитывается только после того, как ваш друг отправит свой первый отчёт о книге — одного /start недостаточно.)</i>",
     )
     await call.message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
 
@@ -1017,6 +1031,15 @@ async def toplist_congrats_handler(call: types.CallbackQuery, state: FSMContext)
     from tgbot.models import TelegramProfile as _TP, ConfirmationReport as _CR
     from django.db.models import Sum as _Sum
     from tgbot.tasks import BOT_TOKEN
+
+    # Delete the congrats DM from the user's chat 1 minute after they click.
+    async def _del_after():
+        await _asyncio.sleep(60)
+        try:
+            await bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+        except Exception:
+            pass
+    _asyncio.create_task(_del_after())
 
     congratulator_tg_id = call.from_user.id
     presser_name = _esc(user.full_name or "Kitobxon")

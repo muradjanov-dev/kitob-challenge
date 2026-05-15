@@ -111,6 +111,13 @@ class TelegramProfile(BaseModel):
         db_index=True,
         verbose_name="Referral Code"
     )
+    pending_referral_code = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="The referral code that brought this user in. Counted only after their first ConfirmationReport, then cleared.",
+    )
     full_name = models.CharField(
         max_length=255,
         null=True,

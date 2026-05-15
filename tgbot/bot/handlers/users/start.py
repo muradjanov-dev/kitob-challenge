@@ -17,7 +17,6 @@ from tgbot.bot.keyboards.inline import (
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.states.main import AdmissionState
 from tgbot.bot.utils import get_user
-from tgbot.services.referral import ReferralService
 
 
 AGE_LABELS = {
@@ -186,18 +185,24 @@ async def age_pick(call: types.CallbackQuery, state: FSMContext):
     region_id = data.get("region_id")
     referral_code = data.get("referral_code")
 
+    defaults = {
+        "username": call.from_user.username,
+        "full_name": full_name,
+        "gender": gender,
+        "region_id": region_id,
+        "age_range": age_code,
+        "is_registered": True,
+    }
+    # Pending referral: hold the inviter's code on the new user; it is processed
+    # only after they submit their first ConfirmationReport, then cleared.
+    if referral_code:
+        defaults["pending_referral_code"] = referral_code
+
     user, _created = await sync_to_async(
         TelegramProfile.objects.update_or_create
     )(
         telegram_id=call.from_user.id,
-        defaults={
-            "username": call.from_user.username,
-            "full_name": full_name,
-            "gender": gender,
-            "region_id": region_id,
-            "age_range": age_code,
-            "is_registered": True,
-        },
+        defaults=defaults,
     )
 
     await call.answer()
@@ -205,12 +210,6 @@ async def age_pick(call: types.CallbackQuery, state: FSMContext):
         await call.message.edit_reply_markup(reply_markup=None)
     except Exception:
         pass
-
-    if referral_code:
-        try:
-            await ReferralService.process_referral(user, referral_code)
-        except Exception as e:
-            print(f"referral processing failed: {e}")
 
     lang = user.language or "uz"
     await call.message.answer(
