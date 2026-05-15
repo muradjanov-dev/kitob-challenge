@@ -130,10 +130,11 @@ async def send_book_selection_menu(message_or_call, state: FSMContext, page=1):
                    callback_data="confirm_selection"))
 
     markup.add(InlineKeyboardButton(
-        text="➕ Yangi kitob qo'shish", callback_data="add_new_book"))
+        text="➕ 📖 / 🎧 Yangi kitob qo'shish", callback_data="add_new_book"))
 
     text = _(
-        "Qaysi kitobni o'qiyotganingizni tanlang (bir nechtasini tanlash mumkin):")
+        "Qaysi kitobni o'qiyotganingizni tanlang (bir nechtasini tanlash mumkin) "
+        "/ Yoki yangi kitob qo'shing (📖 Qog'oz / 🎧 Audio):")
 
     if isinstance(message_or_call, types.CallbackQuery):
         await message_or_call.message.edit_text(text, reply_markup=markup)
