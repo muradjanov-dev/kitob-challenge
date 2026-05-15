@@ -429,7 +429,7 @@ async def _menu_cabinet(call, user, state: FSMContext):
                 InlineKeyboardButton("🔒 O'sish jadvali (Premium)", callback_data="menu:premium")
             )
         calendar_markup.row(InlineKeyboardButton(
-            "🌟 Yaxshilik ulashuvchi", callback_data="referral:link",
+            "🌟 Yaxshilik ulashuvchi (Referal)", callback_data="referral:link",
         ))
         for btn in challenge_btns:
             calendar_markup.row(btn)
@@ -447,7 +447,7 @@ async def _menu_cabinet(call, user, state: FSMContext):
             kb.add(InlineKeyboardButton("🔒 Hisobotlar tarixi (Premium)", callback_data="menu:premium"))
             kb.add(InlineKeyboardButton("🔒 O'sish jadvali (Premium)", callback_data="menu:premium"))
         kb.add(InlineKeyboardButton(
-            "🌟 Yaxshilik ulashuvchi", callback_data="referral:link",
+            "🌟 Yaxshilik ulashuvchi (Referal)", callback_data="referral:link",
         ))
         for btn in challenge_btns:
             kb.row(btn)
@@ -688,7 +688,7 @@ def _reyting_kb(lang: str, active: str) -> InlineKeyboardMarkup:
         ("month",    _t(lang, "Bu oy",      "Этот месяц")),
         ("3months",  _t(lang, "3 oy",       "3 месяца")),
         ("yearly",   _t(lang, "Yillik",     "Годовой")),
-        ("referral", _t(lang, "🌟 Ulashuvchi", "🌟 Улашувчи")),
+        ("referral", _t(lang, "🌟 Ulashuvchi (Referal)", "🌟 Улашувчи (Реферал)")),
     ]
     kb = InlineKeyboardMarkup(row_width=2)
     btns = []
@@ -839,7 +839,7 @@ def _referral_top_text(lang: str, user=None) -> str:
     rows = ranked[:20]
     header = _t(
         lang,
-        "🌟 <b>Yaxshilik ulashuvchilar — Top 20</b>\n\n"
+        "🌟 <b>Yaxshilik ulashuvchilar (Referal) — Top 20</b>\n\n"
         "Kitobxonlik odatini tarqatganlar reytingi:\n\n",
         "🌟 <b>Топ 20 распространителей</b>\n\n"
         "Рейтинг тех, кто популяризирует чтение:\n\n",
