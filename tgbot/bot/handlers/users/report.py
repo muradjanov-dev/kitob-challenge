@@ -727,7 +727,11 @@ async def _do_confirm_report(message, user, state: FSMContext):
 
     # Kitobcha only on first report of the day — subsequent premium submissions
     # update the aggregation but don't farm rewards.
-    if not is_aggregating:
+    # Race-safe: use the smallest id of today's rows; only that one gets the
+    # award. If two concurrent submissions both insert, only the earlier-id
+    # row triggers the reward.
+    first_today_id = todays[0].id if todays else None
+    if first_today_id == report.id:
         try:
             awarded = await sync_to_async(user.update_ball)(True, 25)
             premium_note = " 💎 ×2 premium!" if awarded > 25 else ""

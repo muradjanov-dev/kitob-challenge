@@ -94,10 +94,11 @@ class ReferralService:
             # S(n) = 20n + 5*n*(n-1)/2; first n where S(n) >= 1000 is n=17 (S(17)=1020)
             BREAKPOINT = 17
             if count <= BREAKPOINT:
-                kitobcha = 20 + 5 * (count - 1)
+                base_kitobcha = 20 + 5 * (count - 1)
             else:
-                kitobcha = 50
-            referrer.update_ball(True, kitobcha)
+                base_kitobcha = 50
+            # update_ball returns the actually-applied amount (doubled for premium).
+            actually_awarded = referrer.update_ball(True, base_kitobcha)
 
             # Every 2nd invite = 1 day premium
             if count % 2 == 0:
@@ -116,12 +117,13 @@ class ReferralService:
                         end_date=today + timedelta(days=1),
                         status="paid",
                     )
+            return actually_awarded
 
-        await _award(ref_count)
+        awarded_kitobcha = await _award(ref_count)
 
         # Notify parties
         await ReferralService._notify_admin(referrer, user, referral_code)
-        await ReferralService._notify_referrer(referrer, user, ref_count)
+        await ReferralService._notify_referrer(referrer, user, ref_count, awarded_kitobcha)
 
         return True
 
@@ -144,14 +146,16 @@ class ReferralService:
             print(f"Failed to send referral notification to admin: {e}")
 
     @staticmethod
-    async def _notify_referrer(referrer: TelegramProfile, new_user: TelegramProfile, ref_count: int = 0):
+    async def _notify_referrer(referrer: TelegramProfile, new_user: TelegramProfile, ref_count: int = 0, awarded_kitobcha: int = 0):
         try:
             BREAKPOINT = 17
             if ref_count <= BREAKPOINT:
-                kitobcha = 20 + 5 * (ref_count - 1)
+                base_kitobcha = 20 + 5 * (ref_count - 1)
             else:
-                kitobcha = 50
-            reward_lines = [f"🪙 <b>+{kitobcha} Kitobcha</b> qo'shildi!"]
+                base_kitobcha = 50
+            display_amount = awarded_kitobcha if awarded_kitobcha else base_kitobcha
+            premium_note = " 💎 ×2 premium!" if awarded_kitobcha and awarded_kitobcha > base_kitobcha else ""
+            reward_lines = [f"🪙 <b>+{display_amount} Kitobcha</b> qo'shildi!{premium_note}"]
             if ref_count % 2 == 0:
                 reward_lines.append(f"💎 <b>+1 kun Premium</b> qo'shildi! (har 2 ta taklif)")
 

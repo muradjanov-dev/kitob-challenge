@@ -1816,9 +1816,85 @@ def send_daily_personal_report():
                 sent += 1
             elif resp.status_code == 429:
                 _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
-        except Exception as e:
-            print(f"send_daily_personal_report failed uid={uid}: {e}")
+        except Exception as e:  # noqa: BLE001
+            print(f"send_daily_personal_report uid={uid}: {e}")
         _time.sleep(0.05)
+
+    # ── Audio-only reporters (no live pages today) ──────────────────────────
+    # These users would otherwise be skipped entirely. Send them an audio-focused
+    # version of the 23:57 report.
+    seen_uids = set(user_ids)
+    audio_rows = list(
+        ConfirmationReport.objects
+        .filter(date__date=today, is_audio=True)
+        .exclude(user_id__in=seen_uids)
+        .values("user_id")
+        .annotate(today_minutes=_S("minutes_listened"))
+        .filter(today_minutes__gt=0)
+        .order_by("-today_minutes")
+    )
+
+    if audio_rows:
+        # Yesterday's audio minutes for trend
+        yest_audio = {
+            r["user_id"]: r["t"] or 0 for r in
+            ConfirmationReport.objects
+            .filter(date__date=yesterday, is_audio=True, user_id__in=[r["user_id"] for r in audio_rows])
+            .values("user_id").annotate(t=_S("minutes_listened"))
+        }
+        total_audio_rows = list(
+            ConfirmationReport.objects
+            .filter(is_audio=True, user_id__in=[r["user_id"] for r in audio_rows])
+            .values("user_id").annotate(t=_S("minutes_listened"))
+        )
+        total_audio_at = {r["user_id"]: r["t"] or 0 for r in total_audio_rows}
+
+        for row in audio_rows:
+            uid = row["user_id"]
+            today_min = row["today_minutes"] or 0
+            try:
+                user = TelegramProfile.objects.filter(id=uid).first()
+                if not user:
+                    continue
+                yest_min = yest_audio.get(uid, 0)
+                total_min = total_audio_at.get(uid, 0)
+                is_prem = uid in premium_user_ids
+
+                if is_prem:
+                    text = (
+                        f"💎 <b>Premium Hisobot — {today.strftime('%d.%m.%Y')}</b>\n\n"
+                        f"🎧 Bugun audio eshitdingiz — barakalla!\n\n"
+                        f"🎧 Bugun: <b>{today_min} daqiqa</b>\n"
+                        f"📅 Kecha: {yest_min} daqiqa → <b>{_pct_str(yest_min, today_min)}</b>\n"
+                        f"📚 Jami eshitilgan: <b>{total_min} daqiqa</b>\n\n"
+                        f"<i>💎 Premium a'zo sifatida bu hisobotni har kuni 23:57 da olasiz.</i>"
+                    )
+                else:
+                    if today_min > yest_min > 0:
+                        trend = "📈 O'sish! Kechagidan ko'proq"
+                    elif today_min < yest_min and yest_min > 0:
+                        trend = "📉 Kecha ko'proq eshitgandingiz"
+                    else:
+                        trend = "→ Barqaror sur'at"
+                    text = (
+                        f"📊 <b>Bugungi audio natijangiz</b>\n\n"
+                        f"🎧 <b>Bugun:</b> {today_min} daqiqa\n"
+                        f"📈 <b>Trend:</b> {trend}\n"
+                        f"📚 <b>Jami eshitilgan:</b> {total_min} daqiqa\n\n"
+                        f"<i>💎 Premium olib to'liq tahlil va taqqoslama oling — menyudan 💎 Premium.</i>"
+                    )
+                resp = requests.post(
+                    url,
+                    data={"chat_id": user.telegram_id, "text": text, "parse_mode": "HTML"},
+                    timeout=5,
+                )
+                if resp.ok:
+                    sent += 1
+                elif resp.status_code == 429:
+                    _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
+            except Exception as e:  # noqa: BLE001
+                print(f"send_daily_personal_report audio uid={uid}: {e}")
+            _time.sleep(0.05)
 
     print(f"send_daily_personal_report: sent={sent}/{total_reporters}")
 
