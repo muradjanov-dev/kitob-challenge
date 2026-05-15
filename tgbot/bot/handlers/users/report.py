@@ -57,6 +57,23 @@ def get_confirmation_report_exists(user, date):
 
 
 @sync_to_async
+def _is_premium_user(user):
+    from tgbot.models import Payment
+    return Payment.objects.filter(
+        user=user, status="paid", end_date__gte=timezone.localdate()
+    ).exists()
+
+
+@sync_to_async
+def _today_reports_qs(user, today):
+    return list(
+        ConfirmationReport.objects
+        .filter(user=user, date__date=today)
+        .order_by("date")
+    )
+
+
+@sync_to_async
 def create_confirmation_report(
     user, pages_read, date, conclusion, book_ids,
     book_title=None, is_audio=False, minutes_listened=None
@@ -128,6 +145,27 @@ async def send_book_selection_menu(message_or_call, state: FSMContext, page=1):
 
 # ── CTA inline button (from broadcast messages) ──────────────────────────────
 
+async def _compute_reading_day(user, today):
+    """If user already has a report today, keep today's reading_day; else N+1."""
+    from django.db.models.functions import TruncDate
+
+    @sync_to_async
+    def _q():
+        distinct_days = (
+            ConfirmationReport.objects
+            .filter(user=user)
+            .annotate(_d=TruncDate("date"))
+            .values("_d")
+            .distinct()
+            .count()
+        )
+        has_today = ConfirmationReport.objects.filter(user=user, date__date=today).exists()
+        return distinct_days, has_today
+
+    distinct_days, has_today = await _q()
+    return distinct_days if has_today else distinct_days + 1
+
+
 @dp.callback_query_handler(lambda c: c.data == "cta_send_report", state="*")
 async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
     user = get_user(call.from_user.id)
@@ -139,9 +177,10 @@ async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
         return
 
     today = timezone.localdate()
-    if await get_confirmation_report_exists(user, today):
+    already_today = await get_confirmation_report_exists(user, today)
+    if already_today and not await _is_premium_user(user):
         await call.answer(
-            _("Siz bugungi kun uchun allaqachon hisobotingizni yubordingiz."),
+            _("Siz bugungi kun uchun allaqachon hisobotingizni yubordingiz. 💎 Premium foydalanuvchilar kuniga bir nechta hisobot yubora oladi."),
             show_alert=True,
         )
         return
@@ -149,16 +188,7 @@ async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.finish()
 
-    from django.db.models.functions import TruncDate
-    distinct_days = await sync_to_async(
-        lambda: ConfirmationReport.objects
-            .filter(user=user)
-            .annotate(_d=TruncDate("date"))
-            .values("_d")
-            .distinct()
-            .count()
-    )()
-    reading_day = distinct_days + 1
+    reading_day = await _compute_reading_day(user, today)
     await state.update_data(reading_day=reading_day, selected_book_ids=[])
 
     try:
@@ -180,16 +210,15 @@ async def send_daily_report_handler(message: types.Message, state: FSMContext):
         await message.answer(_("Siz bot tomonidan bloklangansiz."))
         return await state.finish()
 
-    from django.db.models.functions import TruncDate
-    distinct_days = await sync_to_async(
-        lambda: ConfirmationReport.objects
-            .filter(user=user)
-            .annotate(_d=TruncDate("date"))
-            .values("_d")
-            .distinct()
-            .count()
-    )()
-    reading_day = distinct_days + 1
+    today = timezone.localdate()
+    already_today = await get_confirmation_report_exists(user, today)
+    if already_today and not await _is_premium_user(user):
+        await message.answer(
+            _("Siz bugungi kun uchun allaqachon hisobotingizni yubordingiz.\n\n💎 Premium foydalanuvchilar kuniga bir necha marotaba hisobot yubora oladi — barcha hisobotlar avtomatik jamlanadi va guruhdagi xabar yangilanadi."),
+        )
+        return await state.finish()
+
+    reading_day = await _compute_reading_day(user, today)
     await state.update_data(reading_day=reading_day, selected_book_ids=[])
     await ReportState.select_book.set()
     await send_book_selection_menu(message, state)
@@ -495,8 +524,11 @@ async def confirm_report_callback(call: CallbackQuery, state: FSMContext):
 
 async def _do_confirm_report(message, user, state: FSMContext):
     today = timezone.localdate()
+    is_premium = await _is_premium_user(user)
+    prior_reports = await _today_reports_qs(user, today)
+    is_aggregating = bool(prior_reports) and is_premium
 
-    if await get_confirmation_report_exists(user, today):
+    if prior_reports and not is_premium:
         await message.answer(
             _("Siz bugungi kun uchun allaqachon hisobotingizni yubordingiz."),
             reply_markup=main_markup(),
@@ -509,7 +541,7 @@ async def _do_confirm_report(message, user, state: FSMContext):
     book = data.get("book_title")
     is_audio = data.get("is_audio", False)
     is_combined = data.get("is_combined", False)
-    pages_read = data.get("pages_read", 0)
+    pages_read = data.get("pages_read", 0) or 0
     minutes_listened = data.get("minutes_listened")
     conclusion = data.get("conclusion")
     book_ids = data.get("selected_book_ids")
@@ -539,14 +571,11 @@ async def _do_confirm_report(message, user, state: FSMContext):
             minutes_listened=minutes_listened,
         )
 
-    data = await state.get_data()
-    book_reports = data.get("book_reports", {})
-
+    book_reports = (await state.get_data()).get("book_reports", {})
     for bid, value in book_reports.items():
         try:
             book_obj = await get_book_by_id(bid)
             if book_obj:
-                # Update progress for all book types (pages for live, minutes for audio)
                 book_obj.current_page += value
                 if book_obj.total_pages > 0 and book_obj.current_page > book_obj.total_pages:
                     book_obj.current_page = book_obj.total_pages
@@ -562,28 +591,33 @@ async def _do_confirm_report(message, user, state: FSMContext):
         except Exception as e:
             print(f"Error updating book {bid}: {e}")
 
-    from tgbot.models import Payment
+    prem_badge = "💎 " if is_premium else ""
 
-    @sync_to_async
-    def _check_premium():
-        return Payment.objects.filter(
-            user=user, status="paid", end_date__gte=timezone.localdate()
-        ).exists()
+    # Refresh today's report list (now includes the row we just created) to
+    # compute cumulative totals for the aggregated group message.
+    todays = await _today_reports_qs(user, today)
+    total_pages = sum((r.pages_read or 0) for r in todays if not r.is_audio)
+    total_minutes = sum((r.minutes_listened or 0) for r in todays if r.is_audio)
+    has_pages = total_pages > 0
+    has_audio = total_minutes > 0
 
-    prem_badge = "💎 " if await _check_premium() else ""
-
-    if is_combined:
+    if has_pages and has_audio:
         value_line = (
-            f"<b>✅ O'qilgan betlar:</b> {pages_read}+ bet\n"
-            f"<b>🎧 Eshitilgan vaqt:</b> {minutes_listened} daqiqa"
+            f"<b>✅ O'qilgan betlar:</b> {total_pages}+ bet\n"
+            f"<b>🎧 Eshitilgan vaqt:</b> {total_minutes} daqiqa"
         )
         type_tag = "📖 Kitob + 🎧 Audiokitob"
-    elif is_audio:
-        value_line = f"<b>🎧 Eshitilgan vaqt:</b> {minutes_listened} daqiqa"
+    elif has_audio:
+        value_line = f"<b>🎧 Eshitilgan vaqt:</b> {total_minutes} daqiqa"
         type_tag = "🎧 Audiokitob"
     else:
-        value_line = f"<b>✅O'qilgan betlar:</b> {pages_read}+ bet"
+        value_line = f"<b>✅O'qilgan betlar:</b> {total_pages}+ bet"
         type_tag = "📖 Kitob"
+
+    aggregate_note = ""
+    if is_aggregating:
+        n = len(todays)
+        aggregate_note = f"\n\n<i>💎 {n} ta hisobot jamlandi</i>"
 
     report_message = (
         f"<b><a href='tg://user?id={user.telegram_id}'>{prem_badge}{user.full_name}</a></b>:\n\n"
@@ -593,24 +627,15 @@ async def _do_confirm_report(message, user, state: FSMContext):
         f"{value_line}\n\n"
         f"<b>💡Olingan xulosa:</b> {conclusion}\n\n"
         f"<b>Haqiqiy peshqadam 🏆</b>"
+        f"{aggregate_note}"
     )
 
     if not user:
         await state.finish()
         return
 
-    target_chat_id = None
-    target_thread_id = None
-
-    if is_audio:
-        # Audiobook reports go to B-tier thread (no page count for routing)
-        routing_pages = 0
-    else:
-        try:
-            routing_pages = int(pages_read)
-        except (ValueError, TypeError):
-            routing_pages = 0
-
+    # Routing — by cumulative pages (audio-only days route to B-tier).
+    routing_pages = total_pages if has_pages else 0
     if user.gender == "male":
         target_chat_id = BOYS_GROUP_ID
         if routing_pages <= 50:
@@ -632,6 +657,25 @@ async def _do_confirm_report(message, user, state: FSMContext):
         else:
             target_thread_id = E_GIRLS_THREAD_ID
 
+    # Delete prior group messages for today (premium aggregation).
+    if is_aggregating:
+        seen = set()
+        for prev in prior_reports:
+            key = (prev.group_chat_id, prev.group_message_id)
+            if not prev.group_chat_id or not prev.group_message_id or key in seen:
+                continue
+            seen.add(key)
+            try:
+                await bot.delete_message(
+                    chat_id=prev.group_chat_id, message_id=prev.group_message_id,
+                )
+            except Exception as e:
+                print(f"delete prior aggregated msg failed (chat={prev.group_chat_id}, msg={prev.group_message_id}): {e}")
+        # Clear references on prior rows so we don't re-attempt deletion.
+        await sync_to_async(
+            ConfirmationReport.objects.filter(user=user, date__date=today).exclude(id=report.id).update
+        )(group_chat_id=None, group_message_id=None, group_thread_id=None)
+
     sent_msg = None
     if target_chat_id:
         try:
@@ -645,8 +689,25 @@ async def _do_confirm_report(message, user, state: FSMContext):
             print(
                 f"Error sending report to group {target_chat_id} thread {target_thread_id}: {e}")
 
+    if sent_msg:
+        await sync_to_async(
+            ConfirmationReport.objects.filter(id=report.id).update
+        )(
+            group_chat_id=target_chat_id,
+            group_message_id=sent_msg.message_id,
+            group_thread_id=target_thread_id,
+            reading_day=reading_day,
+        )
+
     lang = user.language or "uz"
-    done_text = "Ваш отчёт отправлен." if lang == "ru" else "Hisobotingiz yuborildi."
+    if is_aggregating:
+        done_text = (
+            "Hisobotingiz jamlandi va guruhdagi xabar yangilandi. 💎"
+            if lang != "ru" else
+            "Отчёт суммирован и групповое сообщение обновлено. 💎"
+        )
+    else:
+        done_text = "Ваш отчёт отправлен." if lang == "ru" else "Hisobotingiz yuborildi."
     if sent_msg:
         chat_id_str = str(target_chat_id).lstrip("-")
         if chat_id_str.startswith("100"):
@@ -664,15 +725,18 @@ async def _do_confirm_report(message, user, state: FSMContext):
         disable_web_page_preview=True,
     )
 
-    try:
-        awarded = await sync_to_async(user.update_ball)(True, 25)
-        premium_note = " 💎 ×2 premium!" if awarded > 25 else ""
-        await message.answer(
-            f"🪙 +{awarded} Kitobcha qo'shildi!{premium_note} Joriy balans: <b>{int(user.ball)}</b>",
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        print(f"award kitobcha for report failed: {e}")
+    # Kitobcha only on first report of the day — subsequent premium submissions
+    # update the aggregation but don't farm rewards.
+    if not is_aggregating:
+        try:
+            awarded = await sync_to_async(user.update_ball)(True, 25)
+            premium_note = " 💎 ×2 premium!" if awarded > 25 else ""
+            await message.answer(
+                f"🪙 +{awarded} Kitobcha qo'shildi!{premium_note} Joriy balans: <b>{int(user.ball)}</b>",
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            print(f"award kitobcha for report failed: {e}")
 
     try:
         from tgbot.tasks import check_user_achievements

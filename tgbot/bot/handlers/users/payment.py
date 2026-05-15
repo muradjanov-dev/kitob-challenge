@@ -21,6 +21,9 @@ MONTHLY_PRICE = 17_000   # UZS
 PREMIUM_FEATURES_UZ = (
     "💎 <b>Premium obuna imtiyozlari:</b>\n\n"
     "🪙 <b>×2 (KARRA KO'P) Kitobchalar!</b> 🔥 — har bir hisobot, yutuq va reyting mukofoti ikki barobar!\n"
+    "♾️ <b>Cheksiz kunlik hisobotlar</b> 🔥 — bir kunda bir necha marotaba hisobot yuboring, "
+    "barchasi avtomatik jamlanadi. Guruhda esa faqat eng so'nggi (jamlangan) hisobotingiz turadi — "
+    "feedlarni egallamasdan, har safar yangi natijani jo'nataverasiz!\n"
     "📊 <b>Kunlik shaxsiy hisobot (23:57)</b> — bugun vs kecha, 3 kun, hafta, oy, yil taqqoslama "
     "(%), reytingdagi o'rin va motivatsion xat\n"
     "📋 <b>To'liq hisobotlar tarixi</b> — qaysi kuni, qaysi kitob, qanday xulosa yozganingizni ko'ring\n"
@@ -34,6 +37,9 @@ PREMIUM_FEATURES_UZ = (
 PREMIUM_FEATURES_RU = (
     "💎 <b>Преимущества Premium подписки:</b>\n\n"
     "🪙 <b>Kitobcha ×2 (В 2 РАЗА БОЛЬШЕ!)</b> 🔥 — каждый отчёт, достижение и рейтинговая награда удваиваются!\n"
+    "♾️ <b>Безлимитные отчёты в день</b> 🔥 — отправляйте несколько отчётов за день, все они "
+    "автоматически суммируются. В группе остаётся только последний (итоговый) отчёт — лента не "
+    "засоряется, а вы свободно дополняете прогресс в течение дня!\n"
     "📊 <b>Ежедневный личный отчёт (23:57)</b> — сегодня vs вчера, 3 дня, неделя, месяц, год (%), "
     "место в рейтинге и мотивационное письмо\n"
     "📋 <b>Полная история отчётов</b> — какой день, какая книга, какой вывод\n"

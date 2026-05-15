@@ -26,6 +26,7 @@ def _build_premium_welcome(start_date, end_date) -> str:
         f"📅 Muddati: <b>{start_date.strftime('%d.%m.%Y')}</b> — <b>{end_date.strftime('%d.%m.%Y')}</b>\n\n"
         "Sizga quyidagi imkoniyatlar ochildi:\n\n"
         "🪙 <b>×2 (KARRA KO'P) Kitobchalar!</b> 🔥 — har bir hisobot, yutuq va reyting mukofoti ikki barobar!\n"
+        "♾️ <b>Cheksiz kunlik hisobotlar</b> — bir kunda bir necha marotaba hisobot yuboring, barchasi avtomatik jamlanadi!\n"
         "📋 <b>To'liq hisobotlar tarixi</b> — qaysi kuni, qaysi kitob, qanday xulosa yozganingizni ko'ring\n"
         "📊 <b>O'sish jadvali</b> — kun / hafta / oy / yil kesimida o'sish va tushish foizini ko'ring\n"
         "💎 <b>Premium badge</b> — guruh hisobotlari va reyting ro'yxatlarida 💎 belgisi bilan ajralib turing\n\n"

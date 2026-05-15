@@ -57,6 +57,10 @@ class ReferralService:
         if not referral_code:
             return False
 
+        # Only count after the invited user has fully completed registration.
+        if not getattr(user, "is_registered", False):
+            return False
+
         # Check if already referred
         is_already_referred = await sync_to_async(UserReferal.objects.filter(referred_user=user).exists)()
         if is_already_referred:

@@ -398,6 +398,10 @@ class ConfirmationReport(models.Model):
         default=False, verbose_name=_("Is Audiobook"))
     minutes_listened = models.IntegerField(
         null=True, blank=True, verbose_name=_("Minutes listened"))
+    group_chat_id = models.BigIntegerField(null=True, blank=True)
+    group_message_id = models.BigIntegerField(null=True, blank=True)
+    group_thread_id = models.IntegerField(null=True, blank=True)
+    reading_day = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         if self.is_audio:
