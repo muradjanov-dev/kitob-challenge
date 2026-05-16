@@ -193,8 +193,17 @@ async def show_user_cabinet(message: types.Message, state=None):
         total_pages__gt=0
     ).count()
 
-    total_pages_read = BookReport.objects.filter(
-        user=user).aggregate(total=Sum('pages_read'))['total'] or 0
+    # Read totals from ConfirmationReport (it has is_audio/minutes_listened);
+    # BookReport pools audio minutes into pages_read so summing it conflates
+    # the two units. Pages are page-based reports; audio minutes are tracked
+    # separately and shown on their own line.
+    total_pages_read = ConfirmationReport.objects.filter(
+        user=user, is_audio=False
+    ).aggregate(total=Sum('pages_read'))['total'] or 0
+
+    total_audio_minutes = ConfirmationReport.objects.filter(
+        user=user, is_audio=True
+    ).aggregate(total=Sum('minutes_listened'))['total'] or 0
 
     # 2. Reading speed (Average pages per day)
     # We can calculate this from BookReport by averaging pages_read
@@ -286,12 +295,18 @@ async def show_user_cabinet(message: types.Message, state=None):
 
     kitobcha_balance = int(user.ball or 0)
 
+    audio_line = (
+        f"🎧 <b>Eshitilgan audiokitoblar:</b> {total_audio_minutes} daqiqa\n"
+        if total_audio_minutes else ""
+    )
+
     # Construct the message
     response_text = (
         f"👤 <b>Sizning shaxsiy kabinetingiz</b>\n\n"
         f"🪙 <b>Kitobcha balansi:</b> {kitobcha_balance}\n"
         f"📚 <b>O'qilgan kitoblar:</b> {completed_books_count} ta\n"
         f"📄 <b>Jami o'qilgan sahifalar:</b> {total_pages_read}\n"
+        f"{audio_line}"
         f"⚡️ <b>O'rtacha kunlik o'qish:</b> {int(avg_pages_per_day)} bet\n"
         f"📅 <b>Eng faol kuningiz:</b> {most_active_day}\n"
         f"⏰ <b>Sevimli vaqtingiz:</b> {active_hour}\n"
