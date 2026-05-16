@@ -205,10 +205,15 @@ async def show_user_cabinet(message: types.Message, state=None):
         user=user, is_audio=True
     ).aggregate(total=Sum('minutes_listened'))['total'] or 0
 
-    # 2. Reading speed (Average pages per day)
-    # We can calculate this from BookReport by averaging pages_read
-    avg_pages_per_day = BookReport.objects.filter(
-        user=user).aggregate(avg=Avg('pages_read'))['avg'] or 0
+    # 2. Reading speed — separate averages for pages vs audio. Average is per
+    # report (≈ per active day for non-premium users who submit one daily).
+    avg_pages_per_day = ConfirmationReport.objects.filter(
+        user=user, is_audio=False
+    ).aggregate(avg=Avg('pages_read'))['avg'] or 0
+
+    avg_audio_per_day = ConfirmationReport.objects.filter(
+        user=user, is_audio=True
+    ).aggregate(avg=Avg('minutes_listened'))['avg'] or 0
 
     # 3. Active days (Most frequent weekdays)
     # 1=Sunday, 2=Monday, ..., 7=Saturday
@@ -295,9 +300,13 @@ async def show_user_cabinet(message: types.Message, state=None):
 
     kitobcha_balance = int(user.ball or 0)
 
-    audio_line = (
+    audio_total_line = (
         f"🎧 <b>Eshitilgan audiokitoblar:</b> {total_audio_minutes} daqiqa\n"
         if total_audio_minutes else ""
+    )
+    audio_avg_line = (
+        f"🎧 <b>O'rtacha kunlik eshitish:</b> {int(avg_audio_per_day)} daqiqa\n"
+        if avg_audio_per_day else ""
     )
 
     # Construct the message
@@ -306,8 +315,9 @@ async def show_user_cabinet(message: types.Message, state=None):
         f"🪙 <b>Kitobcha balansi:</b> {kitobcha_balance}\n"
         f"📚 <b>O'qilgan kitoblar:</b> {completed_books_count} ta\n"
         f"📄 <b>Jami o'qilgan sahifalar:</b> {total_pages_read}\n"
-        f"{audio_line}"
+        f"{audio_total_line}"
         f"⚡️ <b>O'rtacha kunlik o'qish:</b> {int(avg_pages_per_day)} bet\n"
+        f"{audio_avg_line}"
         f"📅 <b>Eng faol kuningiz:</b> {most_active_day}\n"
         f"⏰ <b>Sevimli vaqtingiz:</b> {active_hour}\n"
         f"{rank_text}"
