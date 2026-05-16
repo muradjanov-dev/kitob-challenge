@@ -8,7 +8,7 @@ from tgbot.bot.filters import IsPrivate
 from tgbot.bot.keyboards.reply import admin_keyboard, back_keyboard
 from tgbot.bot.loader import dp
 from tgbot.bot.states.main import PollAdminState
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 from tgbot.models import BotPoll, BotPollVote, TelegramProfile
 
 
@@ -39,7 +39,7 @@ def _vote_kb(poll: BotPoll):
 @dp.message_handler(IsPrivate(), Text("📊 So'rovnoma"), state="*")
 async def poll_admin_start(message: types.Message, state: FSMContext, _admin_id=None):
     actor_id = _admin_id or message.from_user.id
-    user = get_user(actor_id)
+    user = await aget_user(actor_id)
     if not _is_admin(user):
         await message.answer("Siz admin emassiz!")
         return
@@ -109,7 +109,7 @@ async def poll_cancel(call: types.CallbackQuery, state: FSMContext):
 
 @dp.callback_query_handler(lambda c: c.data == "poll_send", state=PollAdminState.confirm)
 async def poll_send(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not _is_admin(user):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return
@@ -159,7 +159,7 @@ async def poll_vote(call: types.CallbackQuery):
         await call.answer("Variant topilmadi", show_alert=True)
         return
 
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not user:
         await call.answer("Avval /start yuboring", show_alert=True)
         return
@@ -182,7 +182,7 @@ async def poll_vote(call: types.CallbackQuery):
 @dp.message_handler(IsPrivate(), Text("📊 So'rovnoma natijalari"), state="*")
 async def poll_results_list(message: types.Message, state: FSMContext, _admin_id=None):
     actor_id = _admin_id or message.from_user.id
-    user = get_user(actor_id)
+    user = await aget_user(actor_id)
     if not _is_admin(user):
         await message.answer("Siz admin emassiz!")
         return
@@ -206,7 +206,7 @@ async def poll_results_list(message: types.Message, state: FSMContext, _admin_id
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("poll_refresh:"))
 async def poll_refresh(call: types.CallbackQuery):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not _is_admin(user):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return

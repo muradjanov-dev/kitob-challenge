@@ -8,7 +8,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from asgiref.sync import sync_to_async
 
 from tgbot.bot.loader import dp, bot
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 from tgbot.bot.states.main import QuizCreateState, QuizEditState, QuizBattleState
 from tgbot.models import Quiz, QuizQuestion, QuizOption, QuizSession, TelegramProfile
 
@@ -96,7 +96,7 @@ async def show_quiz_list(message: types.Message, user):
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("qz:"), state="*")
 async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not _is_admin(user):
         await call.answer("Faqat adminlar uchun!", show_alert=True)
         return
@@ -269,7 +269,7 @@ async def qz_got_title(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=QuizCreateState.description)
 async def qz_got_desc(message: types.Message, state: FSMContext):
-    user = get_user(message.from_user.id)
+    user = await aget_user(message.from_user.id)
     data = await state.get_data()
     desc = message.text.strip() if message.text.strip() != "—" else ""
 
@@ -535,7 +535,7 @@ async def vizov_scheduled(message: types.Message, state: FSMContext):
 async def _launch_vizov(msg, quiz_id: int, start_dt, creator_tg_id: int):
     from django.utils import timezone as tz
 
-    creator = get_user(creator_tg_id)
+    creator = await aget_user(creator_tg_id)
 
     @sync_to_async
     def _create_session():

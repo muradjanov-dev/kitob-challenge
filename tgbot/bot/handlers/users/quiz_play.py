@@ -9,7 +9,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from asgiref.sync import sync_to_async
 
 from tgbot.bot.loader import dp, bot
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 from tgbot.models import (
     Quiz, QuizQuestion, QuizOption, QuizSession, QuizParticipant, QuizUserAnswer,
 )
@@ -178,7 +178,7 @@ def _cancel_timer(session_id: int):
 # ─── Solo play (deep link: /start quiz_CODE) ──────────────────────────────────
 
 async def start_solo_quiz(message: types.Message, quiz_code: str):
-    user = get_user(message.from_user.id)
+    user = await aget_user(message.from_user.id)
     if not user or not user.is_registered:
         await message.answer("Avval /start bosib ro'yxatdan o'ting.")
         return
@@ -210,7 +210,7 @@ async def start_solo_quiz(message: types.Message, quiz_code: str):
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("qsolo:"), state="*")
 async def solo_start(call: types.CallbackQuery, state: FSMContext):
     await call.answer()
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     quiz_id = int(call.data.split(":")[1])
 
     @sync_to_async
@@ -244,7 +244,7 @@ async def solo_start(call: types.CallbackQuery, state: FSMContext):
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("qjoin:"), state="*")
 async def vizov_join(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not user or not user.is_registered:
         await call.answer("Avval /start bosib ro'yxatdan o'ting.", show_alert=True)
         return
@@ -291,7 +291,7 @@ async def vizov_join(call: types.CallbackQuery, state: FSMContext):
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("qans:"), state="*")
 async def answer_question(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not user:
         await call.answer("Avval /start bosing.", show_alert=True)
         return

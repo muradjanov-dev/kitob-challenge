@@ -5,7 +5,7 @@ from aiogram.dispatcher import FSMContext
 
 from tgbot.bot.loader import dp, bot, gettext as _
 from tgbot.models import Payment
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 from tgbot.bot.keyboards.reply import main_markup
 from tgbot.bot.consts import ADMIN_GROUP_ID
 from tgbot.bot.states.main import AnswerMessageState
@@ -17,7 +17,7 @@ async def send_answer_to_user(call: types.CallbackQuery, state: FSMContext):
     user_telegram_id = split_data[1]
     await call.message.edit_reply_markup(reply_markup=None)
 
-    user = get_user(telegram_id=user_telegram_id)
+    user = await aget_user(telegram_id=user_telegram_id)
 
     if not user:
         return
@@ -31,7 +31,7 @@ async def send_answer_to_user(call: types.CallbackQuery, state: FSMContext):
 async def confirm_payment_message_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
     user_telegram_id = data.get("user_telegram_id")
-    user = get_user(telegram_id=user_telegram_id)
+    user = await aget_user(telegram_id=user_telegram_id)
     try:
         username_or_telegram_id = f"""<a href="https://{user.username}.t.me">@{user.username}</a>""" if user.username else user.telegram_id
         await message.copy_to(chat_id=user.telegram_id, reply_markup=main_markup(user.language))

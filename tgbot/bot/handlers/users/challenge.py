@@ -6,14 +6,14 @@ from asgiref.sync import sync_to_async
 from django.utils import timezone
 
 from tgbot.bot.loader import dp
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 
 
 # ── Join ──────────────────────────────────────────────────────────────────
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("join_challenge:"), state="*")
 async def join_challenge_handler(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not user or not user.is_registered:
         await call.answer("Avval /start bosib ro'yxatdan o'ting.", show_alert=True)
         return
@@ -53,7 +53,7 @@ async def join_challenge_handler(call: types.CallbackQuery, state: FSMContext):
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("challenge_done:"), state="*")
 async def challenge_done_handler(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not user:
         await call.answer("Avval /start bosing.", show_alert=True)
         return
@@ -147,7 +147,7 @@ async def challenge_done_handler(call: types.CallbackQuery, state: FSMContext):
 
 @dp.callback_query_handler(lambda c: c.data == "challenge:history", state="*")
 async def challenge_history_handler(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not user:
         await call.answer()
         return

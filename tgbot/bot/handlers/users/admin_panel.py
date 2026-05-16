@@ -10,7 +10,7 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from tgbot.bot.states.main import StatisticState, NotificationState
 from tgbot.bot.filters import IsPrivate
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 from tgbot.bot.loader import gettext as _
 
 
@@ -18,7 +18,7 @@ from tgbot.bot.loader import gettext as _
 @dp.message_handler(IsPrivate(), Text(equals=["👑 Admin panel", "👑 Админ панель"]), state="*")
 async def admin_commands(message: types.Message, state: FSMContext = None):
     telegram_id = message.from_user.id
-    user = get_user(telegram_id)
+    user = await aget_user(telegram_id)
     if user and user.is_admin:
         if state is not None:
             try:
@@ -348,7 +348,7 @@ async def all_users(message: types.Message):
 
 @dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("adm_userp:"), state="*")
 async def adm_user_page(call: types.CallbackQuery):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not (user and user.is_admin):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return
@@ -363,7 +363,7 @@ async def adm_user_page(call: types.CallbackQuery):
 
 @dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("adm_userd:"), state="*")
 async def adm_user_detail(call: types.CallbackQuery):
-    actor = get_user(call.from_user.id)
+    actor = await aget_user(call.from_user.id)
     if not (actor and actor.is_admin):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return
@@ -496,7 +496,7 @@ async def input_user_id(message: types.Message, state: FSMContext):
     state="*",
 )
 async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not (user and user.is_admin):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return

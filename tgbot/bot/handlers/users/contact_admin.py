@@ -7,7 +7,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from tgbot.bot.filters import IsPrivate
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.states.main import ContactAdminState, AdminReplyState
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 from tgbot.bot.keyboards.reply import back_keyboard
 
 
@@ -25,7 +25,7 @@ def _user_lang(user):
 @dp.message_handler(IsPrivate(), text=CONTACT_BUTTON_TEXTS, state="*")
 async def contact_admin_entry(message: types.Message, state: FSMContext):
     await state.finish()
-    user = get_user(message.from_user.id)
+    user = await aget_user(message.from_user.id)
     lang = _user_lang(user)
     await message.answer(
         _t(
@@ -58,7 +58,7 @@ def _confirm_kb(lang: str) -> InlineKeyboardMarkup:
 )
 async def contact_admin_preview(message: types.Message, state: FSMContext):
     """Step 1: capture the user's draft and show a Yuborish / Bekor preview."""
-    user = get_user(message.from_user.id)
+    user = await aget_user(message.from_user.id)
     lang = _user_lang(user)
 
     # Stash the source message so we can copy_to the admin later.
@@ -82,7 +82,7 @@ async def contact_admin_preview(message: types.Message, state: FSMContext):
     state=ContactAdminState.confirm,
 )
 async def contact_admin_cancel(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     lang = _user_lang(user)
     await call.answer()
     try:
@@ -100,7 +100,7 @@ async def contact_admin_cancel(call: types.CallbackQuery, state: FSMContext):
     state=ContactAdminState.confirm,
 )
 async def contact_admin_confirm_send(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     lang = _user_lang(user)
 
     data = await state.get_data()
@@ -299,7 +299,7 @@ async def admin_reply_confirm_send(call: types.CallbackQuery, state: FSMContext)
         await state.finish()
         return
 
-    target = get_user(int(target_user_id))
+    target = await aget_user(int(target_user_id))
     target_lang = (target.language if target else None) or "uz"
     header = _t(
         target_lang,

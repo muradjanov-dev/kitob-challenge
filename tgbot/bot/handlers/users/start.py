@@ -16,7 +16,7 @@ from tgbot.bot.keyboards.inline import (
 )
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.states.main import AdmissionState
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 
 
 AGE_LABELS = {
@@ -40,7 +40,7 @@ def _user_lang(user) -> str:
 
 @dp.message_handler(CommandStart(), ChatTypeFilter(ChatType.PRIVATE), state="*")
 async def do_start(message: types.Message, state: FSMContext):
-    user = get_user(message.from_user.id)
+    user = await aget_user(message.from_user.id)
     args = message.get_args()
     lang = _user_lang(user)
 
@@ -91,7 +91,7 @@ async def do_start(message: types.Message, state: FSMContext):
 @dp.message_handler(state=AdmissionState.full_name)
 async def full_name_handler(message: types.Message, state: FSMContext):
     full_name_text = (message.text or "").strip()
-    user = get_user(message.from_user.id)
+    user = await aget_user(message.from_user.id)
     lang = _user_lang(user)
 
     if not full_name_text:
@@ -124,7 +124,7 @@ async def gender_pick(call: types.CallbackQuery, state: FSMContext):
     gender = call.data.split(":", 1)[1]
     await state.update_data(gender=gender)
 
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     lang = _user_lang(user)
 
     await call.answer()
@@ -148,7 +148,7 @@ async def region_pick(call: types.CallbackQuery, state: FSMContext):
     region_id = int(call.data.split(":", 1)[1])
     await state.update_data(region_id=region_id)
 
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     lang = _user_lang(user)
 
     await call.answer()
@@ -170,7 +170,7 @@ async def region_pick(call: types.CallbackQuery, state: FSMContext):
 )
 async def age_pick(call: types.CallbackQuery, state: FSMContext):
     age_code = call.data.split(":", 1)[1]
-    user_pre = get_user(call.from_user.id)
+    user_pre = await aget_user(call.from_user.id)
     lang = _user_lang(user_pre)
 
     if age_code not in AGE_LABELS:

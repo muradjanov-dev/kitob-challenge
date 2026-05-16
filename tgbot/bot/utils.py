@@ -1,3 +1,4 @@
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from tgbot.models import TelegramProfile as User
 from html import escape
@@ -18,9 +19,21 @@ async def get_lang_code(state):
     return get_lang(language)
 
 
-def get_user(telegram_id):
-    user = User.objects.filter(telegram_id=telegram_id).first()
-    return user
+def get_user_sync(telegram_id):
+    return User.objects.filter(telegram_id=telegram_id).first()
+
+
+# Async wrapper so bot handlers (running on the asyncio event loop) don't
+# block the loop on every DB lookup. DJANGO_ALLOW_ASYNC_UNSAFE=True in
+# settings was silencing the warning while every Telegram update serialized
+# behind this one query — the visible "slow / unresponsive" symptom.
+aget_user = sync_to_async(get_user_sync, thread_sensitive=True)
+
+
+# Backwards-compat alias: any caller that does `user = get_user(...)` from a
+# sync context still works (admin actions, management commands, etc.). All
+# async bot handlers MUST use `aget_user` instead.
+get_user = get_user_sync
 
 
 def get_all_users():

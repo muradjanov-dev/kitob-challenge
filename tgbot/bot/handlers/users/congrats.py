@@ -15,7 +15,7 @@ from aiogram.dispatcher import FSMContext
 from asgiref.sync import sync_to_async
 
 from tgbot.bot.loader import dp, bot
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 from tgbot.models import UserAchievement, Congratulation
 
 
@@ -69,7 +69,7 @@ async def congrats_handler(call: types.CallbackQuery, state: FSMContext):
         await call.answer()
         return
 
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not user:
         await call.answer("Avval /start bosing", show_alert=True)
         return

@@ -17,7 +17,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 from html import escape
 from tgbot.bot.loader import dp, bot
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 from tgbot.bot.keyboards.reply import (
     main_markup_for_user, admin_keyboard, back_keyboard, report_reply_keyboard,
 )
@@ -76,7 +76,7 @@ HOME_BUTTON_TEXTS = ["🏠 Bosh menyu", "🏠 Главное меню", "🏠 As
 @dp.message_handler(commands=["menu"], state="*")
 async def menu_command(message: types.Message, state: FSMContext):
     await state.finish()
-    user = get_user(message.from_user.id)
+    user = await aget_user(message.from_user.id)
     await send_main_menu(message, user)
 
 
@@ -86,7 +86,7 @@ async def menu_command(message: types.Message, state: FSMContext):
 )
 async def home_button_handler(message: types.Message, state: FSMContext):
     await state.finish()
-    user = get_user(message.from_user.id)
+    user = await aget_user(message.from_user.id)
     await send_main_menu(message, user)
 
 
@@ -99,7 +99,7 @@ async def home_button_handler(message: types.Message, state: FSMContext):
 )
 async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
     action = call.data.split(":", 1)[1]
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     lang = _user_lang(user)
 
     if action == "report":
@@ -467,7 +467,7 @@ async def _menu_cabinet(call, user, state: FSMContext):
 
 @dp.callback_query_handler(lambda c: c.data == "cab:cal_toggle", state="*")
 async def cabinet_toggle_calendar(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not user:
         await call.answer("Avval /start bosing", show_alert=True)
         return
@@ -934,7 +934,7 @@ async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
     if period not in _VALID_PERIODS:
         await call.answer()
         return
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     lang = _user_lang(user)
     await call.answer()
     try:
@@ -968,7 +968,7 @@ async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(lambda c: c.data == "referral:link", state="*")
 async def referral_link_handler(call: types.CallbackQuery, state: FSMContext):
     del state  # injected by aiogram, unused here
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not user:
         await call.answer("Avval /start bosing.", show_alert=True)
         return
@@ -1007,7 +1007,7 @@ async def referral_link_handler(call: types.CallbackQuery, state: FSMContext):
     state="*",
 )
 async def toplist_congrats_handler(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not user:
         await call.answer("Avval /start bosing", show_alert=True)
         return
@@ -1215,7 +1215,7 @@ async def _menu_settings(call, user, state: FSMContext):
     state="*",
 )
 async def settings_pick(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not user:
         await call.answer("Avval /start bosing", show_alert=True)
         return
@@ -1365,7 +1365,7 @@ async def settings_pick(call: types.CallbackQuery, state: FSMContext):
 @dp.message_handler(state=ConfirmDeleteState.confirm)
 async def confirm_delete_handler(message: types.Message, state: FSMContext):
     """User must type 'Tasdiqlayman' exactly to confirm full data deletion."""
-    user = get_user(message.from_user.id)
+    user = await aget_user(message.from_user.id)
     if not user:
         await state.finish()
         return

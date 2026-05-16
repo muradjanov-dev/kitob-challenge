@@ -8,7 +8,7 @@ from tgbot.bot.filters import IsPrivate
 from tgbot.bot.keyboards.reply import back_keyboard
 from tgbot.bot.loader import dp
 from tgbot.bot.states.main import ReminderState
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 from tgbot.models import ScheduledReminder, TelegramProfile
 
 
@@ -59,7 +59,7 @@ async def _build_reminders_view():
 @dp.message_handler(IsPrivate(), Text("📋 Eslatmalar"), state="*")
 async def reminders_menu(message: types.Message, state: FSMContext, _admin_id=None):
     actor_id = _admin_id or message.from_user.id
-    user = get_user(actor_id)
+    user = await aget_user(actor_id)
     if not _is_admin(user):
         await message.answer("Siz admin emassiz!")
         return
@@ -70,7 +70,7 @@ async def reminders_menu(message: types.Message, state: FSMContext, _admin_id=No
 
 @dp.callback_query_handler(lambda c: c.data == "rem_add", state="*")
 async def reminder_add_start(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not _is_admin(user):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return
@@ -113,7 +113,7 @@ async def reminder_text_received(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("rem_del:"))
 async def reminder_delete(call: types.CallbackQuery):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not _is_admin(user):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return
@@ -131,7 +131,7 @@ async def reminder_delete(call: types.CallbackQuery):
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("rem_toggle:"))
 async def reminder_toggle(call: types.CallbackQuery):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not _is_admin(user):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return

@@ -4,7 +4,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.builtin import ChatTypeFilter
 from aiogram.types import ChatType
 
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 from tgbot.bot.states.main import SendMessageInBot
 from tgbot.bot.loader import dp, bot, gettext as _
 from tgbot.bot.keyboards.reply import main_markup, back_keyboard
@@ -21,7 +21,7 @@ async def send_message_from_bot_handler(message: types.Message, state: FSMContex
 
 @dp.callback_query_handler(state=SendMessageInBot.content)
 async def send_message_from_bot_handler(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(telegram_id=call.from_user.id)
+    user = await aget_user(telegram_id=call.from_user.id)
     content = call.data
     if content == "cancel":
         await call.message.answer(_("Asosiy oyna"), reply_markup=main_markup(language=user.language))
@@ -39,7 +39,7 @@ async def send_message_from_bot_handler(call: types.CallbackQuery, state: FSMCon
 async def send_message_from_bot_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
     content = data.get("content")
-    user = get_user(telegram_id=message.from_user.id)
+    user = await aget_user(telegram_id=message.from_user.id)
 
     thread_id = MESSAGE_THREAD_ID
     if content == "technical":

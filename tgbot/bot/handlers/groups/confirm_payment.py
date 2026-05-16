@@ -9,7 +9,7 @@ from datetime import timedelta
 
 from tgbot.bot.loader import dp, bot, gettext as _
 from tgbot.models import Payment
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 from tgbot.bot.keyboards.inline import send_receipt_button
 MONTHLY_PAYMENT = 50000
 from tgbot.bot.consts import ADMIN_GROUP_ID
@@ -40,7 +40,7 @@ async def confirm_payment_message_handler(call: types.CallbackQuery, state: FSMC
     user_telegram_id = split_data[1]
     photo_message_id = split_data[2]
 
-    user = get_user(telegram_id=user_telegram_id)
+    user = await aget_user(telegram_id=user_telegram_id)
 
     if not user:
         return
@@ -90,7 +90,7 @@ async def confirm_payment_message_handler(call: types.CallbackQuery, state: FSMC
     await state.update_data(photo_message_id=photo_message_id)
     await state.update_data(user_telegram_id=user_telegram_id)
 
-    user = get_user(telegram_id=user_telegram_id)
+    user = await aget_user(telegram_id=user_telegram_id)
 
     if not user:
         return
@@ -113,7 +113,7 @@ async def confirm_payment_message_handler(message: types.Message, state: FSMCont
     if not user_telegram_id or str(send_message_id) != str(message.reply_to_message.message_id):
         return
 
-    user = get_user(telegram_id=user_telegram_id)
+    user = await aget_user(telegram_id=user_telegram_id)
 
     await bot.send_message(
         chat_id=user_telegram_id,
@@ -156,7 +156,7 @@ async def padmin_accept(call: types.CallbackQuery):
         return
 
     user_telegram_id = call.data.split(":", 1)[1]
-    user = get_user(telegram_id=user_telegram_id)
+    user = await aget_user(telegram_id=user_telegram_id)
     if not user:
         await call.answer("Foydalanuvchi topilmadi.", show_alert=True)
         return

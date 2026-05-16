@@ -7,14 +7,14 @@ from tgbot.models import Group
 from tgbot.bot.keyboards.reply import group_markup, main_markup
 from tgbot.bot.loader import dp
 from tgbot.bot.loader import gettext as _
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 from tgbot.bot.states.main import GroupStates
 
 
 @dp.message_handler(ChatTypeFilter(ChatType.PRIVATE), text="👤 Guruhni o'zgartirish", state="*")
 @dp.message_handler(ChatTypeFilter(ChatType.PRIVATE), text="👤 Изменить группу", state="*")
 async def change_group_handler(message: types.Message):
-    user = get_user(message.from_user.id)
+    user = await aget_user(message.from_user.id)
     gender = False
     if user.gender == "male":
         gender = True
@@ -34,7 +34,7 @@ async def change_group_handler(message: types.Message):
 
 @dp.message_handler(state=GroupStates.group)
 async def group_handler(message: types.Message, state: FSMContext):
-    user = get_user(message.from_user.id)
+    user = await aget_user(message.from_user.id)
     lang = user.language
     group = message.text
 

@@ -3,7 +3,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.builtin import ChatTypeFilter
 from aiogram.types import ChatType, InlineKeyboardMarkup, InlineKeyboardButton
 
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 from tgbot.bot.states.main import PaymentStates
 from tgbot.bot.loader import dp, bot, gettext as _
 from tgbot.bot.keyboards.reply import main_markup, back_keyboard
@@ -96,7 +96,7 @@ def premium_menu_markup(language="uz"):
 )
 async def premium_menu_handler(message: types.Message, state: FSMContext):
     await state.finish()
-    user = get_user(telegram_id=message.from_user.id)
+    user = await aget_user(telegram_id=message.from_user.id)
     lang = user.language if user else "uz"
 
     # Check existing active subscription
@@ -129,7 +129,7 @@ async def premium_menu_handler(message: types.Message, state: FSMContext):
 # ── Check subscription via inline button ─────────────────────────────────────
 @dp.callback_query_handler(ChatTypeFilter(ChatType.PRIVATE), lambda c: c.data == "check_premium")
 async def check_premium_callback(call: types.CallbackQuery):
-    user = get_user(telegram_id=call.from_user.id)
+    user = await aget_user(telegram_id=call.from_user.id)
     lang = user.language if user else "uz"
 
     active = Payment.objects.filter(
@@ -153,7 +153,7 @@ async def check_premium_callback(call: types.CallbackQuery):
 # ── Buy: show card info ───────────────────────────────────────────────────────
 @dp.callback_query_handler(ChatTypeFilter(ChatType.PRIVATE), lambda c: c.data == "buy_premium")
 async def buy_premium_callback(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(telegram_id=call.from_user.id)
+    user = await aget_user(telegram_id=call.from_user.id)
     lang = user.language if user else "uz"
 
     await call.message.answer(
@@ -168,7 +168,7 @@ async def buy_premium_callback(call: types.CallbackQuery, state: FSMContext):
 # ── Legacy: send_receipt callback (from old inline button) ───────────────────
 @dp.callback_query_handler(ChatTypeFilter(ChatType.PRIVATE), lambda c: c.data == "send_receipt")
 async def payment_receipt_prompt(call: types.CallbackQuery, state: FSMContext):
-    user = get_user(telegram_id=call.from_user.id)
+    user = await aget_user(telegram_id=call.from_user.id)
     lang = user.language if user else "uz"
     await call.message.answer(
         payment_info_text(lang),
@@ -186,7 +186,7 @@ async def payment_receipt_prompt(call: types.CallbackQuery, state: FSMContext):
     state=PaymentStates.receipt
 )
 async def payment_receipt_photo_handler(message: types.Message, state: FSMContext):
-    user = get_user(telegram_id=message.from_user.id)
+    user = await aget_user(telegram_id=message.from_user.id)
     lang = user.language if user else "uz"
 
     username_link = (
@@ -271,7 +271,7 @@ async def payment_receipt_photo_handler(message: types.Message, state: FSMContex
     state=PaymentStates.receipt
 )
 async def payment_wrong_content(message: types.Message, state: FSMContext):
-    user = get_user(telegram_id=message.from_user.id)
+    user = await aget_user(telegram_id=message.from_user.id)
     lang = user.language if user else "uz"
 
     if message.text in [_("🔙 Orqaga"), "🔙 Orqaga", "🔙 Назад"]:

@@ -12,7 +12,7 @@ from tgbot.bot.keyboards.reply import main_markup, back_keyboard
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.loader import gettext as _
 from tgbot.bot.states.main import ReportState
-from tgbot.bot.utils import get_user
+from tgbot.bot.utils import aget_user
 
 from tgbot.bot.consts import (
     BOYS_GROUP_ID, GIRLS_GROUP_ID,
@@ -97,7 +97,7 @@ def create_confirmation_report(
 async def send_book_selection_menu(message_or_call, state: FSMContext, page=1):
     data = await state.get_data()
     selected_book_ids = data.get("selected_book_ids", [])
-    user = get_user(message_or_call.from_user.id)
+    user = await aget_user(message_or_call.from_user.id)
 
     books_page = await get_user_books(user, page)
 
@@ -167,7 +167,7 @@ async def _compute_reading_day(user, today):
 
 @dp.callback_query_handler(lambda c: c.data == "cta_send_report", state="*")
 async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     if not user:
         await call.answer("Avval /start bosing", show_alert=True)
         return
@@ -204,7 +204,7 @@ async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
 @dp.message_handler(ChatTypeFilter(ChatType.PRIVATE), text="📚 Kitob hisoboti", state="*")
 @dp.message_handler(ChatTypeFilter(ChatType.PRIVATE), text="📚 Отчет о книге", state="*")
 async def send_daily_report_handler(message: types.Message, state: FSMContext):
-    user = get_user(message.from_user.id)
+    user = await aget_user(message.from_user.id)
     if user.is_blocked:
         await message.answer(_("Siz bot tomonidan bloklangansiz."))
         return await state.finish()
@@ -315,7 +315,7 @@ async def process_new_book_pages(message: types.Message, state: FSMContext):
     data = await state.get_data()
     book_title = data.get("new_book_title")
     new_book_is_audio = data.get("new_book_is_audio", False)
-    user = get_user(message.from_user.id)
+    user = await aget_user(message.from_user.id)
 
     # Smart default: if user picked "Oddiy kitob" but the title obviously
     # says audiobook, auto-flip — prevents the most common add-flow mistake.
@@ -453,7 +453,7 @@ async def spent_time_handler(message: types.Message, state: FSMContext):
 
     await state.update_data(conclusion=conclusion)
 
-    user = get_user(message.from_user.id)
+    user = await aget_user(message.from_user.id)
     today = timezone.localdate()
 
     data = await state.get_data()
@@ -519,7 +519,7 @@ async def spent_time_handler(message: types.Message, state: FSMContext):
     state=ReportState.confirm_report,
 )
 async def confirm_report_callback(call: CallbackQuery, state: FSMContext):
-    user = get_user(call.from_user.id)
+    user = await aget_user(call.from_user.id)
     await call.answer()
     try:
         await call.message.edit_reply_markup(reply_markup=None)
