@@ -1,6 +1,7 @@
 """Quiz play: join Vizov, solo play via deep link, answer questions."""
 import asyncio
 import json
+import os
 import random
 
 from aiogram import types
@@ -13,6 +14,30 @@ from tgbot.bot.utils import aget_user
 from tgbot.models import (
     Quiz, QuizQuestion, QuizOption, QuizSession, QuizParticipant, QuizUserAnswer,
 )
+
+BOT_USERNAME = os.environ.get("BOT_USERNAME", "kitob_challange_bot")
+
+
+def _solo_preview_kb(quiz) -> InlineKeyboardMarkup:
+    """Preview/intro keyboard shown before the solo timer kicks off.
+    Includes Share-to-Group so any user (not just admins) can share."""
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton(text="▶️ Boshlash", callback_data=f"qsolo:{quiz.id}"))
+    kb.add(InlineKeyboardButton(
+        text="📤 Guruhga ulashish",
+        url=f"https://t.me/{BOT_USERNAME}?startgroup=quiz_{quiz.link_code}",
+    ))
+    return kb
+
+
+def _preview_text(quiz, q_count: int) -> str:
+    shuffle_line = "🔀 Savollar va variantlar aralashtirilib beriladi." if quiz.shuffle else ""
+    return (
+        f"📝 <b>{quiz.title}</b>\n\n"
+        f"{quiz.description or ''}\n\n"
+        f"❓ {q_count} ta savol · ⏱ {quiz.time_per_question} son/savol\n"
+        f"{shuffle_line}"
+    )
 
 # session_id -> running countdown task
 _active_timers: dict[int, asyncio.Task] = {}
@@ -202,15 +227,37 @@ async def start_solo_quiz(message: types.Message, quiz_code: str):
         await message.answer("❌ Quiz topilmadi.")
         return
 
-    kb = InlineKeyboardMarkup()
-    kb.add(InlineKeyboardButton(text="▶️ Boshlash", callback_data=f"qsolo:{quiz.id}"))
     await message.answer(
-        f"📝 <b>{quiz.title}</b>\n\n"
-        f"{quiz.description or ''}\n\n"
-        f"❓ {q_count} ta savol · ⏱ {quiz.time_per_question} son/savol\n"
-        f"{'🔀 Savollar va variantlar aralashtirilib beriladi.' if quiz.shuffle else ''}",
+        _preview_text(quiz, q_count),
         parse_mode="HTML",
-        reply_markup=kb,
+        reply_markup=_solo_preview_kb(quiz),
+    )
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith("qprev:"), state="*")
+async def quiz_preview(call: types.CallbackQuery, state: FSMContext):
+    """Preview screen used by the in-bot 'Kitob Quizlar' picker. Replaces the
+    old behavior of dispatching to qsolo immediately, which started the timer
+    before the user could read the question."""
+    await call.answer()
+    quiz_id = int(call.data.split(":")[1])
+
+    @sync_to_async
+    def _load():
+        q = Quiz.objects.prefetch_related("questions").filter(id=quiz_id).first()
+        if not q:
+            return None, 0
+        return q, q.questions.count()
+
+    quiz, q_count = await _load()
+    if not quiz:
+        await call.message.answer("❌ Quiz topilmadi.")
+        return
+
+    await call.message.answer(
+        _preview_text(quiz, q_count),
+        parse_mode="HTML",
+        reply_markup=_solo_preview_kb(quiz),
     )
 
 

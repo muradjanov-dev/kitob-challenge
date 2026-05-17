@@ -1448,9 +1448,11 @@ async def _menu_quiz(call, user, _state: FSMContext):
 
     kb = InlineKeyboardMarkup(row_width=1)
     for qid, title, q_count, tpq, _ in quizzes:
+        # qprev shows a preview screen with Boshlash + Guruhga ulashish.
+        # The timer no longer starts the instant you tap the title.
         kb.add(InlineKeyboardButton(
             text=f"📝 {title} ({q_count} savol · {tpq}s)",
-            callback_data=f"qsolo:{qid}",
+            callback_data=f"qprev:{qid}",
         ))
     await call.message.answer(
         "📝 <b>Kitob Quizlar</b>\n\nQuyidagi quizlardan birini tanlang:",
