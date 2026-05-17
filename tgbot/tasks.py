@@ -139,6 +139,67 @@ def send_daily_message():
         send_notification(chat_id=user.telegram_id, text=random.choice(messages))
 
 
+def _build_combined_top_rows(start_date, end_date, limit):
+    """Merge page and audio aggregates per user across [start, end].
+
+    Returns list of dicts: {tg_id, full_name, pages, minutes}, sorted by
+    (pages desc, minutes desc). Anyone with pages>0 OR minutes>0 is included,
+    so audio-only listeners show up at the bottom of the list.
+    """
+    pages_rows = (
+        ConfirmationReport.objects.filter(
+            date__date__gte=start_date,
+            date__date__lte=end_date,
+            is_audio=False,
+        )
+        .values('user__telegram_id', 'user__full_name')
+        .annotate(total=Sum('pages_read'))
+        .filter(total__gt=0)
+    )
+    audio_rows = (
+        ConfirmationReport.objects.filter(
+            date__date__gte=start_date,
+            date__date__lte=end_date,
+            is_audio=True,
+        )
+        .values('user__telegram_id', 'user__full_name')
+        .annotate(total=Sum('minutes_listened'))
+        .filter(total__gt=0)
+    )
+    merged = {}
+    for r in pages_rows:
+        tg = r['user__telegram_id']
+        merged[tg] = {
+            'tg_id': tg,
+            'full_name': r['user__full_name'],
+            'pages': r['total'] or 0,
+            'minutes': 0,
+        }
+    for r in audio_rows:
+        tg = r['user__telegram_id']
+        if tg in merged:
+            merged[tg]['minutes'] = r['total'] or 0
+        else:
+            merged[tg] = {
+                'tg_id': tg,
+                'full_name': r['user__full_name'],
+                'pages': 0,
+                'minutes': r['total'] or 0,
+            }
+    ordered = sorted(merged.values(), key=lambda x: (-x['pages'], -x['minutes']))
+    return ordered[:limit]
+
+
+def _format_top_stat(pages, minutes):
+    """Render `502 bet 📚 · 2326 daq 🎧`, omitting any zero column."""
+    parts = []
+    if pages:
+        parts.append(f"{pages} bet 📚")
+    if minutes:
+        parts.append(f"{minutes} daq 🎧")
+    return " · ".join(parts) or "—"
+
+
 @shared_task
 def daily_top_read_user_action_button():
     asyncio.run(_daily_top_read_user_action_button())
@@ -148,23 +209,18 @@ async def _daily_top_read_user_action_button():
     today = timezone.now().date()
     premium_ids = _get_premium_tg_ids()
 
-    reports = list(
-        ConfirmationReport.objects.filter(date__date=today, is_audio=False)
-        .values('user__telegram_id', 'user__full_name')
-        .annotate(total_pages=Sum('pages_read'))
-        .filter(total_pages__gt=0)
-        .order_by('-total_pages')[:20]
-    )
+    rows = _build_combined_top_rows(today, today, 20)
 
-    if reports:
-        message = "📚 Bugun eng ko'p kitob o'qigan 20ta Peshqadam foydalanuvchilar:\n\n"
-        for index, r in enumerate(reports, start=1):
-            tg_id = r['user__telegram_id']
-            name = escape(r['user__full_name'] or "Foydalanuvchi")
+    if rows:
+        message = "📚 Bugun eng faol kitobxonlar (📚 Kitob va 🎧 Audio):\n\n"
+        for index, r in enumerate(rows, start=1):
+            tg_id = r['tg_id']
+            name = escape(r['full_name'] or "Foydalanuvchi")
             badge = "💎 " if tg_id in premium_ids else ""
-            message += f"{index}) <b><a href='tg://user?id={tg_id}'>{badge}{name}</a></b>: {r['total_pages']} bet 📚\n\n"
+            stat = _format_top_stat(r['pages'], r['minutes'])
+            message += f"{index}) <b><a href='tg://user?id={tg_id}'>{badge}{name}</a></b>: {stat}\n\n"
     else:
-        message = "📚 Bugun kitob o'qigan foydalanuvchilar yo'q."
+        message = "📚 Bugun hisobot yuborgan foydalanuvchilar yo'q."
 
     for _cid in _group_chat_ids():
         send_message(_cid, message)
@@ -183,27 +239,18 @@ def _get_premium_tg_ids() -> set:
 def _send_period_report(start_date, end_date, limit, period_name):
     premium_ids = _get_premium_tg_ids()
 
-    reports = list(
-        ConfirmationReport.objects.filter(
-            date__date__gte=start_date,
-            date__date__lte=end_date,
-            is_audio=False,
-        ).values('user__telegram_id', 'user__full_name')
-        .annotate(total_pages=Sum('pages_read'))
-        .filter(total_pages__gt=0)
-        .order_by('-total_pages')[:limit]
-    )
+    rows = _build_combined_top_rows(start_date, end_date, limit)
 
-    if not reports:
-        message = f"📚 {period_name} uchun kitob o'qigan foydalanuvchilar yo'q."
+    if not rows:
+        message = f"📚 {period_name} uchun hisobot yuborgan foydalanuvchilar yo'q."
     else:
         message = f"📚 {period_name} eng faol kitobxonlar:\n\n"
-        for index, report in enumerate(reports, start=1):
-            full_name = escape(report['user__full_name'] or "Foydalanuvchi")
-            tg_id = report['user__telegram_id']
-            total_pages = report['total_pages']
+        for index, r in enumerate(rows, start=1):
+            tg_id = r['tg_id']
+            full_name = escape(r['full_name'] or "Foydalanuvchi")
             badge = "💎 " if tg_id in premium_ids else ""
-            message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_pages} bet 📚\n"
+            stat = _format_top_stat(r['pages'], r['minutes'])
+            message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {stat}\n"
 
     for _cid in _group_chat_ids():
         send_message(_cid, message)
@@ -377,32 +424,25 @@ def users_unread_book():
 
 
 def _build_top_readers_message(start_date, end_date, period_label, limit=20):
-    """Top kitobxonlar (period bo'yicha): kitob o'qiganlar, pages > 0."""
+    """Top kitobxonlar (period bo'yicha): pages + audio minutes per user."""
     premium_ids = _get_premium_tg_ids()
 
-    reports = list(
-        ConfirmationReport.objects.filter(
-            date__date__gte=start_date,
-            date__date__lte=end_date,
-            is_audio=False,
-        ).values('user__telegram_id', 'user__full_name')
-        .annotate(total_pages=Sum('pages_read'))
-        .filter(total_pages__gt=0)
-        .order_by('-total_pages')[:limit]
-    )
+    rows = _build_combined_top_rows(start_date, end_date, limit)
 
-    if not reports:
+    if not rows:
         return None
 
-    grand_total = sum((r['total_pages'] or 0) for r in reports)
+    grand_pages = sum(r['pages'] for r in rows)
+    grand_minutes = sum(r['minutes'] for r in rows)
     message = f"📚 {period_label} eng faol Kitobxonlar:\n\n"
-    for index, report in enumerate(reports, start=1):
-        full_name = escape(report['user__full_name'] or "Foydalanuvchi")
-        tg_id = report['user__telegram_id']
-        total_pages = report['total_pages'] or 0
+    for index, r in enumerate(rows, start=1):
+        tg_id = r['tg_id']
+        full_name = escape(r['full_name'] or "Foydalanuvchi")
         badge = "💎 " if tg_id in premium_ids else ""
-        message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {total_pages} bet 📚\n"
-    message += f"\n📊 Jami: <b>{grand_total} bet</b>"
+        stat = _format_top_stat(r['pages'], r['minutes'])
+        message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {stat}\n"
+    total_stat = _format_top_stat(grand_pages, grand_minutes)
+    message += f"\n📊 Jami: <b>{total_stat}</b>"
     return message
 
 
