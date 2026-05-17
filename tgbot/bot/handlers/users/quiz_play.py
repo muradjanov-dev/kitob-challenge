@@ -559,17 +559,20 @@ async def group_start(call: types.CallbackQuery, state: FSMContext):
     def _begin():
         session = QuizSession.objects.filter(id=session_id).first()
         if not session:
-            return None, "missing"
+            return None, "missing", 0
         if not session.is_group:
-            return session, "not_group"
+            return session, "not_group", 0
         if session.creator_id != user.id and not getattr(user, "is_admin", False):
-            return session, "forbidden"
+            return session, "forbidden", 0
         if session.status != "waiting":
-            return session, "already"
+            return session, "already", 0
+        join_count = QuizParticipant.objects.filter(session_id=session_id).count()
+        if join_count < 2:
+            return session, "too_few", join_count
         QuizSession.objects.filter(id=session_id).update(status="active")
-        return session, "ok"
+        return session, "ok", join_count
 
-    session, status = await _begin()
+    session, status, join_count = await _begin()
     if status == "missing":
         await call.answer("Sessiya topilmadi.", show_alert=True)
         return
@@ -581,6 +584,14 @@ async def group_start(call: types.CallbackQuery, state: FSMContext):
         return
     if status == "already":
         await call.answer("Boshlangan yoki tugagan.", show_alert=True)
+        return
+    if status == "too_few":
+        await call.answer(
+            f"Quizni boshlash uchun kamida 2 ta ishtirokchi kerak.\n"
+            f"Hozircha: {join_count} ta. "
+            f"Yana {2 - join_count} kishi <b>✋ Qo'shilaman</b> bossin.",
+            show_alert=True,
+        )
         return
 
     await call.answer("Boshlandi! 🎮")
