@@ -340,6 +340,31 @@ async def vizov_join(call: types.CallbackQuery, state: FSMContext):
     except Exception:
         pass
 
+    # Auto-start group quizzes the moment the 2nd participant joins — the
+    # creator no longer needs to tap Boshlash. Vizov DM-broadcast sessions
+    # (is_group=False) keep the original 'wait for scheduled start' behavior.
+    if session.is_group and count >= 2:
+        @sync_to_async
+        def _flip_to_active():
+            return QuizSession.objects.filter(
+                id=session.id, status="waiting", is_group=True,
+            ).update(status="active") > 0
+
+        if await _flip_to_active():
+            try:
+                await call.message.edit_reply_markup(reply_markup=None)
+            except Exception:
+                pass
+            try:
+                await bot.send_message(
+                    chat_id=session.chat_id,
+                    text="🚀 <b>2 ishtirokchi qo'shildi — quiz boshlanmoqda!</b>",
+                    parse_mode="HTML",
+                )
+            except Exception:
+                pass
+            await _send_group_question(session.chat_id, session.id, 0)
+
 
 # ─── Answer a question ─────────────────────────────────────────────────────────
 
