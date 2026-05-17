@@ -43,6 +43,13 @@ def _quiz_view_kb(quiz) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text=shuffle_label, callback_data=f"qz:sh:{quiz.id}"),
     )
     kb.row(InlineKeyboardButton(text="🏆 Vizov yaratish", callback_data=f"qz:viz:{quiz.id}"))
+    # Share to a group: Telegram's ?startgroup flow lets the user pick a group
+    # to add the bot to (or reuse an existing membership); the bot then receives
+    # /start quiz_<code> from that group and spins up a group session.
+    kb.row(InlineKeyboardButton(
+        text="📤 Guruhga ulashish",
+        url=f"https://t.me/{BOT_USERNAME}?startgroup=quiz_{quiz.link_code}",
+    ))
     kb.row(InlineKeyboardButton(text="🗑 O'chirish", callback_data=f"qz:del:{quiz.id}"))
     kb.row(InlineKeyboardButton(text="« Orqaga", callback_data="qz:ls"))
     return kb

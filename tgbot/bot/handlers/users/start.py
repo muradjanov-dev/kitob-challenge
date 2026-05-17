@@ -38,6 +38,21 @@ def _user_lang(user) -> str:
     return (user.language if user else None) or "uz"
 
 
+@dp.message_handler(
+    CommandStart(),
+    ChatTypeFilter((ChatType.GROUP, ChatType.SUPERGROUP)),
+    state="*",
+)
+async def do_start_group(message: types.Message, state: FSMContext):
+    """Group /start: only handles /start quiz_<code> (group quiz spawn).
+    Anything else in a group is ignored — registration etc. is private-only."""
+    args = message.get_args()
+    if not args or not args.startswith("quiz_"):
+        return
+    from tgbot.bot.handlers.users.quiz_play import start_group_quiz
+    await start_group_quiz(message, args[len("quiz_"):])
+
+
 @dp.message_handler(CommandStart(), ChatTypeFilter(ChatType.PRIVATE), state="*")
 async def do_start(message: types.Message, state: FSMContext):
     user = await aget_user(message.from_user.id)
