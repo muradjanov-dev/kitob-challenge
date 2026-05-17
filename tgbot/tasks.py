@@ -1115,11 +1115,11 @@ def broadcast_congrats_to_others(user_achievement_id: int, points: int):
         f"{points_line}\n"
         "Keling, kitobxonni tabriklaymiz! 🎉"
     )
-    keyboard = json.dumps({
-        "inline_keyboard": [[{
-            "text": "🎉 Tabriklash",
-            "callback_data": f"congrats:{ua.id}",
-        }]]
+    tabriklash_btn = {"text": "🎉 Tabriklash", "callback_data": f"congrats:{ua.id}"}
+    reminder_btn = {"text": "🔔 Eslatmalarni sozlash", "callback_data": "menu:settings"}
+    keyboard_basic = json.dumps({"inline_keyboard": [[tabriklash_btn]]})
+    keyboard_with_reminder = json.dumps({
+        "inline_keyboard": [[tabriklash_btn], [reminder_btn]]
     })
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -1133,6 +1133,10 @@ def broadcast_congrats_to_others(user_achievement_id: int, points: int):
         try:
             if not _gender_match(achiever, recipient):
                 continue
+            # Nudge: every 10th Tabriklash DM also surfaces the reminder
+            # config button so users can adjust daily reminders without
+            # hunting through the settings menu.
+            keyboard = keyboard_with_reminder if (sent + 1) % 10 == 0 else keyboard_basic
             resp = requests.post(
                 url,
                 data={
