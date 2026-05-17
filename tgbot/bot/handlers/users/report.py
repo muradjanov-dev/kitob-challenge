@@ -74,6 +74,39 @@ def _today_reports_qs(user, today):
 
 
 @sync_to_async
+def _today_books_with_type(user, today):
+    """Deduplicated [(title, is_audio), ...] across all today's reports' M2M books."""
+    seen = {}
+    qs = (
+        ConfirmationReport.objects
+        .filter(user=user, date__date=today)
+        .prefetch_related("books")
+    )
+    for r in qs:
+        for b in r.books.all():
+            if b.id not in seen:
+                seen[b.id] = (b.title, b.is_audio)
+    return list(seen.values())
+
+
+def _format_books_block(books_with_type, fallback_title=None):
+    """Render a 'Kitob:' / 'Kitoblar:' block from [(title, is_audio), ...]."""
+    if not books_with_type:
+        if fallback_title:
+            return f"<b>Kitob nomi:</b> {fallback_title}"
+        return "<b>Kitob nomi:</b> Tanlanmagan"
+    if len(books_with_type) == 1:
+        title, is_audio = books_with_type[0]
+        icon = "🎧" if is_audio else "📖"
+        return f"<b>Kitob:</b> {icon} {title}"
+    lines = "\n".join(
+        f"{'🎧' if is_audio else '📖'} {title}"
+        for title, is_audio in books_with_type
+    )
+    return f"<b>Kitoblar:</b>\n{lines}"
+
+
+@sync_to_async
 def create_confirmation_report(
     user, pages_read, date, conclusion, book_ids,
     book_title=None, is_audio=False, minutes_listened=None
@@ -461,18 +494,20 @@ async def spent_time_handler(message: types.Message, state: FSMContext):
     is_audio = data.get("is_audio", False)
 
     book = data.get('book_title')
-    if not book:
-        book_reports = data.get("book_reports", {})
-        if book_reports:
-            titles = []
-            for bid in book_reports.keys():
-                b_obj = await get_book_by_id(bid)
-                if b_obj:
-                    titles.append(b_obj.title)
+    book_reports = data.get("book_reports", {})
+    books_with_type = []
+    if book_reports:
+        titles = []
+        for bid in book_reports.keys():
+            b_obj = await get_book_by_id(bid)
+            if b_obj:
+                titles.append(b_obj.title)
+                books_with_type.append((b_obj.title, b_obj.is_audio))
+        if not book:
             book = ", ".join(titles)
             await state.update_data(book_title=book)
-        else:
-            book = "Tanlanmagan"
+    if not book:
+        book = "Tanlanmagan"
 
     is_combined = data.get("is_combined", False)
     if is_combined:
@@ -492,11 +527,13 @@ async def spent_time_handler(message: types.Message, state: FSMContext):
         value_line = f"<b>✅O'qilgan betlar:</b> {pages_read}+ bet"
         type_label = "📖 Kitob"
 
+    books_block = _format_books_block(books_with_type, fallback_title=book)
+
     confirmation_message = (
         f"<b><a href='tg://user?id={user.telegram_id}'>{user.full_name}</a></b>:\n\n"
         f"📊#kun - {reading_day}  ({today})\n\n"
         f"<b>Tur:</b> {type_label}\n\n"
-        f"<b>Kitob nomi:</b> {book}\n\n"
+        f"{books_block}\n\n"
         f"{value_line}\n\n"
         f"<b>💡Olingan xulosa:</b> {conclusion}\n\n"
         f"<b>Haqiqiy peshqadam 🏆</b>\n\n"
@@ -640,11 +677,14 @@ async def _do_confirm_report(message, user, state: FSMContext):
         n = len(todays)
         aggregate_note = f"\n\n<i>💎 {n} ta hisobot jamlandi</i>"
 
+    today_books = await _today_books_with_type(user, today)
+    books_block = _format_books_block(today_books, fallback_title=book)
+
     report_message = (
         f"<b><a href='tg://user?id={user.telegram_id}'>{prem_badge}{user.full_name}</a></b>:\n\n"
         f"📊#kun - {reading_day}  ({report.date.strftime('%Y-%m-%d')})\n\n"
         f"<b>Tur:</b> {type_tag}\n\n"
-        f"<b>Kitob nomi:</b> {book}\n\n"
+        f"{books_block}\n\n"
         f"{value_line}\n\n"
         f"<b>💡Olingan xulosa:</b> {conclusion}\n\n"
         f"<b>Haqiqiy peshqadam 🏆</b>"
