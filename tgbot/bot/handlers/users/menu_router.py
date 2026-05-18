@@ -124,8 +124,38 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
         await _menu_admin(call, user, state)
     elif action == "quiz":
         await _menu_quiz(call, user, state)
+    elif action == "shop":
+        await _menu_shop(call, user, state)
     else:
         await call.answer(_t(lang, "Noma'lum amal", "Неизвестное действие"))
+
+
+async def _menu_shop(call, user, _state: FSMContext):
+    """Kitob Challenge Shop — placeholder while the shop is being built."""
+    lang = _user_lang(user)
+    await call.answer(
+        _t(lang, "🛒 Tez kunda!", "🛒 Скоро!"),
+        show_alert=True,
+    )
+    await call.message.answer(
+        _t(
+            lang,
+            (
+                "🛒 <b>Kitob Challenge Shop</b>\n\n"
+                "🚧 Tez kunda!\n\n"
+                "Bu yerda Kitobchalaringizni kitoblar, mukofotlar va "
+                "boshqa narsalarga almashtirishingiz mumkin bo'ladi. "
+                "Kuting — yaqinda ochilamiz! 🚀"
+            ),
+            (
+                "🛒 <b>Магазин Kitob Challenge</b>\n\n"
+                "🚧 Скоро!\n\n"
+                "Здесь вы сможете обменивать ваши Kitobcha на книги, "
+                "награды и многое другое. Совсем скоро откроемся! 🚀"
+            ),
+        ),
+        parse_mode="HTML",
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -427,6 +457,9 @@ async def _menu_cabinet(call, user, state: FSMContext):
                 callback_data="cab:cal_toggle",
             )
         )
+        calendar_markup.row(InlineKeyboardButton(
+            "🏆 Yutuqlarim", callback_data="menu:achievements",
+        ))
         if is_prem:
             calendar_markup.row(
                 InlineKeyboardButton("📋 Hisobotlar tarixi", callback_data="cab:history:0")
@@ -450,6 +483,9 @@ async def _menu_cabinet(call, user, state: FSMContext):
         kb.add(InlineKeyboardButton(
             "📅 Streak kalendarni ko'rsatish",
             callback_data="cab:cal_toggle",
+        ))
+        kb.add(InlineKeyboardButton(
+            "🏆 Yutuqlarim", callback_data="menu:achievements",
         ))
         if is_prem:
             kb.add(InlineKeyboardButton("📋 Hisobotlar tarixi", callback_data="cab:history:0"))
