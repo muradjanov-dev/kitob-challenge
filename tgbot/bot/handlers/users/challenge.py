@@ -1,12 +1,86 @@
 """Kitobxonlik Challenge handlers: join, daily mark, cabinet widget, history."""
 from aiogram import types
 from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters import Text
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from asgiref.sync import sync_to_async
 from django.utils import timezone
 
 from tgbot.bot.loader import dp
 from tgbot.bot.utils import aget_user
+
+
+@sync_to_async
+def _verify_and_mark_done(user, challenge_id, today, today_str):
+    """Validate today's challenge condition and, if met, append today to the
+    participant's completed_dates. Shared by the inline cabinet button and
+    the new persistent '✅ Bajardim!' reply-keyboard button."""
+    from tgbot.models import Challenge, ChallengeParticipant, ConfirmationReport, UserReferal
+    from django.db.models import Sum
+    from django.db.models.functions import Length
+
+    challenge = Challenge.objects.filter(id=challenge_id, is_active=True).first()
+    if not challenge:
+        return "expired", None, 0, ""
+    if today < challenge.start_date or today > challenge.end_date:
+        return "expired", None, 0, ""
+
+    participant = ChallengeParticipant.objects.filter(challenge=challenge, user=user).first()
+    if not participant:
+        return "not_joined", None, 0, ""
+    if today_str in (participant.completed_dates or []):
+        return "already_done", challenge, participant.days_completed, ""
+
+    ctype = challenge.condition_type
+    cval = challenge.condition_value
+    verified = False
+    hint = ""
+
+    if ctype == "pages_daily":
+        pages = ConfirmationReport.objects.filter(
+            user=user, date__date=today, is_audio=False
+        ).aggregate(s=Sum("pages_read"))["s"] or 0
+        verified = pages >= cval
+        hint = f"Bugun kamida {cval} bet o'qib hisobot yuboring. Hozircha: {pages} bet."
+
+    elif ctype == "audio_daily":
+        minutes = ConfirmationReport.objects.filter(
+            user=user, date__date=today, is_audio=True
+        ).aggregate(s=Sum("minutes_listened"))["s"] or 0
+        verified = minutes >= cval
+        hint = f"Bugun kamida {cval} daqiqa audio eshitib hisobot yuboring. Hozircha: {minutes} daqiqa."
+
+    elif ctype == "referrals_daily":
+        count = UserReferal.objects.filter(referrer=user, created_at__date=today).count()
+        verified = count >= cval
+        hint = f"Bugun {cval} ta do'stingizni taklif qiling. Hozircha: {count} ta."
+
+    elif ctype == "review_daily":
+        verified = ConfirmationReport.objects.filter(
+            user=user, date__date=today
+        ).annotate(_l=Length("conclusion")).filter(_l__gte=cval).exists()
+        hint = f"Bugun {cval}+ belgili xulosa bilan hisobot yuboring."
+
+    if not verified:
+        return "not_verified", challenge, participant.days_completed, hint
+
+    dates = list(participant.completed_dates or [])
+    dates.append(today_str)
+    new_days = len(dates)
+    last_at = timezone.now() if new_days >= 3 else participant.last_completed_at
+    ChallengeParticipant.objects.filter(id=participant.id).update(
+        completed_dates=dates,
+        days_completed=new_days,
+        last_completed_at=last_at,
+    )
+    return "marked", challenge, new_days, ""
+
+
+@sync_to_async
+def _find_active_challenge_id():
+    from tgbot.models import Challenge
+    ch = Challenge.objects.filter(is_active=True).first()
+    return ch.id if ch else None
 
 
 # ── Join ──────────────────────────────────────────────────────────────────
@@ -60,71 +134,9 @@ async def challenge_done_handler(call: types.CallbackQuery, state: FSMContext):
 
     challenge_id = int(call.data.split(":")[1])
     today = timezone.localdate()
-    today_str = today.isoformat()
-
-    @sync_to_async
-    def _verify_and_mark():
-        from tgbot.models import Challenge, ChallengeParticipant, ConfirmationReport, UserReferal
-        from django.db.models import Sum
-        from django.db.models.functions import Length
-
-        challenge = Challenge.objects.filter(id=challenge_id, is_active=True).first()
-        if not challenge:
-            return "expired", None, 0, ""
-        if today < challenge.start_date or today > challenge.end_date:
-            return "expired", None, 0, ""
-
-        participant = ChallengeParticipant.objects.filter(challenge=challenge, user=user).first()
-        if not participant:
-            return "not_joined", None, 0, ""
-        if today_str in (participant.completed_dates or []):
-            return "already_done", challenge, participant.days_completed, ""
-
-        ctype = challenge.condition_type
-        cval = challenge.condition_value
-        verified = False
-        hint = ""
-
-        if ctype == "pages_daily":
-            pages = ConfirmationReport.objects.filter(
-                user=user, date__date=today, is_audio=False
-            ).aggregate(s=Sum("pages_read"))["s"] or 0
-            verified = pages >= cval
-            hint = f"Bugun kamida {cval} bet o'qib hisobot yuboring. Hozircha: {pages} bet."
-
-        elif ctype == "audio_daily":
-            minutes = ConfirmationReport.objects.filter(
-                user=user, date__date=today, is_audio=True
-            ).aggregate(s=Sum("minutes_listened"))["s"] or 0
-            verified = minutes >= cval
-            hint = f"Bugun kamida {cval} daqiqa audio eshitib hisobot yuboring. Hozircha: {minutes} daqiqa."
-
-        elif ctype == "referrals_daily":
-            count = UserReferal.objects.filter(referrer=user, created_at__date=today).count()
-            verified = count >= cval
-            hint = f"Bugun {cval} ta do'stingizni taklif qiling. Hozircha: {count} ta."
-
-        elif ctype == "review_daily":
-            verified = ConfirmationReport.objects.filter(
-                user=user, date__date=today
-            ).annotate(_l=Length("conclusion")).filter(_l__gte=cval).exists()
-            hint = f"Bugun {cval}+ belgili xulosa bilan hisobot yuboring."
-
-        if not verified:
-            return "not_verified", challenge, participant.days_completed, hint
-
-        dates = list(participant.completed_dates or [])
-        dates.append(today_str)
-        new_days = len(dates)
-        last_at = timezone.now() if new_days >= 3 else participant.last_completed_at
-        ChallengeParticipant.objects.filter(id=participant.id).update(
-            completed_dates=dates,
-            days_completed=new_days,
-            last_completed_at=last_at,
-        )
-        return "marked", challenge, new_days, ""
-
-    status, challenge, days_done, hint = await _verify_and_mark()
+    status, challenge, days_done, hint = await _verify_and_mark_done(
+        user, challenge_id, today, today.isoformat()
+    )
 
     if status == "expired":
         await call.answer("❌ Bu challenge tugadi.", show_alert=True)
@@ -138,6 +150,51 @@ async def challenge_done_handler(call: types.CallbackQuery, state: FSMContext):
         await call.answer(f"✅ {days_done}/3 kun bajarildi!", show_alert=False)
         end_msg = "🎉 Barcha 3 kun bajarildi! Natijalar e'lon qilinadi." if days_done >= 3 else f"⏳ Yana {3 - days_done} kun qoldi."
         await call.message.answer(
+            f"✅ <b>Bajarildi! {days_done}/3 kun</b>\n\n{end_msg}",
+            parse_mode="HTML",
+        )
+
+
+@dp.message_handler(
+    Text(equals=["✅ Bajardim!", "✅ Выполнено!"]),
+    state="*",
+)
+async def challenge_done_reply_button(message: types.Message, state: FSMContext):
+    """Persistent '✅ Bajardim!' reply-keyboard button — finds the currently
+    active challenge and runs the same verify/mark logic as the inline button.
+    Works from any state so it never gets swallowed by an in-progress flow."""
+    user = await aget_user(message.from_user.id)
+    if not user:
+        await message.answer("Avval /start bosing.")
+        return
+
+    challenge_id = await _find_active_challenge_id()
+    if not challenge_id:
+        await message.answer("Hozir aktiv challenge yo'q.")
+        return
+
+    today = timezone.localdate()
+    status, challenge, days_done, hint = await _verify_and_mark_done(
+        user, challenge_id, today, today.isoformat()
+    )
+
+    if status == "expired":
+        await message.answer("❌ Bu challenge tugadi.")
+    elif status == "not_joined":
+        await message.answer(
+            "❌ Siz bu challengega qo'shilmagansiz.\n"
+            "Qatnashish uchun 👤 Kabinetga kiring va challenge ostidagi tugmani bosing."
+        )
+    elif status == "already_done":
+        await message.answer(f"✅ Bugun allaqachon bajargansiz! ({days_done}/3)")
+    elif status == "not_verified":
+        await message.answer(f"❌ Shart bajarilmagan.\n{hint}")
+    else:
+        end_msg = (
+            "🎉 Barcha 3 kun bajarildi! Natijalar e'lon qilinadi."
+            if days_done >= 3 else f"⏳ Yana {3 - days_done} kun qoldi."
+        )
+        await message.answer(
             f"✅ <b>Bajarildi! {days_done}/3 kun</b>\n\n{end_msg}",
             parse_mode="HTML",
         )

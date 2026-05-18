@@ -89,17 +89,27 @@ def main_markup(language="uz", is_admin=False):
 
 
 def report_reply_keyboard(language="uz"):
-    """Persistent bottom reply keyboard with two buttons:
-    📚 Kitob hisoboti (primary action) and 🏠 Bosh menyu (return to main).
-    Both are always visible so the user can never feel 'lost in a flow'."""
+    """Persistent bottom reply keyboard. Two rows of two so the 4 highest-
+    frequency actions are always reachable in one tap — never 'lost in flow'.
+
+    Row 1: report submission (the hero action) + daily challenge done mark.
+    Row 2: cabinet shortcut + home menu.
+    """
     if language == "ru":
         report_text = "📚 Отчет о книге"
         home_text = "🏠 Главное меню"
+        cabinet_text = "👤 Кабинет"
+        done_text = "✅ Выполнено!"
     else:
         report_text = "📚 Kitob hisoboti"
         home_text = "🏠 Bosh menyu"
+        cabinet_text = "👤 Kabinet"
+        done_text = "✅ Bajardim!"
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=report_text), KeyboardButton(text=home_text)]],
+        keyboard=[
+            [KeyboardButton(text=report_text), KeyboardButton(text=done_text)],
+            [KeyboardButton(text=cabinet_text), KeyboardButton(text=home_text)],
+        ],
         resize_keyboard=True,
         is_persistent=True,
     )
