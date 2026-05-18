@@ -261,15 +261,26 @@ def _premium_growth_section(user) -> str:
     year_p = _p(today.replace(month=1, day=1), today)
     prev_year_p = _p(_dt.date(today.year - 1, 1, 1), _dt.date(today.year - 1, 12, 31))
 
-    # Last 7 days for bar chart
+    # Last 7 days for bar chart. Each cell is padded to a fixed width so the
+    # bar row visually lines up underneath the label row when Telegram renders
+    # it in monospace via <code>…</code>.
     daily = [_p(today - _dt.timedelta(days=i), today - _dt.timedelta(days=i)) for i in range(6, -1, -1)]
     day_abbr = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"]
     day_labels = [day_abbr[(today - _dt.timedelta(days=i)).weekday()] for i in range(6, -1, -1)]
 
-    BAR = " ▁▂▃▄▅▆▇█"
+    BAR = "▁▂▃▄▅▆▇█"  # 8 ascending blocks — 0-pages day still shows ▁ as baseline
     max_d = max(daily) if daily else 0
-    bar_str = "".join(BAR[min(8, round(d / max_d * 8))] if max_d > 0 else "▁" for d in daily)
-    label_str = "  ".join(day_labels)
+    bar_chars = []
+    for d in daily:
+        if max_d > 0 and d > 0:
+            idx = min(7, max(0, round(d / max_d * 7)))
+            bar_chars.append(BAR[idx])
+        else:
+            bar_chars.append("▁")  # baseline so empty days still mark position
+
+    CELL = 3  # 2-char label + 1-char gap; bar char left-aligned in same cell
+    bar_str = "".join(f"{c:<{CELL}}" for c in bar_chars).rstrip()
+    label_str = "".join(f"{d:<{CELL}}" for d in day_labels).rstrip()
 
     def _pct(old, new):
         if old == 0:
