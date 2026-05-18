@@ -3,6 +3,7 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.builtin import ChatTypeFilter
 from aiogram.types import ChatType, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from django.db.models import Sum
 from django.utils import timezone
 from asgiref.sync import sync_to_async
 from django.core.paginator import Paginator
@@ -437,8 +438,25 @@ async def ask_next_book_pages(message, state: FSMContext):
     await ReportState.enter_pages_loop.set()
 
 
-MAX_PAGES_PER_SUBMISSION = 2000
-MAX_AUDIO_MINUTES_PER_SUBMISSION = 720  # 12 hours/day cap
+MAX_PAGES_PER_DAY = 2000
+MAX_AUDIO_MINUTES_PER_DAY = 720  # 12 hours/day cap
+
+
+@sync_to_async
+def _today_committed_totals(user, today):
+    """Pages and audio minutes already saved to ConfirmationReport today.
+    Used for the daily cap check on each new per-book value entry."""
+    pages = (
+        ConfirmationReport.objects
+        .filter(user=user, date__date=today, is_audio=False)
+        .aggregate(s=Sum("pages_read"))["s"] or 0
+    )
+    minutes = (
+        ConfirmationReport.objects
+        .filter(user=user, date__date=today, is_audio=True)
+        .aggregate(s=Sum("minutes_listened"))["s"] or 0
+    )
+    return pages, minutes
 
 
 @dp.message_handler(state=ReportState.enter_pages_loop)
@@ -462,39 +480,42 @@ async def process_loop_pages(message: types.Message, state: FSMContext):
     current_book_id = pending_books[0]
     current_book = await get_book_by_id(current_book_id)
 
-    # Sanity caps per submission: prevent obviously-bogus inputs like 99999.
-    # Computed against the running submission totals (this entry + the ones
-    # already entered in this same report).
-    pages_so_far = 0
-    audio_so_far = 0
+    # Daily caps: include both already-confirmed reports submitted earlier
+    # today (e.g. Premium aggregation) AND values entered so far in this
+    # same in-progress submission.
+    user = await aget_user(message.from_user.id)
+    today = timezone.localdate()
+    committed_pages, committed_audio = await _today_committed_totals(user, today)
+
+    pending_pages = 0
+    pending_audio = 0
     for bid, v in reports.items():
         b = await get_book_by_id(int(bid))
         if not b:
             continue
         if b.is_audio:
-            audio_so_far += v
+            pending_audio += v
         else:
-            pages_so_far += v
+            pending_pages += v
 
     if current_book and current_book.is_audio:
-        new_audio_total = audio_so_far + value
-        if new_audio_total > MAX_AUDIO_MINUTES_PER_SUBMISSION:
-            remaining = max(0, MAX_AUDIO_MINUTES_PER_SUBMISSION - audio_so_far)
+        used = committed_audio + pending_audio
+        if used + value > MAX_AUDIO_MINUTES_PER_DAY:
+            remaining = max(0, MAX_AUDIO_MINUTES_PER_DAY - used)
             await message.answer(
-                f"❌ Bir hisobotda eshitish vaqti <b>{MAX_AUDIO_MINUTES_PER_SUBMISSION} daqiqa "
-                f"(12 soat)</b> dan oshmasin.\n\n"
-                f"Hozirgacha bu hisobotda: <b>{audio_so_far} daqiqa</b>.\n"
+                f"❌ Kuniga maksimal eshitish vaqti: <b>{MAX_AUDIO_MINUTES_PER_DAY} daqiqa (12 soat)</b>.\n\n"
+                f"Bugun jami eshitganingiz: <b>{used} daqiqa</b>.\n"
                 f"Iltimos, <b>{remaining}</b> daqiqadan ko'p bo'lmagan qiymat kiriting.",
                 parse_mode="HTML",
             )
             return
     else:
-        new_pages_total = pages_so_far + value
-        if new_pages_total > MAX_PAGES_PER_SUBMISSION:
-            remaining = max(0, MAX_PAGES_PER_SUBMISSION - pages_so_far)
+        used = committed_pages + pending_pages
+        if used + value > MAX_PAGES_PER_DAY:
+            remaining = max(0, MAX_PAGES_PER_DAY - used)
             await message.answer(
-                f"❌ Bir hisobotda jami betlar <b>{MAX_PAGES_PER_SUBMISSION}</b> dan oshmasin.\n\n"
-                f"Hozirgacha bu hisobotda: <b>{pages_so_far} bet</b>.\n"
+                f"❌ Kuniga maksimal o'qish: <b>{MAX_PAGES_PER_DAY} bet</b>.\n\n"
+                f"Bugun jami o'qiganingiz: <b>{used} bet</b>.\n"
                 f"Iltimos, <b>{remaining}</b> betdan ko'p bo'lmagan qiymat kiriting.",
                 parse_mode="HTML",
             )
