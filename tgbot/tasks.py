@@ -1091,10 +1091,27 @@ def _gender_match(achiever, recipient) -> bool:
     return True
 
 
+def _achievement_count_matches_range(count: int, tier: str) -> bool:
+    """Match the achiever's total achievement count against a recipient's
+    'tabriklar_range' tier. 'any' matches everything (default)."""
+    if tier == "any" or not tier:
+        return True
+    if tier == "3-10":
+        return 3 <= count <= 10
+    if tier == "11-20":
+        return 11 <= count <= 20
+    if tier == "21-40":
+        return 21 <= count <= 40
+    if tier == "41+":
+        return count >= 41
+    return True  # Unknown tier — don't silently drop.
+
+
 @shared_task
 def broadcast_congrats_to_others(user_achievement_id: int, points: int):
     """For a freshly-unlocked UserAchievement, send a Tabriklash invitation
-    DM to every OTHER eligible registered user. Filtering by gender prefs."""
+    DM to every OTHER eligible registered user. Filters by gender prefs and
+    by recipient's tabriklar_range vs achiever's total achievement count."""
     from tgbot.services.achievements import find_achievement
 
     ua = UserAchievement.objects.filter(id=user_achievement_id).first()
@@ -1104,6 +1121,10 @@ def broadcast_congrats_to_others(user_achievement_id: int, points: int):
     ach = find_achievement(ua.code)
     if not ach:
         return
+
+    # Achiever's total achievements — used to decide which recipient tier
+    # gets this Tabriklash DM.
+    achiever_total = UserAchievement.objects.filter(user=achiever).count()
 
     title = ach.get("title_uz") or ach["code"]
     plain_name = escape(achiever.full_name or "Kitobxon")
@@ -1133,6 +1154,9 @@ def broadcast_congrats_to_others(user_achievement_id: int, points: int):
         try:
             if not _gender_match(achiever, recipient):
                 continue
+            tier = getattr(recipient, "tabriklar_range", "any") or "any"
+            if not _achievement_count_matches_range(achiever_total, tier):
+                continue
             # Nudge: every 10th Tabriklash DM also surfaces the reminder
             # config button so users can adjust daily reminders without
             # hunting through the settings menu.
@@ -1151,7 +1175,7 @@ def broadcast_congrats_to_others(user_achievement_id: int, points: int):
                 sent += 1
         except Exception as e:
             print(f"broadcast_congrats_to_others to {recipient.id} failed: {e}")
-    print(f"broadcast_congrats_to_others ua={user_achievement_id}: sent={sent}")
+    print(f"broadcast_congrats_to_others ua={user_achievement_id}: sent={sent}, achiever_total={achiever_total}")
 
 
 @shared_task

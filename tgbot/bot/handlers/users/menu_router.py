@@ -1104,11 +1104,21 @@ async def toplist_congrats_handler(call: types.CallbackQuery, state: FSMContext)
 # ──────────────────────────────────────────────────────────────────────────
 # Settings — currently: per-user reminder count (0–3).
 # ──────────────────────────────────────────────────────────────────────────
+TABRIKLAR_RANGE_CHOICES = (
+    ("any", "Hammasi"),
+    ("3-10", "3-10"),
+    ("11-20", "11-20"),
+    ("21-40", "21-40"),
+    ("41+", "41+"),
+)
+
+
 def _settings_markup(user) -> InlineKeyboardMarkup:
     rc = getattr(user, "reminder_count", 3) if user else 3
     show_cal = bool(getattr(user, "show_calendar", False)) if user else False
     accept = (getattr(user, "accept_congrats_from", "any") or "any") if user else "any"
     send_to = (getattr(user, "send_congrats_to", "any") or "any") if user else "any"
+    tab_range = (getattr(user, "tabriklar_range", "any") or "any") if user else "any"
 
     kb = InlineKeyboardMarkup(row_width=4)
     # Reminder count row
@@ -1135,6 +1145,15 @@ def _settings_markup(user) -> InlineKeyboardMarkup:
         marker = "●" if send_to == code else "○"
         kb.insert(InlineKeyboardButton(
             text=f"{marker} {label}", callback_data=f"settings:send:{code}",
+        ))
+
+    # Tabriklar eslatmalari — filter incoming Tabriklash DMs by achiever's
+    # total achievement count. Pick a tier or 'Hammasi' for no filter.
+    kb.row(InlineKeyboardButton("🎯 Tabriklar eslatmalari (yutuqlar soni):", callback_data="noop"))
+    for code, label in TABRIKLAR_RANGE_CHOICES:
+        marker = "●" if tab_range == code else "○"
+        kb.insert(InlineKeyboardButton(
+            text=f"{marker} {label}", callback_data=f"settings:tabriklar:{code}",
         ))
 
     # Language toggle
@@ -1164,8 +1183,13 @@ def _settings_text(user, lang: str) -> str:
     show_cal = bool(getattr(user, "show_calendar", False)) if user else False
     accept = (getattr(user, "accept_congrats_from", "any") or "any") if user else "any"
     send_to = (getattr(user, "send_congrats_to", "any") or "any") if user else "any"
+    tab_range = (getattr(user, "tabriklar_range", "any") or "any") if user else "any"
 
     label = {"any": "Hammadan/Hammaga", "male": "Erkak", "female": "Ayol"}
+    range_label = {
+        "any": "Hammasi", "3-10": "3-10 yutuq",
+        "11-20": "11-20 yutuq", "21-40": "21-40 yutuq", "41+": "41+ yutuq",
+    }
     cal_uz = "yoqilgan" if show_cal else "o'chirilgan"
     cal_ru = "включён" if show_cal else "выключен"
     return _t(
@@ -1180,6 +1204,8 @@ def _settings_text(user, lang: str) -> str:
             f"🎉 <b>Tabriklash filtri:</b>\n"
             f"  Qabul qilish: <b>{label.get(accept, accept)}</b>\n"
             f"  Yuborish: <b>{label.get(send_to, send_to)}</b>\n\n"
+            f"🎯 <b>Tabriklar eslatmalari:</b> <b>{range_label.get(tab_range, tab_range)}</b>\n"
+            "  Faqat tanlangan diapazondagi yutuqlar uchun Tabriklash xabari keladi.\n\n"
             "🌐 <b>Til:</b> sozlamalar orqali o'zgartiring.\n\n"
             "🔄 <b>Qayta boshlash</b> — faqat ro'yxatdan o'tish jarayonini qaytaradi.\n"
             "🗑 <b>Ma'lumotlarni o'chirish</b> — barcha ma'lumotlaringiz o'chiriladi."
@@ -1257,6 +1283,17 @@ async def settings_pick(call: types.CallbackQuery, state: FSMContext):
             )(send_congrats_to=choice)
             user.send_congrats_to = choice
             await call.answer("✅ Saqlandi")
+        else:
+            await call.answer()
+            return
+    elif action == "tabriklar" and len(parts) > 2:
+        choice = parts[2]
+        if choice in {"any", "3-10", "11-20", "21-40", "41+"}:
+            await sync_to_async(
+                TelegramProfile.objects.filter(id=user.id).update
+            )(tabriklar_range=choice)
+            user.tabriklar_range = choice
+            await call.answer(f"✅ Saqlandi: {choice}")
         else:
             await call.answer()
             return

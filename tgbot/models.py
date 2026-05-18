@@ -191,6 +191,21 @@ class TelegramProfile(BaseModel):
         choices=[("any", "Hammaga"), ("male", "Erkaklarga"), ("female", "Ayollarga")],
         help_text="Whom the user is willing to congratulate.",
     )
+    tabriklar_range = models.CharField(
+        max_length=10,
+        default="any",
+        choices=[
+            ("any", "Hammasi"),
+            ("3-10", "3-10 yutuq"),
+            ("11-20", "11-20 yutuq"),
+            ("21-40", "21-40 yutuq"),
+            ("41+", "41+ yutuq"),
+        ],
+        help_text=(
+            "Filter Tabriklash DMs by the achiever's total achievement count. "
+            "'any' = receive all (default)."
+        ),
+    )
     contact_count = models.PositiveIntegerField(
         default=0,
         verbose_name=_("Admin contact count"),
