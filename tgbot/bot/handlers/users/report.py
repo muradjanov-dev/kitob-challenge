@@ -437,6 +437,10 @@ async def ask_next_book_pages(message, state: FSMContext):
     await ReportState.enter_pages_loop.set()
 
 
+MAX_PAGES_PER_SUBMISSION = 2000
+MAX_AUDIO_MINUTES_PER_SUBMISSION = 720  # 12 hours/day cap
+
+
 @dp.message_handler(state=ReportState.enter_pages_loop)
 async def process_loop_pages(message: types.Message, state: FSMContext):
     if message.text == _("🔙 Orqaga"):
@@ -455,7 +459,48 @@ async def process_loop_pages(message: types.Message, state: FSMContext):
     pending_books = data.get("pending_books", [])
     reports = data.get("book_reports", {})
 
-    current_book_id = pending_books.pop(0)
+    current_book_id = pending_books[0]
+    current_book = await get_book_by_id(current_book_id)
+
+    # Sanity caps per submission: prevent obviously-bogus inputs like 99999.
+    # Computed against the running submission totals (this entry + the ones
+    # already entered in this same report).
+    pages_so_far = 0
+    audio_so_far = 0
+    for bid, v in reports.items():
+        b = await get_book_by_id(int(bid))
+        if not b:
+            continue
+        if b.is_audio:
+            audio_so_far += v
+        else:
+            pages_so_far += v
+
+    if current_book and current_book.is_audio:
+        new_audio_total = audio_so_far + value
+        if new_audio_total > MAX_AUDIO_MINUTES_PER_SUBMISSION:
+            remaining = max(0, MAX_AUDIO_MINUTES_PER_SUBMISSION - audio_so_far)
+            await message.answer(
+                f"❌ Bir hisobotda eshitish vaqti <b>{MAX_AUDIO_MINUTES_PER_SUBMISSION} daqiqa "
+                f"(12 soat)</b> dan oshmasin.\n\n"
+                f"Hozirgacha bu hisobotda: <b>{audio_so_far} daqiqa</b>.\n"
+                f"Iltimos, <b>{remaining}</b> daqiqadan ko'p bo'lmagan qiymat kiriting.",
+                parse_mode="HTML",
+            )
+            return
+    else:
+        new_pages_total = pages_so_far + value
+        if new_pages_total > MAX_PAGES_PER_SUBMISSION:
+            remaining = max(0, MAX_PAGES_PER_SUBMISSION - pages_so_far)
+            await message.answer(
+                f"❌ Bir hisobotda jami betlar <b>{MAX_PAGES_PER_SUBMISSION}</b> dan oshmasin.\n\n"
+                f"Hozirgacha bu hisobotda: <b>{pages_so_far} bet</b>.\n"
+                f"Iltimos, <b>{remaining}</b> betdan ko'p bo'lmagan qiymat kiriting.",
+                parse_mode="HTML",
+            )
+            return
+
+    pending_books.pop(0)
     reports[current_book_id] = value
 
     await state.update_data(pending_books=pending_books, book_reports=reports)
