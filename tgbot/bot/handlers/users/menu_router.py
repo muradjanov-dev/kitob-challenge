@@ -273,12 +273,12 @@ def _premium_growth_section(user) -> str:
     year_p = _p(today.replace(month=1, day=1), today)
     prev_year_p = _p(_dt.date(today.year - 1, 1, 1), _dt.date(today.year - 1, 12, 31))
 
-    # Last 7 days for bar chart. Each cell is padded to a fixed width so the
-    # bar row visually lines up underneath the label row when Telegram renders
-    # it in monospace via <code>…</code>.
-    daily = [_p(today - _dt.timedelta(days=i), today - _dt.timedelta(days=i)) for i in range(6, -1, -1)]
-    day_abbr = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"]
-    day_labels = [day_abbr[(today - _dt.timedelta(days=i)).weekday()] for i in range(6, -1, -1)]
+    # Current calendar week (Monday to Sunday) for the bar chart.
+    # Accumulates progress through the week and resets on Monday.
+    monday = today - _dt.timedelta(days=today.weekday())
+    week_dates = [monday + _dt.timedelta(days=i) for i in range(7)]
+    daily = [_p(d, d) for d in week_dates]
+    day_labels = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"]
 
     BAR = " ▂▃▄▅▆▇█"  # Ascending blocks
     max_d = max(daily) if daily else 0
@@ -311,7 +311,7 @@ def _premium_growth_section(user) -> str:
         f"📆 <b>Bu hafta</b> ({week_p} bet) vs O'tgan hafta ({prev_week_p} bet): <b>{_pct(prev_week_p, week_p)}</b>\n"
         f"🗓 <b>Bu oy</b> ({month_p} bet) vs O'tgan oy ({prev_month_p} bet): <b>{_pct(prev_month_p, month_p)}</b>\n"
         f"📈 <b>Bu yil</b> ({year_p} bet) vs O'tgan yil ({prev_year_p} bet): <b>{_pct(prev_year_p, year_p)}</b>\n\n"
-        f"<b>Oxirgi 7 kunlik kitobxonlik jadvali (betlarda):</b>\n"
+        f"<b>Haftalik kitobxonlik jadvali (betlarda):</b>\n"
         f"<code>{bar_str}</code>\n"
         f"<code>{label_str}</code>\n"
         f"<code>{pages_str}</code>"
@@ -400,15 +400,6 @@ async def _menu_cabinet(call, user, state: FSMContext):
         active_hour = f"{h:02d}:00-{h+1:02d}:00 oralig'ida"
 
     conclusion_text = ""
-    if top_conclusions:
-        conclusion_text = "\n\n✍️ <b>Eng uzun xulosalaringiz</b> (matn uzunligi bo'yicha):\n"
-        for i, report in enumerate(top_conclusions, 1):
-            book_title = (
-                (report.book or "").strip()
-                or conclusion_titles.get(report.id)
-                or "Tanlanmagan kitob"
-            )
-            conclusion_text += f"{i}. <i>{book_title}</i> ({report.pages_read} bet)\n"
 
     # Ranking text.
     rank_text = ""

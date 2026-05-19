@@ -241,23 +241,7 @@ async def show_user_cabinet(message: types.Message, state=None):
         top_hour = hour_stats[0]['hour']
         active_hour = f"{top_hour:02d}:00-{top_hour+1:02d}:00 oralig'ida"
 
-    # 5. Top conclusions (Longest texts in ConfirmationReport)
-    top_conclusions = ConfirmationReport.objects.filter(user=user).annotate(
-        length=Length('conclusion')
-    ).order_by('-length')[:3]
-
     conclusion_text = ""
-    if top_conclusions:
-        conclusion_text = "\n\n✍️ <b>Eng uzun xulosalaringiz</b> (matn uzunligi bo'yicha):\n"
-        for i, report in enumerate(top_conclusions, 1):
-            book_title = (report.book or "").strip()
-            if not book_title:
-                m2m_titles = list(report.books.values_list("title", flat=True))
-                if m2m_titles:
-                    book_title = ", ".join(m2m_titles)
-                else:
-                    book_title = "Tanlanmagan kitob"
-            conclusion_text += f"{i}. <i>{book_title}</i> ({report.pages_read} bet)\n"
 
     # 6. Ranking — % ahead/behind by total pages read.
     rank_text = ""
