@@ -35,6 +35,18 @@ Return ONLY valid JSON in the following format:
 }
 Make sure options are up to 4 items. correct_index is 0-indexed.
 Do not wrap JSON in markdown block. Just pure JSON.
+
+CRITICAL LANGUAGE REQUIREMENT:
+Generate the entire JSON response (including title, description, question text, options, and hints) in the SAME LANGUAGE as the primary content of the input text or image.
+For example:
+- If the input is in Uzbek (e.g. Uzbek book), the quiz must be completely in Uzbek.
+- If the input is in Russian, the quiz must be completely in Russian.
+- If the input is in English, the quiz must be completely in English.
+
+CRITICAL CONTENT REQUIREMENT:
+Focus ONLY on the actual content, story, characters, or core educational topic of the book/document.
+Absolutely IGNORE any publisher advertisements, library introductions (such as 'ziyouz.com', 'Ziyouz kutubxonasi', library flyers, website purposes, etc.), copyright notices, or web link flyers at the beginning or end of the document.
+The quiz must be about the BOOK'S actual content, not the website or library from which it was downloaded.
 """
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -167,6 +179,18 @@ Return ONLY valid JSON in the following format:
 }}
 Make sure options are up to 4 items. correct_index is 0-indexed.
 Do not wrap JSON in markdown block. Just pure JSON.
+
+CRITICAL LANGUAGE REQUIREMENT:
+Generate the entire JSON response (including title, description, question text, options, and hints) in the SAME LANGUAGE as the primary content of the input text or image.
+For example:
+- If the input is in Uzbek (e.g. Uzbek book), the quiz must be completely in Uzbek.
+- If the input is in Russian, the quiz must be completely in Russian.
+- If the input is in English, the quiz must be completely in English.
+
+CRITICAL CONTENT REQUIREMENT:
+Focus ONLY on the actual content, story, characters, or core educational topic of the book/document.
+Absolutely IGNORE any publisher advertisements, library introductions (such as 'ziyouz.com', 'Ziyouz kutubxonasi', library flyers, website purposes, etc.), copyright notices, or web link flyers at the beginning or end of the document.
+The quiz must be about the BOOK'S actual content, not the website or library from which it was downloaded.
 """
 
         messages = [
