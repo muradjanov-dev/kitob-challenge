@@ -559,12 +559,12 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
         from django.utils import timezone as _tz
         today = _tz.localdate()
         period_cfg = {
-            "daily":    (today,                              today, "Bugun 🔥 Top kitobxonlar",    20),
-            "3days":    (today - _dt.timedelta(days=2),     today, "3 kunlik Top kitobxonlar",    20),
-            "weekly":   (today - _dt.timedelta(days=6),     today, "Bu hafta 🏆 Top kitobxonlar", 30),
-            "monthly":  (today - _dt.timedelta(days=29),    today, "Bu oy 📅 Top kitobxonlar",    30),
-            "3monthly": (today - _dt.timedelta(days=89),    today, "3 oylik 📊 Top kitobxonlar",  40),
-            "yearly":   (today - _dt.timedelta(days=364),   today, "Yillik 🏅 Top kitobxonlar",   60),
+            "daily":    (today,                              today, "Bugun 🔥",        20),
+            "3days":    (today - _dt.timedelta(days=2),     today, "Oxirgi 3 kunda",  20),
+            "weekly":   (today - _dt.timedelta(days=6),     today, "Bu hafta 🏆",     25),
+            "monthly":  (today - _dt.timedelta(days=29),    today, "Bu oy 📅",        30),
+            "3monthly": (today - _dt.timedelta(days=89),    today, "3 oylik 📊",      40),
+            "yearly":   (today - _dt.timedelta(days=364),   today, "Yillik 🏅",       60),
         }
         if period_key not in period_cfg:
             await call.message.answer("Noma'lum davr.")

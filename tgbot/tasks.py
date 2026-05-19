@@ -264,7 +264,7 @@ def daily_top_read_user():
     # _broadcast_top_to_groups_and_users covers both group posts AND user DMs
     # with a Tabriklash button. Calling _send_period_report on top of it was
     # producing duplicate identical group posts.
-    msg = _build_top_readers_message(today, today, "Bugun 🔥 Top kitobxonlar", limit=20)
+    msg = _build_top_readers_message(today, today, "Bugun 🔥", limit=20)
     if msg:
         _broadcast_top_to_groups_and_users(msg, "daily", date_str)
 
@@ -283,7 +283,7 @@ def weekly_top_read_user():
     end_date = timezone.localdate()
     start_date = end_date - _dt.timedelta(days=6)
     date_str = end_date.strftime("%Y%m%d")
-    msg = _build_top_readers_message(start_date, end_date, "Bu hafta 🏆 Top kitobxonlar", limit=30)
+    msg = _build_top_readers_message(start_date, end_date, "Bu hafta 🏆", limit=30)
     if msg:
         _broadcast_top_to_groups_and_users(msg, "weekly", date_str)
 
@@ -294,7 +294,7 @@ def monthly_top_read_user():
     end_date = timezone.localdate()
     start_date = end_date - _dt.timedelta(days=29)
     date_str = end_date.strftime("%Y%m%d")
-    msg = _build_top_readers_message(start_date, end_date, "Bu oy 📅 Top kitobxonlar", limit=30)
+    msg = _build_top_readers_message(start_date, end_date, "Bu oy 📅", limit=30)
     if msg:
         _broadcast_top_to_groups_and_users(msg, "monthly", date_str)
 
@@ -305,7 +305,7 @@ def three_months_top_read_user():
     end_date = timezone.localdate()
     start_date = end_date - _dt.timedelta(days=89)
     date_str = end_date.strftime("%Y%m%d")
-    msg = _build_top_readers_message(start_date, end_date, "3 oylik 📊 Top kitobxonlar", limit=40)
+    msg = _build_top_readers_message(start_date, end_date, "3 oylik 📊", limit=40)
     if msg:
         _broadcast_top_to_groups_and_users(msg, "3monthly", date_str)
 
@@ -324,7 +324,7 @@ def yearly_top_read_user():
     end_date = timezone.localdate()
     start_date = end_date - _dt.timedelta(days=364)
     date_str = end_date.strftime("%Y%m%d")
-    msg = _build_top_readers_message(start_date, end_date, "Yillik 🏅 Top kitobxonlar", limit=60)
+    msg = _build_top_readers_message(start_date, end_date, "Yillik 🏅", limit=60)
     if msg:
         _broadcast_top_to_groups_and_users(msg, "yearly", date_str)
 
@@ -422,7 +422,10 @@ def _build_top_readers_message(start_date, end_date, period_label, limit=20):
 
     grand_pages = sum(r['pages'] for r in rows)
     grand_minutes = sum(r['minutes'] for r in rows)
-    message = f"📚 {period_label} eng faol Kitobxonlar:\n\n"
+    # period_label is the time descriptor only (e.g. 'Bugun', 'Oxirgi 3 kunda',
+    # 'Bu hafta 🏆'). The 'Top {limit} Kitobxonlar:' suffix is composed here so
+    # all callers stay consistent.
+    message = f"📚 {period_label} Top {limit} Kitobxonlar:\n\n"
     for index, r in enumerate(rows, start=1):
         tg_id = r['tg_id']
         full_name = escape(r['full_name'] or "Foydalanuvchi")
@@ -564,24 +567,50 @@ def process_toplist_congrats(period: str, date_str: str, congratulator_tg_id: in
             print(f"toplist congrats DM failed for {tg_id}: {e}")
 
 
+def _post_period_top(start_date, end_date, label, limit):
+    """Build a 'Top N Kitobxonlar' message for the period and post to all
+    groups. Returns nothing — purely a side-effect helper used by the three
+    periodic tasks below and the legacy bundled admin action."""
+    msg = _build_top_readers_message(start_date, end_date, label, limit=limit)
+    if msg is None:
+        msg = f"📚 {label} Top {limit} Kitobxonlar: ma'lumot yo'q."
+    for _cid in _group_chat_ids():
+        send_message(_cid, msg)
+
+
 @shared_task
-def weekly_report_for_general():
-    """3 kunlik, 7 kunlik va 30 kunlik top kitobxonlarni umumiy kanalga yuboradi."""
+def three_day_top_report():
+    """3 kunlik Top 20 Kitobxonlar — scheduled every 3 days."""
     import datetime as _dt
     end_date = timezone.localdate()
+    _post_period_top(end_date - _dt.timedelta(days=2), end_date, "Oxirgi 3 kunda", 20)
 
-    periods = [
-        (end_date - _dt.timedelta(days=2),  end_date, "Oxirgi 3 kunda"),
-        (end_date - _dt.timedelta(days=6),  end_date, "Oxirgi 7 kunda"),
-        (end_date - _dt.timedelta(days=29), end_date, "Oxirgi 30 kunda"),
-    ]
 
-    for start_date, period_end, label in periods:
-        message = _build_top_readers_message(start_date, period_end, label)
-        if message is None:
-            message = f"📚 {label} kitob o'qigan foydalanuvchilar yo'q."
-        for _cid in _group_chat_ids():
-            send_message(_cid, message)
+@shared_task
+def seven_day_top_report():
+    """7 kunlik Top 25 Kitobxonlar — scheduled weekly."""
+    import datetime as _dt
+    end_date = timezone.localdate()
+    _post_period_top(end_date - _dt.timedelta(days=6), end_date, "Oxirgi 7 kunda", 25)
+
+
+@shared_task
+def thirty_day_top_report():
+    """30 kunlik Top 30 Kitobxonlar — scheduled monthly."""
+    import datetime as _dt
+    end_date = timezone.localdate()
+    _post_period_top(end_date - _dt.timedelta(days=29), end_date, "Oxirgi 30 kunda", 30)
+
+
+@shared_task
+def weekly_report_for_general():
+    """Legacy bundled task: fires all three (3/7/30-day) at once. Still wired
+    to the Django-admin action button. The Celery beat schedule no longer
+    uses this — the three reports are scheduled independently and on their
+    own cadences so they don't collide with the daily top (23:35)."""
+    three_day_top_report()
+    seven_day_top_report()
+    thirty_day_top_report()
 
 
 # ──────────────────────────────────────────────────────────────────────────

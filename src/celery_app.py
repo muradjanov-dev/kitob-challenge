@@ -75,9 +75,20 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=22, minute=0)
     },
 
-    'send_three_days_report': {
-        'task': 'tgbot.tasks.weekly_report_for_general',
-        'schedule': crontab(hour=0, minute=17, day_of_month='*/3')
+    # 3 / 7 / 30 day top reports — each on its own cadence and time-of-day so
+    # they don't collide with the daily top (23:35) and don't all post
+    # together. Limits: 20 / 25 / 30 respectively.
+    'send-3-day-top-readers': {
+        'task': 'tgbot.tasks.three_day_top_report',
+        'schedule': crontab(hour=19, minute=0, day_of_month='*/3'),
+    },
+    'send-7-day-top-readers': {
+        'task': 'tgbot.tasks.seven_day_top_report',
+        'schedule': crontab(hour=20, minute=0, day_of_week=0),  # Sundays
+    },
+    'send-30-day-top-readers': {
+        'task': 'tgbot.tasks.thirty_day_top_report',
+        'schedule': crontab(hour=12, minute=0, day_of_month=1),
     },
 
     # Pool-based admin reminders — fire 09:00 and 21:00 (Tashkent), each time
