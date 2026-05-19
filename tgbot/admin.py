@@ -355,3 +355,48 @@ class PaymentAdmin(admin.ModelAdmin):
         """Tanlangan to‘lovlarni `paid` holatiga o‘tkazish."""
         queryset.update(status="paid")
     mark_as_paid.short_description = "To‘lovlarni 'paid' holatiga o‘tkazish"
+
+################################################################################
+#                               QUIZ SYSTEM                                    #
+################################################################################
+
+class QuizOptionInline(admin.TabularInline):
+    model = models.QuizOption
+    extra = 4
+
+@admin.register(models.QuizQuestion)
+class QuizQuestionAdmin(admin.ModelAdmin):
+    list_display = ('text', 'quiz', 'order')
+    list_filter = ('quiz',)
+    search_fields = ('text',)
+    inlines = [QuizOptionInline]
+
+class QuizQuestionInline(admin.TabularInline):
+    model = models.QuizQuestion
+    extra = 1
+    show_change_link = True
+
+@admin.register(models.Quiz)
+class QuizAdmin(admin.ModelAdmin):
+    list_display = ('title', 'creator', 'time_per_question', 'shuffle', 'created_at')
+    search_fields = ('title', 'description')
+    list_filter = ('created_at', 'creator')
+    inlines = [QuizQuestionInline]
+    
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+        if request.user.is_authenticated:
+            # Try to find corresponding TelegramProfile for the admin user
+            try:
+                profile = models.TelegramProfile.objects.filter(is_admin=True).first()
+                if profile:
+                    initial['creator'] = profile.id
+            except Exception:
+                pass
+        return initial
+
+@admin.register(models.QuizSession)
+class QuizSessionAdmin(admin.ModelAdmin):
+    list_display = ('quiz', 'creator', 'status', 'is_group', 'created_at')
+    list_filter = ('status', 'is_group', 'created_at')
+    search_fields = ('quiz__title',)

@@ -32,6 +32,7 @@ def _quiz_list_kb(quizzes) -> InlineKeyboardMarkup:
             callback_data=f"qz:v:{q.id}",
         ))
     kb.add(InlineKeyboardButton(text="➕ Yangi quiz", callback_data="qz:new"))
+    kb.add(InlineKeyboardButton(text="🤖 AI yordamida yaratish (Premium)", callback_data="qz:ai"))
     return kb
 
 
@@ -61,6 +62,7 @@ def _quiz_edit_kb(quiz_id: int) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="✏️ Nomini o'zgartirish", callback_data=f"qz:et:{quiz_id}"),
         InlineKeyboardButton(text="📝 Tavsifini o'zgartirish", callback_data=f"qz:ed:{quiz_id}"),
         InlineKeyboardButton(text="⏱ Vaqtini o'zgartirish", callback_data=f"qz:em:{quiz_id}"),
+        InlineKeyboardButton(text="❓ Savollarni tahrirlash", callback_data=f"qz:eqs:{quiz_id}"),
         InlineKeyboardButton(text="« Orqaga", callback_data=f"qz:v:{quiz_id}"),
     )
     return kb
@@ -88,6 +90,7 @@ async def show_quiz_list(message: types.Message, user):
     if not quizzes:
         kb = InlineKeyboardMarkup()
         kb.add(InlineKeyboardButton(text="➕ Yangi quiz yaratish", callback_data="qz:new"))
+        kb.add(InlineKeyboardButton(text="🤖 AI yordamida yaratish (Premium)", callback_data="qz:ai"))
         await message.answer(
             "📭 Hali quiz yo'q. Birinchisini yarating!",
             reply_markup=kb,
@@ -120,6 +123,7 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
         if not quizzes:
             kb = InlineKeyboardMarkup()
             kb.add(InlineKeyboardButton(text="➕ Yangi quiz", callback_data="qz:new"))
+            kb.add(InlineKeyboardButton(text="🤖 AI yordamida yaratish (Premium)", callback_data="qz:ai"))
             await call.message.edit_text("📭 Hali quiz yo'q.", reply_markup=kb)
             return
         try:
@@ -136,6 +140,28 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
         await state.finish()
         await call.message.answer("📝 Quiz nomini kiriting:")
         await QuizCreateState.title.set()
+
+    # AI quiz — start creation
+    elif action == "ai":
+        from django.utils import timezone
+        from tgbot.models import Payment
+        from tgbot.bot.states.main import AIQuizCreateState
+        
+        is_premium = await sync_to_async(
+            Payment.objects.filter(user=user, status="paid", end_date__gte=timezone.localdate()).exists
+        )()
+        if not is_premium:
+            await call.answer("Bu funksiya faqat Premium foydalanuvchilar uchun! ⭐", show_alert=True)
+            return
+            
+        await call.answer()
+        await state.finish()
+        await call.message.answer(
+            "🤖 <b>AI yordamida Quiz yaratish</b>\n\n"
+            "Iltimos, matn (text) yoki rasm (image) yuboring. AI o'sha asosda quiz savollarini generatsiya qiladi.",
+            parse_mode="HTML"
+        )
+        await AIQuizCreateState.input_content.set()
 
     # View
     elif action == "v" and len(parts) > 2:
@@ -181,6 +207,57 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
         await state.update_data(edit_quiz_id=int(parts[2]), edit_field="time")
         await call.message.answer("Har savol necha soniya bo'lsin? (masalan: 30):")
         await QuizEditState.time.set()
+
+    # Edit Questions List
+    elif action == "eqs" and len(parts) > 2:
+        await call.answer()
+        quiz_id = int(parts[2])
+        questions = await sync_to_async(list)(QuizQuestion.objects.filter(quiz_id=quiz_id).order_by('order'))
+        kb = InlineKeyboardMarkup(row_width=1)
+        for q in questions:
+            kb.add(InlineKeyboardButton(text=f"❓ {q.text[:30]}...", callback_data=f"qz:qv:{q.id}"))
+        kb.add(InlineKeyboardButton(text="« Orqaga", callback_data=f"qz:e:{quiz_id}"))
+        await call.message.edit_text("✏️ Qaysi savolni tahrirlaysiz?", reply_markup=kb)
+
+    # Question View
+    elif action == "qv" and len(parts) > 2:
+        await call.answer()
+        q_id = int(parts[2])
+        q = await sync_to_async(QuizQuestion.objects.select_related('quiz').get)(id=q_id)
+        opts = await sync_to_async(list)(q.options.all().order_by('order'))
+        text = f"❓ <b>{q.text}</b>\n\nVariantlar:\n"
+        for i, opt in enumerate(opts):
+            mark = "✅" if opt.is_correct else "❌"
+            text += f"{'ABCDE'[i] if i < 5 else '-'}) {opt.text} {mark}\n"
+        
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(InlineKeyboardButton(text="✏️ Matnni o'zgartirish", callback_data=f"qz:qt:{q.id}"))
+        kb.add(InlineKeyboardButton(text="🗑 O'chirish", callback_data=f"qz:qdel:{q.id}"))
+        kb.add(InlineKeyboardButton(text="« Orqaga", callback_data=f"qz:eqs:{q.quiz_id}"))
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+
+    # Edit Question Text
+    elif action == "qt" and len(parts) > 2:
+        await call.answer()
+        q_id = int(parts[2])
+        await state.update_data(edit_q_id=q_id)
+        await call.message.answer("Yangi savol matnini kiriting:")
+        await QuizEditState.edit_q_text.set()
+        
+    # Delete Question
+    elif action == "qdel" and len(parts) > 2:
+        q_id = int(parts[2])
+        q = await sync_to_async(QuizQuestion.objects.select_related('quiz').get)(id=q_id)
+        quiz_id = q.quiz_id
+        await sync_to_async(q.delete)()
+        await call.answer("Savol o'chirildi ✅")
+        
+        questions = await sync_to_async(list)(QuizQuestion.objects.filter(quiz_id=quiz_id).order_by('order'))
+        kb = InlineKeyboardMarkup(row_width=1)
+        for q_item in questions:
+            kb.add(InlineKeyboardButton(text=f"❓ {q_item.text[:30]}...", callback_data=f"qz:qv:{q_item.id}"))
+        kb.add(InlineKeyboardButton(text="« Orqaga", callback_data=f"qz:e:{quiz_id}"))
+        await call.message.edit_text("✏️ Qaysi savolni tahrirlaysiz?", reply_markup=kb)
 
     # Toggle shuffle
     elif action == "sh" and len(parts) > 2:
@@ -499,6 +576,27 @@ async def qze_got_time(message: types.Message, state: FSMContext):
     await sync_to_async(Quiz.objects.filter(id=data["edit_quiz_id"]).update)(time_per_question=secs)
     await state.finish()
     await message.answer(f"✅ Vaqt {secs} soniyaga yangilandi.")
+
+@dp.message_handler(state=QuizEditState.edit_q_text)
+async def qze_got_q_text(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    q_id = data.get("edit_q_id")
+    await sync_to_async(QuizQuestion.objects.filter(id=q_id).update)(text=message.text.strip())
+    
+    q = await sync_to_async(QuizQuestion.objects.get)(id=q_id)
+    opts = await sync_to_async(list)(q.options.all().order_by('order'))
+    text = f"❓ <b>{q.text}</b>\n\nVariantlar:\n"
+    for i, opt in enumerate(opts):
+        mark = "✅" if opt.is_correct else "❌"
+        text += f"{'ABCDE'[i] if i < 5 else '-'}) {opt.text} {mark}\n"
+    
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton(text="✏️ Matnni o'zgartirish", callback_data=f"qz:qt:{q.id}"))
+    kb.add(InlineKeyboardButton(text="🗑 O'chirish", callback_data=f"qz:qdel:{q.id}"))
+    kb.add(InlineKeyboardButton(text="« Orqaga", callback_data=f"qz:eqs:{q.quiz_id}"))
+    
+    await state.finish()
+    await message.answer("✅ Savol matni yangilandi.\n\n" + text, parse_mode="HTML", reply_markup=kb)
 
 
 # ─── Vizov scheduling ─────────────────────────────────────────────────────────

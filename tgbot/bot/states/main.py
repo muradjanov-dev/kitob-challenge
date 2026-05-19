@@ -99,7 +99,15 @@ class QuizEditState(StatesGroup):
     title = State()
     description = State()
     time = State()
+    edit_q_text = State()
+    edit_q_opts = State()
+    edit_q_hint = State()
 
 
 class QuizBattleState(StatesGroup):
     start_time = State()
+
+
+class AIQuizCreateState(StatesGroup):
+    input_content = State()
+    parsing = State()

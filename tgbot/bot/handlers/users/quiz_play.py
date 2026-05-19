@@ -389,19 +389,13 @@ async def answer_question(call: types.CallbackQuery, state: FSMContext):
         await call.answer("Siz allaqachon javob berdingiz!", show_alert=True)
         return
 
-    # In group mode, suppress correct-answer reveal during the live question —
-    # otherwise a wrong tapper sees the answer in their private alert and can
-    # whisper it to others still answering. The reveal happens at timer expiry.
-    if is_group:
-        await call.answer("✅ Javobingiz qabul qilindi!" if is_correct else "❌ Noto'g'ri javob!")
+    if is_correct:
+        await call.answer("✅ To'g'ri!", show_alert=True)
     else:
-        if is_correct:
-            await call.answer("✅ To'g'ri!", show_alert=True)
-        else:
-            msg = f"❌ Noto'g'ri!\n✅ To'g'ri javob: {correct_text}"
-            if hint:
-                msg += f"\n\n💡 {hint}"
-            await call.answer(msg, show_alert=True)
+        msg = f"❌ Noto'g'ri!\n✅ To'g'ri javob: {correct_text}"
+        if hint:
+            msg += f"\n\n💡 {hint}"
+        await call.answer(msg, show_alert=True)
 
     # For solo sessions: cancel timer and auto-advance immediately.
     if session and not session.is_group:

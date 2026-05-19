@@ -1,4 +1,4 @@
-﻿import os
+import os
 
 from aiogram import types
 from aiogram.dispatcher.filters.builtin import ChatTypeFilter
@@ -11,7 +11,6 @@ from tgbot.bot.loader import dp, bot, gettext as _
 from tgbot.models import Payment
 from tgbot.bot.utils import aget_user
 from tgbot.bot.keyboards.inline import send_receipt_button
-MONTHLY_PAYMENT = 50000
 from tgbot.bot.consts import ADMIN_GROUP_ID
 
 
@@ -37,8 +36,9 @@ def _build_premium_welcome(start_date, end_date) -> str:
 @dp.callback_query_handler(ChatTypeFilter((ChatType.GROUP, ChatType.SUPERGROUP)), lambda c: "accept" in c.data)
 async def confirm_payment_message_handler(call: types.CallbackQuery, state: FSMContext):
     split_data = call.data.split(":")
-    user_telegram_id = split_data[1]
-    photo_message_id = split_data[2]
+    price = int(split_data[1])
+    user_telegram_id = split_data[2]
+    photo_message_id = split_data[3] if len(split_data) > 3 and split_data[3] != 'None' else None
 
     user = await aget_user(telegram_id=user_telegram_id)
 
@@ -50,7 +50,7 @@ async def confirm_payment_message_handler(call: types.CallbackQuery, state: FSMC
         end_date = timezone.localdate() + timedelta(days=30)
         Payment.objects.create(
             user=user,
-            amount=MONTHLY_PAYMENT,
+            amount=price,
             start_date=start_date,
             end_date=end_date,
             status="paid"
@@ -59,7 +59,7 @@ async def confirm_payment_message_handler(call: types.CallbackQuery, state: FSMC
         message_to_user = _build_premium_welcome(start_date, end_date)
         data = await state.get_data()
         username_or_telegram_id = f"""<a href="https://{user.username}.t.me">@{user.username}</a>""" if user.username else user.telegram_id
-        message_to_admin = f"""✅To'lov tasdiqlandi!\n👤FISH: {user.full_name}[{username_or_telegram_id}]\n🧾Qiymat: {MONTHLY_PAYMENT} UZS\n📅Davr: {start_date.strftime("%d.%m.%Y")} -> {end_date.strftime("%d.%m.%Y")}\n\n#paid #monthly"""
+        message_to_admin = f"""✅To'lov tasdiqlandi!\n👤FISH: {user.full_name}[{username_or_telegram_id}]\n🧾Qiymat: {price:,} UZS\n📅Davr: {start_date.strftime("%d.%m.%Y")} -> {end_date.strftime("%d.%m.%Y")}\n\n#paid #monthly"""
         if photo_message_id:
             try:
                 await bot.edit_message_caption(
@@ -82,10 +82,12 @@ async def confirm_payment_message_handler(call: types.CallbackQuery, state: FSMC
 
 
 @dp.callback_query_handler(ChatTypeFilter((ChatType.GROUP, ChatType.SUPERGROUP)), lambda c: "rejection" in c.data)
-async def confirm_payment_message_handler(call: types.CallbackQuery, state: FSMContext):
+async def confirm_payment_message_handler_reject(call: types.CallbackQuery, state: FSMContext):
     split_data = call.data.split(":")
-    user_telegram_id = split_data[1]
-    photo_message_id = split_data[2]
+    # rejection:price:user_id:msg_id
+    price = int(split_data[1])
+    user_telegram_id = split_data[2]
+    photo_message_id = split_data[3] if len(split_data) > 3 and split_data[3] != 'None' else None
 
     await state.update_data(photo_message_id=photo_message_id)
     await state.update_data(user_telegram_id=user_telegram_id)
@@ -155,7 +157,9 @@ async def padmin_accept(call: types.CallbackQuery):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return
 
-    user_telegram_id = call.data.split(":", 1)[1]
+    split_data = call.data.split(":")
+    price = int(split_data[1])
+    user_telegram_id = split_data[2]
     user = await aget_user(telegram_id=user_telegram_id)
     if not user:
         await call.answer("Foydalanuvchi topilmadi.", show_alert=True)
@@ -173,7 +177,7 @@ async def padmin_accept(call: types.CallbackQuery):
     start_date = timezone.localdate()
     end_date = start_date + timedelta(days=30)
     Payment.objects.create(
-        user=user, amount=MONTHLY_PAYMENT,
+        user=user, amount=price,
         start_date=start_date, end_date=end_date, status="paid",
     )
 
@@ -203,7 +207,9 @@ async def padmin_reject(call: types.CallbackQuery, state: FSMContext):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return
 
-    user_telegram_id = call.data.split(":", 1)[1]
+    split_data = call.data.split(":")
+    price = int(split_data[1])
+    user_telegram_id = split_data[2]
     await state.update_data(padmin_reject_target=user_telegram_id)
 
     try:

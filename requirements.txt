@@ -114,3 +114,5 @@ dj-database-url==1.2.0
 marshmallow<4.0.0
 
 django-modeladmin-reorder
+openai==1.52.2
+PyMuPDF==1.23.21
