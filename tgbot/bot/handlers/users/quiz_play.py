@@ -329,14 +329,16 @@ async def vizov_join(call: types.CallbackQuery, state: FSMContext):
     if not created:
         await call.answer(f"Siz allaqachon ro'yxatdasiz! (Jami: {count} ishtirokchi)", show_alert=True)
         try:
-            await call.message.edit_reply_markup(reply_markup=joined_kb)
+            if not session.is_group:
+                await call.message.edit_reply_markup(reply_markup=joined_kb)
         except Exception:
             pass
         return
 
     await call.answer(f"✅ Ro'yxatdan o'tdingiz! Jami {count} ishtirokchi.", show_alert=True)
     try:
-        await call.message.edit_reply_markup(reply_markup=joined_kb)
+        if not session.is_group:
+            await call.message.edit_reply_markup(reply_markup=joined_kb)
     except Exception:
         pass
 
