@@ -280,19 +280,20 @@ def _premium_growth_section(user) -> str:
     day_abbr = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"]
     day_labels = [day_abbr[(today - _dt.timedelta(days=i)).weekday()] for i in range(6, -1, -1)]
 
-    BAR = "▁▂▃▄▅▆▇█"  # 8 ascending blocks — 0-pages day still shows ▁ as baseline
+    BAR = " ▂▃▄▅▆▇█"  # Ascending blocks
     max_d = max(daily) if daily else 0
     bar_chars = []
     for d in daily:
         if max_d > 0 and d > 0:
-            idx = min(7, max(0, round(d / max_d * 7)))
+            idx = min(7, max(1, round(d / max_d * 7)))
             bar_chars.append(BAR[idx])
         else:
-            bar_chars.append("▁")  # baseline so empty days still mark position
+            bar_chars.append(".")  # baseline dot is universally supported and clear!
 
-    CELL = 3  # 2-char label + 1-char gap; bar char left-aligned in same cell
-    bar_str = "".join(f"{c:<{CELL}}" for c in bar_chars).rstrip()
-    label_str = "".join(f"{d:<{CELL}}" for d in day_labels).rstrip()
+    # Align cells nicely with CELL=4 centering:
+    bar_str = "".join(f"{c:^4}" for c in bar_chars).rstrip()
+    label_str = "".join(f"{d:^4}" for d in day_labels).rstrip()
+    pages_str = "".join(f"{p:^4}" for p in daily).rstrip()
 
     def _pct(old, new):
         if old == 0:
@@ -310,9 +311,10 @@ def _premium_growth_section(user) -> str:
         f"📆 <b>Bu hafta</b> ({week_p} bet) vs O'tgan hafta ({prev_week_p} bet): <b>{_pct(prev_week_p, week_p)}</b>\n"
         f"🗓 <b>Bu oy</b> ({month_p} bet) vs O'tgan oy ({prev_month_p} bet): <b>{_pct(prev_month_p, month_p)}</b>\n"
         f"📈 <b>Bu yil</b> ({year_p} bet) vs O'tgan yil ({prev_year_p} bet): <b>{_pct(prev_year_p, year_p)}</b>\n\n"
-        f"<b>Oxirgi 7 kun:</b>\n"
+        f"<b>Oxirgi 7 kunlik kitobxonlik jadvali (betlarda):</b>\n"
         f"<code>{bar_str}</code>\n"
-        f"<code>{label_str}</code>"
+        f"<code>{label_str}</code>\n"
+        f"<code>{pages_str}</code>"
     )
 
 

@@ -342,8 +342,11 @@ async def challenge_cabinet_block(user):
         else:
             buttons.append(InlineKeyboardButton("🔒 Challenge tarixi (Premium)", callback_data="menu:premium"))
     else:
+        title_short = challenge.title
+        if len(title_short) > 25:
+            title_short = title_short[:22] + "..."
         buttons.append(InlineKeyboardButton(
-            f"🎮 Qatnashaman! {challenge.emoji}",
+            f"🎮 \"{title_short}\"da qatnashaman! {challenge.emoji}",
             callback_data=f"join_challenge:{challenge.id}",
         ))
 

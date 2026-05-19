@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import random
 import requests
 import environ
@@ -2206,9 +2206,12 @@ def announce_challenge():
         f"📊 2 kun: 15 Kitobcha | 1 kun: 5 Kitobcha\n\n"
         f"👇 Qatnashish uchun tugmani bosing!"
     )
+    title_short = challenge.title
+    if len(title_short) > 25:
+        title_short = title_short[:22] + "..."
     keyboard = json.dumps({
         "inline_keyboard": [[{
-            "text": f"🎮 Qatnashaman! {challenge.emoji}",
+            "text": f"🎮 \"{title_short}\"da qatnashaman! {challenge.emoji}",
             "callback_data": f"join_challenge:{challenge.id}",
         }]]
     })
