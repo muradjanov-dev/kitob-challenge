@@ -1,3 +1,4 @@
+import random
 import asyncio
 from aiogram import types
 from aiogram.dispatcher import FSMContext
@@ -74,6 +75,60 @@ def _today_reports_qs(user, today):
     )
 
 
+MOTIVATIONS = [
+    "Kitob — tafakkur qanotidir. ✨",
+    "Har bir o'qilgan sahifa — kelajakka qadam! 🚀",
+    "Bilim — eng kuchli qurol. Uni egallashdan to'xtamang! 💡",
+    "Kitob o'qish orqali dunyoni o'zgartira olasiz. 🌍",
+    "Bugun kitobxon, ertaga yetakchi! 🏆",
+    "Muvaffaqiyat kaliti — tinimsiz izlanishda. 🔑",
+    "Har bir sahifada yangi dunyo yashirin. 🗺",
+    "O'qish — ongni charxlaydi. 🧠",
+    "Bilim bilan yo'lingiz doim yorug' bo'ladi. 🌟",
+    "Katta natijalar kichik qadamlardan boshlanadi! 💪",
+    "Ziyolilik sari yana bir odim. Olg'a! ⚡️",
+    "Kitob sizga eng yaxshi do'st va maslahatgo'ydir. 🤝",
+    "O'rganishdan hech qachon charchamang. 📚",
+    "Har kunlik mutolaa — buyuklik poydevori. 🏛",
+    "Bilim — zanglamas boylik. 💎",
+    "Kitob o'qish — kelajak sarmoyasidir. 📈",
+    "Mutolaa ongni erkin qiladi. 🕊",
+    "Ilm bilan yuksaklikka erishasiz. 🏔",
+    "O'qish orqali tasavvuringiz cheksiz bo'ladi. 🌌",
+    "Siz o'qigan kitoblar kelajagingizni belgilaydi. 🔮",
+    "Har bir muvaffaqiyatli inson — ashaddiy kitobxondir. 😎",
+    "Bilim oling, u sizni yuksaltiradi. 🧗",
+    "Kitoblar sizga hayot yo'llarini ochadi. 🛤",
+    "Ziyoda bilim — ziyoda kuchdir! 🔥",
+    "Kunlik o'qish odati sizni yengilmas qiladi. 🛡",
+    "Mutolaa — qalb va ruh ozuqasi. 🍃",
+    "Har bir sahifa — donolik sari yo'l. 🎓",
+    "Kitob o'qish orqali o'zligingizni toping. 🧩",
+    "O'qigan inson har qanday to'siqni yengadi. 🚧",
+    "Bilim — zulmatdagi nurdir. 🕯",
+    "Siz o'qiyotgan har bir sahifa zoe ketmaydi. 💎",
+    "Buyuk maqsadlar tomon olg'a! 🎯",
+    "Kitob o'qing va dunyoqarashingizni kengaytiring. 🔭",
+    "Bilimdonlik — haqiqiy go'zallikdir. 🌸",
+    "O'rganishda davom eting, chegara yo'q! ♾",
+    "Mutolaa — fikrlar sayohati. ✈️",
+    "Kitob ko'ngil ko'zgusidir. 🪞",
+    "Har bir kitob — yangi hayot. 🐣",
+    "Bilim sizni barcha eshiklarni ochishga qodir qiladi. 🚪",
+    "Kitob bilan o'tgan vaqt — eng unumli vaqtdir. ⏰",
+    "Dunyoni o'qish orqali zabt eting! 👑",
+    "Kitob — eng sodiq hamroh. 🧭",
+    "O'qishdan to'xtagan inson fikrlashdan ham to'xtaydi. 🚦",
+    "Ilm o'rganish — eng oliy ibodat. 🙏",
+    "Bilim yuksalishning yagona yo'lidir. 📈",
+    "Har kuni bir sahifa o'qish ham katta g'alaba. 🏅",
+    "Kitoblar sizga maqsadlaringiz sari kuch beradi. 🔋",
+    "Aqlingizni kitob bilan oziqlantiring. 🍎",
+    "Bilim — hayot chirog'idir. 💡",
+    "Mutolaa bilan har kuningiz mazmunli bo'lsin! ✨"
+]
+
+
 @sync_to_async
 def _today_books_with_type(user, today):
     """Deduplicated [(title, is_audio), ...] across all today's reports' M2M books."""
@@ -90,21 +145,48 @@ def _today_books_with_type(user, today):
     return list(seen.values())
 
 
+@sync_to_async
+def _get_today_books_aggregated(user, today):
+    from tgbot.models import BookReport, BooksToRead
+    reports = BookReport.objects.filter(user=user, created_at__date=today)
+    book_sums = {}
+    for r in reports:
+        book_sums[r.book] = book_sums.get(r.book, 0) + r.pages_read
+
+    books_with_type = []
+    for title, total_val in book_sums.items():
+        b_obj = BooksToRead.objects.filter(user=user, title=title).first()
+        is_audio = b_obj.is_audio if b_obj else False
+        books_with_type.append((title, is_audio, total_val))
+    return books_with_type
+
+
 def _format_books_block(books_with_type, fallback_title=None):
-    """Render a 'Kitob:' / 'Kitoblar:' block from [(title, is_audio), ...]."""
+    """Render a block of read books:
+    O'qilgan kitoblar:
+
+    🎧 O'tkan kunlar (1 daqiqa)
+    📖 Nemo (12+ bet)
+    """
     if not books_with_type:
         if fallback_title:
-            return f"<b>Kitob nomi:</b> {fallback_title}"
-        return "<b>Kitob nomi:</b> Tanlanmagan"
-    if len(books_with_type) == 1:
-        title, is_audio = books_with_type[0]
-        icon = "🎧" if is_audio else "📖"
-        return f"<b>Kitob:</b> {icon} {title}"
-    lines = "\n".join(
-        f"{'🎧' if is_audio else '📖'} {title}"
-        for title, is_audio in books_with_type
-    )
-    return f"<b>Kitoblar:</b>\n{lines}"
+            return f"<b>O'qilgan kitoblar:</b>\n\n📄 {fallback_title}"
+        return "<b>O'qilgan kitoblar:</b>\n\nTanlanmagan"
+
+    lines = []
+    for item in books_with_type:
+        if len(item) == 3:
+            title, is_audio, val = item
+            icon = "🎧" if is_audio else "📖"
+            unit = "daqiqa" if is_audio else "bet"
+            plus = "" if is_audio else "+"
+            lines.append(f"{icon} {title} ({val}{plus} {unit})")
+        else:
+            title, is_audio = item
+            icon = "🎧" if is_audio else "📖"
+            lines.append(f"{icon} {title}")
+
+    return "<b>O'qilgan kitoblar:</b>\n\n" + "\n".join(lines)
 
 
 @sync_to_async
@@ -756,34 +838,29 @@ async def spent_time_handler(message: types.Message, state: FSMContext):
     if not book:
         book = "Tanlanmagan"
 
-    is_combined = data.get("is_combined", False)
-    if is_combined:
-        pages_read = data.get("pages_read", 0)
-        minutes_listened = data.get("minutes_listened", 0)
-        value_line = (
-            f"<b>✅ O'qilgan betlar:</b> {pages_read}+ bet\n"
-            f"<b>🎧 Eshitilgan vaqt:</b> {minutes_listened} daqiqa"
-        )
-        type_label = "📖 Kitob + 🎧 Audiokitob"
-    elif is_audio:
-        minutes_listened = data.get("minutes_listened", 0)
-        value_line = f"<b>🎧 Eshitilgan vaqt:</b> {minutes_listened} daqiqa"
-        type_label = "🎧 Audiokitob"
+    if book_reports:
+        books_block = _format_books_block(books_with_type, fallback_title=book)
     else:
-        pages_read = data.get("pages_read", 0)
-        value_line = f"<b>✅O'qilgan betlar:</b> {pages_read}+ bet"
-        type_label = "📖 Kitob"
+        pages_read = data.get("pages_read", 0) or 0
+        minutes_listened = data.get("minutes_listened", 0) or 0
+        is_audio = data.get("is_audio", False)
+        is_combined = data.get("is_combined", False)
+        if is_combined:
+            books_block = f"<b>O'qilgan kitoblar:</b>\n\n📖 {book} ({pages_read}+ bet)\n🎧 {book} ({minutes_listened} daqiqa)"
+        elif is_audio:
+            books_block = f"<b>O'qilgan kitoblar:</b>\n\n🎧 {book} ({minutes_listened} daqiqa)"
+        else:
+            books_block = f"<b>O'qilgan kitoblar:</b>\n\n📖 {book} ({pages_read}+ bet)"
 
-    books_block = _format_books_block(books_with_type, fallback_title=book)
+    motivation = random.choice(MOTIVATIONS)
+    await state.update_data(motivation=motivation)
 
     confirmation_message = (
         f"<b><a href='tg://user?id={user.telegram_id}'>{user.full_name}</a></b>:\n\n"
         f"📊#kun - {reading_day}  ({today})\n\n"
-        f"<b>Tur:</b> {type_label}\n\n"
         f"{books_block}\n\n"
-        f"{value_line}\n\n"
         f"<b>💡Olingan xulosa:</b> {conclusion}\n\n"
-        f"<b>Haqiqiy peshqadam 🏆</b>\n\n"
+        f"<b>{motivation}</b>\n\n"
         "Tasdiqlaysizmi?"
     )
 
@@ -906,35 +983,30 @@ async def _do_confirm_report(message, user, state: FSMContext):
     has_pages = total_pages > 0
     has_audio = total_minutes > 0
 
-    if has_pages and has_audio:
-        value_line = (
-            f"<b>✅ O'qilgan betlar:</b> {total_pages}+ bet\n"
-            f"<b>🎧 Eshitilgan vaqt:</b> {total_minutes} daqiqa"
-        )
-        type_tag = "📖 Kitob + 🎧 Audiokitob"
-    elif has_audio:
-        value_line = f"<b>🎧 Eshitilgan vaqt:</b> {total_minutes} daqiqa"
-        type_tag = "🎧 Audiokitob"
+    today_books = await _get_today_books_aggregated(user, today)
+    if today_books:
+        books_block = _format_books_block(today_books, fallback_title=book)
     else:
-        value_line = f"<b>✅O'qilgan betlar:</b> {total_pages}+ bet"
-        type_tag = "📖 Kitob"
+        if has_pages and has_audio:
+            books_block = f"<b>O'qilgan kitoblar:</b>\n\n📖 {book} ({total_pages}+ bet)\n🎧 {book} ({total_minutes} daqiqa)"
+        elif has_audio:
+            books_block = f"<b>O'qilgan kitoblar:</b>\n\n🎧 {book} ({total_minutes} daqiqa)"
+        else:
+            books_block = f"<b>O'qilgan kitoblar:</b>\n\n📖 {book} ({total_pages}+ bet)"
 
     aggregate_note = ""
     if is_aggregating:
         n = len(todays)
         aggregate_note = f"\n\n<i>💎 {n} ta hisobot jamlandi</i>"
 
-    today_books = await _today_books_with_type(user, today)
-    books_block = _format_books_block(today_books, fallback_title=book)
+    motivation = data.get("motivation") or random.choice(MOTIVATIONS)
 
     report_message = (
         f"<b><a href='tg://user?id={user.telegram_id}'>{prem_badge}{user.full_name}</a></b>:\n\n"
         f"📊#kun - {reading_day}  ({report.date.strftime('%Y-%m-%d')})\n\n"
-        f"<b>Tur:</b> {type_tag}\n\n"
         f"{books_block}\n\n"
-        f"{value_line}\n\n"
         f"<b>💡Olingan xulosa:</b> {conclusion}\n\n"
-        f"<b>Haqiqiy peshqadam 🏆</b>"
+        f"<b>{motivation}</b>"
         f"{aggregate_note}"
     )
 
