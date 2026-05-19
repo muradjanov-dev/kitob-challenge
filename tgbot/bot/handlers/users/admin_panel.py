@@ -1,4 +1,4 @@
-﻿from aiogram.utils.markdown import hlink
+from aiogram.utils.markdown import hlink
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from django.utils import timezone
 from asgiref.sync import sync_to_async
@@ -369,7 +369,13 @@ async def adm_user_detail(call: types.CallbackQuery):
         return
     target_id = int(call.data.split(":", 1)[1])
     text = await sync_to_async(_build_user_detail)(target_id)
-    back_kb = InlineKeyboardMarkup().add(
+    target_user = await sync_to_async(TelegramProfile.objects.filter(id=target_id).first)()
+    back_kb = InlineKeyboardMarkup(row_width=1)
+    if target_user and target_user.telegram_id:
+        back_kb.add(
+            InlineKeyboardButton("✉️ Xabar yozish (Loyiha asoschisidan)", callback_data=f"owner_reply:{target_user.telegram_id}")
+        )
+    back_kb.add(
         InlineKeyboardButton("⬅️ Ro'yxatga qaytish", callback_data="adm_userp:1")
     )
     try:

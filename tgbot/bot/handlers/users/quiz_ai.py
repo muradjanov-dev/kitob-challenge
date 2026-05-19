@@ -15,7 +15,7 @@ from tgbot.models import Quiz, QuizQuestion, QuizOption, Payment
 from tgbot.bot.handlers.users.quiz_admin import _quiz_view_kb, _quiz_view_text
 from django.utils import timezone
 
-client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY", "dummy_key"))
+# client will be initialized dynamically inside handlers using the environment variable
 
 AI_PROMPT = """You are an AI that creates quizzes. You will receive text or an image.
 Extract the main concepts and create exactly 5 multiple choice questions.
@@ -139,19 +139,27 @@ async def process_ai_input(message: types.Message, state: FSMContext):
         model = "gpt-4o-mini"
 
         # Call OpenAI
-        response = await client.chat.completions.create(
+        api_key = os.environ.get("OPENAI_API_KEY")
+        openai_client = AsyncOpenAI(api_key=api_key)
+        response = await openai_client.chat.completions.create(
             model=model,
             messages=messages,
             max_tokens=1500,
             temperature=0.7,
+            response_format={"type": "json_object"},
         )
 
         result_text = response.choices[0].message.content.strip()
         # Clean markdown code block if present
         if result_text.startswith("```json"):
-            result_text = result_text[7:-3].strip()
+            result_text = result_text.split("```json", 1)[1]
+            if "```" in result_text:
+                result_text = result_text.rsplit("```", 1)[0]
         elif result_text.startswith("```"):
-            result_text = result_text[3:-3].strip()
+            result_text = result_text.split("```", 1)[1]
+            if "```" in result_text:
+                result_text = result_text.rsplit("```", 1)[0]
+        result_text = result_text.strip()
             
         data = json.loads(result_text)
 

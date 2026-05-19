@@ -210,7 +210,7 @@ async def admin_reply_start(call: types.CallbackQuery, state: FSMContext):
         return
     target_user_id = call.data.split(":", 1)[1]
     await state.finish()
-    await state.update_data(reply_target_user_id=target_user_id)
+    await state.update_data(reply_target_user_id=target_user_id, is_owner_reply=False)
     await call.answer()
     try:
         await call.message.edit_reply_markup(reply_markup=None)
@@ -218,6 +218,33 @@ async def admin_reply_start(call: types.CallbackQuery, state: FSMContext):
         pass
     await call.message.answer(
         f"✍️ Javobingizni yozing (foydalanuvchi: <code>{target_user_id}</code>):\n"
+        f"<i>Matn, rasm, video, fayl — istalgan format</i>",
+        parse_mode="HTML",
+    )
+    await AdminReplyState.message.set()
+
+
+@dp.callback_query_handler(
+    lambda c: c.data and c.data.startswith("owner_reply:"),
+    state="*",
+)
+async def owner_reply_start(call: types.CallbackQuery, state: FSMContext):
+    if call.message and call.message.chat.type != types.ChatType.PRIVATE:
+        await call.answer()
+        return
+    if not _is_admin(call.from_user.id):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    target_user_id = call.data.split(":", 1)[1]
+    await state.finish()
+    await state.update_data(reply_target_user_id=target_user_id, is_owner_reply=True)
+    await call.answer()
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await call.message.answer(
+        f"✍️ Loyiha asoschisi nomidan yoziladigan xabarni kiriting (foydalanuvchi: <code>{target_user_id}</code>):\n"
         f"<i>Matn, rasm, video, fayl — istalgan format</i>",
         parse_mode="HTML",
     )
@@ -249,8 +276,14 @@ async def admin_reply_preview(message: types.Message, state: FSMContext):
     )
     data = await state.get_data()
     target_user_id = data.get("reply_target_user_id") or "—"
+    is_owner = data.get("is_owner_reply", False)
+    prompt = (
+        f"Yuqoridagi xabarni foydalanuvchiga (<code>{target_user_id}</code>) Loyiha Asoschisi nomidan yuboraylikmi?"
+        if is_owner else
+        f"Yuqoridagi javobni foydalanuvchiga (<code>{target_user_id}</code>) yuboraylikmi?"
+    )
     await message.answer(
-        f"Yuqoridagi javobni foydalanuvchiga (<code>{target_user_id}</code>) yuboraylikmi?",
+        prompt,
         parse_mode="HTML",
         reply_markup=_admin_reply_confirm_kb(),
     )
@@ -287,6 +320,7 @@ async def admin_reply_confirm_send(call: types.CallbackQuery, state: FSMContext)
     target_user_id = data.get("reply_target_user_id")
     draft_chat_id = data.get("ar_draft_chat_id")
     draft_message_id = data.get("ar_draft_message_id")
+    is_owner = data.get("is_owner_reply", False)
 
     await call.answer()
     try:
@@ -301,11 +335,18 @@ async def admin_reply_confirm_send(call: types.CallbackQuery, state: FSMContext)
 
     target = await aget_user(int(target_user_id))
     target_lang = (target.language if target else None) or "uz"
-    header = _t(
-        target_lang,
-        "✉️ <b>Adminstratordan javob:</b>",
-        "✉️ <b>Ответ от администратора:</b>",
-    )
+    if is_owner:
+        header = _t(
+            target_lang,
+            "✉️ <b>Loyiha asoschisidan xabar:</b>",
+            "✉️ <b>Сообщение от владельца проекта:</b>",
+        )
+    else:
+        header = _t(
+            target_lang,
+            "✉️ <b>Adminstratordan javob:</b>",
+            "✉️ <b>Ответ от администратора:</b>",
+        )
     try:
         await bot.send_message(
             chat_id=target_user_id, text=header, parse_mode="HTML",
@@ -315,7 +356,7 @@ async def admin_reply_confirm_send(call: types.CallbackQuery, state: FSMContext)
             from_chat_id=draft_chat_id,
             message_id=draft_message_id,
         )
-        await call.message.answer("✅ Javob foydalanuvchiga yuborildi.")
+        await call.message.answer("✅ Xabar foydalanuvchiga yuborildi.")
     except Exception as e:
         print(f"admin_reply: send to {target_user_id} failed: {e}")
         await call.message.answer(f"❌ Yuborib bo'lmadi: {e}")
