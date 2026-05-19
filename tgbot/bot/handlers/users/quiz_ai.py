@@ -59,25 +59,39 @@ async def process_ai_input(message: types.Message, state: FSMContext):
         await state.finish()
         return
 
+    pdf_cache_key = f"ai_quiz_pdf_limit_{user.id}"
     if message.document:
         if not message.document.file_name.lower().endswith('.pdf'):
             await message.answer("⚠️ Iltimos, faqat PDF formatidagi fayllarni yuboring.")
             return
-            
+
+        # PDF input requires active Premium (any tier). Super-premium check
+        # has been retired — all Premium subscribers get one PDF/day.
         @sync_to_async
-        def check_super_premium():
+        def check_premium():
             return Payment.objects.filter(
-                user=user, 
-                status="paid", 
-                amount__gte=47000, 
-                end_date__gte=timezone.localdate()
+                user=user,
+                status="paid",
+                end_date__gte=timezone.localdate(),
             ).exists()
-            
-        if not await check_super_premium():
+
+        if not await check_premium():
             await message.answer(
-                "🌟 <b>Super Premium funksiyasi!</b>\n\n"
-                "PDF kitoblar orqali avtomatik quiz yaratish uchun sizda <b>Super Premium</b> obunasi bo'lishi kerak.\n\n"
+                "💎 <b>Premium funksiyasi!</b>\n\n"
+                "PDF kitoblar orqali avtomatik quiz yaratish uchun sizda "
+                "<b>Premium</b> obunasi bo'lishi kerak.\n\n"
                 "Obuna bo'lish uchun Asosiy menyudan <i>💎 Premium</i> bo'limiga o'ting.",
+                parse_mode="HTML"
+            )
+            return
+
+        # Premium PDF cap: 1 generation per day (the 10/day general cap still
+        # applies on top, so this is a separate, stricter PDF-only counter).
+        if cache.get(pdf_cache_key, 0) >= 1:
+            await message.answer(
+                "⚠️ <b>Bugungi PDF limit tugadi!</b>\n\n"
+                "Premium foydalanuvchilar bir kunda <b>1 marta</b> PDF dan quiz yarata oladi. "
+                "Ertaga qayta urinib ko'ring (matn yoki rasm orqali esa kuniga 10 martagacha mumkin).",
                 parse_mode="HTML"
             )
             return
@@ -173,6 +187,11 @@ async def process_ai_input(message: types.Message, state: FSMContext):
             cache.set(cache_key, 1, timeout=86400) # Reset after 24 hours
         else:
             cache.incr(cache_key)
+
+        # Separate PDF-specific 1/day counter so PDFs are gated even when the
+        # general 10/day cap isn't exhausted yet.
+        if message.document and cache.get(pdf_cache_key, 0) == 0:
+            cache.set(pdf_cache_key, 1, timeout=86400)
         
         await msg.delete()
         
