@@ -1,4 +1,4 @@
-﻿
+
 """
 Central inline-menu callback router.
 
@@ -1540,7 +1540,7 @@ async def _menu_quiz(call, user, _state: FSMContext):
     @sync_to_async
     def _load():
         from tgbot.models import Quiz
-        qs = list(Quiz.objects.prefetch_related("questions").all())
+        qs = list(Quiz.objects.prefetch_related("questions").filter(creator=user))
         return [(q.id, q.title, q.questions.count(), q.time_per_question, q.description) for q in qs]
 
     quizzes = await _load()

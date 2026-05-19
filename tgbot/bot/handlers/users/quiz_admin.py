@@ -176,6 +176,7 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
         from django.utils import timezone
         from tgbot.models import Payment
         from tgbot.bot.states.main import AIQuizCreateState
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
         
         is_premium = await sync_to_async(
             Payment.objects.filter(user=user, status="paid", end_date__gte=timezone.localdate()).exists
@@ -186,12 +187,22 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
             
         await call.answer()
         await state.finish()
+        
+        kb = InlineKeyboardMarkup(row_width=5)
+        kb.add(
+            InlineKeyboardButton("5", callback_data="aiqz_q:5"),
+            InlineKeyboardButton("10", callback_data="aiqz_q:10"),
+            InlineKeyboardButton("15", callback_data="aiqz_q:15"),
+            InlineKeyboardButton("20", callback_data="aiqz_q:20"),
+            InlineKeyboardButton("25", callback_data="aiqz_q:25"),
+        )
         await call.message.answer(
             "🤖 <b>AI yordamida Quiz yaratish</b>\n\n"
-            "Iltimos, matn (text) yoki rasm (image) yuboring. AI o'sha asosda quiz savollarini generatsiya qiladi.",
-            parse_mode="HTML"
+            "Nechta savol bo'lishini xohlaysiz? Quyidagi tugmalardan birini tanlang:",
+            parse_mode="HTML",
+            reply_markup=kb
         )
-        await AIQuizCreateState.input_content.set()
+        await AIQuizCreateState.question_count.set()
 
     # View
     elif action == "v" and len(parts) > 2:

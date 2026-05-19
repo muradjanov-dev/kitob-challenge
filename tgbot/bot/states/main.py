@@ -109,5 +109,7 @@ class QuizBattleState(StatesGroup):
 
 
 class AIQuizCreateState(StatesGroup):
+    question_count = State()
+    time_limit = State()
     input_content = State()
     parsing = State()

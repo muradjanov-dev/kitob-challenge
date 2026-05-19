@@ -37,6 +37,51 @@ Make sure options are up to 4 items. correct_index is 0-indexed.
 Do not wrap JSON in markdown block. Just pure JSON.
 """
 
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith("aiqz_q:"), state=AIQuizCreateState.question_count)
+async def process_question_count(call: types.CallbackQuery, state: FSMContext):
+    await call.answer()
+    q_count = int(call.data.split(":")[1])
+    await state.update_data(question_count=q_count)
+    
+    kb = InlineKeyboardMarkup(row_width=5)
+    kb.add(
+        InlineKeyboardButton("15s", callback_data="aiqz_t:15"),
+        InlineKeyboardButton("25s", callback_data="aiqz_t:25"),
+        InlineKeyboardButton("35s", callback_data="aiqz_t:35"),
+        InlineKeyboardButton("45s", callback_data="aiqz_t:45"),
+        InlineKeyboardButton("55s", callback_data="aiqz_t:55"),
+    )
+    await call.message.edit_text(
+        "🤖 <b>AI yordamida Quiz yaratish</b>\n\n"
+        f"Tanlangan savollar soni: <b>{q_count} ta</b>\n\n"
+        "Har bir savol uchun vaqt qancha bo'lishini xohlaysiz? Quyidagi tugmalardan birini tanlang:",
+        parse_mode="HTML",
+        reply_markup=kb
+    )
+    await AIQuizCreateState.time_limit.set()
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith("aiqz_t:"), state=AIQuizCreateState.time_limit)
+async def process_time_limit(call: types.CallbackQuery, state: FSMContext):
+    await call.answer()
+    t_limit = int(call.data.split(":")[1])
+    await state.update_data(time_limit=t_limit)
+    
+    state_data = await state.get_data()
+    q_count = state_data.get("question_count", 5)
+    
+    await call.message.edit_text(
+        "🤖 <b>AI yordamida Quiz yaratish</b>\n\n"
+        f"Savollar soni: <b>{q_count} ta</b>\n"
+        f"Savol vaqti: <b>{t_limit} soniya</b>\n\n"
+        "Sozlamalar saqlandi. Endi, quiz yaratish uchun matn yuboring, rasm yuklang yoki PDF fayl jo'nating:",
+        parse_mode="HTML"
+    )
+    await AIQuizCreateState.input_content.set()
+
+
 @dp.message_handler(content_types=['text', 'photo', 'document'], state=AIQuizCreateState.input_content)
 async def process_ai_input(message: types.Message, state: FSMContext):
     if not os.environ.get("OPENAI_API_KEY"):
@@ -45,6 +90,11 @@ async def process_ai_input(message: types.Message, state: FSMContext):
         return
 
     user = await aget_user(message.from_user.id)
+    
+    # Get user choices
+    state_data = await state.get_data()
+    q_count = state_data.get("question_count", 5)
+    t_limit = state_data.get("time_limit", 30)
     
     # 10 limit per day check
     cache_key = f"ai_quiz_limit_{user.id}"
@@ -99,8 +149,28 @@ async def process_ai_input(message: types.Message, state: FSMContext):
     msg = await message.answer("⏳ AI ma'lumotni tahlil qilib, quiz generatsiya qilmoqda... Iltimos kuting.")
     
     try:
+        prompt = f"""You are an AI that creates quizzes. You will receive text or an image.
+Extract the main concepts and create exactly {q_count} multiple choice questions.
+Return ONLY valid JSON in the following format:
+{{
+  "title": "Quiz Title based on text",
+  "description": "Short description",
+  "time_per_question": {t_limit},
+  "questions": [
+    {{
+      "text": "Question text here?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correct_index": 1,
+      "hint": "Hint if they get it wrong"
+    }}
+  ]
+}}
+Make sure options are up to 4 items. correct_index is 0-indexed.
+Do not wrap JSON in markdown block. Just pure JSON.
+"""
+
         messages = [
-            {"role": "system", "content": AI_PROMPT}
+            {"role": "system", "content": prompt}
         ]
 
         if message.photo:
@@ -170,7 +240,7 @@ async def process_ai_input(message: types.Message, state: FSMContext):
                 creator=user,
                 title=ai_data.get("title", "AI Quiz"),
                 description=ai_data.get("description", ""),
-                time_per_question=ai_data.get("time_per_question", 30),
+                time_per_question=ai_data.get("time_per_question", t_limit),
             )
             for i, q_data in enumerate(ai_data.get("questions", [])):
                 question = QuizQuestion.objects.create(

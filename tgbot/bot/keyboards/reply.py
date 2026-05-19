@@ -89,8 +89,22 @@ def main_markup(language="uz", is_admin=False):
 
 
 def report_reply_keyboard(language="uz", bajardim_label=None):
-    from aiogram.types import ReplyKeyboardRemove
-    return ReplyKeyboardRemove()
+    if language == "ru":
+        report_text = "📚 Отчет о книге"
+        home_text = "🏠 Главное меню"
+        done_text = bajardim_label or "✅ Выполнено!"
+    else:
+        report_text = "📚 Kitob hisoboti"
+        home_text = "🏠 Bosh menyu"
+        done_text = bajardim_label or "✅ Bajardim!"
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=report_text), KeyboardButton(text=done_text)],
+            [KeyboardButton(text=home_text)],
+        ],
+        resize_keyboard=True,
+        is_persistent=True,
+    )
 
 
 def main_markup_for_user(user):
