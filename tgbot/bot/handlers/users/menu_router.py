@@ -1531,6 +1531,8 @@ async def _menu_quiz(call, user, _state: FSMContext):
         await call.message.answer("Avval /start bosib ro'yxatdan o'ting.")
         return
 
+    is_admin = bool(getattr(user, "is_admin", False))
+
     @sync_to_async
     def _load():
         from tgbot.models import Quiz
@@ -1538,11 +1540,29 @@ async def _menu_quiz(call, user, _state: FSMContext):
         return [(q.id, q.title, q.questions.count(), q.time_per_question, q.description) for q in qs]
 
     quizzes = await _load()
-    if not quizzes:
-        await call.message.answer("📭 Hozircha quiz mavjud emas.")
-        return
 
     kb = InlineKeyboardMarkup(row_width=1)
+    # Admin shortcut: surface manual + AI quiz creation at the top of the
+    # player-facing list so admins don't have to detour through Admin panel.
+    if is_admin:
+        kb.add(InlineKeyboardButton(
+            text="➕ Yangi quiz yaratish", callback_data="qz:new",
+        ))
+        kb.add(InlineKeyboardButton(
+            text="🤖 AI yordamida yaratish (Premium)", callback_data="qz:ai",
+        ))
+
+    if not quizzes:
+        if is_admin:
+            await call.message.answer(
+                "📭 <b>Hozircha quiz mavjud emas.</b>\n\nBirinchisini yarating:",
+                parse_mode="HTML",
+                reply_markup=kb,
+            )
+        else:
+            await call.message.answer("📭 Hozircha quiz mavjud emas.")
+        return
+
     for qid, title, q_count, tpq, _ in quizzes:
         # qprev shows a preview screen with Boshlash + Guruhga ulashish.
         # The timer no longer starts the instant you tap the title.
