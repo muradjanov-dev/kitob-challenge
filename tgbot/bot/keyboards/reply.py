@@ -88,23 +88,28 @@ def main_markup(language="uz", is_admin=False):
     return kb
 
 
-def report_reply_keyboard(language="uz"):
+def report_reply_keyboard(language="uz", bajardim_label=None):
     """Persistent bottom reply keyboard. Two rows of two so the 4 highest-
     frequency actions are always reachable in one tap — never 'lost in flow'.
 
     Row 1: report submission (the hero action) + daily challenge done mark.
     Row 2: cabinet shortcut + home menu.
+
+    `bajardim_label` lets the caller pass a dynamic label that embeds the
+    user's challenge progress and condition (e.g. '✅ Bajardim! (1/3) · 50+
+    bet'). The text handler matches on the '✅ Bajardim!' / '✅ Выполнено!'
+    prefix so any suffix still routes correctly.
     """
     if language == "ru":
         report_text = "📚 Отчет о книге"
         home_text = "🏠 Главное меню"
         cabinet_text = "👤 Кабинет"
-        done_text = "✅ Выполнено!"
+        done_text = bajardim_label or "✅ Выполнено!"
     else:
         report_text = "📚 Kitob hisoboti"
         home_text = "🏠 Bosh menyu"
         cabinet_text = "👤 Kabinet"
-        done_text = "✅ Bajardim!"
+        done_text = bajardim_label or "✅ Bajardim!"
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=report_text), KeyboardButton(text=done_text)],

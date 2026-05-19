@@ -58,9 +58,16 @@ async def send_main_menu(message: types.Message, user, header_text=None):
     lang = _user_lang(user)
     header = header_text or _t(lang, "🏠 Asosiy menyu", "🏠 Главное меню")
     sub = _t(lang, "Quyidagilardan birini tanlang:", "Выберите одно из ниже:")
-    # Persistent reply kb with the big "Kitob hisoboti" button.
+    # Compute the dynamic '✅ Bajardim!' label embedding today's challenge
+    # progress + condition so the persistent button reflects current state
+    # (e.g. '✅ Bajardim! (1/3) · 50+ bet').
+    from tgbot.bot.handlers.users.challenge import compute_bajardim_label
+    bajardim_label = await compute_bajardim_label(user, lang) if user else None
     try:
-        await message.answer(header, reply_markup=report_reply_keyboard(lang))
+        await message.answer(
+            header,
+            reply_markup=report_reply_keyboard(lang, bajardim_label),
+        )
     except Exception:
         pass
     await message.answer(sub, reply_markup=main_markup_for_user(user))

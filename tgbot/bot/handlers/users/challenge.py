@@ -83,6 +83,39 @@ def _find_active_challenge_id():
     return ch.id if ch else None
 
 
+# Per-user dynamic label for the persistent '✅ Bajardim!' reply-keyboard
+# button — embeds today's progress (N/3) plus the challenge condition
+# (e.g. '50+ bet') so the user always sees their status at a glance.
+@sync_to_async
+def compute_bajardim_label(user, lang: str = "uz") -> str:
+    from tgbot.models import Challenge, ChallengeParticipant
+    base = "✅ Выполнено!" if lang == "ru" else "✅ Bajardim!"
+    ch = Challenge.objects.filter(is_active=True).first()
+    if not ch:
+        return base
+    cond_map_uz = {
+        "pages_daily":     f"{ch.condition_value}+ bet",
+        "audio_daily":     f"{ch.condition_value}+ daq",
+        "referrals_daily": f"{ch.condition_value}+ taklif",
+        "review_daily":    f"{ch.condition_value}+ xulosa",
+    }
+    cond_map_ru = {
+        "pages_daily":     f"{ch.condition_value}+ стр",
+        "audio_daily":     f"{ch.condition_value}+ мин",
+        "referrals_daily": f"{ch.condition_value}+ приглашений",
+        "review_daily":    f"{ch.condition_value}+ симв.",
+    }
+    cond = (cond_map_ru if lang == "ru" else cond_map_uz).get(ch.condition_type, "")
+    parts = [base]
+    if user:
+        p = ChallengeParticipant.objects.filter(challenge=ch, user=user).first()
+        if p:
+            parts.append(f"({p.days_completed}/3)")
+    if cond:
+        parts.append(f"· {cond}")
+    return " ".join(parts)
+
+
 # ── Join ──────────────────────────────────────────────────────────────────
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("join_challenge:"), state="*")
@@ -156,7 +189,7 @@ async def challenge_done_handler(call: types.CallbackQuery, state: FSMContext):
 
 
 @dp.message_handler(
-    Text(equals=["✅ Bajardim!", "✅ Выполнено!"]),
+    Text(startswith=["✅ Bajardim!", "✅ Выполнено!"]),
     state="*",
 )
 async def challenge_done_reply_button(message: types.Message, state: FSMContext):
@@ -194,9 +227,15 @@ async def challenge_done_reply_button(message: types.Message, state: FSMContext)
             "🎉 Barcha 3 kun bajarildi! Natijalar e'lon qilinadi."
             if days_done >= 3 else f"⏳ Yana {3 - days_done} kun qoldi."
         )
+        # Refresh the persistent keyboard so the Bajardim! button label
+        # reflects the new N/3 count immediately.
+        from tgbot.bot.keyboards.reply import report_reply_keyboard
+        lang = (user.language if user else None) or "uz"
+        new_label = await compute_bajardim_label(user, lang)
         await message.answer(
             f"✅ <b>Bajarildi! {days_done}/3 kun</b>\n\n{end_msg}",
             parse_mode="HTML",
+            reply_markup=report_reply_keyboard(lang, new_label),
         )
 
 
