@@ -100,7 +100,12 @@ def compute_bajardim_label(user, lang: str = "uz") -> str:
         if p:
             days_completed = p.days_completed
 
-    title_short = ch.title
+    title_clean = ch.title
+    import re
+    title_clean = re.sub(r'(?i)\bchallenge\b', '', title_clean)
+    title_clean = re.sub(r'\s+', ' ', title_clean).strip()
+
+    title_short = title_clean
     if len(title_short) > 15:
         title_short = title_short[:12] + "..."
 
