@@ -22,6 +22,8 @@ class ReportState(StatesGroup):
     select_book = State()
     enter_book_name = State()
     enter_book_pages = State()
+    edit_book_title = State()
+    edit_book_pages = State()
     book_title = State()
     pages_read = State()
     spent_time = State()

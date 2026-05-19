@@ -145,8 +145,11 @@ async def send_book_selection_menu(message_or_call, state: FSMContext, page=1):
         label = f"{type_icon} {book.title} ({percent}%)"
         if book.id in selected_book_ids:
             label = f"✅ {label}"
-        markup.add(InlineKeyboardButton(text=label,
-                   callback_data=f"select_book:{book.id}:{page}"))
+        # Row with book selector and a settings button to edit/delete
+        markup.row(
+            InlineKeyboardButton(text=label, callback_data=f"select_book:{book.id}:{page}"),
+            InlineKeyboardButton(text="⚙️", callback_data=f"manage_book:{book.id}:{page}")
+        )
 
     nav_buttons = []
     if books_page.has_previous():
@@ -267,6 +270,9 @@ async def book_selection_handler(call: CallbackQuery, state: FSMContext):
             InlineKeyboardButton("📖 Oddiy kitob", callback_data="add_book_type:live"),
             InlineKeyboardButton("🎧 Audiokitob",  callback_data="add_book_type:audio"),
         )
+        type_kb.add(
+            InlineKeyboardButton("🔙 Orqaga", callback_data="add_book_back")
+        )
         await call.message.edit_text("Qo'shmoqchi bo'lgan kitob turini tanlang:", reply_markup=type_kb)
         await call.answer()
 
@@ -276,6 +282,10 @@ async def book_selection_handler(call: CallbackQuery, state: FSMContext):
         await call.message.delete()
         await call.message.answer(_("Kitob nomini kiriting?"), reply_markup=back_keyboard)
         await ReportState.enter_book_name.set()
+        await call.answer()
+
+    elif call.data == "add_book_back":
+        await send_book_selection_menu(call, state)
         await call.answer()
 
     elif call.data.startswith("books_page:"):
@@ -296,6 +306,122 @@ async def book_selection_handler(call: CallbackQuery, state: FSMContext):
             selected_book_ids.append(book_id)
 
         await state.update_data(selected_book_ids=selected_book_ids)
+        await send_book_selection_menu(call, state, page)
+
+    elif call.data.startswith("manage_book:"):
+        parts = call.data.split(":")
+        book_id = int(parts[1])
+        page = int(parts[2]) if len(parts) > 2 else 1
+
+        book = await get_book_by_id(book_id)
+        if not book:
+            await call.answer("Kitob topilmadi.", show_alert=True)
+            return
+
+        await call.answer()
+        type_label = "Audiokitob" if book.is_audio else "Oddiy kitob"
+        type_icon = "🎧" if book.is_audio else "📖"
+        unit = "daqiqa" if book.is_audio else "bet"
+        percent = 0
+        if book.total_pages > 0:
+            percent = int((book.current_page / book.total_pages) * 100)
+
+        text = (
+            f"⚙️ <b>Kitobni boshqarish:</b> \"{book.title}\"\n\n"
+            f"Turi: {type_icon} {type_label}\n"
+            f"Jami: {book.total_pages} {unit}\n"
+            f"O'qilgan/eshitilgan: {book.current_page} {unit} ({percent}%)\n\n"
+            f"Tuzatmoqchi bo'lsangiz quyidagi amallardan birini tanlang:"
+        )
+
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(
+            InlineKeyboardButton("✏️ Nomini o'zgartirish", callback_data=f"edit_book_title_btn:{book.id}:{page}"),
+            InlineKeyboardButton("📄 Jami bet/daqiqasini o'zgartirish", callback_data=f"edit_book_pages_btn:{book.id}:{page}"),
+            InlineKeyboardButton("🗑 Kitobni o'chirib tashlash", callback_data=f"delete_book_confirm_btn:{book.id}:{page}"),
+            InlineKeyboardButton("🔙 Orqaga", callback_data=f"books_page:{page}")
+        )
+
+        await call.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+
+    elif call.data.startswith("edit_book_title_btn:"):
+        parts = call.data.split(":")
+        book_id = int(parts[1])
+        page = int(parts[2]) if len(parts) > 2 else 1
+
+        book = await get_book_by_id(book_id)
+        if not book:
+            await call.answer("Kitob topilmadi.", show_alert=True)
+            return
+
+        await call.answer()
+        await state.update_data(edit_book_id=book_id, edit_book_page=page)
+        await ReportState.edit_book_title.set()
+
+        await call.message.delete()
+        await call.message.answer(
+            f"\"{book.title}\" kitobi uchun yangi nom kiriting:",
+            reply_markup=back_keyboard
+        )
+
+    elif call.data.startswith("edit_book_pages_btn:"):
+        parts = call.data.split(":")
+        book_id = int(parts[1])
+        page = int(parts[2]) if len(parts) > 2 else 1
+
+        book = await get_book_by_id(book_id)
+        if not book:
+            await call.answer("Kitob topilmadi.", show_alert=True)
+            return
+
+        await call.answer()
+        await state.update_data(edit_book_id=book_id, edit_book_page=page)
+        await ReportState.edit_book_pages.set()
+
+        await call.message.delete()
+        unit = "daqiqa" if book.is_audio else "bet"
+        await call.message.answer(
+            f"\"{book.title}\" kitobining jami {unit}lar sonini kiriting:",
+            reply_markup=back_keyboard
+        )
+
+    elif call.data.startswith("delete_book_confirm_btn:"):
+        parts = call.data.split(":")
+        book_id = int(parts[1])
+        page = int(parts[2]) if len(parts) > 2 else 1
+
+        book = await get_book_by_id(book_id)
+        if not book:
+            await call.answer("Kitob topilmadi.", show_alert=True)
+            return
+
+        await call.answer()
+        text = f"⚠️ Haqiqatdan ham \"{book.title}\" kitobini o'chirib tashlamoqchimisiz?\n\nBu amalni ortga qaytarib bo'lmaydi!"
+        kb = InlineKeyboardMarkup(row_width=2)
+        kb.add(
+            InlineKeyboardButton("🗑 Ha, o'chirish", callback_data=f"delete_book_yes:{book.id}:{page}"),
+            InlineKeyboardButton("❌ Yo'q", callback_data=f"manage_book:{book.id}:{page}")
+        )
+        await call.message.edit_text(text, reply_markup=kb)
+
+    elif call.data.startswith("delete_book_yes:"):
+        parts = call.data.split(":")
+        book_id = int(parts[1])
+        page = int(parts[2]) if len(parts) > 2 else 1
+
+        book = await get_book_by_id(book_id)
+        if book:
+            data = await state.get_data()
+            selected_book_ids = data.get("selected_book_ids", [])
+            if book_id in selected_book_ids:
+                selected_book_ids.remove(book_id)
+                await state.update_data(selected_book_ids=selected_book_ids)
+
+            await sync_to_async(book.delete)()
+            await call.answer("Kitob o'chirildi.", show_alert=True)
+        else:
+            await call.answer("Kitob topilmadi.", show_alert=True)
+
         await send_book_selection_menu(call, state, page)
 
     elif call.data == "confirm_selection":
@@ -374,6 +500,61 @@ async def process_new_book_pages(message: types.Message, state: FSMContext):
 
     await ReportState.select_book.set()
     await send_book_selection_menu(message, state)
+
+
+@dp.message_handler(state=ReportState.edit_book_title)
+async def process_edit_book_title(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    book_id = data.get("edit_book_id")
+    page = data.get("edit_book_page", 1)
+
+    if message.text == _("🔙 Orqaga"):
+        await ReportState.select_book.set()
+        await send_book_selection_menu(message, state, page)
+        return
+
+    new_title = message.text.strip()
+    if len(new_title) > 120:
+        await message.answer(_("Iltimos, kitobni nomi uzun bo'lmasin!"))
+        return
+
+    book = await get_book_by_id(book_id)
+    if book:
+        book.title = new_title
+        await sync_to_async(book.save)()
+        await message.answer("Kitob nomi muvaffaqiyatli o'zgartirildi! ✅")
+
+    await ReportState.select_book.set()
+    await send_book_selection_menu(message, state, page)
+
+
+@dp.message_handler(state=ReportState.edit_book_pages)
+async def process_edit_book_pages(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    book_id = data.get("edit_book_id")
+    page = data.get("edit_book_page", 1)
+
+    if message.text == _("🔙 Orqaga"):
+        await ReportState.select_book.set()
+        await send_book_selection_menu(message, state, page)
+        return
+
+    pages_str = message.text
+    if not pages_str.isdigit() or int(pages_str) <= 0:
+        await message.answer(_("Iltimos, to'g'ri son kiriting."))
+        return
+
+    total_pages = int(pages_str)
+    book = await get_book_by_id(book_id)
+    if book:
+        book.total_pages = total_pages
+        if book.current_page > total_pages:
+            book.current_page = total_pages
+        await sync_to_async(book.save)()
+        await message.answer("Kitob sahifalar/daqiqalar soni muvaffaqiyatli yangilandi! ✅")
+
+    await ReportState.select_book.set()
+    await send_book_selection_menu(message, state, page)
 
 
 # ── Per-book value entry loop (pages for live, minutes for audio) ─────────────
