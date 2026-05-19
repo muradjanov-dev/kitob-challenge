@@ -261,9 +261,9 @@ def daily_top_read_user():
     import datetime as _dt
     today = timezone.localdate()
     date_str = today.strftime("%Y%m%d")
-    # Send to general channel
-    _send_period_report(today, today, 20, "Bugun")
-    # Build message and broadcast to groups + all users
+    # _broadcast_top_to_groups_and_users covers both group posts AND user DMs
+    # with a Tabriklash button. Calling _send_period_report on top of it was
+    # producing duplicate identical group posts.
     msg = _build_top_readers_message(today, today, "Bugun 🔥 Top kitobxonlar", limit=20)
     if msg:
         _broadcast_top_to_groups_and_users(msg, "daily", date_str)
@@ -283,9 +283,6 @@ def weekly_top_read_user():
     end_date = timezone.localdate()
     start_date = end_date - _dt.timedelta(days=6)
     date_str = end_date.strftime("%Y%m%d")
-    # Send to general channel
-    _send_period_report(start_date, end_date, 30, "Bu hafta")
-    # Build message and broadcast to groups + all users
     msg = _build_top_readers_message(start_date, end_date, "Bu hafta 🏆 Top kitobxonlar", limit=30)
     if msg:
         _broadcast_top_to_groups_and_users(msg, "weekly", date_str)
@@ -297,9 +294,6 @@ def monthly_top_read_user():
     end_date = timezone.localdate()
     start_date = end_date - _dt.timedelta(days=29)
     date_str = end_date.strftime("%Y%m%d")
-    # Send to general channel
-    _send_period_report(start_date, end_date, 30, "Bu oy")
-    # Build message and broadcast to groups + all users
     msg = _build_top_readers_message(start_date, end_date, "Bu oy 📅 Top kitobxonlar", limit=30)
     if msg:
         _broadcast_top_to_groups_and_users(msg, "monthly", date_str)
@@ -311,9 +305,6 @@ def three_months_top_read_user():
     end_date = timezone.localdate()
     start_date = end_date - _dt.timedelta(days=89)
     date_str = end_date.strftime("%Y%m%d")
-    # Send to general channel
-    _send_period_report(start_date, end_date, 40, "Oxirgi 3 oyda")
-    # Build message and broadcast to groups + all users
     msg = _build_top_readers_message(start_date, end_date, "3 oylik 📊 Top kitobxonlar", limit=40)
     if msg:
         _broadcast_top_to_groups_and_users(msg, "3monthly", date_str)
@@ -333,9 +324,6 @@ def yearly_top_read_user():
     end_date = timezone.localdate()
     start_date = end_date - _dt.timedelta(days=364)
     date_str = end_date.strftime("%Y%m%d")
-    # Send to general channel
-    _send_period_report(start_date, end_date, 60, "Bu yil")
-    # Build message and broadcast to groups + all users
     msg = _build_top_readers_message(start_date, end_date, "Yillik 🏅 Top kitobxonlar", limit=60)
     if msg:
         _broadcast_top_to_groups_and_users(msg, "yearly", date_str)
