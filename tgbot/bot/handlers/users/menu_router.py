@@ -59,10 +59,15 @@ async def send_main_menu(message: types.Message, user, header_text=None):
     header = header_text or _t(lang, "🏠 Asosiy menyu", "🏠 Главное меню")
     sub = _t(lang, "Quyidagilardan birini tanlang:", "Выберите одно из ниже:")
     # Compute the dynamic '✅ Bajardim!' label embedding today's challenge
-    # progress + condition so the persistent button reflects current state
-    # (e.g. '✅ Bajardim! (1/3) · 50+ bet').
-    from tgbot.bot.handlers.users.challenge import compute_bajardim_label
-    bajardim_label = await compute_bajardim_label(user, lang) if user else None
+    # progress + condition. Wrapped in try/except so any DB hiccup falls back
+    # to the static label rather than blanking the whole menu render.
+    bajardim_label = None
+    if user:
+        try:
+            from tgbot.bot.handlers.users.challenge import compute_bajardim_label
+            bajardim_label = await compute_bajardim_label(user, lang)
+        except Exception as e:
+            print(f"compute_bajardim_label failed: {e}")
     try:
         await message.answer(
             header,

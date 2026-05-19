@@ -610,5 +610,46 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "quizzes":
         from tgbot.bot.handlers.users.quiz_admin import show_quiz_list
         await show_quiz_list(call.message, user)
+    elif action == "kitobcha_top":
+        await _send_kitobcha_top(call.message)
     else:
         await msg.answer("Noma'lum amal.")
+
+
+async def _send_kitobcha_top(message):
+    """Admin-only ranking of users by Kitobcha (ball) balance, Top 30."""
+    from asgiref.sync import sync_to_async
+    from django.utils.html import escape as _esc
+    from tgbot.models import TelegramProfile
+
+    @sync_to_async
+    def _load():
+        return list(
+            TelegramProfile.objects
+            .filter(is_registered=True)
+            .exclude(ball__isnull=True)
+            .order_by("-ball", "id")[:30]
+            .values_list("telegram_id", "full_name", "ball")
+        )
+
+    rows = await _load()
+    rows = [r for r in rows if (r[2] or 0) > 0]
+    if not rows:
+        await message.answer("🪙 Hozircha hech kimda Kitobcha yo'q.")
+        return
+
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    lines = ["🪙 <b>Kitobcha bo'yicha reyting (Top 30):</b>\n"]
+    for i, (tg_id, name, ball) in enumerate(rows, 1):
+        marker = medals.get(i, f"{i}.")
+        nm = _esc(name or "Kitobxon")
+        lines.append(
+            f"{marker} <a href='tg://user?id={tg_id}'>{nm}</a>: <b>{int(ball or 0)}</b> 🪙"
+        )
+    total = sum(int(r[2] or 0) for r in rows)
+    lines.append(f"\n📊 Top 30 jami: <b>{total}</b> 🪙")
+    await message.answer(
+        "\n".join(lines),
+        parse_mode="HTML",
+        disable_web_page_preview=True,
+    )

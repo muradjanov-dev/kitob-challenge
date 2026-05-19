@@ -193,6 +193,9 @@ admin_keyboard.row(
     InlineKeyboardButton(text="🏆 Top kitobxonlar (broadcast)", callback_data="admin:top_readers"),
 )
 admin_keyboard.row(
+    InlineKeyboardButton(text="🪙 Kitobcha reytingi", callback_data="admin:kitobcha_top"),
+)
+admin_keyboard.row(
     InlineKeyboardButton(text="📝 Quizlar", callback_data="admin:quizzes"),
 )
 
