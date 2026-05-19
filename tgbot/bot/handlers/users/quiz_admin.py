@@ -20,6 +20,27 @@ def _is_admin(user) -> bool:
     return bool(user and getattr(user, "is_admin", False))
 
 
+@sync_to_async
+def _is_active_premium(user) -> bool:
+    """Active Premium subscription right now."""
+    from django.utils import timezone as _tz
+    from tgbot.models import Payment
+    if not user:
+        return False
+    return Payment.objects.filter(
+        user=user, status="paid", end_date__gte=_tz.localdate(),
+    ).exists()
+
+
+async def _can_manage_quizzes(user) -> bool:
+    """Either an admin or an active Premium subscriber. Each quiz handler
+    additionally filters by creator=user, so a Premium user can only see
+    and edit their own quizzes."""
+    if _is_admin(user):
+        return True
+    return await _is_active_premium(user)
+
+
 def _quiz_link(code: str) -> str:
     return f"https://t.me/{BOT_USERNAME}?start=quiz_{code}"
 
@@ -107,12 +128,21 @@ async def show_quiz_list(message: types.Message, user):
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("qz:"), state="*")
 async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
     user = await aget_user(call.from_user.id)
-    if not _is_admin(user):
-        await call.answer("Faqat adminlar uchun!", show_alert=True)
+    if not await _can_manage_quizzes(user):
+        await call.answer(
+            "Quiz yaratish va boshqarish — admin yoki 💎 Premium foydalanuvchilar uchun.",
+            show_alert=True,
+        )
         return
 
     parts = call.data.split(":")
     action = parts[1]
+
+    # Vizov (live broadcast to every registered user) stays admin-only — it's
+    # a high-volume action that non-admin Premium users shouldn't trigger.
+    if action == "viz" and not _is_admin(user):
+        await call.answer("Vizov yuborish faqat adminlar uchun.", show_alert=True)
+        return
 
     # List
     if action == "ls":

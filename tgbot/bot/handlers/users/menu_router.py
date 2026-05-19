@@ -1532,6 +1532,10 @@ async def _menu_quiz(call, user, _state: FSMContext):
         return
 
     is_admin = bool(getattr(user, "is_admin", False))
+    # Premium subscribers can create + manage their own quizzes (same flow
+    # admins use). Free users see the playable list only.
+    from tgbot.bot.handlers.users.quiz_admin import _is_active_premium
+    can_create = is_admin or await _is_active_premium(user)
 
     @sync_to_async
     def _load():
@@ -1542,25 +1546,31 @@ async def _menu_quiz(call, user, _state: FSMContext):
     quizzes = await _load()
 
     kb = InlineKeyboardMarkup(row_width=1)
-    # Admin shortcut: surface manual + AI quiz creation at the top of the
-    # player-facing list so admins don't have to detour through Admin panel.
-    if is_admin:
+    if can_create:
         kb.add(InlineKeyboardButton(
             text="➕ Yangi quiz yaratish", callback_data="qz:new",
         ))
         kb.add(InlineKeyboardButton(
             text="🤖 AI yordamida yaratish (Premium)", callback_data="qz:ai",
         ))
+        kb.add(InlineKeyboardButton(
+            text="📋 Mening quizlarim", callback_data="qz:ls",
+        ))
 
     if not quizzes:
-        if is_admin:
+        if can_create:
             await call.message.answer(
                 "📭 <b>Hozircha quiz mavjud emas.</b>\n\nBirinchisini yarating:",
                 parse_mode="HTML",
                 reply_markup=kb,
             )
         else:
-            await call.message.answer("📭 Hozircha quiz mavjud emas.")
+            await call.message.answer(
+                "📭 Hozircha quiz mavjud emas.\n\n"
+                "💎 <b>Premium</b> obunaga ega bo'lsangiz, o'zingiz ham quiz "
+                "yaratishingiz mumkin.",
+                parse_mode="HTML",
+            )
         return
 
     for qid, title, q_count, tpq, _ in quizzes:
