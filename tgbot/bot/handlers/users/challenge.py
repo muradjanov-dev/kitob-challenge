@@ -93,6 +93,17 @@ def compute_bajardim_label(user, lang: str = "uz") -> str:
     ch = Challenge.objects.filter(is_active=True).first()
     if not ch:
         return base
+
+    days_completed = 0
+    if user:
+        p = ChallengeParticipant.objects.filter(challenge=ch, user=user).first()
+        if p:
+            days_completed = p.days_completed
+
+    title_short = ch.title
+    if len(title_short) > 15:
+        title_short = title_short[:12] + "..."
+
     cond_map_uz = {
         "pages_daily":     f"{ch.condition_value}+ bet",
         "audio_daily":     f"{ch.condition_value}+ daq",
@@ -106,11 +117,8 @@ def compute_bajardim_label(user, lang: str = "uz") -> str:
         "review_daily":    f"{ch.condition_value}+ симв.",
     }
     cond = (cond_map_ru if lang == "ru" else cond_map_uz).get(ch.condition_type, "")
-    parts = [base]
-    if user:
-        p = ChallengeParticipant.objects.filter(challenge=ch, user=user).first()
-        if p:
-            parts.append(f"({p.days_completed}/3)")
+
+    parts = [base, f"· {title_short} ({days_completed}/3)"]
     if cond:
         parts.append(f"· {cond}")
     return " ".join(parts)
