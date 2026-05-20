@@ -731,12 +731,12 @@ _HOW_IT_WORKS_RU = (
 
 
 def _how_it_works_kb(lang: str) -> InlineKeyboardMarkup:
+    # Reyting shortcut removed — leaderboard now lives only in the group chart.
     if lang == "ru":
         rows = [
             ("📚 Отчёт",       "cta_send_report"),
             ("👤 Кабинет",     "menu:cabinet"),
             ("🏆 Достижения",  "menu:achievements"),
-            ("📊 Рейтинг",     "menu:reyting"),
             ("💎 Подписка",    "menu:premium"),
             ("⚙️ Настройки",  "menu:settings"),
         ]
@@ -745,7 +745,6 @@ def _how_it_works_kb(lang: str) -> InlineKeyboardMarkup:
             ("📚 Hisobot",      "cta_send_report"),
             ("👤 Kabinet",      "menu:cabinet"),
             ("🏆 Yutuqlar",     "menu:achievements"),
-            ("📊 Reyting",      "menu:reyting"),
             ("💎 Premium",      "menu:premium"),
             ("⚙️ Sozlamalar",  "menu:settings"),
         ]
