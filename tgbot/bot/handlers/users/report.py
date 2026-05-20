@@ -190,8 +190,10 @@ def _format_books_block(books_with_type, fallback_title=None):
     """Render a block of read books:
     O'qilgan kitoblar:
 
-    🎧 O'tkan kunlar (1 daqiqa)
-    📖 Nemo (12+ bet)
+    🎧 O'tkan kunlar: 1 daqiqa
+    📖 Nemo: 12+ bet
+
+    Jami: 📖 12+ bet · 🎧 1 daqiqa
     """
     if not books_with_type:
         if fallback_title:
@@ -199,19 +201,49 @@ def _format_books_block(books_with_type, fallback_title=None):
         return "<b>O'qilgan kitoblar:</b>\n\nTanlanmagan"
 
     lines = []
+    total_pages = 0
+    total_minutes = 0
+    book_count = 0
+    audio_count = 0
+    live_count = 0
+    has_quantities = False
+
     for item in books_with_type:
         if len(item) == 3:
             title, is_audio, val = item
             icon = "🎧" if is_audio else "📖"
             unit = "daqiqa" if is_audio else "bet"
             plus = "" if is_audio else "+"
-            lines.append(f"{icon} {title} ({val}{plus} {unit})")
+            lines.append(f"{icon} {title}: {val}{plus} {unit}")
+            has_quantities = True
+            book_count += 1
+            if is_audio:
+                total_minutes += val or 0
+                audio_count += 1
+            else:
+                total_pages += val or 0
+                live_count += 1
         else:
             title, is_audio = item
             icon = "🎧" if is_audio else "📖"
             lines.append(f"{icon} {title}")
+            book_count += 1
+            if is_audio:
+                audio_count += 1
+            else:
+                live_count += 1
 
-    return "<b>O'qilgan kitoblar:</b>\n\n" + "\n".join(lines)
+    body = "\n".join(lines)
+    # Show a totals footer only when there are multiple books AND we have quantities
+    if has_quantities and book_count > 1 and (live_count > 0 or audio_count > 0):
+        totals = []
+        if live_count > 0:
+            totals.append(f"📖 {total_pages}+ bet")
+        if audio_count > 0:
+            totals.append(f"🎧 {total_minutes} daqiqa")
+        body += "\n\n<b>Jami:</b> " + " · ".join(totals)
+
+    return "<b>O'qilgan kitoblar:</b>\n\n" + body
 
 
 @sync_to_async
