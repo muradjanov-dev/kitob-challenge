@@ -176,3 +176,6 @@ dump.rdb
 
 #sql
 *.sql
+
+# Vendored/local packages (not meant for version control)
+d_packages/

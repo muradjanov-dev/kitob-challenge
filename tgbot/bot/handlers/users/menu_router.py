@@ -740,10 +740,10 @@ async def _menu_how_it_works(call, user, _state: FSMContext):
 # ──────────────────────────────────────────────────────────────────────────
 # Reyting — top readers for 5 periods, user-selectable via inline buttons.
 # ──────────────────────────────────────────────────────────────────────────
-_VALID_PERIODS = ("today", "week", "month", "3months", "yearly", "referral")
+_VALID_PERIODS = ("today", "week", "month", "3months", "yearly", "referral", "top_books")
 
 
-def _reyting_kb(lang: str, active: str) -> InlineKeyboardMarkup:
+def _reyting_kb(lang: str, active: str, is_admin: bool = False) -> InlineKeyboardMarkup:
     periods = [
         ("today",    _t(lang, "Bugun",      "Сегодня")),
         ("week",     _t(lang, "Bu hafta",   "Эта неделя")),
@@ -765,6 +765,12 @@ def _reyting_kb(lang: str, active: str) -> InlineKeyboardMarkup:
         kb.row(InlineKeyboardButton(
             text=_t(lang, "📤 Mening havolam", "📤 Моя ссылка"),
             callback_data="referral:link",
+        ))
+    if is_admin:
+        marker = "●" if active == "top_books" else "○"
+        kb.row(InlineKeyboardButton(
+            text=_t(lang, f"{marker} 📚 Eng ko'p o'qilgan kitoblar", f"{marker} 📚 Самые читаемые книги"),
+            callback_data="reyting:top_books",
         ))
     return kb
 
@@ -968,13 +974,45 @@ def _referral_top_text(lang: str, user=None) -> str:
 async def _menu_reyting(call, user, _state: FSMContext):
     await call.answer()
     lang = _user_lang(user)
+    is_admin = bool(user and getattr(user, "is_admin", False))
     text = await _top_readers_text("week", lang)
     await call.message.answer(
         text,
         parse_mode="HTML",
-        reply_markup=_reyting_kb(lang, "week"),
+        reply_markup=_reyting_kb(lang, "week", is_admin=is_admin),
         disable_web_page_preview=True,
     )
+
+
+@sync_to_async
+def _top_books_text(lang: str) -> str:
+    from tgbot.models import GlobalBook
+    from django.db.models import Count
+
+    top_books = list(
+        GlobalBook.objects
+        .annotate(read_count=Count("user_books__confirmationreport", distinct=True))
+        .filter(read_count__gt=0)
+        .order_by("-read_count")[:30]
+    )
+
+    if not top_books:
+        return _t(lang, "📭 Hali ma'lumot yo'q.", "📭 Данных пока нет.")
+
+    header = _t(
+        lang,
+        "📚 <b>Eng ko'p o'qilgan kitoblar</b> (Admin)\n\n",
+        "📚 <b>Самые читаемые книги</b> (Admin)\n\n",
+    )
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    unit = _t(lang, "marta", "раз")
+    lines = []
+    for i, book in enumerate(top_books, 1):
+        medal = medals.get(i, f"{i}.")
+        lines.append(
+            f"{medal} <b>{escape(book.title)}</b> — {book.read_count} {unit}"
+        )
+    return header + "\n".join(lines)
 
 
 @dp.callback_query_handler(
@@ -988,10 +1026,19 @@ async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
         return
     user = await aget_user(call.from_user.id)
     lang = _user_lang(user)
+    is_admin = bool(user and getattr(user, "is_admin", False))
+
+    # top_books is admin-only
+    if period == "top_books" and not is_admin:
+        await call.answer(_t(lang, "Bu bo'lim faqat adminlar uchun.", "Этот раздел только для админов."), show_alert=True)
+        return
+
     await call.answer()
     try:
         if period == "referral":
             text = await _referral_top_text(lang, user)
+        elif period == "top_books":
+            text = await _top_books_text(lang)
         else:
             text = await _top_readers_text(period, lang)
     except Exception as e:
@@ -1002,7 +1049,7 @@ async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
         await call.message.edit_text(
             text,
             parse_mode="HTML",
-            reply_markup=_reyting_kb(lang, period),
+            reply_markup=_reyting_kb(lang, period, is_admin=is_admin),
             disable_web_page_preview=True,
         )
     except Exception:
@@ -1010,7 +1057,7 @@ async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
             await call.message.answer(
                 text,
                 parse_mode="HTML",
-                reply_markup=_reyting_kb(lang, period),
+                reply_markup=_reyting_kb(lang, period, is_admin=is_admin),
                 disable_web_page_preview=True,
             )
         except Exception as e2:
@@ -1175,41 +1222,53 @@ def _settings_markup(user, lang: str = "uz") -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup(row_width=1)
 
     if lang == "ru":
-        btn_manage = "⚙️ Управление книгами"
-        lbl_reminders = "🔔 Ежедневные напоминания:"
-        lbl_calendar_on = "📅 Календарь (streak): Включен"
-        lbl_calendar_off = "📅 Календарь (streak): Выключен"
-        lbl_accept = "📥 Принимать поздравления:"
-        lbl_send = "📤 Отправлять поздравления:"
-        lbl_range = "🎯 Напоминания (кол-во достижений):"
-        lbl_lang = "🌐 Изменить язык"
-        lbl_how = "❓ Как это работает?"
-        lbl_restart = "🔄 Начать заново"
-        lbl_reset = "🗑 Удалить все данные"
-        accept_labels = {"any": "От всех", "male": "Мужчин", "female": "Женщин"}
-        send_labels = {"any": "Всем", "male": "Мужчинам", "female": "Женщинам"}
-        range_labels = {"any": "Все", "3-10": "3-10", "11-20": "11-20", "21-40": "21-40", "41+": "41+"}
+        sec_books    = "── 📚 Книги ──────────────────"
+        btn_manage   = "📖 Управление книгами"
+        sec_remind   = "── 🔔 Напоминания ───────────"
+        lbl_remind_hint = "0 — выкл  |  1 — вечер  |  2 — у+в  |  3 — 3×"
+        sec_cal      = "── 📅 Стрик-календарь ───────"
+        lbl_cal_on   = "● Включён  (нажмите — выключить)"
+        lbl_cal_off  = "○ Выключен (нажмите — включить)"
+        sec_congrats = "── 🎉 Поздравления ──────────"
+        lbl_accept   = "📥 Принимать:"
+        lbl_send     = "📤 Отправлять:"
+        lbl_range    = "🔔 Уведомлять при достижениях:"
+        sec_other    = "── ⚙️ Прочее ────────────────"
+        lbl_lang     = "🌐 Язык"
+        lbl_how      = "❓ Как работает?"
+        lbl_restart  = "🔄 Начать заново"
+        lbl_reset    = "🗑 Удалить все данные"
+        accept_labels = {"any": "Все", "male": "Мужчины", "female": "Женщины"}
+        send_labels   = {"any": "Всем", "male": "Мужч.", "female": "Женщ."}
+        range_labels  = {"any": "Все", "3-10": "3–10", "11-20": "11–20", "21-40": "21–40", "41+": "41+"}
     else:
-        btn_manage = "⚙️ Kitoblarni boshqarish"
-        lbl_reminders = "🔔 Kunlik eslatmalar soni:"
-        lbl_calendar_on = "📅 Streak kalendar: Yoqilgan"
-        lbl_calendar_off = "📅 Streak kalendar: O'chirilgan"
-        lbl_accept = "📥 Tabriklarni qabul qilish:"
-        lbl_send = "📤 Tabriklash yuborish:"
-        lbl_range = "🎯 Tabriklar eslatmasi (yutuqlar):"
-        lbl_lang = "🌐 Tilni o'zgartirish"
-        lbl_how = "❓ Qanday ishlaydi?"
-        lbl_restart = "🔄 Qayta boshlash"
-        lbl_reset = "🗑 Barcha ma'lumotlarni o'chirish"
+        sec_books    = "── 📚 Kitoblar ───────────────"
+        btn_manage   = "📖 Kitoblarni boshqarish"
+        sec_remind   = "── 🔔 Eslatmalar ────────────"
+        lbl_remind_hint = "0 — yo'q  |  1 — kechqurun  |  2 — e+k  |  3 — 3×"
+        sec_cal      = "── 📅 Streak kalendar ───────"
+        lbl_cal_on   = "● Yoqilgan  (bosing — o'chirish)"
+        lbl_cal_off  = "○ O'chirilgan (bosing — yoqish)"
+        sec_congrats = "── 🎉 Tabriklash ────────────"
+        lbl_accept   = "📥 Qabul qilish:"
+        lbl_send     = "📤 Yuborish:"
+        lbl_range    = "🔔 Yutuq eslatmalari:"
+        sec_other    = "── ⚙️ Boshqalar ─────────────"
+        lbl_lang     = "🌐 Til"
+        lbl_how      = "❓ Qanday ishlaydi?"
+        lbl_restart  = "🔄 Qayta boshlash"
+        lbl_reset    = "🗑 Ma'lumotlarni o'chirish"
         accept_labels = {"any": "Hammadan", "male": "Erkak", "female": "Ayol"}
-        send_labels = {"any": "Hammaga", "male": "Erkak", "female": "Ayol"}
-        range_labels = {"any": "Hammasi", "3-10": "3-10", "11-20": "11-20", "21-40": "21-40", "41+": "41+"}
+        send_labels   = {"any": "Hammaga", "male": "Erkak", "female": "Ayol"}
+        range_labels  = {"any": "Hammasi", "3-10": "3–10", "11-20": "11–20", "21-40": "21–40", "41+": "41+"}
 
-    # 1. Book Management button (Hero button at the top!)
+    # ── 📚 Kitoblar ──
+    kb.row(InlineKeyboardButton(sec_books, callback_data="noop"))
     kb.row(InlineKeyboardButton(btn_manage, callback_data="cab:manage_books"))
 
-    # 2. Daily Reminders Row
-    kb.row(InlineKeyboardButton(lbl_reminders, callback_data="noop"))
+    # ── 🔔 Eslatmalar ──
+    kb.row(InlineKeyboardButton(sec_remind, callback_data="noop"))
+    kb.row(InlineKeyboardButton(lbl_remind_hint, callback_data="noop"))
     reminders_row = []
     for n in range(0, 4):
         marker = "●" if n == rc else "○"
@@ -1218,56 +1277,51 @@ def _settings_markup(user, lang: str = "uz") -> InlineKeyboardMarkup:
         ))
     kb.row(*reminders_row)
 
-    # 3. Calendar Toggle Row
-    cal_label = lbl_calendar_on if show_cal else lbl_calendar_off
+    # ── 📅 Streak kalendar ──
+    kb.row(InlineKeyboardButton(sec_cal, callback_data="noop"))
+    cal_label = lbl_cal_on if show_cal else lbl_cal_off
     kb.row(InlineKeyboardButton(text=cal_label, callback_data="settings:cal_toggle"))
 
-    # 4. Accept congrats row
-    kb.row(InlineKeyboardButton(lbl_accept, callback_data="noop"))
-    accept_row = []
-    for code, label in (("any", accept_labels["any"]), ("male", accept_labels["male"]), ("female", accept_labels["female"])):
+    # ── 🎉 Tabriklash ──
+    kb.row(InlineKeyboardButton(sec_congrats, callback_data="noop"))
+    accept_row = [InlineKeyboardButton(lbl_accept, callback_data="noop")]
+    for code in ("any", "male", "female"):
         marker = "●" if accept == code else "○"
         accept_row.append(InlineKeyboardButton(
-            text=f"{marker} {label}", callback_data=f"settings:accept:{code}"
+            text=f"{marker} {accept_labels[code]}", callback_data=f"settings:accept:{code}"
         ))
     kb.row(*accept_row)
 
-    # 5. Send congrats row
-    kb.row(InlineKeyboardButton(lbl_send, callback_data="noop"))
-    send_row = []
-    for code, label in (("any", send_labels["any"]), ("male", send_labels["male"]), ("female", send_labels["female"])):
+    send_row = [InlineKeyboardButton(lbl_send, callback_data="noop")]
+    for code in ("any", "male", "female"):
         marker = "●" if send_to == code else "○"
         send_row.append(InlineKeyboardButton(
-            text=f"{marker} {label}", callback_data=f"settings:send:{code}"
+            text=f"{marker} {send_labels[code]}", callback_data=f"settings:send:{code}"
         ))
     kb.row(*send_row)
 
-    # 6. Tabriklar Range row
     kb.row(InlineKeyboardButton(lbl_range, callback_data="noop"))
-    
     range_row_1 = []
-    for code, label in TABRIKLAR_RANGE_CHOICES[:3]:
+    for code, _ in TABRIKLAR_RANGE_CHOICES[:3]:
         marker = "●" if tab_range == code else "○"
         range_row_1.append(InlineKeyboardButton(
             text=f"{marker} {range_labels[code]}", callback_data=f"settings:tabriklar:{code}"
         ))
     kb.row(*range_row_1)
-
     range_row_2 = []
-    for code, label in TABRIKLAR_RANGE_CHOICES[3:]:
+    for code, _ in TABRIKLAR_RANGE_CHOICES[3:]:
         marker = "●" if tab_range == code else "○"
         range_row_2.append(InlineKeyboardButton(
             text=f"{marker} {range_labels[code]}", callback_data=f"settings:tabriklar:{code}"
         ))
     kb.row(*range_row_2)
 
-    # 7. Language and How it works side-by-side
+    # ── ⚙️ Boshqalar ──
+    kb.row(InlineKeyboardButton(sec_other, callback_data="noop"))
     kb.row(
         InlineKeyboardButton(text=lbl_lang, callback_data="settings:language"),
         InlineKeyboardButton(text=lbl_how, callback_data="settings:how_it_works"),
     )
-
-    # 8. Restart & Reset data side-by-side
     kb.row(
         InlineKeyboardButton(text=lbl_restart, callback_data="settings:restart_ask"),
         InlineKeyboardButton(text=lbl_reset, callback_data="settings:reset_ask"),
@@ -1283,53 +1337,47 @@ def _settings_text(user, lang: str) -> str:
     tab_range = (getattr(user, "tabriklar_range", "any") or "any") if user else "any"
 
     if lang == "ru":
-        label = {"any": "От всех/Всем", "male": "Мужчинам", "female": "Женщинам"}
-        range_label = {
-            "any": "Все", "3-10": "3-10 достижений",
-            "11-20": "11-20 достижений", "21-40": "21-40 достижений", "41+": "41+ достижений",
-        }
-        cal_status = "включён" if show_cal else "выключен"
-    else:
-        label = {"any": "Hammadan/Hammaga", "male": "Erkak", "female": "Ayol"}
-        range_label = {
-            "any": "Hammasi", "3-10": "3-10 yutuq",
-            "11-20": "11-20 yutuq", "21-40": "21-40 yutuq", "41+": "41+ yutuq",
-        }
-        cal_status = "yoqilgan" if show_cal else "o'chirilgan"
-
-    return _t(
-        lang,
-        (
-            "⚙️ <b>Sozlamalar</b>\n\n"
-            "🔔 <b>Kunlik eslatmalar:</b>\n"
-            "  0 — yo'q · 1 — kechqurun · 2 — ertalab + kechqurun · 3 — uch marta\n"
-            f"  Joriy: <b>{rc}</b>\n\n"
-            f"📅 <b>Kalendar (streak):</b> {cal_status}\n"
-            "  Kabinetda kunlik streak ko'rsatiladi.\n\n"
-            f"🎉 <b>Tabriklash filtri:</b>\n"
-            f"  Qabul qilish: <b>{label.get(accept, accept)}</b>\n"
-            f"  Yuborish: <b>{label.get(send_to, send_to)}</b>\n\n"
-            f"🎯 <b>Tabriklar eslatmalari:</b> <b>{range_label.get(tab_range, tab_range)}</b>\n"
-            "  Faqat tanlangan diapazondagi yutuqlar uchun Tabriklash xabari keladi.\n\n"
-            "🌐 <b>Til:</b> sozlamalar orqali o'zgartiring.\n\n"
-            "🔄 <b>Qayta boshlash</b> — faqat ro'yxatdan o'tish jarayonini qaytaradi.\n"
-            "🗑 <b>Ma'lumotlarni o'chirish</b> — barcha ma'lumotlaringiz o'chiriladi."
-        ),
-        (
+        a_lbl = {"any": "Ото всех", "male": "От мужчин", "female": "От женщин"}
+        s_lbl = {"any": "Всем", "male": "Мужчинам", "female": "Женщинам"}
+        r_lbl = {"any": "Все", "3-10": "3–10", "11-20": "11–20", "21-40": "21–40", "41+": "41+"}
+        cal_status = "✅ Включён" if show_cal else "⭕ Выключен"
+        remind_map = {0: "Выкл.", 1: "Вечер", 2: "Утро + вечер", 3: "3 раза в день"}
+        return (
             "⚙️ <b>Настройки</b>\n\n"
-            "🔔 <b>Ежедневные напоминания:</b>\n"
-            "  0 — нет · 1 — вечер · 2 — утро+вечер · 3 — три раза\n"
-            f"  Текущее: <b>{rc}</b>\n\n"
-            f"📅 <b>Календарь (streak):</b> {cal_status}\n\n"
-            f"🎉 <b>Поздравления:</b>\n"
-            f"  Принимаю: <b>{label.get(accept, accept)}</b>\n"
-            f"  Отправляю: <b>{label.get(send_to, send_to)}</b>\n\n"
-            f"🎯 <b>Поздравления:</b> <b>{range_label.get(tab_range, tab_range)}</b>\n\n"
-            "🌐 <b>Язык:</b> изменить через кнопку ниже.\n\n"
-            "🔄 <b>Перезапуск</b> — только регистрация заново, данные сохраняются.\n"
-            "🗑 <b>Удаление данных</b> — все данные удаляются."
-        ),
-    )
+            "📚 <b>Книги</b>\n"
+            "  Управление своим списком книг.\n\n"
+            f"🔔 <b>Напоминания:</b> <b>{remind_map.get(rc, rc)}</b>\n"
+            "  0 — выкл · 1 — вечер · 2 — утро+вечер · 3 — три раза\n\n"
+            f"📅 <b>Стрик-календарь:</b> {cal_status}\n"
+            "  Отображает дни чтения в кабинете.\n\n"
+            "🎉 <b>Поздравления</b>\n"
+            f"  📥 Принимать: <b>{a_lbl.get(accept, accept)}</b>\n"
+            f"  📤 Отправлять: <b>{s_lbl.get(send_to, send_to)}</b>\n"
+            f"  🔔 Уведомлять при: <b>{r_lbl.get(tab_range, tab_range)} достиж.</b>\n\n"
+            "⚙️ <b>Прочее</b>\n"
+            "  🌐 Язык — 🔄 Перезапуск — 🗑 Удаление данных"
+        )
+    else:
+        a_lbl = {"any": "Hammadan", "male": "Erkakdan", "female": "Ayoldan"}
+        s_lbl = {"any": "Hammaga", "male": "Erkaklarga", "female": "Ayollarga"}
+        r_lbl = {"any": "Hammasi", "3-10": "3–10", "11-20": "11–20", "21-40": "21–40", "41+": "41+"}
+        cal_status = "✅ Yoqilgan" if show_cal else "⭕ O'chirilgan"
+        remind_map = {0: "Yo'q", 1: "Kechqurun", 2: "Ertalab + kechqurun", 3: "Kuniga 3 marta"}
+        return (
+            "⚙️ <b>Sozlamalar</b>\n\n"
+            "📚 <b>Kitoblar</b>\n"
+            "  O'zingizning kitoblar ro'yxatini boshqarish.\n\n"
+            f"🔔 <b>Eslatmalar:</b> <b>{remind_map.get(rc, rc)}</b>\n"
+            "  0 — yo'q · 1 — kechqurun · 2 — ertalab+kechqurun · 3 — kuniga 3×\n\n"
+            f"📅 <b>Streak kalendar:</b> {cal_status}\n"
+            "  Kabinetda kunlik streak ko'rinadi.\n\n"
+            "🎉 <b>Tabriklash</b>\n"
+            f"  📥 Qabul qilish: <b>{a_lbl.get(accept, accept)}</b>\n"
+            f"  📤 Yuborish: <b>{s_lbl.get(send_to, send_to)}</b>\n"
+            f"  🔔 Eslatma: <b>{r_lbl.get(tab_range, tab_range)} yutuq</b>\n\n"
+            "⚙️ <b>Boshqalar</b>\n"
+            "  🌐 Til — 🔄 Qayta boshlash — 🗑 Ma'lumotlarni o'chirish"
+        )
 
 
 async def _menu_settings(call, user, state: FSMContext):

@@ -443,43 +443,42 @@ async def process_new_book_name(message: types.Message, state: FSMContext):
         return
 
     await state.update_data(new_book_title=book_title)
-    
+
     from tgbot.models import GlobalBook, normalize_uzbek_text
-    
+
     normalized_query = normalize_uzbek_text(book_title)
-    
+
     matches = await sync_to_async(list)(
         GlobalBook.objects.filter(normalized_title__icontains=normalized_query)[:5]
     )
-    
+
     if not matches:
         kb = InlineKeyboardMarkup(row_width=1)
         kb.add(
-            InlineKeyboardButton("➕ Yangi kitob qo'shish", callback_data="create_global_book"),
-            InlineKeyboardButton("🔙 Orqaga", callback_data="add_book_back")
+            InlineKeyboardButton("➕ Shu nomda yangi kitob qo'shish", callback_data="create_global_book"),
+            InlineKeyboardButton("🔙 Orqaga", callback_data="add_book_back"),
         )
         text = (
-            f"🔍 Hech qanday kitob topilmadi.\n\n"
-            f"\"{book_title}\" kitobini birinchi bo'lib qo'shishni xohlaysizmi? "
-            f"(Keyingi foydalanuvchilar uni qidirganda chiqadigan bo'ladi)"
+            f"❌ <b>Bunday kitob hali yo'q ekan</b>\n\n"
+            f"<b>«{book_title}»</b> nomli kitob bazamizda topilmadi.\n\n"
+            f"Siz uni birinchi bo'lib qo'shishingiz mumkin — "
+            f"keyingi boshqa foydalanuvchilar qidirganda ham ko'rinadi! 📚"
         )
-        await message.answer(text, reply_markup=kb)
+        await message.answer(text, reply_markup=kb, parse_mode="HTML")
     else:
         kb = InlineKeyboardMarkup(row_width=1)
         for gbook in matches:
             kb.add(InlineKeyboardButton(f"📖 {gbook.title}", callback_data=f"select_global_book:{gbook.id}"))
-        
         kb.add(
-            InlineKeyboardButton("➕ Yangi kitob qo'shish", callback_data="create_global_book"),
-            InlineKeyboardButton("🔙 Orqaga", callback_data="add_book_back")
+            InlineKeyboardButton("➕ Boshqa kitob qo'shish (ro'yxatda yo'q)", callback_data="create_global_book"),
+            InlineKeyboardButton("🔙 Orqaga", callback_data="add_book_back"),
         )
-        
         text = (
-            f"🔍 Quyidagi kitoblar topildi:\n\n"
-            f"Agar siz izlagan kitob bu ro'yxatda bo'lsa, uni tanlang. "
-            f"Bo'lmasa, yangi kitob sifatida qo'shing:"
+            f"✅ <b>Quyidagi kitoblar topildi:</b>\n\n"
+            f"Siz qidirayotgan kitobni tanlang.\n"
+            f"Agar ro'yxatda yo'q bo'lsa — «➕ Boshqa kitob qo'shish»ni bosing:"
         )
-        await message.answer(text, reply_markup=kb)
+        await message.answer(text, reply_markup=kb, parse_mode="HTML")
 
 
 @dp.callback_query_handler(lambda c: c.data == "create_global_book" or c.data.startswith("select_global_book:"), state=ReportState.enter_book_name)
