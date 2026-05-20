@@ -393,17 +393,21 @@ async def _menu_cabinet(call, user, state: FSMContext):
             if titles:
                 conclusion_titles[r.id] = ", ".join(titles)
 
-        # Ranking — ahead/behind percentages.
+        # Ranking — ahead/behind percentages. Exclude blocked users so
+        # cheaters don't poison the percentile computation.
         all_user_pages = list(
             ConfirmationReport.objects
+            .filter(user__is_blocked=False)
             .values("user_id")
             .annotate(total=Sum("pages_read"))
             .values_list("total", flat=True)
         )
-        active_user_count = ConfirmationReport.objects.values_list(
-            "user_id"
-        ).distinct().count()
-        registered_total = TelegramProfile.objects.filter(is_registered=True).count()
+        active_user_count = ConfirmationReport.objects.filter(
+            user__is_blocked=False
+        ).values_list("user_id").distinct().count()
+        registered_total = TelegramProfile.objects.filter(
+            is_registered=True, is_blocked=False,
+        ).count()
         zero_count = max(registered_total - active_user_count, 0)
         all_user_pages.extend([0] * zero_count)
 
@@ -832,10 +836,14 @@ def _top_readers_text(period: str, lang: str) -> str:
     from django.db.models import Sum
 
     try:
-        # Live book readers — ranked by pages
+        # Live book readers — ranked by pages. Blocked users (e.g. cheaters)
+        # are excluded from leaderboards.
         live_rows = list(
             ConfirmationReport.objects
-            .filter(date__date__gte=start, date__date__lte=end, is_audio=False)
+            .filter(
+                date__date__gte=start, date__date__lte=end,
+                is_audio=False, user__is_blocked=False,
+            )
             .values("user__telegram_id", "user__full_name")
             .annotate(total=Sum("pages_read"))
             .order_by("-total")[:limit]
@@ -844,7 +852,10 @@ def _top_readers_text(period: str, lang: str) -> str:
         # Audiobook listeners — ranked by minutes
         audio_rows = list(
             ConfirmationReport.objects
-            .filter(date__date__gte=start, date__date__lte=end, is_audio=True)
+            .filter(
+                date__date__gte=start, date__date__lte=end,
+                is_audio=True, user__is_blocked=False,
+            )
             .values("user__telegram_id", "user__full_name")
             .annotate(total=Sum("minutes_listened"))
             .filter(total__gt=0)
@@ -860,7 +871,10 @@ def _top_readers_text(period: str, lang: str) -> str:
             pass
         live_rows = list(
             ConfirmationReport.objects
-            .filter(date__date__gte=start, date__date__lte=end)
+            .filter(
+                date__date__gte=start, date__date__lte=end,
+                user__is_blocked=False,
+            )
             .values("user__telegram_id", "user__full_name")
             .annotate(total=Sum("pages_read"))
             .order_by("-total")[:limit]

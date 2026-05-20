@@ -146,11 +146,13 @@ def _build_combined_top_rows(start_date, end_date, limit):
     (pages desc, minutes desc). Anyone with pages>0 OR minutes>0 is included,
     so audio-only listeners show up at the bottom of the list.
     """
+    # Exclude blocked users (e.g. for cheating/scamming) from all top lists.
     pages_rows = (
         ConfirmationReport.objects.filter(
             date__date__gte=start_date,
             date__date__lte=end_date,
             is_audio=False,
+            user__is_blocked=False,
         )
         .values('user__telegram_id', 'user__full_name')
         .annotate(total=Sum('pages_read'))
@@ -161,6 +163,7 @@ def _build_combined_top_rows(start_date, end_date, limit):
             date__date__gte=start_date,
             date__date__lte=end_date,
             is_audio=True,
+            user__is_blocked=False,
         )
         .values('user__telegram_id', 'user__full_name')
         .annotate(total=Sum('minutes_listened'))
@@ -1203,9 +1206,11 @@ def daily_top_readers_reward():
     today = timezone.localdate()
     rewards_by_rank = {1: 50, 2: 30, 3: 15}
 
-    # Track 1: live book readers ranked by pages
+    # Track 1: live book readers ranked by pages (blocked users excluded)
     live_reports = list(
-        ConfirmationReport.objects.filter(date__date=today, is_audio=False)
+        ConfirmationReport.objects.filter(
+            date__date=today, is_audio=False, user__is_blocked=False,
+        )
         .values('user_id')
         .annotate(total=Sum('pages_read'))
         .filter(total__gt=0)
@@ -1215,7 +1220,9 @@ def daily_top_readers_reward():
 
     # Track 2: audio-only listeners (not already in live track) ranked by minutes
     audio_reports = list(
-        ConfirmationReport.objects.filter(date__date=today, is_audio=True)
+        ConfirmationReport.objects.filter(
+            date__date=today, is_audio=True, user__is_blocked=False,
+        )
         .values('user_id')
         .annotate(total=Sum('minutes_listened'))
         .filter(total__gt=0)
@@ -1829,10 +1836,10 @@ def send_daily_personal_report():
         _Pay.objects.filter(status="paid", end_date__gte=today).values_list("user_id", flat=True)
     )
 
-    # Today's live-book reporters, ranked by pages
+    # Today's live-book reporters, ranked by pages (blocked excluded)
     today_rows = list(
         ConfirmationReport.objects
-        .filter(date__date=today, is_audio=False)
+        .filter(date__date=today, is_audio=False, user__is_blocked=False)
         .values("user_id")
         .annotate(today_pages=_S("pages_read"))
         .filter(today_pages__gt=0)
@@ -1969,7 +1976,7 @@ def send_daily_personal_report():
     seen_uids = set(user_ids)
     audio_rows = list(
         ConfirmationReport.objects
-        .filter(date__date=today, is_audio=True)
+        .filter(date__date=today, is_audio=True, user__is_blocked=False)
         .exclude(user_id__in=seen_uids)
         .values("user_id")
         .annotate(today_minutes=_S("minutes_listened"))
