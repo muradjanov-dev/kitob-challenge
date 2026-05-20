@@ -11,7 +11,7 @@ from aiogram.dispatcher import FSMContext
 from tgbot.bot.states.main import StatisticState, NotificationState
 from tgbot.bot.filters import IsPrivate
 from tgbot.bot.utils import aget_user
-from tgbot.bot.loader import gettext as _
+from tgbot.bot.loader import gettext as _, bot
 
 
 @dp.message_handler(IsPrivate(), commands=["admin"], state="*")
@@ -375,6 +375,17 @@ async def adm_user_detail(call: types.CallbackQuery):
         back_kb.add(
             InlineKeyboardButton("✉️ Xabar yozish (Loyiha asoschisidan)", callback_data=f"owner_reply:{target_user.telegram_id}")
         )
+        # Block / Unblock toggle — admin-only control over user access.
+        if target_user.is_blocked:
+            back_kb.add(InlineKeyboardButton(
+                "✅ Blokdan chiqarish",
+                callback_data=f"adm_block_toggle:{target_user.id}:0",
+            ))
+        else:
+            back_kb.add(InlineKeyboardButton(
+                "🚫 Bloklash",
+                callback_data=f"adm_block_toggle:{target_user.id}:1",
+            ))
     back_kb.add(
         InlineKeyboardButton("⬅️ Ro'yxatga qaytish", callback_data="adm_userp:1")
     )
@@ -383,6 +394,97 @@ async def adm_user_detail(call: types.CallbackQuery):
     except Exception:
         await call.message.answer(text, parse_mode="HTML", reply_markup=back_kb)
     await call.answer()
+
+
+@dp.callback_query_handler(
+    IsPrivate(),
+    lambda c: c.data and c.data.startswith("adm_block_toggle:"),
+    state="*",
+)
+async def adm_block_toggle(call: types.CallbackQuery):
+    """Toggle a user's is_blocked flag. Notifies the target so they aren't
+    silently locked out, and re-renders the detail card."""
+    actor = await aget_user(call.from_user.id)
+    if not (actor and actor.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+
+    parts = call.data.split(":")
+    if len(parts) < 3:
+        await call.answer()
+        return
+    target_id = int(parts[1])
+    block = parts[2] == "1"
+
+    target_user = await sync_to_async(
+        TelegramProfile.objects.filter(id=target_id).first
+    )()
+    if not target_user:
+        await call.answer("Foydalanuvchi topilmadi.", show_alert=True)
+        return
+
+    if target_user.is_admin and block:
+        await call.answer("Adminni bloklash mumkin emas.", show_alert=True)
+        return
+
+    await sync_to_async(
+        TelegramProfile.objects.filter(id=target_id).update
+    )(is_blocked=block)
+
+    # Inform the affected user so they understand why the bot stopped responding.
+    try:
+        if block:
+            await bot.send_message(
+                target_user.telegram_id,
+                "🚫 <b>Sizning hisobingiz cheklangan.</b>\n\n"
+                "Bot funksiyalaridan foydalana olmaysiz.\n"
+                "Sabab yoki blokdan chiqarish bo'yicha "
+                "<b>📞 Admin bilan bog'lanish</b> tugmasi orqali murojaat qilishingiz mumkin.",
+                parse_mode="HTML",
+            )
+        else:
+            await bot.send_message(
+                target_user.telegram_id,
+                "✅ <b>Sizning hisobingiz qayta tiklandi.</b>\n\n"
+                "Botning barcha funksiyalari yana ochildi. Marhamat!",
+                parse_mode="HTML",
+            )
+    except Exception as e:
+        print(f"block-toggle notify failed for {target_user.telegram_id}: {e}")
+
+    await call.answer(
+        "🚫 Bloklandi" if block else "✅ Blokdan chiqarildi",
+        show_alert=False,
+    )
+
+    # Re-render the detail card so the button flips immediately.
+    text = await sync_to_async(_build_user_detail)(target_id)
+    target_user = await sync_to_async(
+        TelegramProfile.objects.filter(id=target_id).first
+    )()
+    back_kb = InlineKeyboardMarkup(row_width=1)
+    if target_user and target_user.telegram_id:
+        back_kb.add(InlineKeyboardButton(
+            "✉️ Xabar yozish (Loyiha asoschisidan)",
+            callback_data=f"owner_reply:{target_user.telegram_id}",
+        ))
+        if target_user.is_blocked:
+            back_kb.add(InlineKeyboardButton(
+                "✅ Blokdan chiqarish",
+                callback_data=f"adm_block_toggle:{target_user.id}:0",
+            ))
+        else:
+            back_kb.add(InlineKeyboardButton(
+                "🚫 Bloklash",
+                callback_data=f"adm_block_toggle:{target_user.id}:1",
+            ))
+    back_kb.add(InlineKeyboardButton(
+        "⬅️ Ro'yxatga qaytish", callback_data="adm_userp:1",
+    ))
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=back_kb)
+    except Exception:
+        pass
 
 
 @dp.callback_query_handler(IsPrivate(), lambda c: c.data == "noop", state="*")

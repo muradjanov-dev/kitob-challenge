@@ -347,7 +347,10 @@ async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
         await call.answer("Avval /start bosing", show_alert=True)
         return
     if user.is_blocked:
-        await call.answer(_("Siz bot tomonidan bloklangansiz."), show_alert=True)
+        await call.answer(
+            _("Hisobingiz cheklangan. Admin bilan bog'lanish tugmasi orqali murojaat qiling."),
+            show_alert=True,
+        )
         return
 
     today = timezone.localdate()
@@ -381,7 +384,12 @@ async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
 async def send_daily_report_handler(message: types.Message, state: FSMContext):
     user = await aget_user(message.from_user.id)
     if user.is_blocked:
-        await message.answer(_("Siz bot tomonidan bloklangansiz."))
+        await message.answer(
+            "🚫 <b>Sizning hisobingiz cheklangan.</b>\n\n"
+            "Hisobot yubora olmaysiz. <b>📞 Admin bilan bog'lanish</b> "
+            "tugmasi orqali murojaat qiling.",
+            parse_mode="HTML",
+        )
         return await state.finish()
 
     today = timezone.localdate()

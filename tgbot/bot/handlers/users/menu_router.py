@@ -114,6 +114,26 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
     user = await aget_user(call.from_user.id)
     lang = _user_lang(user)
 
+    # Blocked users can ONLY reach the "contact admin" path so they can
+    # appeal. Everything else short-circuits with a clear message.
+    if user and user.is_blocked and action != "contact":
+        await call.answer()
+        await call.message.answer(
+            _t(
+                lang,
+                "🚫 <b>Sizning hisobingiz cheklangan.</b>\n\n"
+                "Bot funksiyalaridan foydalana olmaysiz.\n"
+                "Sabab yoki blokdan chiqarish bo'yicha <b>📞 Admin bilan bog'lanish</b> "
+                "tugmasi orqali murojaat qiling.",
+                "🚫 <b>Ваш аккаунт ограничен.</b>\n\n"
+                "Функции бота недоступны.\n"
+                "Чтобы узнать причину или попросить разблокировку — нажмите "
+                "<b>📞 Написать администратору</b>.",
+            ),
+            parse_mode="HTML",
+        )
+        return
+
     if action == "report":
         await _menu_report(call, user, state)
     elif action == "cabinet":
@@ -183,7 +203,16 @@ async def _menu_report(call, user, state: FSMContext):
         return
     if user.is_blocked:
         await call.message.answer(
-            _t(lang, "Siz bot tomonidan bloklangansiz.", "Вы заблокированы ботом.")
+            _t(
+                lang,
+                "🚫 <b>Sizning hisobingiz cheklangan.</b>\n\n"
+                "Hisobot yubora olmaysiz. <b>📞 Admin bilan bog'lanish</b> "
+                "tugmasi orqali murojaat qiling.",
+                "🚫 <b>Ваш аккаунт ограничен.</b>\n\n"
+                "Отправка отчётов недоступна. Нажмите "
+                "<b>📞 Написать администратору</b> для обращения.",
+            ),
+            parse_mode="HTML",
         )
         return
 
