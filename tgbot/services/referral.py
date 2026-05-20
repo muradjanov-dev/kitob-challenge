@@ -100,8 +100,8 @@ class ReferralService:
             # update_ball returns the actually-applied amount (doubled for premium).
             actually_awarded = referrer.update_ball(True, base_kitobcha)
 
-            # Every 2nd invite = 1 day premium
-            if count % 2 == 0:
+            # Every 3rd invite = 1 day premium
+            if count % 3 == 0:
                 today = _tz.localdate()
                 active = Payment.objects.filter(
                     user=referrer, status="paid", end_date__gte=today
@@ -156,8 +156,8 @@ class ReferralService:
             display_amount = awarded_kitobcha if awarded_kitobcha else base_kitobcha
             premium_note = " 💎 ×2 premium!" if awarded_kitobcha and awarded_kitobcha > base_kitobcha else ""
             reward_lines = [f"🪙 <b>+{display_amount} Kitobcha</b> qo'shildi!{premium_note}"]
-            if ref_count % 2 == 0:
-                reward_lines.append(f"💎 <b>+1 kun Premium</b> qo'shildi! (har 2 ta taklif)")
+            if ref_count % 3 == 0:
+                reward_lines.append(f"💎 <b>+1 kun Premium</b> qo'shildi! (har 3 ta taklif)")
 
             referrer_notification = (
                 f"🎉 <b>Yangi Referal!</b>\n\n"
