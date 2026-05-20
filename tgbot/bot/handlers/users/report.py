@@ -481,16 +481,31 @@ async def process_new_book_name(message: types.Message, state: FSMContext):
         await message.answer(text, reply_markup=kb, parse_mode="HTML")
 
 
-@dp.callback_query_handler(lambda c: c.data == "create_global_book" or c.data.startswith("select_global_book:"), state=ReportState.enter_book_name)
+@dp.callback_query_handler(
+    lambda c: c.data == "create_global_book"
+    or c.data == "add_book_back"
+    or c.data.startswith("select_global_book:"),
+    state=ReportState.enter_book_name,
+)
 async def process_global_book_choice(call: CallbackQuery, state: FSMContext):
     await call.answer()
-    
+
+    # Back → return to book selection menu
+    if call.data == "add_book_back":
+        try:
+            await call.message.delete()
+        except Exception:
+            pass
+        await ReportState.select_book.set()
+        await send_book_selection_menu(call.message, state)
+        return
+
     if call.data == "create_global_book":
         await state.update_data(global_book_id=None)
     else:
         global_book_id = int(call.data.split(":")[1])
         await state.update_data(global_book_id=global_book_id)
-        
+
         from tgbot.models import GlobalBook
         gbook = await sync_to_async(GlobalBook.objects.filter(id=global_book_id).first)()
         if gbook:
@@ -499,12 +514,12 @@ async def process_global_book_choice(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     new_book_is_audio = data.get("new_book_is_audio", False)
     question = "Kitob jami necha daqiqa davom etadi?" if new_book_is_audio else _("Kitob jami nechi betdan iborat?")
-    
+
     try:
         await call.message.delete()
     except Exception:
         pass
-        
+
     await call.message.answer(question, reply_markup=back_keyboard)
     await ReportState.enter_book_pages.set()
 
