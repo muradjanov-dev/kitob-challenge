@@ -1905,15 +1905,16 @@ def send_daily_personal_report():
                 year_p = year_all.get(uid, 0)
                 py_p = py_all.get(uid, 0)
 
-                # Personal motivation only — no rank/percentile messaging.
-                if today_p >= 100:
-                    motiv = f"🔥 Zo'r! Bugun {today_p} bet o'qidingiz!"
+                if rank == 1:
+                    motiv = "🥇 Barakalla! Bugun siz BIRINCHI bo'ldingiz! Zo'r natija!"
+                elif rank <= 3:
+                    motiv = f"🏅 Zo'r! Bugun TOP-3 ichida turibsiz ({rank}-o'rin)!"
+                elif pct_ahead >= 75:
+                    motiv = f"📈 Ajoyib! Kitobxonlarning {pct_ahead}% dan ko'p o'qidingiz!"
                 elif today_p > yest_p > 0:
                     motiv = "📗 Kechagidan ko'proq o'qidingiz! O'sish davom etyapti!"
-                elif today_p > 0:
-                    motiv = "📖 Har bir bet — kelajakka investitsiya. Davom eting!"
                 else:
-                    motiv = "📚 Davom eting — mutolaa eng yaxshi odat!"
+                    motiv = "📖 Har bir bet — kelajakka investitsiya. Davom eting!"
 
                 text = (
                     f"💎 <b>Premium Hisobot — {today.strftime('%d.%m.%Y')}</b>\n\n"
