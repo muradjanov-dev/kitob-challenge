@@ -313,5 +313,8 @@ async def show_user_cabinet(message: types.Message, state=None):
     # Calendar
     now = timezone.now()
     calendar_markup = generate_calendar_markup(user_id, now.year, now.month)
+    calendar_markup.add(
+        InlineKeyboardButton("⚙️ Kitoblarni boshqarish", callback_data="cab:manage_books")
+    )
 
     await message.answer(response_text, parse_mode="HTML", reply_markup=calendar_markup)

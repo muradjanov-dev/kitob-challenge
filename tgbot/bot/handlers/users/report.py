@@ -252,10 +252,9 @@ async def send_book_selection_menu(message_or_call, state: FSMContext, page=1):
         label = f"{type_icon} {book.title} ({percent}%)"
         if book.id in selected_book_ids:
             label = f"✅ {label}"
-        # Row with book selector and a settings button to edit/delete
-        markup.row(
-            InlineKeyboardButton(text=label, callback_data=f"select_book:{book.id}:{page}"),
-            InlineKeyboardButton(text="⚙️", callback_data=f"manage_book:{book.id}:{page}")
+        # Row with book selector button only, no settings button to clean up selection UI
+        markup.add(
+            InlineKeyboardButton(text=label, callback_data=f"select_book:{book.id}:{page}")
         )
 
     nav_buttons = []
@@ -415,121 +414,6 @@ async def book_selection_handler(call: CallbackQuery, state: FSMContext):
         await state.update_data(selected_book_ids=selected_book_ids)
         await send_book_selection_menu(call, state, page)
 
-    elif call.data.startswith("manage_book:"):
-        parts = call.data.split(":")
-        book_id = int(parts[1])
-        page = int(parts[2]) if len(parts) > 2 else 1
-
-        book = await get_book_by_id(book_id)
-        if not book:
-            await call.answer("Kitob topilmadi.", show_alert=True)
-            return
-
-        await call.answer()
-        type_label = "Audiokitob" if book.is_audio else "Oddiy kitob"
-        type_icon = "🎧" if book.is_audio else "📖"
-        unit = "daqiqa" if book.is_audio else "bet"
-        percent = 0
-        if book.total_pages > 0:
-            percent = int((book.current_page / book.total_pages) * 100)
-
-        text = (
-            f"⚙️ <b>Kitobni boshqarish:</b> \"{book.title}\"\n\n"
-            f"Turi: {type_icon} {type_label}\n"
-            f"Jami: {book.total_pages} {unit}\n"
-            f"O'qilgan/eshitilgan: {book.current_page} {unit} ({percent}%)\n\n"
-            f"Tuzatmoqchi bo'lsangiz quyidagi amallardan birini tanlang:"
-        )
-
-        kb = InlineKeyboardMarkup(row_width=1)
-        kb.add(
-            InlineKeyboardButton("✏️ Nomini o'zgartirish", callback_data=f"edit_book_title_btn:{book.id}:{page}"),
-            InlineKeyboardButton("📄 Jami bet/daqiqasini o'zgartirish", callback_data=f"edit_book_pages_btn:{book.id}:{page}"),
-            InlineKeyboardButton("🗑 Kitobni o'chirib tashlash", callback_data=f"delete_book_confirm_btn:{book.id}:{page}"),
-            InlineKeyboardButton("🔙 Orqaga", callback_data=f"books_page:{page}")
-        )
-
-        await call.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
-
-    elif call.data.startswith("edit_book_title_btn:"):
-        parts = call.data.split(":")
-        book_id = int(parts[1])
-        page = int(parts[2]) if len(parts) > 2 else 1
-
-        book = await get_book_by_id(book_id)
-        if not book:
-            await call.answer("Kitob topilmadi.", show_alert=True)
-            return
-
-        await call.answer()
-        await state.update_data(edit_book_id=book_id, edit_book_page=page)
-        await ReportState.edit_book_title.set()
-
-        await call.message.delete()
-        await call.message.answer(
-            f"\"{book.title}\" kitobi uchun yangi nom kiriting:",
-            reply_markup=back_keyboard
-        )
-
-    elif call.data.startswith("edit_book_pages_btn:"):
-        parts = call.data.split(":")
-        book_id = int(parts[1])
-        page = int(parts[2]) if len(parts) > 2 else 1
-
-        book = await get_book_by_id(book_id)
-        if not book:
-            await call.answer("Kitob topilmadi.", show_alert=True)
-            return
-
-        await call.answer()
-        await state.update_data(edit_book_id=book_id, edit_book_page=page)
-        await ReportState.edit_book_pages.set()
-
-        await call.message.delete()
-        unit = "daqiqa" if book.is_audio else "bet"
-        await call.message.answer(
-            f"\"{book.title}\" kitobining jami {unit}lar sonini kiriting:",
-            reply_markup=back_keyboard
-        )
-
-    elif call.data.startswith("delete_book_confirm_btn:"):
-        parts = call.data.split(":")
-        book_id = int(parts[1])
-        page = int(parts[2]) if len(parts) > 2 else 1
-
-        book = await get_book_by_id(book_id)
-        if not book:
-            await call.answer("Kitob topilmadi.", show_alert=True)
-            return
-
-        await call.answer()
-        text = f"⚠️ Haqiqatdan ham \"{book.title}\" kitobini o'chirib tashlamoqchimisiz?\n\nBu amalni ortga qaytarib bo'lmaydi!"
-        kb = InlineKeyboardMarkup(row_width=2)
-        kb.add(
-            InlineKeyboardButton("🗑 Ha, o'chirish", callback_data=f"delete_book_yes:{book.id}:{page}"),
-            InlineKeyboardButton("❌ Yo'q", callback_data=f"manage_book:{book.id}:{page}")
-        )
-        await call.message.edit_text(text, reply_markup=kb)
-
-    elif call.data.startswith("delete_book_yes:"):
-        parts = call.data.split(":")
-        book_id = int(parts[1])
-        page = int(parts[2]) if len(parts) > 2 else 1
-
-        book = await get_book_by_id(book_id)
-        if book:
-            data = await state.get_data()
-            selected_book_ids = data.get("selected_book_ids", [])
-            if book_id in selected_book_ids:
-                selected_book_ids.remove(book_id)
-                await state.update_data(selected_book_ids=selected_book_ids)
-
-            await sync_to_async(book.delete)()
-            await call.answer("Kitob o'chirildi.", show_alert=True)
-        else:
-            await call.answer("Kitob topilmadi.", show_alert=True)
-
-        await send_book_selection_menu(call, state, page)
 
     elif call.data == "confirm_selection":
         data = await state.get_data()
@@ -681,10 +565,14 @@ async def process_edit_book_title(message: types.Message, state: FSMContext):
     data = await state.get_data()
     book_id = data.get("edit_book_id")
     page = data.get("edit_book_page", 1)
+    source = data.get("edit_book_source", "")
 
     if message.text == _("🔙 Orqaga"):
-        await ReportState.select_book.set()
-        await send_book_selection_menu(message, state, page)
+        if source == "cab":
+            await send_cabinet_books_management(message, state, page)
+        else:
+            await ReportState.select_book.set()
+            await send_book_selection_menu(message, state, page)
         return
 
     new_title = message.text.strip()
@@ -698,8 +586,11 @@ async def process_edit_book_title(message: types.Message, state: FSMContext):
         await sync_to_async(book.save)()
         await message.answer("Kitob nomi muvaffaqiyatli o'zgartirildi! ✅")
 
-    await ReportState.select_book.set()
-    await send_book_selection_menu(message, state, page)
+    if source == "cab":
+        await send_cabinet_books_management(message, state, page)
+    else:
+        await ReportState.select_book.set()
+        await send_book_selection_menu(message, state, page)
 
 
 @dp.message_handler(state=ReportState.edit_book_pages)
@@ -707,10 +598,14 @@ async def process_edit_book_pages(message: types.Message, state: FSMContext):
     data = await state.get_data()
     book_id = data.get("edit_book_id")
     page = data.get("edit_book_page", 1)
+    source = data.get("edit_book_source", "")
 
     if message.text == _("🔙 Orqaga"):
-        await ReportState.select_book.set()
-        await send_book_selection_menu(message, state, page)
+        if source == "cab":
+            await send_cabinet_books_management(message, state, page)
+        else:
+            await ReportState.select_book.set()
+            await send_book_selection_menu(message, state, page)
         return
 
     pages_str = message.text
@@ -727,8 +622,214 @@ async def process_edit_book_pages(message: types.Message, state: FSMContext):
         await sync_to_async(book.save)()
         await message.answer("Kitob sahifalar/daqiqalar soni muvaffaqiyatli yangilandi! ✅")
 
-    await ReportState.select_book.set()
-    await send_book_selection_menu(message, state, page)
+    if source == "cab":
+        await send_cabinet_books_management(message, state, page)
+    else:
+        await ReportState.select_book.set()
+        await send_book_selection_menu(message, state, page)
+
+
+# ── Cabinet Book Management UI & Callback Handlers ───────────────────────────
+
+async def send_cabinet_books_management(message_or_call, state: FSMContext, page=1):
+    user = await aget_user(message_or_call.from_user.id)
+    books_page = await get_user_books(user, page)
+
+    markup = InlineKeyboardMarkup(row_width=1)
+
+    for book in books_page:
+        type_icon = "🎧" if book.is_audio else "📖"
+        percent = 0
+        if book.total_pages > 0:
+            percent = int((book.current_page / book.total_pages) * 100)
+        label = f"{type_icon} {book.title} ({percent}%)"
+        markup.add(
+            InlineKeyboardButton(text=label, callback_data=f"manage_book:{book.id}:{page}:cab")
+        )
+
+    nav_buttons = []
+    if books_page.has_previous():
+        nav_buttons.append(InlineKeyboardButton(
+            text="⬅️", callback_data=f"cab_books_page:{books_page.previous_page_number()}"))
+    nav_buttons.append(InlineKeyboardButton(
+        text=f"{page}/{books_page.paginator.num_pages}", callback_data="noop"))
+    if books_page.has_next():
+        nav_buttons.append(InlineKeyboardButton(
+            text="➡️", callback_data=f"cab_books_page:{books_page.next_page_number()}"))
+    if nav_buttons:
+        markup.row(*nav_buttons)
+
+    markup.add(InlineKeyboardButton(text="🔙 Shaxsiy kabinetga qaytish", callback_data="cab:back_to_cabinet"))
+
+    text = "⚙️ <b>Kitoblarni boshqarish:</b>\n\nTahrirlash yoki o'chirish uchun kitobni tanlang:"
+
+    if isinstance(message_or_call, types.CallbackQuery):
+        await message_or_call.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+    else:
+        await message_or_call.answer(text, reply_markup=markup, parse_mode="HTML")
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("cab:manage_books"), state="*")
+async def cab_manage_books_callback(call: types.CallbackQuery, state: FSMContext):
+    await call.answer()
+    parts = call.data.split(":")
+    page = int(parts[2]) if len(parts) > 2 else 1
+    await send_cabinet_books_management(call, state, page)
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("cab_books_page:"), state="*")
+async def cab_books_page_callback(call: types.CallbackQuery, state: FSMContext):
+    await call.answer()
+    page = int(call.data.split(":")[1])
+    await send_cabinet_books_management(call, state, page)
+
+
+@dp.callback_query_handler(lambda c: c.data == "cab:back_to_cabinet", state="*")
+async def back_to_cabinet_callback(call: types.CallbackQuery, state: FSMContext):
+    await call.answer()
+    user = await aget_user(call.from_user.id)
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
+    from tgbot.bot.handlers.users.menu_router import _menu_cabinet
+    await _menu_cabinet(call, user, state)
+
+
+# ── State-Agnostic Book Management Callbacks ────────────────────────────
+
+@dp.callback_query_handler(lambda c: c.data.startswith("manage_book:"), state="*")
+async def process_manage_book(call: types.CallbackQuery, state: FSMContext):
+    parts = call.data.split(":")
+    book_id = int(parts[1])
+    page = int(parts[2]) if len(parts) > 2 else 1
+    source = parts[3] if len(parts) > 3 else ""
+
+    book = await get_book_by_id(book_id)
+    if not book:
+        await call.answer("Kitob topilmadi.", show_alert=True)
+        return
+
+    await call.answer()
+    type_label = "Audiokitob" if book.is_audio else "Oddiy kitob"
+    type_icon = "🎧" if book.is_audio else "📖"
+    unit = "daqiqa" if book.is_audio else "bet"
+    percent = 0
+    if book.total_pages > 0:
+        percent = int((book.current_page / book.total_pages) * 100)
+
+    text = (
+        f"⚙️ <b>Kitobni boshqarish:</b> \"{book.title}\"\n\n"
+        f"Turi: {type_icon} {type_label}\n"
+        f"Jami: {book.total_pages} {unit}\n"
+        f"O'qilgan/eshitilgan: {book.current_page} {unit} ({percent}%)\n\n"
+        f"Tuzatmoqchi bo'lsangiz quyidagi amallardan birini tanlang:"
+    )
+
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(
+        InlineKeyboardButton("✏️ Nomini o'zgartirish", callback_data=f"edit_book_title_btn:{book.id}:{page}:{source}"),
+        InlineKeyboardButton("📄 Jami bet/daqiqasini o'zgartirish", callback_data=f"edit_book_pages_btn:{book.id}:{page}:{source}"),
+        InlineKeyboardButton("🗑 Kitobni o'chirib tashlash", callback_data=f"delete_book_confirm_btn:{book.id}:{page}:{source}"),
+        InlineKeyboardButton("🔙 Orqaga", callback_data=f"cab_books_page:{page}" if source == "cab" else f"books_page:{page}")
+    )
+
+    await call.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("edit_book_title_btn:"), state="*")
+async def process_edit_book_title_btn(call: types.CallbackQuery, state: FSMContext):
+    parts = call.data.split(":")
+    book_id = int(parts[1])
+    page = int(parts[2]) if len(parts) > 2 else 1
+    source = parts[3] if len(parts) > 3 else ""
+
+    book = await get_book_by_id(book_id)
+    if not book:
+        await call.answer("Kitob topilmadi.", show_alert=True)
+        return
+
+    await call.answer()
+    await state.update_data(edit_book_id=book_id, edit_book_page=page, edit_book_source=source)
+    await ReportState.edit_book_title.set()
+
+    await call.message.delete()
+    await call.message.answer(
+        f"\"{book.title}\" kitobi uchun yangi nom kiriting:",
+        reply_markup=back_keyboard
+    )
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("edit_book_pages_btn:"), state="*")
+async def process_edit_book_pages_btn(call: types.CallbackQuery, state: FSMContext):
+    parts = call.data.split(":")
+    book_id = int(parts[1])
+    page = int(parts[2]) if len(parts) > 2 else 1
+    source = parts[3] if len(parts) > 3 else ""
+
+    book = await get_book_by_id(book_id)
+    if not book:
+        await call.answer("Kitob topilmadi.", show_alert=True)
+        return
+
+    await call.answer()
+    await state.update_data(edit_book_id=book_id, edit_book_page=page, edit_book_source=source)
+    await ReportState.edit_book_pages.set()
+
+    await call.message.delete()
+    unit = "daqiqa" if book.is_audio else "bet"
+    await call.message.answer(
+        f"\"{book.title}\" kitobining jami {unit}lar sonini kiriting:",
+        reply_markup=back_keyboard
+    )
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("delete_book_confirm_btn:"), state="*")
+async def process_delete_book_confirm_btn(call: types.CallbackQuery, state: FSMContext):
+    parts = call.data.split(":")
+    book_id = int(parts[1])
+    page = int(parts[2]) if len(parts) > 2 else 1
+    source = parts[3] if len(parts) > 3 else ""
+
+    book = await get_book_by_id(book_id)
+    if not book:
+        await call.answer("Kitob topilmadi.", show_alert=True)
+        return
+
+    await call.answer()
+    text = f"⚠️ Haqiqatdan ham \"{book.title}\" kitobini o'chirib tashlamoqchimisiz?\n\nBu amalni ortga qaytarib bo'lmaydi!"
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("🗑 Ha, o'chirish", callback_data=f"delete_book_yes:{book.id}:{page}:{source}"),
+        InlineKeyboardButton("❌ Yo'q", callback_data=f"manage_book:{book.id}:{page}:{source}")
+    )
+    await call.message.edit_text(text, reply_markup=kb)
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("delete_book_yes:"), state="*")
+async def process_delete_book_yes_btn(call: types.CallbackQuery, state: FSMContext):
+    parts = call.data.split(":")
+    book_id = int(parts[1])
+    page = int(parts[2]) if len(parts) > 2 else 1
+    source = parts[3] if len(parts) > 3 else ""
+
+    book = await get_book_by_id(book_id)
+    if book:
+        data = await state.get_data()
+        selected_book_ids = data.get("selected_book_ids", [])
+        if book_id in selected_book_ids:
+            selected_book_ids.remove(book_id)
+            await state.update_data(selected_book_ids=selected_book_ids)
+
+        await sync_to_async(book.delete)()
+        await call.answer("Kitob o'chirildi.", show_alert=True)
+    else:
+        await call.answer("Kitob topilmadi.", show_alert=True)
+
+    if source == "cab":
+        await send_cabinet_books_management(call, state, page)
+    else:
+        await send_book_selection_menu(call, state, page)
 
 
 # ── Per-book value entry loop (pages for live, minutes for audio) ─────────────

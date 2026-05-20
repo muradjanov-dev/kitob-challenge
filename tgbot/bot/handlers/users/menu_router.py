@@ -488,6 +488,9 @@ async def _menu_cabinet(call, user, state: FSMContext):
                 InlineKeyboardButton("🔒 O'sish jadvali (Premium)", callback_data="menu:premium")
             )
         calendar_markup.row(InlineKeyboardButton(
+            "⚙️ Kitoblarni boshqarish", callback_data="cab:manage_books"
+        ))
+        calendar_markup.row(InlineKeyboardButton(
             "🌟 Yaxshilik ulashuvchi (Referal)", callback_data="referral:link",
         ))
         for btn in challenge_btns:
@@ -508,6 +511,9 @@ async def _menu_cabinet(call, user, state: FSMContext):
         else:
             kb.add(InlineKeyboardButton("🔒 Hisobotlar tarixi (Premium)", callback_data="menu:premium"))
             kb.add(InlineKeyboardButton("🔒 O'sish jadvali (Premium)", callback_data="menu:premium"))
+        kb.add(InlineKeyboardButton(
+            "⚙️ Kitoblarni boshqarish", callback_data="cab:manage_books"
+        ))
         kb.add(InlineKeyboardButton(
             "🌟 Yaxshilik ulashuvchi (Referal)", callback_data="referral:link",
         ))
