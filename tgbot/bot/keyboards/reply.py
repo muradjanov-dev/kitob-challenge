@@ -74,10 +74,10 @@ def main_markup(language="uz", is_admin=False):
         InlineKeyboardButton(text=labels["cabinet"], callback_data="menu:cabinet"),
         InlineKeyboardButton(text=labels["shop"], callback_data="menu:shop"),
     )
-    # Reyting (📊) removed from the user-facing main menu — top-readers
-    # stats now live exclusively in the group chart broadcast. The admin
-    # "🏆 Top kitobxonlar (broadcast)" button continues to drive that.
-    kb.row(InlineKeyboardButton(text=labels["premium"], callback_data="menu:premium"))
+    kb.row(
+        InlineKeyboardButton(text=labels["reyting"], callback_data="menu:reyting"),
+        InlineKeyboardButton(text=labels["premium"], callback_data="menu:premium"),
+    )
     kb.row(InlineKeyboardButton(text=labels["quiz"], callback_data="menu:quiz"))
     kb.row(
         InlineKeyboardButton(text=labels["settings"], callback_data="menu:settings"),

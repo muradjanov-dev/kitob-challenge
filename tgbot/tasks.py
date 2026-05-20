@@ -1229,14 +1229,15 @@ def daily_top_readers_reward():
             if not user:
                 return
             awarded = user.update_ball(True, kitobcha)
-            place_emoji = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, "🏅")
             prem_note = " 💎 ×2!" if awarded > kitobcha else ""
+            # Rank-agnostic DM: tell the user they earned Kitobcha for today's
+            # reading. The "top kitobxonlar" framing now lives only in the
+            # group chart broadcast, not in user DMs.
             dm_text = (
-                f"{place_emoji} <b>Bugungi reyting natijangiz!</b>\n\n"
-                f"O'rningiz: <b>{rank}</b>\n"
+                f"🪙 <b>Bugungi o'qish uchun mukofot!</b>\n\n"
                 f"{stat_line}\n"
-                f"🪙 Mukofot: <b>+{awarded} Kitobcha</b>{prem_note}\n\n"
-                f"Joriy balans: <b>{int(user.ball)}</b>"
+                f"🎁 Mukofot: <b>+{awarded} Kitobcha</b>{prem_note}\n\n"
+                f"💰 Joriy balans: <b>{int(user.ball)}</b>"
             )
             send_notification(chat_id=user.telegram_id, text=dm_text)
         except Exception as e:
@@ -1904,16 +1905,15 @@ def send_daily_personal_report():
                 year_p = year_all.get(uid, 0)
                 py_p = py_all.get(uid, 0)
 
-                if rank == 1:
-                    motiv = "🥇 Barakalla! Bugun siz BIRINCHI bo'ldingiz! Zo'r natija!"
-                elif rank <= 3:
-                    motiv = f"🏅 Zo'r! Bugun TOP-3 ichida turibsiz ({rank}-o'rin)!"
-                elif pct_ahead >= 75:
-                    motiv = f"📈 Ajoyib! Kitobxonlarning {pct_ahead}% dan ko'p o'qidingiz!"
+                # Personal motivation only — no rank/percentile messaging.
+                if today_p >= 100:
+                    motiv = f"🔥 Zo'r! Bugun {today_p} bet o'qidingiz!"
                 elif today_p > yest_p > 0:
                     motiv = "📗 Kechagidan ko'proq o'qidingiz! O'sish davom etyapti!"
-                else:
+                elif today_p > 0:
                     motiv = "📖 Har bir bet — kelajakka investitsiya. Davom eting!"
+                else:
+                    motiv = "📚 Davom eting — mutolaa eng yaxshi odat!"
 
                 text = (
                     f"💎 <b>Premium Hisobot — {today.strftime('%d.%m.%Y')}</b>\n\n"
@@ -1925,9 +1925,6 @@ def send_daily_personal_report():
                     f"🗓 Bu hafta: {week_p} bet (o'tgan hafta: {pw_p} bet) → <b>{_pct_str(pw_p, week_p)}</b>\n"
                     f"🗃 Bu oy: {month_p} bet (o'tgan oy: {pm_p} bet) → <b>{_pct_str(pm_p, month_p)}</b>\n"
                     f"📈 Bu yil: {year_p} bet (o'tgan yil: {py_p} bet) → <b>{_pct_str(py_p, year_p)}</b>\n\n"
-                    f"🏆 <b>Bugungi reyting:</b>\n"
-                    f"🎯 <b>{rank}-o'rin</b> / {total_reporters} ta kitobxon orasida\n"
-                    f"📉 Bugun <b>{pct_ahead}%</b> kitobxondan ko'p o'qidingiz\n\n"
                     f"📚 <b>Umumiy:</b> Jami <b>{total_p} bet</b> o'qilgan\n\n"
                     f"<i>💎 Premium a'zo sifatida bu hisobotni har kuni 23:57 da olasiz.\n"
                     f"Davom eting — har bet kelajakka investitsiya! 🚀</i>"
@@ -1942,13 +1939,13 @@ def send_daily_personal_report():
 
                 text = (
                     f"📊 <b>Bugungi natijangiz</b>\n\n"
-                    f"🏆 <b>Reyting:</b> <b>{rank}-o'rin</b> / {total_reporters} ta kitobxon orasida\n"
+                    f"📖 <b>Bugun o'qidingiz:</b> <b>{today_p} bet</b>\n"
                     f"📈 <b>Trend:</b> {trend}\n"
                     f"📚 <b>Jami o'qilgan:</b> <b>{total_p} bet</b>\n\n"
                     f"💎 <b>Premium a'zolar har kuni quyidagilarni oladi:</b>\n"
                     f"  • Bugun vs kecha, hafta, oy, yil taqqoslama (%)\n"
                     f"  • To'liq shaxsiy tahlil va motivatsion xat\n"
-                    f"  • Reyting va o'sish dinamikasi\n\n"
+                    f"  • O'sish dinamikasi va batafsil tahlil\n\n"
                     f"<i>Premium obuna: menyudan 💎 Premium tugmasini bosing!</i>"
                 )
 
