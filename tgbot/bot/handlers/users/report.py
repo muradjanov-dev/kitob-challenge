@@ -41,8 +41,33 @@ def get_user_books(user, page=1):
 
 
 @sync_to_async
-def create_new_book(user, title, total_pages, is_audio=False):
-    return BooksToRead.objects.create(user=user, title=title, total_pages=total_pages, is_audio=is_audio)
+def create_new_book(user, title, total_pages, is_audio=False, global_book_id=None):
+    from tgbot.models import GlobalBook, normalize_uzbek_text
+    gbook = None
+    if global_book_id:
+        try:
+            gbook = GlobalBook.objects.get(id=global_book_id)
+        except GlobalBook.DoesNotExist:
+            pass
+
+    if not gbook:
+        normalized = normalize_uzbek_text(title)
+        gbook = GlobalBook.objects.filter(normalized_title=normalized).first()
+        if not gbook:
+            gbook = GlobalBook.objects.filter(title__iexact=title.strip()).first()
+            if not gbook:
+                try:
+                    gbook = GlobalBook.objects.create(title=title.strip())
+                except Exception:
+                    gbook = GlobalBook.objects.filter(normalized_title=normalized).first()
+
+    return BooksToRead.objects.create(
+        user=user,
+        global_book=gbook,
+        title=gbook.title if gbook else title,
+        total_pages=total_pages,
+        is_audio=is_audio
+    )
 
 
 @sync_to_async
@@ -534,10 +559,70 @@ async def process_new_book_name(message: types.Message, state: FSMContext):
         return
 
     await state.update_data(new_book_title=book_title)
+    
+    from tgbot.models import GlobalBook, normalize_uzbek_text
+    
+    normalized_query = normalize_uzbek_text(book_title)
+    
+    matches = await sync_to_async(list)(
+        GlobalBook.objects.filter(normalized_title__icontains=normalized_query)[:5]
+    )
+    
+    if not matches:
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(
+            InlineKeyboardButton("➕ Yangi kitob qo'shish", callback_data="create_global_book"),
+            InlineKeyboardButton("🔙 Orqaga", callback_data="add_book_back")
+        )
+        text = (
+            f"🔍 Hech qanday kitob topilmadi.\n\n"
+            f"\"{book_title}\" kitobini birinchi bo'lib qo'shishni xohlaysizmi? "
+            f"(Keyingi foydalanuvchilar uni qidirganda chiqadigan bo'ladi)"
+        )
+        await message.answer(text, reply_markup=kb)
+    else:
+        kb = InlineKeyboardMarkup(row_width=1)
+        for gbook in matches:
+            kb.add(InlineKeyboardButton(f"📖 {gbook.title}", callback_data=f"select_global_book:{gbook.id}"))
+        
+        kb.add(
+            InlineKeyboardButton("➕ Yangi kitob qo'shish", callback_data="create_global_book"),
+            InlineKeyboardButton("🔙 Orqaga", callback_data="add_book_back")
+        )
+        
+        text = (
+            f"🔍 Quyidagi kitoblar topildi:\n\n"
+            f"Agar siz izlagan kitob bu ro'yxatda bo'lsa, uni tanlang. "
+            f"Bo'lmasa, yangi kitob sifatida qo'shing:"
+        )
+        await message.answer(text, reply_markup=kb)
+
+
+@dp.callback_query_handler(lambda c: c.data == "create_global_book" or c.data.startswith("select_global_book:"), state=ReportState.enter_book_name)
+async def process_global_book_choice(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+    
+    if call.data == "create_global_book":
+        await state.update_data(global_book_id=None)
+    else:
+        global_book_id = int(call.data.split(":")[1])
+        await state.update_data(global_book_id=global_book_id)
+        
+        from tgbot.models import GlobalBook
+        gbook = await sync_to_async(GlobalBook.objects.filter(id=global_book_id).first)()
+        if gbook:
+            await state.update_data(new_book_title=gbook.title)
+
     data = await state.get_data()
     new_book_is_audio = data.get("new_book_is_audio", False)
     question = "Kitob jami necha daqiqa davom etadi?" if new_book_is_audio else _("Kitob jami nechi betdan iborat?")
-    await message.answer(question, reply_markup=back_keyboard)
+    
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
+        
+    await call.message.answer(question, reply_markup=back_keyboard)
     await ReportState.enter_book_pages.set()
 
 
@@ -557,6 +642,7 @@ async def process_new_book_pages(message: types.Message, state: FSMContext):
     data = await state.get_data()
     book_title = data.get("new_book_title")
     new_book_is_audio = data.get("new_book_is_audio", False)
+    global_book_id = data.get("global_book_id")
     user = await aget_user(message.from_user.id)
 
     # Smart default: if user picked "Oddiy kitob" but the title obviously
@@ -566,7 +652,13 @@ async def process_new_book_pages(message: types.Message, state: FSMContext):
     if not new_book_is_audio and any(kw in title_l for kw in audio_keywords):
         new_book_is_audio = True
 
-    new_book = await create_new_book(user, book_title, total_pages, is_audio=new_book_is_audio)
+    new_book = await create_new_book(
+        user,
+        book_title,
+        total_pages,
+        is_audio=new_book_is_audio,
+        global_book_id=global_book_id
+    )
 
     selected_book_ids = data.get("selected_book_ids", [])
     if new_book.id not in selected_book_ids:
@@ -966,6 +1058,7 @@ async def _do_confirm_report(message, user, state: FSMContext):
                 from tgbot.models import BookReport
                 await sync_to_async(BookReport.objects.create)(
                     user=user,
+                    global_book=book_obj.global_book,
                     reading_day=reading_day,
                     book=book_obj.title,
                     pages_read=value,

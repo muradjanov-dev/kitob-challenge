@@ -1,4 +1,4 @@
-﻿from django.db import models
+from django.db import models
 from django.utils.translation import gettext_lazy as _
 from solo.models import SingletonModel
 
@@ -340,8 +340,55 @@ class TelegramButton(BaseModel):
         super(TelegramButton, self).save(*args, **kwargs)
 
 
+CYRILLIC_TO_LATIN = {
+    'А': 'A', 'а': 'a', 'Б': 'B', 'б': 'b', 'В': 'V', 'в': 'v', 'Г': 'G', 'г': 'g',
+    'Д': 'D', 'д': 'd', 'Е': 'E', 'е': 'e', 'Ё': 'Yo', 'ё': 'yo', 'Ж': 'J', 'ж': 'j',
+    'З': 'Z', 'з': 'z', 'И': 'I', 'и': 'i', 'Й': 'Y', 'й': 'y', 'К': 'K', 'к': 'k',
+    'Л': 'L', 'л': 'l', 'М': 'M', 'м': 'm', 'Н': 'N', 'н': 'n', 'О': 'O', 'о': 'o',
+    'П': 'P', 'п': 'p', 'Р': 'R', 'р': 'r', 'С': 'S', 'с': 's', 'Т': 'T', 'т': 't',
+    'У': 'U', 'у': 'u', 'Ф': 'F', 'ф': 'f', 'Х': 'X', 'х': 'x', 'Ц': 'Ts', 'ц': 'ts',
+    'Ч': 'Ch', 'ч': 'ch', 'Ш': 'Sh', 'ш': 'sh', 'Ъ': '', 'ъ': '', 'Ь': '', 'ь': '',
+    'Э': 'E', 'э': 'e', 'Ю': 'Yu', 'ю': 'yu', 'Я': 'Ya', 'я': 'ya', 'Ў': 'O', 'ў': 'o',
+    'Қ': 'Q', 'қ': 'q', 'Ғ': 'G', 'ғ': 'g', 'Ҳ': 'H', 'ҳ': 'h',
+}
+
+def normalize_uzbek_text(text: str) -> str:
+    if not text:
+        return ""
+    # 1. Transliterate Cyrillic characters to Latin
+    latin_chars = [CYRILLIC_TO_LATIN.get(c, c) for c in text]
+    latin_text = "".join(latin_chars).lower()
+
+    # 2. Strip all styles of apostrophes (', `, ’, ’, ”, ʻ) to prevent matching mismatch
+    apostrophes = ["'", "`", "’", "‘", "ʻ", "\"", "”", "“"]
+    for ap in apostrophes:
+        latin_text = latin_text.replace(ap, "")
+
+    # 3. Clean extra whitespaces
+    return " ".join(latin_text.split())
+
+
+class GlobalBook(BaseModel):
+    title = models.CharField(max_length=255, unique=True, verbose_name="Book Title")
+    normalized_title = models.CharField(max_length=255, db_index=True)
+    author = models.CharField(max_length=255, blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        self.normalized_title = normalize_uzbek_text(self.title)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        verbose_name = _("Global Book")
+        verbose_name_plural = _("Global Books")
+        db_table = "global_book"
+
+
 class BooksToRead(BaseModel):
     user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE)
+    global_book = models.ForeignKey(GlobalBook, on_delete=models.SET_NULL, null=True, blank=True, related_name="user_books")
     title = models.CharField(max_length=255)
     is_audio = models.BooleanField(default=False)
     total_pages = models.PositiveIntegerField(default=1)  # for audio: total minutes
@@ -361,6 +408,14 @@ class BookReport(BaseModel):
         TelegramProfile,
         on_delete=models.CASCADE,
         verbose_name=_("User")
+    )
+    global_book = models.ForeignKey(
+        GlobalBook,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reports",
+        verbose_name=_("Global Book")
     )
     reading_day = models.IntegerField(
         default=1,
