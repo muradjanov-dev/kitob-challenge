@@ -659,9 +659,16 @@ async def send_cabinet_books_management(message_or_call, state: FSMContext, page
     if nav_buttons:
         markup.row(*nav_buttons)
 
-    markup.add(InlineKeyboardButton(text="🔙 Shaxsiy kabinetga qaytish", callback_data="cab:back_to_cabinet"))
+    # Localized text and back buttons
+    lang = (user.language if user else "uz") or "uz"
+    if lang == "ru":
+        back_label = "🔙 Вернуться в настройки"
+        text = "⚙️ <b>Управление книгами:</b>\n\nВыберите книгу для редактирования или удаления:"
+    else:
+        back_label = "🔙 Sozlamalarga qaytish"
+        text = "⚙️ <b>Kitoblarni boshqarish:</b>\n\nTahrirlash yoki o'chirish uchun kitobni tanlang:"
 
-    text = "⚙️ <b>Kitoblarni boshqarish:</b>\n\nTahrirlash yoki o'chirish uchun kitobni tanlang:"
+    markup.add(InlineKeyboardButton(text=back_label, callback_data="cab:back_to_settings"))
 
     if isinstance(message_or_call, types.CallbackQuery):
         await message_or_call.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
@@ -684,16 +691,16 @@ async def cab_books_page_callback(call: types.CallbackQuery, state: FSMContext):
     await send_cabinet_books_management(call, state, page)
 
 
-@dp.callback_query_handler(lambda c: c.data == "cab:back_to_cabinet", state="*")
-async def back_to_cabinet_callback(call: types.CallbackQuery, state: FSMContext):
+@dp.callback_query_handler(lambda c: c.data == "cab:back_to_settings", state="*")
+async def back_to_settings_callback(call: types.CallbackQuery, state: FSMContext):
     await call.answer()
     user = await aget_user(call.from_user.id)
     try:
         await call.message.delete()
     except Exception:
         pass
-    from tgbot.bot.handlers.users.menu_router import _menu_cabinet
-    await _menu_cabinet(call, user, state)
+    from tgbot.bot.handlers.users.menu_router import _menu_settings
+    await _menu_settings(call, user, state)
 
 
 # ── State-Agnostic Book Management Callbacks ────────────────────────────

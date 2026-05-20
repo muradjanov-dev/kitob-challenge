@@ -488,9 +488,6 @@ async def _menu_cabinet(call, user, state: FSMContext):
                 InlineKeyboardButton("🔒 O'sish jadvali (Premium)", callback_data="menu:premium")
             )
         calendar_markup.row(InlineKeyboardButton(
-            "⚙️ Kitoblarni boshqarish", callback_data="cab:manage_books"
-        ))
-        calendar_markup.row(InlineKeyboardButton(
             "🌟 Yaxshilik ulashuvchi (Referal)", callback_data="referral:link",
         ))
         for btn in challenge_btns:
@@ -511,9 +508,6 @@ async def _menu_cabinet(call, user, state: FSMContext):
         else:
             kb.add(InlineKeyboardButton("🔒 Hisobotlar tarixi (Premium)", callback_data="menu:premium"))
             kb.add(InlineKeyboardButton("🔒 O'sish jadvali (Premium)", callback_data="menu:premium"))
-        kb.add(InlineKeyboardButton(
-            "⚙️ Kitoblarni boshqarish", callback_data="cab:manage_books"
-        ))
         kb.add(InlineKeyboardButton(
             "🌟 Yaxshilik ulashuvchi (Referal)", callback_data="referral:link",
         ))
@@ -1171,67 +1165,112 @@ TABRIKLAR_RANGE_CHOICES = (
 )
 
 
-def _settings_markup(user) -> InlineKeyboardMarkup:
+def _settings_markup(user, lang: str = "uz") -> InlineKeyboardMarkup:
     rc = getattr(user, "reminder_count", 3) if user else 3
     show_cal = bool(getattr(user, "show_calendar", False)) if user else False
     accept = (getattr(user, "accept_congrats_from", "any") or "any") if user else "any"
     send_to = (getattr(user, "send_congrats_to", "any") or "any") if user else "any"
     tab_range = (getattr(user, "tabriklar_range", "any") or "any") if user else "any"
 
-    kb = InlineKeyboardMarkup(row_width=4)
-    # Reminder count row
-    kb.insert(InlineKeyboardButton(text="🔔 Eslatma:", callback_data="noop"))
+    kb = InlineKeyboardMarkup(row_width=1)
+
+    if lang == "ru":
+        btn_manage = "⚙️ Управление книгами"
+        lbl_reminders = "🔔 Ежедневные напоминания:"
+        lbl_calendar_on = "📅 Календарь (streak): Включен"
+        lbl_calendar_off = "📅 Календарь (streak): Выключен"
+        lbl_accept = "📥 Принимать поздравления:"
+        lbl_send = "📤 Отправлять поздравления:"
+        lbl_range = "🎯 Напоминания (кол-во достижений):"
+        lbl_lang = "🌐 Изменить язык"
+        lbl_how = "❓ Как это работает?"
+        lbl_restart = "🔄 Начать заново"
+        lbl_reset = "🗑 Удалить все данные"
+        accept_labels = {"any": "От всех", "male": "Мужчин", "female": "Женщин"}
+        send_labels = {"any": "Всем", "male": "Мужчинам", "female": "Женщинам"}
+        range_labels = {"any": "Все", "3-10": "3-10", "11-20": "11-20", "21-40": "21-40", "41+": "41+"}
+    else:
+        btn_manage = "⚙️ Kitoblarni boshqarish"
+        lbl_reminders = "🔔 Kunlik eslatmalar soni:"
+        lbl_calendar_on = "📅 Streak kalendar: Yoqilgan"
+        lbl_calendar_off = "📅 Streak kalendar: O'chirilgan"
+        lbl_accept = "📥 Tabriklarni qabul qilish:"
+        lbl_send = "📤 Tabriklash yuborish:"
+        lbl_range = "🎯 Tabriklar eslatmasi (yutuqlar):"
+        lbl_lang = "🌐 Tilni o'zgartirish"
+        lbl_how = "❓ Qanday ishlaydi?"
+        lbl_restart = "🔄 Qayta boshlash"
+        lbl_reset = "🗑 Barcha ma'lumotlarni o'chirish"
+        accept_labels = {"any": "Hammadan", "male": "Erkak", "female": "Ayol"}
+        send_labels = {"any": "Hammaga", "male": "Erkak", "female": "Ayol"}
+        range_labels = {"any": "Hammasi", "3-10": "3-10", "11-20": "11-20", "21-40": "21-40", "41+": "41+"}
+
+    # 1. Book Management button (Hero button at the top!)
+    kb.row(InlineKeyboardButton(btn_manage, callback_data="cab:manage_books"))
+
+    # 2. Daily Reminders Row
+    kb.row(InlineKeyboardButton(lbl_reminders, callback_data="noop"))
+    reminders_row = []
     for n in range(0, 4):
         marker = "●" if n == rc else "○"
-        kb.insert(InlineKeyboardButton(
-            text=f"{marker}{n}", callback_data=f"settings:reminders:{n}",
+        reminders_row.append(InlineKeyboardButton(
+            text=f"{marker} {n}", callback_data=f"settings:reminders:{n}"
         ))
-    # Calendar toggle
-    cal_label = "✅ Kalendar yoqilgan" if show_cal else "⚪️ Kalendar o'chirilgan"
+    kb.row(*reminders_row)
+
+    # 3. Calendar Toggle Row
+    cal_label = lbl_calendar_on if show_cal else lbl_calendar_off
     kb.row(InlineKeyboardButton(text=cal_label, callback_data="settings:cal_toggle"))
 
-    # Accept congrats from
-    kb.row(InlineKeyboardButton("Tabriklarni qabul qilish:", callback_data="noop"))
-    for code, label in (("any", "Hammadan"), ("male", "Erkak"), ("female", "Ayol")):
+    # 4. Accept congrats row
+    kb.row(InlineKeyboardButton(lbl_accept, callback_data="noop"))
+    accept_row = []
+    for code, label in (("any", accept_labels["any"]), ("male", accept_labels["male"]), ("female", accept_labels["female"])):
         marker = "●" if accept == code else "○"
-        kb.insert(InlineKeyboardButton(
-            text=f"{marker} {label}", callback_data=f"settings:accept:{code}",
+        accept_row.append(InlineKeyboardButton(
+            text=f"{marker} {label}", callback_data=f"settings:accept:{code}"
         ))
-    # Send congrats to
-    kb.row(InlineKeyboardButton("Tabriklash yuborish:", callback_data="noop"))
-    for code, label in (("any", "Hammaga"), ("male", "Erkak"), ("female", "Ayol")):
+    kb.row(*accept_row)
+
+    # 5. Send congrats row
+    kb.row(InlineKeyboardButton(lbl_send, callback_data="noop"))
+    send_row = []
+    for code, label in (("any", send_labels["any"]), ("male", send_labels["male"]), ("female", send_labels["female"])):
         marker = "●" if send_to == code else "○"
-        kb.insert(InlineKeyboardButton(
-            text=f"{marker} {label}", callback_data=f"settings:send:{code}",
+        send_row.append(InlineKeyboardButton(
+            text=f"{marker} {label}", callback_data=f"settings:send:{code}"
         ))
+    kb.row(*send_row)
 
-    # Tabriklar eslatmalari — filter incoming Tabriklash DMs by achiever's
-    # total achievement count. Pick a tier or 'Hammasi' for no filter.
-    kb.row(InlineKeyboardButton("🎯 Tabriklar eslatmalari (yutuqlar soni):", callback_data="noop"))
-    for code, label in TABRIKLAR_RANGE_CHOICES:
+    # 6. Tabriklar Range row
+    kb.row(InlineKeyboardButton(lbl_range, callback_data="noop"))
+    
+    range_row_1 = []
+    for code, label in TABRIKLAR_RANGE_CHOICES[:3]:
         marker = "●" if tab_range == code else "○"
-        kb.insert(InlineKeyboardButton(
-            text=f"{marker} {label}", callback_data=f"settings:tabriklar:{code}",
+        range_row_1.append(InlineKeyboardButton(
+            text=f"{marker} {range_labels[code]}", callback_data=f"settings:tabriklar:{code}"
         ))
+    kb.row(*range_row_1)
 
-    # Language toggle
-    kb.row(InlineKeyboardButton(text="🌐 Tilni o'zgartirish / Изменить язык", callback_data="settings:language"))
+    range_row_2 = []
+    for code, label in TABRIKLAR_RANGE_CHOICES[3:]:
+        marker = "●" if tab_range == code else "○"
+        range_row_2.append(InlineKeyboardButton(
+            text=f"{marker} {range_labels[code]}", callback_data=f"settings:tabriklar:{code}"
+        ))
+    kb.row(*range_row_2)
 
-    # How it works
-    kb.row(InlineKeyboardButton(text="❓ Qanday ishlaydi?", callback_data="settings:how_it_works"))
-
-    # Restart & Full reset buttons
+    # 7. Language and How it works side-by-side
     kb.row(
-        InlineKeyboardButton(
-            text="🔄 Qayta boshlash (ma'lumotlar saqlanadi)",
-            callback_data="settings:restart_ask",
-        )
+        InlineKeyboardButton(text=lbl_lang, callback_data="settings:language"),
+        InlineKeyboardButton(text=lbl_how, callback_data="settings:how_it_works"),
     )
+
+    # 8. Restart & Reset data side-by-side
     kb.row(
-        InlineKeyboardButton(
-            text="🗑 Barcha ma'lumotlarni o'chirish",
-            callback_data="settings:reset_ask",
-        )
+        InlineKeyboardButton(text=lbl_restart, callback_data="settings:restart_ask"),
+        InlineKeyboardButton(text=lbl_reset, callback_data="settings:reset_ask"),
     )
     return kb
 
@@ -1243,13 +1282,21 @@ def _settings_text(user, lang: str) -> str:
     send_to = (getattr(user, "send_congrats_to", "any") or "any") if user else "any"
     tab_range = (getattr(user, "tabriklar_range", "any") or "any") if user else "any"
 
-    label = {"any": "Hammadan/Hammaga", "male": "Erkak", "female": "Ayol"}
-    range_label = {
-        "any": "Hammasi", "3-10": "3-10 yutuq",
-        "11-20": "11-20 yutuq", "21-40": "21-40 yutuq", "41+": "41+ yutuq",
-    }
-    cal_uz = "yoqilgan" if show_cal else "o'chirilgan"
-    cal_ru = "включён" if show_cal else "выключен"
+    if lang == "ru":
+        label = {"any": "От всех/Всем", "male": "Мужчинам", "female": "Женщинам"}
+        range_label = {
+            "any": "Все", "3-10": "3-10 достижений",
+            "11-20": "11-20 достижений", "21-40": "21-40 достижений", "41+": "41+ достижений",
+        }
+        cal_status = "включён" if show_cal else "выключен"
+    else:
+        label = {"any": "Hammadan/Hammaga", "male": "Erkak", "female": "Ayol"}
+        range_label = {
+            "any": "Hammasi", "3-10": "3-10 yutuq",
+            "11-20": "11-20 yutuq", "21-40": "21-40 yutuq", "41+": "41+ yutuq",
+        }
+        cal_status = "yoqilgan" if show_cal else "o'chirilgan"
+
     return _t(
         lang,
         (
@@ -1257,7 +1304,7 @@ def _settings_text(user, lang: str) -> str:
             "🔔 <b>Kunlik eslatmalar:</b>\n"
             "  0 — yo'q · 1 — kechqurun · 2 — ertalab + kechqurun · 3 — uch marta\n"
             f"  Joriy: <b>{rc}</b>\n\n"
-            f"📅 <b>Kalendar (streak):</b> {cal_uz}\n"
+            f"📅 <b>Kalendar (streak):</b> {cal_status}\n"
             "  Kabinetda kunlik streak ko'rsatiladi.\n\n"
             f"🎉 <b>Tabriklash filtri:</b>\n"
             f"  Qabul qilish: <b>{label.get(accept, accept)}</b>\n"
@@ -1273,10 +1320,11 @@ def _settings_text(user, lang: str) -> str:
             "🔔 <b>Ежедневные напоминания:</b>\n"
             "  0 — нет · 1 — вечер · 2 — утро+вечер · 3 — три раза\n"
             f"  Текущее: <b>{rc}</b>\n\n"
-            f"📅 <b>Календарь (streak):</b> {cal_ru}\n\n"
+            f"📅 <b>Календарь (streak):</b> {cal_status}\n\n"
             f"🎉 <b>Поздравления:</b>\n"
             f"  Принимаю: <b>{label.get(accept, accept)}</b>\n"
             f"  Отправляю: <b>{label.get(send_to, send_to)}</b>\n\n"
+            f"🎯 <b>Поздравления:</b> <b>{range_label.get(tab_range, tab_range)}</b>\n\n"
             "🌐 <b>Язык:</b> изменить через кнопку ниже.\n\n"
             "🔄 <b>Перезапуск</b> — только регистрация заново, данные сохраняются.\n"
             "🗑 <b>Удаление данных</b> — все данные удаляются."
@@ -1287,11 +1335,18 @@ def _settings_text(user, lang: str) -> str:
 async def _menu_settings(call, user, state: FSMContext):
     await call.answer()
     lang = _user_lang(user)
-    await call.message.answer(
-        _settings_text(user, lang),
-        parse_mode="HTML",
-        reply_markup=_settings_markup(user),
-    )
+    try:
+        await call.message.edit_text(
+            _settings_text(user, lang),
+            parse_mode="HTML",
+            reply_markup=_settings_markup(user, lang),
+        )
+    except Exception:
+        await call.message.answer(
+            _settings_text(user, lang),
+            parse_mode="HTML",
+            reply_markup=_settings_markup(user, lang),
+        )
 
 
 @dp.callback_query_handler(
@@ -1436,7 +1491,7 @@ async def settings_pick(call: types.CallbackQuery, state: FSMContext):
             await call.message.edit_text(
                 _settings_text(user, lang),
                 parse_mode="HTML",
-                reply_markup=_settings_markup(user),
+                reply_markup=_settings_markup(user, lang),
             )
         except Exception:
             pass
@@ -1451,7 +1506,7 @@ async def settings_pick(call: types.CallbackQuery, state: FSMContext):
         await call.message.edit_text(
             _settings_text(user, lang),
             parse_mode="HTML",
-            reply_markup=_settings_markup(user),
+            reply_markup=_settings_markup(user, lang),
         )
     except Exception:
         pass
