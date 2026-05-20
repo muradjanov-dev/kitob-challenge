@@ -41,25 +41,56 @@ def _verify_and_mark_done(user, challenge_id, today, today_str):
             user=user, date__date=today, is_audio=False
         ).aggregate(s=Sum("pages_read"))["s"] or 0
         verified = pages >= cval
-        hint = f"Bugun kamida {cval} bet o'qib hisobot yuboring. Hozircha: {pages} bet."
+        hint = (
+            f"📖 <b>Bugungi shart:</b> kamida {cval} bet o'qish.\n"
+            f"📊 <b>Hozircha:</b> {pages} bet.\n\n"
+            f"<b>Qanday bajaraman?</b>\n"
+            f"1) Pastdagi <b>📚 Kitob hisoboti</b> tugmasini bosing\n"
+            f"2) Kitobni tanlang va bugun o'qigan betlar sonini kiriting\n"
+            f"3) Hisobot yuborilgach, qaytadan <b>✅ Bajardim!</b> tugmasini bosing"
+        )
 
     elif ctype == "audio_daily":
         minutes = ConfirmationReport.objects.filter(
             user=user, date__date=today, is_audio=True
         ).aggregate(s=Sum("minutes_listened"))["s"] or 0
         verified = minutes >= cval
-        hint = f"Bugun kamida {cval} daqiqa audio eshitib hisobot yuboring. Hozircha: {minutes} daqiqa."
+        hint = (
+            f"🎧 <b>Bugungi shart:</b> kamida {cval} daqiqa audiokitob eshitish.\n"
+            f"📊 <b>Hozircha:</b> {minutes} daqiqa.\n\n"
+            f"<b>Qanday bajaraman?</b>\n"
+            f"1) <b>📚 Kitob hisoboti</b> tugmasini bosing\n"
+            f"2) 🎧 Audiokitobni tanlang va bugun eshitgan daqiqalaringizni kiriting\n"
+            f"3) Hisobot yuborilgach, qaytadan <b>✅ Bajardim!</b> tugmasini bosing"
+        )
 
     elif ctype == "referrals_daily":
         count = UserReferal.objects.filter(referrer=user, created_at__date=today).count()
         verified = count >= cval
-        hint = f"Bugun {cval} ta do'stingizni taklif qiling. Hozircha: {count} ta."
+        hint = (
+            f"👥 <b>Bugungi shart:</b> {cval} ta yangi do'stni taklif qilish.\n"
+            f"📊 <b>Hozircha:</b> {count} ta.\n\n"
+            f"<b>Qanday bajaraman?</b>\n"
+            f"1) 👤 Kabinet → 🌟 Yaxshilik ulashuvchi (Referal) tugmasini bosing\n"
+            f"2) Havolangizni do'stlaringizga yuboring\n"
+            f"3) Ular ro'yxatdan o'tib, birinchi hisobotini yuborgach, taklif hisoblanadi\n"
+            f"4) Keyin <b>✅ Bajardim!</b> tugmasini bosing"
+        )
 
     elif ctype == "review_daily":
         verified = ConfirmationReport.objects.filter(
             user=user, date__date=today
         ).annotate(_l=Length("conclusion")).filter(_l__gte=cval).exists()
-        hint = f"Bugun {cval}+ belgili xulosa bilan hisobot yuboring."
+        hint = (
+            f"✍️ <b>Bugungi shart:</b> {cval}+ belgidan iborat taqriz (xulosa) yozish.\n\n"
+            f"<b>Qanday bajaraman?</b>\n"
+            f"1) Pastdagi <b>📚 Kitob hisoboti</b> tugmasini bosing\n"
+            f"2) Kitob va sahifalarni odatdagidek kiriting\n"
+            f"3) Oxirgi qadamda — <b>«Xulosa»</b> bo'limida {cval}+ belgilik fikr-mulohaza yozing\n"
+            f"   (Misol uchun: kitob nima haqida, qaysi joyi yoqdi, nima o'rgandingiz)\n"
+            f"4) Hisobot yuborilgach, qaytadan <b>✅ Bajardim!</b> tugmasini bosing\n\n"
+            f"<i>💡 200 belgi — bu taxminan 2-3 jumla.</i>"
+        )
 
     if not verified:
         return "not_verified", challenge, participant.days_completed, hint
@@ -187,11 +218,16 @@ async def challenge_done_handler(call: types.CallbackQuery, state: FSMContext):
     if status == "expired":
         await call.answer("❌ Bu challenge tugadi.", show_alert=True)
     elif status == "not_joined":
-        await call.answer("❌ Siz bu challengega qo'shilmagansiz.", show_alert=True)
+        await call.answer("❌ Avval challengega qo'shiling.", show_alert=True)
     elif status == "already_done":
         await call.answer(f"✅ Bugun allaqachon bajargansiz! ({days_done}/3)", show_alert=True)
     elif status == "not_verified":
-        await call.answer(f"❌ Shart bajarilmagan.\n{hint}", show_alert=True)
+        # Long HTML hint won't fit in a callback popup — send it as a message.
+        await call.answer("⏳ Hali shart bajarilmagan.", show_alert=False)
+        await call.message.answer(
+            f"⏳ <b>Hali shart bajarilmagan</b>\n\n{hint}",
+            parse_mode="HTML",
+        )
     else:
         await call.answer(f"✅ {days_done}/3 kun bajarildi!", show_alert=False)
         end_msg = "🎉 Barcha 3 kun bajarildi! Natijalar e'lon qilinadi." if days_done >= 3 else f"⏳ Yana {3 - days_done} kun qoldi."
@@ -228,13 +264,24 @@ async def challenge_done_reply_button(message: types.Message, state: FSMContext)
         await message.answer("❌ Bu challenge tugadi.")
     elif status == "not_joined":
         await message.answer(
-            "❌ Siz bu challengega qo'shilmagansiz.\n"
-            "Qatnashish uchun 👤 Kabinetga kiring va challenge ostidagi tugmani bosing."
+            "❌ <b>Siz bu challengega qo'shilmagansiz.</b>\n\n"
+            "<b>Qatnashish uchun:</b>\n"
+            "1) Pastdagi 👤 <b>Kabinet</b> tugmasini bosing\n"
+            "2) «Joriy Challenge» bo'limidagi <b>✅ Qatnashaman</b> tugmasini bosing\n"
+            "3) Shartni bajaring va <b>✅ Bajardim!</b> tugmasini bosing",
+            parse_mode="HTML",
         )
     elif status == "already_done":
-        await message.answer(f"✅ Bugun allaqachon bajargansiz! ({days_done}/3)")
+        await message.answer(
+            f"✅ <b>Bugun allaqachon bajargansiz!</b> ({days_done}/3 kun)\n\n"
+            f"<i>Ertaga shartni yana bajaring va shu tugmani qaytadan bosing.</i>",
+            parse_mode="HTML",
+        )
     elif status == "not_verified":
-        await message.answer(f"❌ Shart bajarilmagan.\n{hint}")
+        await message.answer(
+            f"⏳ <b>Hali shart bajarilmagan</b>\n\n{hint}",
+            parse_mode="HTML",
+        )
     else:
         end_msg = (
             "🎉 Barcha 3 kun bajarildi! Natijalar e'lon qilinadi."
