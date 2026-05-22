@@ -102,6 +102,33 @@ async def _quiz_view_text(quiz) -> str:
     )
 
 
+async def _safe_edit_or_send(call, text, reply_markup=None):
+    """edit_text the current message, falling back to a fresh message if
+    Telegram rejects the edit (too old, identical content, has media, etc).
+    Prevents 'nothing happens' silent failures in the edit flow."""
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=reply_markup)
+    except Exception:
+        try:
+            await call.message.answer(text, parse_mode="HTML", reply_markup=reply_markup)
+        except Exception as e:
+            print(f"_safe_edit_or_send failed: {e}")
+
+
+async def _render_question_view(call, q_id: int):
+    """Question detail card with full edit controls: per-option text edit,
+    correct-answer radio, question-text edit, hint edit, delete."""
+    @sync_to_async
+    def _load(qid):
+        q = QuizQuestion.objects.select_related("quiz").get(id=qid)
+        return q, list(q.options.all().order_by("order"))
+
+    q, opts = await _load(q_id)
+    await _safe_edit_or_send(
+        call, _question_view_body(q, opts), _question_view_markup(q, opts),
+    )
+
+
 # ─── entry point: "📝 Quizlar" from admin panel ───────────────────────────────
 
 async def show_quiz_list(message: types.Message, user):
@@ -223,9 +250,8 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "e" and len(parts) > 2:
         await call.answer()
         quiz_id = int(parts[2])
-        await call.message.edit_text(
-            "✏️ Nimani o'zgartirmoqchisiz?",
-            reply_markup=_quiz_edit_kb(quiz_id),
+        await _safe_edit_or_send(
+            call, "✏️ Nimani o'zgartirmoqchisiz?", _quiz_edit_kb(quiz_id),
         )
 
     # Edit title
@@ -258,24 +284,13 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
         for q in questions:
             kb.add(InlineKeyboardButton(text=f"❓ {q.text[:30]}...", callback_data=f"qz:qv:{q.id}"))
         kb.add(InlineKeyboardButton(text="« Orqaga", callback_data=f"qz:e:{quiz_id}"))
-        await call.message.edit_text("✏️ Qaysi savolni tahrirlaysiz?", reply_markup=kb)
+        await _safe_edit_or_send(call, "✏️ Qaysi savolni tahrirlaysiz?", kb)
 
     # Question View
     elif action == "qv" and len(parts) > 2:
         await call.answer()
         q_id = int(parts[2])
-        q = await sync_to_async(QuizQuestion.objects.select_related('quiz').get)(id=q_id)
-        opts = await sync_to_async(list)(q.options.all().order_by('order'))
-        text = f"❓ <b>{q.text}</b>\n\nVariantlar:\n"
-        for i, opt in enumerate(opts):
-            mark = "✅" if opt.is_correct else "❌"
-            text += f"{'ABCDE'[i] if i < 5 else '-'}) {opt.text} {mark}\n"
-        
-        kb = InlineKeyboardMarkup(row_width=1)
-        kb.add(InlineKeyboardButton(text="✏️ Matnni o'zgartirish", callback_data=f"qz:qt:{q.id}"))
-        kb.add(InlineKeyboardButton(text="🗑 O'chirish", callback_data=f"qz:qdel:{q.id}"))
-        kb.add(InlineKeyboardButton(text="« Orqaga", callback_data=f"qz:eqs:{q.quiz_id}"))
-        await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+        await _render_question_view(call, q_id)
 
     # Edit Question Text
     elif action == "qt" and len(parts) > 2:
@@ -284,7 +299,42 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
         await state.update_data(edit_q_id=q_id)
         await call.message.answer("Yangi savol matnini kiriting:")
         await QuizEditState.edit_q_text.set()
-        
+
+    # Edit Question Hint
+    elif action == "qh" and len(parts) > 2:
+        await call.answer()
+        q_id = int(parts[2])
+        await state.update_data(edit_q_id=q_id)
+        await call.message.answer(
+            "Yangi maslahatni (hint) kiriting.\n"
+            "<i>(Maslahatni o'chirish uchun «—» yuboring.)</i>",
+            parse_mode="HTML",
+        )
+        await QuizEditState.edit_q_hint.set()
+
+    # Edit an Option's text
+    elif action == "optt" and len(parts) > 2:
+        await call.answer()
+        opt_id = int(parts[2])
+        await state.update_data(edit_opt_id=opt_id)
+        await call.message.answer("Variant uchun yangi matn kiriting:")
+        await QuizEditState.edit_q_opts.set()
+
+    # Mark an Option as the correct answer (radio: clears siblings)
+    elif action == "optc" and len(parts) > 2:
+        opt_id = int(parts[2])
+
+        @sync_to_async
+        def _set_correct():
+            opt = QuizOption.objects.select_related("question").get(id=opt_id)
+            QuizOption.objects.filter(question_id=opt.question_id).update(is_correct=False)
+            QuizOption.objects.filter(id=opt_id).update(is_correct=True)
+            return opt.question_id
+
+        q_id = await _set_correct()
+        await call.answer("✅ To'g'ri javob belgilandi")
+        await _render_question_view(call, q_id)
+
     # Delete Question
     elif action == "qdel" and len(parts) > 2:
         q_id = int(parts[2])
@@ -298,7 +348,7 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
         for q_item in questions:
             kb.add(InlineKeyboardButton(text=f"❓ {q_item.text[:30]}...", callback_data=f"qz:qv:{q_item.id}"))
         kb.add(InlineKeyboardButton(text="« Orqaga", callback_data=f"qz:e:{quiz_id}"))
-        await call.message.edit_text("✏️ Qaysi savolni tahrirlaysiz?", reply_markup=kb)
+        await _safe_edit_or_send(call, "✏️ Qaysi savolni tahrirlaysiz?", kb)
 
     # Toggle shuffle
     elif action == "sh" and len(parts) > 2:
@@ -618,26 +668,96 @@ async def qze_got_time(message: types.Message, state: FSMContext):
     await state.finish()
     await message.answer(f"✅ Vaqt {secs} soniyaga yangilandi.")
 
+def _question_view_markup(q, opts):
+    kb = InlineKeyboardMarkup(row_width=2)
+    for i, opt in enumerate(opts):
+        letter = "ABCDE"[i] if i < 5 else "-"
+        correct_label = "✅ To'g'ri" if opt.is_correct else "⚪️ To'g'ri deb belgilash"
+        kb.row(
+            InlineKeyboardButton(text=f"✏️ {letter} matni", callback_data=f"qz:optt:{opt.id}"),
+            InlineKeyboardButton(text=correct_label, callback_data=f"qz:optc:{opt.id}"),
+        )
+    kb.row(InlineKeyboardButton(text="✏️ Savol matni", callback_data=f"qz:qt:{q.id}"))
+    kb.row(InlineKeyboardButton(text="💡 Maslahatni o'zgartirish", callback_data=f"qz:qh:{q.id}"))
+    kb.row(InlineKeyboardButton(text="🗑 Savolni o'chirish", callback_data=f"qz:qdel:{q.id}"))
+    kb.row(InlineKeyboardButton(text="« Orqaga", callback_data=f"qz:eqs:{q.quiz_id}"))
+    return kb
+
+
+def _question_view_body(q, opts):
+    text = f"❓ <b>{q.text}</b>\n\n"
+    if q.hint:
+        text += f"💡 Maslahat: <i>{q.hint}</i>\n\n"
+    text += "Variantlar (✅ = to'g'ri javob):\n"
+    for i, opt in enumerate(opts):
+        mark = "✅" if opt.is_correct else "▫️"
+        text += f"{mark} {'ABCDE'[i] if i < 5 else '-'}) {opt.text}\n"
+    return text
+
+
 @dp.message_handler(state=QuizEditState.edit_q_text)
 async def qze_got_q_text(message: types.Message, state: FSMContext):
     data = await state.get_data()
     q_id = data.get("edit_q_id")
     await sync_to_async(QuizQuestion.objects.filter(id=q_id).update)(text=message.text.strip())
-    
-    q = await sync_to_async(QuizQuestion.objects.get)(id=q_id)
-    opts = await sync_to_async(list)(q.options.all().order_by('order'))
-    text = f"❓ <b>{q.text}</b>\n\nVariantlar:\n"
-    for i, opt in enumerate(opts):
-        mark = "✅" if opt.is_correct else "❌"
-        text += f"{'ABCDE'[i] if i < 5 else '-'}) {opt.text} {mark}\n"
-    
-    kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(InlineKeyboardButton(text="✏️ Matnni o'zgartirish", callback_data=f"qz:qt:{q.id}"))
-    kb.add(InlineKeyboardButton(text="🗑 O'chirish", callback_data=f"qz:qdel:{q.id}"))
-    kb.add(InlineKeyboardButton(text="« Orqaga", callback_data=f"qz:eqs:{q.quiz_id}"))
-    
+
+    @sync_to_async
+    def _load(qid):
+        q = QuizQuestion.objects.select_related("quiz").get(id=qid)
+        return q, list(q.options.all().order_by("order"))
+
+    q, opts = await _load(q_id)
     await state.finish()
-    await message.answer("✅ Savol matni yangilandi.\n\n" + text, parse_mode="HTML", reply_markup=kb)
+    await message.answer(
+        "✅ Savol matni yangilandi.\n\n" + _question_view_body(q, opts),
+        parse_mode="HTML",
+        reply_markup=_question_view_markup(q, opts),
+    )
+
+
+@dp.message_handler(state=QuizEditState.edit_q_hint)
+async def qze_got_q_hint(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    q_id = data.get("edit_q_id")
+    hint = message.text.strip()
+    if hint == "—":
+        hint = ""
+    await sync_to_async(QuizQuestion.objects.filter(id=q_id).update)(hint=hint)
+
+    @sync_to_async
+    def _load(qid):
+        q = QuizQuestion.objects.select_related("quiz").get(id=qid)
+        return q, list(q.options.all().order_by("order"))
+
+    q, opts = await _load(q_id)
+    await state.finish()
+    await message.answer(
+        "✅ Maslahat yangilandi.\n\n" + _question_view_body(q, opts),
+        parse_mode="HTML",
+        reply_markup=_question_view_markup(q, opts),
+    )
+
+
+@dp.message_handler(state=QuizEditState.edit_q_opts)
+async def qze_got_opt_text(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    opt_id = data.get("edit_opt_id")
+    new_text = message.text.strip()[:500]
+
+    @sync_to_async
+    def _update_and_load(oid, txt):
+        QuizOption.objects.filter(id=oid).update(text=txt)
+        opt = QuizOption.objects.select_related("question__quiz").get(id=oid)
+        q = opt.question
+        return q, list(q.options.all().order_by("order"))
+
+    q, opts = await _update_and_load(opt_id, new_text)
+    await state.finish()
+    await message.answer(
+        "✅ Variant yangilandi.\n\n" + _question_view_body(q, opts),
+        parse_mode="HTML",
+        reply_markup=_question_view_markup(q, opts),
+    )
 
 
 # ─── Vizov scheduling ─────────────────────────────────────────────────────────

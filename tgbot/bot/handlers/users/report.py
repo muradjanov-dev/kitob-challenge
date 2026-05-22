@@ -1060,9 +1060,11 @@ async def spent_time_handler(message: types.Message, state: FSMContext):
         await message.answer(_("Iltimos, xulosa matnini kiriting."), reply_markup=back_keyboard)
         return
 
-    if len(conclusion) > 400:
+    # Cap raised 400 → 1000 so review/taqriz challenges (which require 200+
+    # chars) have real headroom instead of a tight 200–400 window.
+    if len(conclusion) > 1000:
         await message.answer(
-            _("Iltimos, xulosa matnini 400 ta belgidan uzun bo'lmasin!"),
+            _("Iltimos, xulosa matnini 1000 ta belgidan uzun bo'lmasin!"),
             reply_markup=back_keyboard,
         )
         return
