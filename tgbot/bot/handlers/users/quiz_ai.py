@@ -17,31 +17,53 @@ from django.utils import timezone
 
 # client will be initialized dynamically inside handlers using the environment variable
 
-AI_PROMPT = """You are an AI that creates quizzes. You will receive text or an image.
-Extract the main concepts and create exactly 5 multiple choice questions.
-Return ONLY valid JSON in the following format:
-{
-  "title": "Quiz Title based on text",
-  "description": "Short description",
-  "time_per_question": 30,
-  "questions": [
-    {
-      "text": "Question text here?",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correct_index": 1,
-      "hint": "Hint if they get it wrong"
-    }
-  ]
-}
+
+def _script_hint(text: str) -> str:
+    """Detect the dominant alphabet of the source text and return a hard,
+    explicit language directive. gpt-4o-mini tends to revert to English for
+    famous works (e.g. 'Animal Farm') unless we anchor the output language
+    to the actual script of the supplied text."""
+    if not text:
+        return ""
+    cyrillic = sum(1 for c in text if "Ѐ" <= c <= "ӿ")
+    latin = sum(1 for c in text if "a" <= c.lower() <= "z")
+    if cyrillic >= 15 and cyrillic >= latin:
+        return (
+            "\n\n⚠️ MAJBURIY TIL QOIDASI: Manba matn KIRILL alifbosida yozilgan "
+            "(o'zbek yoki rus tili). Butun viktorinani — sarlavha, tavsif, "
+            "savollar, variantlar va maslahatlarni — MANBA MATN BILAN BIR XIL "
+            "TILDA va AYNAN KIRILL alifbosida yozing. Inglizcha yoki lotin "
+            "alifbosidan FOYDALANMANG."
+        )
+    # Latin-script Uzbek markers (o', g', apostrophes, common words)
+    low = text.lower()
+    uz_markers = ("o'", "g'", "o‘", "g‘", " va ", " bilan ", " uchun ", "ning ", "lar ")
+    if latin >= 15 and any(m in low for m in uz_markers):
+        return (
+            "\n\n⚠️ MAJBURIY TIL QOIDASI: Manba matn LOTIN alifbosidagi o'zbek "
+            "tilida. Butun viktorinani o'zbek tilida (lotin alifbosida) yozing. "
+            "Inglizchaga tarjima QILMANG."
+        )
+    return ""
+
+
+# Shared language/content rules appended to every generation prompt.
+_PROMPT_RULES = """
 Make sure options are up to 4 items. correct_index is 0-indexed.
 Do not wrap JSON in markdown block. Just pure JSON.
 
-CRITICAL LANGUAGE REQUIREMENT:
-Generate the entire JSON response (including title, description, question text, options, and hints) in the SAME LANGUAGE as the primary content of the input text or image.
-For example:
-- If the input is in Uzbek (e.g. Uzbek book), the quiz must be completely in Uzbek.
-- If the input is in Russian, the quiz must be completely in Russian.
-- If the input is in English, the quiz must be completely in English.
+CRITICAL LANGUAGE REQUIREMENT (HIGHEST PRIORITY):
+Generate the ENTIRE JSON response (title, description, question text, options, and hints)
+in EXACTLY the SAME LANGUAGE and the SAME ALPHABET/SCRIPT as the provided source text.
+- Detect the language from the SUPPLIED TEXT ITSELF, not from your prior knowledge of the work.
+- DO NOT translate into English. DO NOT switch to the book's "original" language.
+- A book may be a famous foreign work (e.g. 'Animal Farm' / 'Hayvonot fermasi'), but if the
+  supplied text is in Uzbek Cyrillic, you MUST write the quiz in Uzbek Cyrillic — NOT English.
+- If the source is Uzbek Cyrillic → respond in Uzbek Cyrillic.
+- If the source is Uzbek Latin → respond in Uzbek Latin.
+- If the source is Russian → respond in Russian.
+- If the source is English → respond in English.
+Matching the source script is mandatory and overrides everything else.
 
 CRITICAL CONTENT REQUIREMENT:
 Focus ONLY on the actual content, story, characters, or core educational topic of the book/document.
@@ -177,21 +199,7 @@ Return ONLY valid JSON in the following format:
     }}
   ]
 }}
-Make sure options are up to 4 items. correct_index is 0-indexed.
-Do not wrap JSON in markdown block. Just pure JSON.
-
-CRITICAL LANGUAGE REQUIREMENT:
-Generate the entire JSON response (including title, description, question text, options, and hints) in the SAME LANGUAGE as the primary content of the input text or image.
-For example:
-- If the input is in Uzbek (e.g. Uzbek book), the quiz must be completely in Uzbek.
-- If the input is in Russian, the quiz must be completely in Russian.
-- If the input is in English, the quiz must be completely in English.
-
-CRITICAL CONTENT REQUIREMENT:
-Focus ONLY on the actual content, story, characters, or core educational topic of the book/document.
-Absolutely IGNORE any publisher advertisements, library introductions (such as 'ziyouz.com', 'Ziyouz kutubxonasi', library flyers, website purposes, etc.), copyright notices, or web link flyers at the beginning or end of the document.
-The quiz must be about the BOOK'S actual content, not the website or library from which it was downloaded.
-"""
+""" + _PROMPT_RULES
 
         messages = [
             {"role": "system", "content": prompt}
@@ -207,27 +215,36 @@ The quiz must be about the BOOK'S actual content, not the website or library fro
             messages.append({
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Rasmdan foydalanib quiz yarating."},
+                    {"type": "text", "text": (
+                        "Rasmdan foydalanib quiz yarating. Viktorinani rasmda "
+                        "ko'rsatilgan matn bilan BIR XIL tilda va alifboda yozing "
+                        "(inglizchaga tarjima qilmang)."
+                    )},
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                 ]
             })
         elif message.document:
             file_info = await bot.get_file(message.document.file_id)
             pdf_bytes_io = await bot.download_file(file_info.file_path)
-            
+
             import fitz
             doc = fitz.open(stream=pdf_bytes_io.read(), filetype="pdf")
             extracted_text = ""
             for page in doc:
                 extracted_text += page.get_text() + "\n"
             doc.close()
-            
+
             # Limit text if it's too huge to prevent token overflow (approx 80k chars)
             extracted_text = extracted_text[:80000]
-            
-            messages.append({"role": "user", "content": f"Quyidagi kitob matnidan foydalanib eng muhim joylaridan quiz yarating:\n\n{extracted_text}"})
+
+            hint = _script_hint(extracted_text)
+            messages.append({"role": "user", "content": (
+                f"Quyidagi kitob matnidan foydalanib eng muhim joylaridan quiz yarating:"
+                f"{hint}\n\n{extracted_text}"
+            )})
         else:
-            messages.append({"role": "user", "content": message.text})
+            hint = _script_hint(message.text or "")
+            messages.append({"role": "user", "content": (message.text or "") + hint})
 
         # All inputs (text, image, pdf) are handled by gpt-4o-mini for maximum speed and cost efficiency
         model = "gpt-4o-mini"
