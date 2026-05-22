@@ -378,7 +378,15 @@ async def answer_question(call: types.CallbackQuery, state: FSMContext):
         return
 
     parts = call.data.split(":")
-    session_id, question_id, option_id = int(parts[1]), int(parts[2]), int(parts[3])
+    # Guard against stale/malformed answer buttons (old quiz messages, etc.)
+    if len(parts) < 4:
+        await call.answer()
+        return
+    try:
+        session_id, question_id, option_id = int(parts[1]), int(parts[2]), int(parts[3])
+    except (ValueError, IndexError):
+        await call.answer()
+        return
 
     already, is_correct, correct_text, hint, participant = await _record_answer(
         session_id, user.id, question_id, option_id
@@ -427,6 +435,9 @@ async def _send_question(chat_id: int, session_id: int, q_idx: int):
         if q_idx >= len(q_ids):
             return None, None, None, len(q_ids), 0
         question = QuizQuestion.objects.prefetch_related("options").filter(id=q_ids[q_idx]).first()
+        if not question:
+            # Question was deleted after the session started.
+            return None, None, None, len(q_ids), 0
         opts = list(question.options.all())
         if session.quiz.shuffle:
             random.shuffle(opts)
@@ -635,6 +646,9 @@ async def _send_group_question(chat_id: int, session_id: int, q_idx: int):
         if q_idx >= len(q_ids):
             return session, None, None, len(q_ids), 0
         question = QuizQuestion.objects.prefetch_related("options").filter(id=q_ids[q_idx]).first()
+        if not question:
+            # Question was deleted after the session started.
+            return None, None, None, len(q_ids), 0
         opts = list(question.options.all())
         if session.quiz.shuffle:
             random.shuffle(opts)

@@ -1075,7 +1075,9 @@ async def spent_time_handler(message: types.Message, state: FSMContext):
     today = timezone.localdate()
 
     data = await state.get_data()
-    reading_day = data['reading_day']
+    # Fall back to 1 if the FSM lost reading_day (e.g. partial state after a
+    # restart) so the report flow can't crash with KeyError here.
+    reading_day = data.get('reading_day') or 1
     is_audio = data.get("is_audio", False)
 
     book = data.get('book_title')
