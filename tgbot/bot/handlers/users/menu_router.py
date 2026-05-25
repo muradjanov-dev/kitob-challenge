@@ -980,14 +980,14 @@ def _referral_top_text(lang: str, user=None) -> str:
         (
             "\n\n🎁 <b>Mukofotlar:</b>\n"
             "  1-taklif: 20 🪙 | 2-taklif: 25 🪙 | 3-taklif: 30 🪙 …\n"
-            "  Har 2 taklif → 💎 1 kun Premium\n"
+            "  Har 3 taklif → 💎 1 kun Premium\n"
             "  17-taklif dan keyin: doimiy 50 🪙 har bir taklif uchun\n\n"
             "<i>(Eslatma: taklif faqat do'stingiz birinchi kitob hisobotini yuborgach hisoblanadi — shunchaki /start bosish yetarli emas.)</i>"
         ),
         (
             "\n\n🎁 <b>Награды:</b>\n"
             "  1-е приглашение: 20 🪙 | 2-е: 25 🪙 | 3-е: 30 🪙 …\n"
-            "  Каждые 2 приглашения → 💎 1 день Premium\n"
+            "  Каждые 3 приглашения → 💎 1 день Premium\n"
             "  С 17-го приглашения: фиксированно 50 🪙\n\n"
             "<i>(Примечание: приглашение засчитывается только после того, как ваш друг отправит свой первый отчёт о книге — одного /start недостаточно.)</i>"
         ),
@@ -1124,8 +1124,8 @@ async def referral_link_handler(call: types.CallbackQuery, state: FSMContext):
         next_reward = 20 + 5 * ref_count
     else:
         next_reward = 50
-    # "Refs until next premium-day": cycle is every 2 invites.
-    next_prem = 2 - (ref_count % 2) if ref_count % 2 != 0 else 2
+    # "Refs until next premium-day": cycle is every 3 invites.
+    next_prem = 3 - (ref_count % 3) if ref_count % 3 != 0 else 3
     text = _t(
         lang,
         f"🔗 <b>Sizning taklif havolangiz:</b>\n<code>{ref_link}</code>\n\n"
