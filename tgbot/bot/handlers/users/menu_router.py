@@ -362,13 +362,25 @@ async def _menu_cabinet(call, user, state: FSMContext):
 
     def _stats():
         completed_books_count = BooksToRead.objects.filter(
-            user=user, current_page__gte=F("total_pages"), total_pages__gt=0
+            user=user, is_audio=False, current_page__gte=F("total_pages"), total_pages__gt=0
         ).count()
-        total_pages_read = BookReport.objects.filter(user=user).aggregate(
-            total=Sum("pages_read")
+        completed_audio_count = BooksToRead.objects.filter(
+            user=user, is_audio=True, current_page__gte=F("total_pages"), total_pages__gt=0
+        ).count()
+        total_pages_read = ConfirmationReport.objects.filter(
+            user=user, is_audio=False
+        ).aggregate(total=Sum("pages_read"))["total"] or 0
+        avg_pages_per_day = ConfirmationReport.objects.filter(
+            user=user, is_audio=False
+        ).aggregate(avg=Avg("pages_read"))["avg"] or 0
+
+        audio_reports_qs = ConfirmationReport.objects.filter(user=user, is_audio=True)
+        audio_reports_count = audio_reports_qs.count()
+        total_audio_minutes = audio_reports_qs.aggregate(
+            total=Sum("minutes_listened")
         )["total"] or 0
-        avg_pages_per_day = BookReport.objects.filter(user=user).aggregate(
-            avg=Avg("pages_read")
+        avg_audio_per_day = audio_reports_qs.aggregate(
+            avg=Avg("minutes_listened")
         )["avg"] or 0
 
         weekday_stats = list(
@@ -397,13 +409,13 @@ async def _menu_cabinet(call, user, state: FSMContext):
         # cheaters don't poison the percentile computation.
         all_user_pages = list(
             ConfirmationReport.objects
-            .filter(user__is_blocked=False)
+            .filter(user__is_blocked=False, is_audio=False)
             .values("user_id")
             .annotate(total=Sum("pages_read"))
             .values_list("total", flat=True)
         )
         active_user_count = ConfirmationReport.objects.filter(
-            user__is_blocked=False
+            user__is_blocked=False, is_audio=False
         ).values_list("user_id").distinct().count()
         registered_total = TelegramProfile.objects.filter(
             is_registered=True, is_blocked=False,
@@ -411,11 +423,15 @@ async def _menu_cabinet(call, user, state: FSMContext):
         zero_count = max(registered_total - active_user_count, 0)
         all_user_pages.extend([0] * zero_count)
 
-        return (completed_books_count, total_pages_read, avg_pages_per_day,
+        return (completed_books_count, completed_audio_count,
+                total_pages_read, avg_pages_per_day,
+                audio_reports_count, total_audio_minutes, avg_audio_per_day,
                 weekday_stats, hour_stats, top_conclusions, conclusion_titles,
                 all_user_pages)
 
-    (completed_books_count, total_pages_read, avg_pages_per_day,
+    (completed_books_count, completed_audio_count,
+     total_pages_read, avg_pages_per_day,
+     audio_reports_count, total_audio_minutes, avg_audio_per_day,
      weekday_stats, hour_stats, top_conclusions, conclusion_titles,
      all_user_pages) = await sync_to_async(_stats)()
 
@@ -458,6 +474,26 @@ async def _menu_cabinet(call, user, state: FSMContext):
 
     kitobcha_balance = int(user.ball or 0)
 
+    # Audio section — show if any audio reports exist
+    audio_section = ""
+    if completed_audio_count or audio_reports_count or total_audio_minutes:
+        audio_books_line = f"🎧 <b>Eshitilgan kitoblar:</b> {completed_audio_count} ta\n" if completed_audio_count else ""
+        audio_report_count_line = f"📋 <b>Audio hisobotlar soni:</b> {audio_reports_count} ta\n" if audio_reports_count else ""
+        if total_audio_minutes:
+            audio_total_line = f"⏱ <b>Jami eshitilgan:</b> {total_audio_minutes} daqiqa\n"
+        elif audio_reports_count:
+            audio_total_line = f"⏱ <b>Jami eshitilgan:</b> — daqiqa (ma'lumot saqlanmagan)\n"
+        else:
+            audio_total_line = ""
+        audio_avg_line = f"🎧 <b>O'rtacha kunlik eshitish:</b> {int(avg_audio_per_day)} daqiqa\n" if avg_audio_per_day else ""
+        audio_section = (
+            f"\n🎧 <b>— Audio kitoblar —</b>\n"
+            f"{audio_books_line}"
+            f"{audio_report_count_line}"
+            f"{audio_total_line}"
+            f"{audio_avg_line}"
+        )
+
     # Premium-only: growth chart
     is_prem = await sync_to_async(_is_premium_user)(user)
     premium_section = ""
@@ -481,10 +517,12 @@ async def _menu_cabinet(call, user, state: FSMContext):
     response_text = (
         f"👤 <b>{prem_badge}Sizning shaxsiy kabinetingiz</b>\n\n"
         f"🪙 <b>Kitobcha balansi:</b> {kitobcha_balance}\n"
-        f"📚 <b>O'qilgan kitoblar:</b> {completed_books_count} ta\n"
-        f"📄 <b>Jami o'qilgan sahifalar:</b> {total_pages_read}\n"
+        f"\n📖 <b>— O'qilgan kitoblar —</b>\n"
+        f"📚 <b>Tugallangan kitoblar:</b> {completed_books_count} ta\n"
+        f"📄 <b>Jami o'qilgan sahifalar:</b> {total_pages_read} bet\n"
         f"⚡️ <b>O'rtacha kunlik o'qish:</b> {int(avg_pages_per_day)} bet\n"
-        f"📅 <b>Eng faol kuningiz:</b> {most_active_day}\n"
+        f"{audio_section}"
+        f"\n📅 <b>Eng faol kuningiz:</b> {most_active_day}\n"
         f"⏰ <b>Sevimli vaqtingiz:</b> {active_hour}\n"
         f"{rank_text}"
         f"{overtake_text}"
