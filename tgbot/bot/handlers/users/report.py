@@ -96,7 +96,50 @@ def _today_reports_qs(user, today):
     return list(
         ConfirmationReport.objects
         .filter(user=user, date__date=today)
+        .prefetch_related("books")
         .order_by("date")
+    )
+
+
+def _format_conclusions_block(reports):
+    """Build a quote-blockquote with all today's conclusions, attributing each
+    to its book(s) only when ambiguous (multiple distinct books across reports).
+    Returns empty string if no non-empty conclusions exist.
+    """
+    items = []
+    all_titles = set()
+    for r in reports:
+        text = (r.conclusion or "").strip()
+        if not text:
+            continue
+        titles = [b.title for b in r.books.all() if b.title] or ([r.book] if r.book else [])
+        titles = [t for t in titles if t]
+        all_titles.update(titles)
+        items.append((titles, text))
+
+    if not items:
+        return ""
+
+    # If everything came from the same single book, no need to label each one.
+    show_label = len(all_titles) > 1
+
+    seen = set()
+    lines = []
+    for titles, text in items:
+        key = (tuple(titles), text)
+        if key in seen:
+            continue
+        seen.add(key)
+        if show_label and titles:
+            label = ", ".join(titles)
+            lines.append(f"<b>{label}:</b> {text}")
+        else:
+            lines.append(text)
+
+    body = "\n\n".join(lines)
+    return (
+        "<b>💡 Olingan xulosalar:</b>\n"
+        f"<blockquote expandable>{body}</blockquote>"
     )
 
 
@@ -1260,11 +1303,18 @@ async def _do_confirm_report(message, user, state: FSMContext):
 
     motivation = data.get("motivation") or random.choice(MOTIVATIONS)
 
+    conclusions_block = _format_conclusions_block(todays)
+    if not conclusions_block and conclusion:
+        conclusions_block = (
+            "<b>💡 Olingan xulosa:</b>\n"
+            f"<blockquote expandable>{conclusion}</blockquote>"
+        )
+
     report_message = (
         f"<b><a href='tg://user?id={user.telegram_id}'>{prem_badge}{user.full_name}</a></b>:\n\n"
         f"📊#kun - {reading_day}  ({report.date.strftime('%Y-%m-%d')})\n\n"
         f"{books_block}\n\n"
-        f"<b>💡Olingan xulosa:</b> {conclusion}\n\n"
+        f"{conclusions_block}\n\n"
         f"<b>{motivation}</b>"
         f"{aggregate_note}"
     )
