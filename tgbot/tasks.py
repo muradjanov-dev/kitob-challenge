@@ -2705,3 +2705,131 @@ def process_scheduled_deletions():
         deleted_ids.append(row.id)
     if deleted_ids:
         ScheduledMessageDeletion.objects.filter(id__in=deleted_ids).delete()
+
+
+@shared_task
+def send_ai_report_to_admin(admin_tg_id: int = 917456291, lang: str = "uz"):
+    """
+    One-off task: generate AI weekly report (Gemini text + Imagen 3 image)
+    using demo data and send to admin_tg_id. Used for manual testing.
+    Standalone — does not touch user DB.
+    """
+    import io as _io
+    import os as _os
+    import requests as _req
+    import google.generativeai as _genai
+
+    token = _os.environ.get("API_TOKEN", "")
+    gemini_key = _os.environ.get("GEMINI_API_KEY", "")
+    if not token:
+        print("[send_ai_report_to_admin] API_TOKEN not set")
+        return
+
+    d = {
+        "full_name": "Aziz Karimov",
+        "week_pages": 312,
+        "prev_week_pages": 245,
+        "audio_minutes": 87,
+        "streak": 12,
+        "total_pages": 4350,
+        "books_week": 1,
+        "rank_pct_ahead": 78,
+    }
+
+    # 1. Gemini text
+    ai_text = None
+    if gemini_key:
+        try:
+            _genai.configure(api_key=gemini_key)
+            model = _genai.GenerativeModel("gemini-2.0-flash")
+            p = round((d["week_pages"] - d["prev_week_pages"]) * 100 / max(d["prev_week_pages"], 1))
+            pct = f"▲ +{p}%" if p > 0 else f"▼ {p}%"
+            ah, am = divmod(d["audio_minutes"], 60)
+            audio_str = f"{ah} soat {am} daqiqa" if ah else f"{d['audio_minutes']} daqiqa"
+            if lang == "ru":
+                prompt = (
+                    f"Ты тренер по чтению. Напиши {d['full_name']} персональный еженедельный отчёт. "
+                    f"Стиль: тёплый, воодушевляющий. Telegram HTML (<b>,<i>). 180-250 слов. Имя 2+ раза. "
+                    f"Данные: {d['week_pages']} стр ({pct}), аудио {audio_str}, "
+                    f"книг {d['books_week']}, всего {d['total_pages']} стр, "
+                    f"стрик {d['streak']} дней, топ {100-d['rank_pct_ahead']}%. Только текст."
+                )
+            else:
+                prompt = (
+                    f"Sen kitobxonlik trenerisisan. {d['full_name']} ga shaxsiy haftalik hisobot yoz. "
+                    f"Uslub: iliq, rag'batlantiruvchan. Telegram HTML (<b>,<i>). 180-250 so'z. Ism 2+ marta. "
+                    f"Ma'lumotlar: {d['week_pages']} bet ({pct}), audio {audio_str}, "
+                    f"kitoblar {d['books_week']} ta, jami {d['total_pages']} bet, "
+                    f"streak {d['streak']} kun, top {100-d['rank_pct_ahead']}%. Faqat matn."
+                )
+            resp = model.generate_content(prompt, generation_config={"temperature": 0.85, "max_output_tokens": 600})
+            ai_text = resp.text.strip()
+            print("[send_ai_report_to_admin] Gemini text OK")
+        except Exception as e:
+            print(f"[send_ai_report_to_admin] Gemini error: {e}")
+
+    if not ai_text:
+        ai_text = (
+            f"Ajoyib natija, <b>{d['full_name']}</b>! Bu hafta — <b>{d['week_pages']} bet</b>. "
+            f"🔥 Streak <b>{d['streak']} kun</b>. Davom eting! 🚀"
+        )
+
+    header = "💎 <b>Haftalik Premium Hisobot</b> 📊 <i>[TEST]</i>" if lang != "ru" else "💎 <b>Еженедельный Premium Отчёт</b> 📊 <i>[ТЕСТ]</i>"
+    ach = (
+        "\n\n🏆 <b>Bu haftadagi yutuqlar:</b>\n"
+        "🔥 <b>7 kunlik streak</b> <i>(+70 Kitobcha)</i>\n"
+        "📚 <b>Yuz bet</b> <i>(+20 Kitobcha)</i>"
+    ) if lang != "ru" else (
+        "\n\n🏆 <b>Достижения этой недели:</b>\n"
+        "🔥 <b>Серия 7 дней</b> <i>(+70 Kitobcha)</i>\n"
+        "📚 <b>Сто страниц</b> <i>(+20 Kitobcha)</i>"
+    )
+    full_text = f"{header}\n\n{ai_text}{ach}"
+
+    # 2. Imagen 3
+    img_bytes = None
+    if gemini_key:
+        try:
+            _genai.configure(api_key=gemini_key)
+            imagen = _genai.ImageGenerationModel("imagen-3.0-generate-002")
+            prompt_img = (
+                f"Personalized weekly reading report card for '{d['full_name']}'. "
+                f"Modern infographic, warm gold and deep navy palette. "
+                f"Stats: {d['week_pages']} pages | {d['audio_minutes']} audio min | "
+                f"{d['streak']}-day streak | {d['total_pages']} total | top {100-d['rank_pct_ahead']}%. "
+                f"Open book and star decorations. No faces. 16:9, high quality."
+            )
+            result = imagen.generate_images(prompt=prompt_img, number_of_images=1, aspect_ratio="16:9", safety_filter_level="block_only_high")
+            if result.images:
+                img = result.images[0]
+                for attr in ("_pil_image", "image", "_image"):
+                    pil = getattr(img, attr, None)
+                    if pil is not None:
+                        buf = _io.BytesIO()
+                        pil.save(buf, format="JPEG", quality=90)
+                        img_bytes = buf.getvalue()
+                        break
+                if img_bytes is None:
+                    for attr in ("_image_bytes", "image_bytes", "data"):
+                        raw = getattr(img, attr, None)
+                        if isinstance(raw, (bytes, bytearray)):
+                            img_bytes = bytes(raw)
+                            break
+            print(f"[send_ai_report_to_admin] Imagen: {'OK' if img_bytes else 'no bytes'}")
+        except Exception as e:
+            print(f"[send_ai_report_to_admin] Imagen error: {e}")
+
+    # 3. Send
+    if img_bytes:
+        _req.post(
+            f"https://api.telegram.org/bot{token}/sendPhoto",
+            data={"chat_id": admin_tg_id, "parse_mode": "HTML"},
+            files={"photo": ("report.jpg", _io.BytesIO(img_bytes), "image/jpeg")},
+            timeout=20,
+        )
+    _req.post(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        data={"chat_id": admin_tg_id, "text": full_text, "parse_mode": "HTML"},
+        timeout=10,
+    )
+    print(f"[send_ai_report_to_admin] done → {admin_tg_id}")
