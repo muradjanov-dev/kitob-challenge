@@ -85,9 +85,15 @@ async def calendar_day_detail(call: types.CallbackQuery):
             m2m_titles = list(r.books.values_list("title", flat=True))
             title = ", ".join(m2m_titles) if m2m_titles else "—"
         conclusion = (r.conclusion or "").strip()
+        if r.is_audio:
+            progress_line = f"🎧 <b>Eshitilgan:</b> {r.minutes_listened or 0} daqiqa"
+            icon = "🎧"
+        else:
+            progress_line = f"📄 <b>Betlar:</b> {r.pages_read}"
+            icon = "📖"
         lines.append(
-            f"📖 <b>Kitob:</b> {title}\n"
-            f"📄 <b>Betlar:</b> {r.pages_read}\n"
+            f"{icon} <b>Kitob:</b> {title}\n"
+            f"{progress_line}\n"
             f"💡 <b>Xulosa:</b> {conclusion or '—'}"
         )
     await call.answer()
@@ -140,9 +146,13 @@ async def cabinet_history(call: types.CallbackQuery):
             m2m_titles = list(r.books.values_list("title", flat=True))
             title = ", ".join(m2m_titles) if m2m_titles else "—"
         conclusion = (r.conclusion or "").strip()
+        if r.is_audio:
+            progress = f"🎧 {r.minutes_listened or 0} daqiqa"
+        else:
+            progress = f"📄 {r.pages_read} bet"
         entry = (
             f"📅 <b>{date_str}</b> — {title}\n"
-            f"📄 {r.pages_read} bet"
+            f"{progress}"
         )
         if conclusion:
             short = conclusion[:120] + ("…" if len(conclusion) > 120 else "")
@@ -185,10 +195,17 @@ async def show_user_cabinet(message: types.Message, state=None):
         await message.answer("Siz ro'yxatdan o'tmagansiz.")
         return
 
-    # 1. Total books and pages read
-    # We count completed books from ConfirmationReport or BooksToRead where current_page >= total_pages
+    # 1. Total books and pages read — audio and text books tracked separately
     completed_books_count = BooksToRead.objects.filter(
         user=user,
+        is_audio=False,
+        current_page__gte=F('total_pages'),
+        total_pages__gt=0
+    ).count()
+
+    completed_audio_count = BooksToRead.objects.filter(
+        user=user,
+        is_audio=True,
         current_page__gte=F('total_pages'),
         total_pages__gt=0
     ).count()
@@ -243,18 +260,19 @@ async def show_user_cabinet(message: types.Message, state=None):
 
     conclusion_text = ""
 
-    # 6. Ranking — % ahead/behind by total pages read.
+    # 6. Ranking — % ahead/behind by total pages read (text books only).
     rank_text = ""
     pages_to_overtake_text = ""
     try:
         all_user_pages = list(
             ConfirmationReport.objects
+            .filter(is_audio=False)
             .values('user_id')
             .annotate(total=Sum('pages_read'))
             .values_list('total', flat=True)
         )
         # Include users with zero pages so ranking reflects whole population.
-        active_user_ids = {row[0] for row in ConfirmationReport.objects.values_list('user_id').distinct()}
+        active_user_ids = {row[0] for row in ConfirmationReport.objects.filter(is_audio=False).values_list('user_id').distinct()}
         zero_count = max(
             TelegramProfile.objects.filter(is_registered=True).count() - len(active_user_ids),
             0,
@@ -284,25 +302,29 @@ async def show_user_cabinet(message: types.Message, state=None):
 
     kitobcha_balance = int(user.ball or 0)
 
-    audio_total_line = (
-        f"🎧 <b>Eshitilgan audiokitoblar:</b> {total_audio_minutes} daqiqa\n"
-        if total_audio_minutes else ""
-    )
-    audio_avg_line = (
-        f"🎧 <b>O'rtacha kunlik eshitish:</b> {int(avg_audio_per_day)} daqiqa\n"
-        if avg_audio_per_day else ""
-    )
+    # Build audio section only if user has any audio activity
+    audio_section = ""
+    if completed_audio_count or total_audio_minutes or avg_audio_per_day:
+        audio_books_line = f"🎧 <b>Eshitilgan kitoblar:</b> {completed_audio_count} ta\n" if completed_audio_count else ""
+        audio_total_line = f"⏱ <b>Jami eshitilgan:</b> {total_audio_minutes} daqiqa\n" if total_audio_minutes else ""
+        audio_avg_line = f"🎧 <b>O'rtacha kunlik eshitish:</b> {int(avg_audio_per_day)} daqiqa\n" if avg_audio_per_day else ""
+        audio_section = (
+            f"\n🎧 <b>— Audio kitoblar —</b>\n"
+            f"{audio_books_line}"
+            f"{audio_total_line}"
+            f"{audio_avg_line}"
+        )
 
     # Construct the message
     response_text = (
         f"👤 <b>Sizning shaxsiy kabinetingiz</b>\n\n"
         f"🪙 <b>Kitobcha balansi:</b> {kitobcha_balance}\n"
-        f"📚 <b>O'qilgan kitoblar:</b> {completed_books_count} ta\n"
-        f"📄 <b>Jami o'qilgan sahifalar:</b> {total_pages_read}\n"
-        f"{audio_total_line}"
+        f"\n📖 <b>— O'qilgan kitoblar —</b>\n"
+        f"📚 <b>Tugallangan kitoblar:</b> {completed_books_count} ta\n"
+        f"📄 <b>Jami o'qilgan sahifalar:</b> {total_pages_read} bet\n"
         f"⚡️ <b>O'rtacha kunlik o'qish:</b> {int(avg_pages_per_day)} bet\n"
-        f"{audio_avg_line}"
-        f"📅 <b>Eng faol kuningiz:</b> {most_active_day}\n"
+        f"{audio_section}"
+        f"\n📅 <b>Eng faol kuningiz:</b> {most_active_day}\n"
         f"⏰ <b>Sevimli vaqtingiz:</b> {active_hour}\n"
         f"{rank_text}"
         f"{pages_to_overtake_text}"
