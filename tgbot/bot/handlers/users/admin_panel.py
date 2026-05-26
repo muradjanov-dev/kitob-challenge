@@ -30,6 +30,30 @@ async def admin_commands(message: types.Message, state: FSMContext = None):
         await message.answer("Siz admin emassiz!")
 
 
+@dp.message_handler(IsPrivate(), commands=["test_weekly_report"], state="*")
+async def test_weekly_report_handler(message: types.Message, state: FSMContext = None):
+    """Admin-only: trigger AI-generated weekly report card to self.
+    Usage: /test_weekly_report   (default uz)
+           /test_weekly_report ru
+    """
+    user = await aget_user(message.from_user.id)
+    if not (user and user.is_admin):
+        await message.answer("Siz admin emassiz!")
+        return
+
+    args = (message.get_args() or "").strip().lower()
+    lang = "ru" if args == "ru" else "uz"
+
+    from tgbot.tasks import send_ai_report_to_admin
+    send_ai_report_to_admin.delay(admin_tg_id=message.from_user.id, lang=lang)
+
+    await message.answer(
+        "⏳ AI report generatsiya qilinmoqda...\n"
+        "🎨 Imagen 3 + 💎 Gemini 2.0 Flash\n"
+        "20-40 soniyada rasm va matn keladi."
+    )
+
+
 @dp.message_handler(IsPrivate(), text="✉️ Habar yuborish")
 async def send_notification_text_handler(message: types.Message):
     await message.answer("Habarni tektini yuboring.", reply_markup=types.ReplyKeyboardRemove())

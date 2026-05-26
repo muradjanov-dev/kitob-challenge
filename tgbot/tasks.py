@@ -2716,6 +2716,7 @@ def send_ai_report_to_admin(admin_tg_id: int = 917456291, lang: str = "uz"):
     """
     import io as _io
     import os as _os
+    import datetime as _dt
     import requests as _req
     import google.generativeai as _genai
 
@@ -2786,20 +2787,58 @@ def send_ai_report_to_admin(admin_tg_id: int = 917456291, lang: str = "uz"):
     )
     full_text = f"{header}\n\n{ai_text}{ach}"
 
-    # 2. Imagen 3
+    # 2. Imagen 3 — branded weekly report card
     img_bytes = None
     if gemini_key:
         try:
             _genai.configure(api_key=gemini_key)
             imagen = _genai.ImageGenerationModel("imagen-3.0-generate-002")
+
+            # Compute the date range for "this week" (last 7 days inclusive)
+            week_end_d = timezone.localdate()
+            week_start_d = week_end_d - _dt.timedelta(days=6)
+            date_range = f"{week_start_d.strftime('%b %d')} – {week_end_d.strftime('%b %d, %Y')}"
+            ah, am = divmod(d["audio_minutes"], 60)
+            audio_label = f"{ah}h {am}m" if ah else f"{d['audio_minutes']}m"
+
             prompt_img = (
-                f"Personalized weekly reading report card for '{d['full_name']}'. "
-                f"Modern infographic, warm gold and deep navy palette. "
-                f"Stats: {d['week_pages']} pages | {d['audio_minutes']} audio min | "
-                f"{d['streak']}-day streak | {d['total_pages']} total | top {100-d['rank_pct_ahead']}%. "
-                f"Open book and star decorations. No faces. 16:9, high quality."
+                "Minimalist luxury weekly reading certificate from 'KITOB CHALLENGE', "
+                "an elite Telegram reading community. "
+                "Style: clean editorial design, lots of negative space, serene and sophisticated. "
+                "PALETTE: soft cream / warm ivory / pearl white background (95% of canvas), "
+                "with luxury accents of deep emerald green, antique gold foil, and matte charcoal black "
+                "used sparingly on key elements only. "
+                "Subtle paper-grain texture, faint gold flecks for premium feel. "
+                "LAYOUT (16:9 landscape, generous whitespace, perfectly balanced): "
+                "TOP — a slim gold horizontal divider line. Above it: tiny minimalist open-book "
+                "logo mark centered. Just below: refined serif wordmark 'KITOB CHALLENGE' in deep "
+                "charcoal, letter-spaced. Tiny sans-serif tagline below: 'WEEKLY READER REPORT'. "
+                f"DATE BADGE — slim outlined gold pill containing '{date_range}'. "
+                f"CENTERPIECE — elegant calligraphic script: 'Presented to {d['full_name']}' "
+                "(large, deep charcoal with subtle gold underline flourish). "
+                "STATS — four minimalist cards in a single row, each with: a thin emerald-green "
+                "icon outline at top, then a very large gold numeral, then a small uppercase "
+                "label in charcoal. Cards have no heavy borders, just airy spacing: "
+                f"📖  {d['week_pages']}  PAGES READ  ·  "
+                f"🎧  {audio_label}  AUDIO TIME  ·  "
+                f"🔥  {d['streak']}  DAY STREAK  ·  "
+                f"🏆  TOP {100 - d['rank_pct_ahead']}%  READER. "
+                f"FINE PRINT line below: 'All-time pages: {d['total_pages']}   |   "
+                f"Books finished this week: {d['books_week']}' in small refined typography. "
+                "BOTTOM — italic serif gratitude line, deep emerald: "
+                "'Thank you for your dedication and unwavering perseverance.' "
+                "Tiny ornamental gold flourish underneath. "
+                "Corners: small minimalist gold corner-mark brackets, like a luxury card frame. "
+                "All English text must be perfectly spelled, crisp typography, no garbled letters. "
+                "No people, no faces. Magazine-quality minimalist luxury aesthetic, "
+                "feels like a Hermès or Aesop print piece. 16:9, ultra-detailed."
             )
-            result = imagen.generate_images(prompt=prompt_img, number_of_images=1, aspect_ratio="16:9", safety_filter_level="block_only_high")
+            result = imagen.generate_images(
+                prompt=prompt_img,
+                number_of_images=1,
+                aspect_ratio="16:9",
+                safety_filter_level="block_only_high",
+            )
             if result.images:
                 img = result.images[0]
                 for attr in ("_pil_image", "image", "_image"):
