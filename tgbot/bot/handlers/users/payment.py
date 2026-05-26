@@ -15,7 +15,7 @@ from django.utils import timezone
 # ── Card & pricing config ────────────────────────────────────────────────────
 CARD_NUMBER = "5614 6830 0539 3277"
 CARD_OWNER  = "N. Murodjonov"
-PREMIUM_PRICE = 17_000   # UZS
+PREMIUM_PRICE = 24_000   # UZS — iyun 2026 dan yangilandi (17_000 dan)
 SUPER_PREMIUM_PRICE = 47_000 # UZS
 
 # ── Premium features list shown to user ─────────────────────────────────────
