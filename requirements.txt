@@ -116,6 +116,7 @@ marshmallow<4.0.0
 django-modeladmin-reorder
 openai==1.52.2
 PyMuPDF==1.23.21
+google-generativeai>=0.8.0
 # Pin httpx<0.28 — openai 1.52.2 passes `proxies=` to httpx.AsyncClient
 # which httpx 0.28+ rejects with TypeError, crashing module import and
 # taking the entire web service down before any handler can register.

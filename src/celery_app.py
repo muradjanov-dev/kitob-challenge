@@ -175,6 +175,12 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.send_streak_warning',
         'schedule': crontab(hour=22, minute=0),
     },
+
+    # Weekly AI Report for Premium users — every Saturday at 20:00 Tashkent.
+    'send-weekly-ai-report': {
+        'task': 'tgbot.tasks.send_weekly_ai_report',
+        'schedule': crontab(hour=20, minute=0, day_of_week=6),  # 6 = Saturday
+    },
 }
 
 # Use Tashkent local time for crontab schedules (matches admin-set HH:MM).

@@ -2050,6 +2050,305 @@ def send_daily_personal_report():
 
 
 # ────────────────────────────────────────────────────────────────────────
+# Weekly AI Report for Premium users (every Saturday evening 20:00)
+# Uses Google Gemini for text + Imagen 3 for a personal report card image.
+# ────────────────────────────────────────────────────────────────────────
+
+def _generate_report_image(
+    full_name: str,
+    week_pages: int,
+    week_audio_minutes: int,
+    streak: int,
+    total_pages: int,
+    books_finished_week: int,
+    rank_pct_ahead: int,
+    new_achievement_titles: list,
+) -> bytes | None:
+    """
+    Generate a personal report card image via Google Imagen 3.
+    Returns raw PNG bytes or None on failure.
+    """
+    try:
+        import google.generativeai as genai
+        api_key = env.str("GEMINI_API_KEY", default="")
+        if not api_key:
+            return None
+        genai.configure(api_key=api_key)
+        imagen = genai.ImageGenerationModel("imagen-3.0-generate-002")
+
+        achiev_text = ""
+        if new_achievement_titles:
+            achiev_text = f"Achievement badges: {', '.join(new_achievement_titles[:3])}. "
+
+        prompt = (
+            f"A beautiful personalized weekly reading report card for '{full_name}'. "
+            f"Modern, clean infographic style with warm golden and deep blue colors. "
+            f"Show these stats clearly: "
+            f"{week_pages} pages read this week, "
+            f"{week_audio_minutes} audio minutes, "
+            f"{streak}-day reading streak, "
+            f"{total_pages} total pages all time, "
+            f"{books_finished_week} books finished this week, "
+            f"top {100 - rank_pct_ahead}% reader ranking. "
+            f"{achiev_text}"
+            f"Include decorative book and star elements. "
+            f"Text on card must be in English. No people faces. "
+            f"16:9 landscape orientation, high quality, professional design."
+        )
+        result = imagen.generate_images(
+            prompt=prompt,
+            number_of_images=1,
+            aspect_ratio="16:9",
+            safety_filter_level="block_only_high",
+        )
+        if result.images:
+            return result.images[0]._pil_image.tobytes("jpeg", "RGB") if hasattr(result.images[0], '_pil_image') else None
+    except Exception as e:
+        print(f"[weekly_ai_report] Imagen error: {e}")
+    return None
+
+
+def _send_weekly_report_to_user(
+    user,
+    week_start,
+    week_end,
+    premium_user_ids: set,
+) -> bool:
+    """Build stats, call AI, send report to one premium user. Returns True on success."""
+    import datetime as _dt
+    from tgbot.models import UserAchievement as _UA, BooksToRead as _BTR
+    from tgbot.services.weekly_ai_report import generate_weekly_report
+    from tgbot.services.achievements import compute_user_stats, _max_consecutive_days
+    from django.db.models import Sum as _S, F as _F, Max as _M
+    from django.utils.html import escape as _esc
+
+    uid = user.id
+    lang = user.language or "uz"
+
+    # ── This week's stats ──────────────────────────────────────────────
+    week_pages = (
+        ConfirmationReport.objects
+        .filter(user=user, date__date__gte=week_start, date__date__lte=week_end, is_audio=False)
+        .aggregate(t=_S("pages_read"))["t"] or 0
+    )
+    prev_week_start = week_start - _dt.timedelta(days=7)
+    prev_week_end = week_end - _dt.timedelta(days=7)
+    prev_week_pages = (
+        ConfirmationReport.objects
+        .filter(user=user, date__date__gte=prev_week_start, date__date__lte=prev_week_end, is_audio=False)
+        .aggregate(t=_S("pages_read"))["t"] or 0
+    )
+    week_audio = (
+        ConfirmationReport.objects
+        .filter(user=user, date__date__gte=week_start, date__date__lte=week_end, is_audio=True)
+        .aggregate(t=_S("minutes_listened"))["t"] or 0
+    )
+    prev_week_audio = (
+        ConfirmationReport.objects
+        .filter(user=user, date__date__gte=prev_week_start, date__date__lte=prev_week_end, is_audio=True)
+        .aggregate(t=_S("minutes_listened"))["t"] or 0
+    )
+    books_finished_week = _BTR.objects.filter(
+        user=user, is_audio=False,
+        current_page__gte=_F("total_pages"), total_pages__gt=0,
+        updated_at__date__gte=week_start, updated_at__date__lte=week_end,
+    ).count()
+    total_books_finished = _BTR.objects.filter(
+        user=user, is_audio=False,
+        current_page__gte=_F("total_pages"), total_pages__gt=0,
+    ).count()
+    total_pages_all_time = (
+        ConfirmationReport.objects.filter(user=user, is_audio=False)
+        .aggregate(t=_S("pages_read"))["t"] or 0
+    )
+
+    # ── Streak ──────────────────────────────────────────────────────────
+    streak = _max_consecutive_days(user)
+
+    # ── Ranking this week ────────────────────────────────────────────────
+    all_week_pages = list(
+        ConfirmationReport.objects
+        .filter(date__date__gte=week_start, date__date__lte=week_end, is_audio=False, user__is_blocked=False)
+        .values("user_id").annotate(t=_S("pages_read"))
+        .values_list("t", flat=True)
+    )
+    rank_pct_ahead = 0
+    if all_week_pages and len(all_week_pages) > 1:
+        behind = sum(1 for p in all_week_pages if (p or 0) < week_pages)
+        rank_pct_ahead = round(behind * 100 / max(len(all_week_pages) - 1, 1))
+
+    # ── Best day & avg ────────────────────────────────────────────────────
+    from django.db.models.functions import TruncDate as _TD
+    day_rows = list(
+        ConfirmationReport.objects
+        .filter(user=user, date__date__gte=week_start, date__date__lte=week_end, is_audio=False)
+        .annotate(_d=_TD("date")).values("_d").annotate(dp=_S("pages_read"))
+    )
+    best_day_pages = max((r["dp"] or 0 for r in day_rows), default=0)
+    avg_pages_per_day = week_pages / 7
+
+    # ── New achievements this week ─────────────────────────────────────
+    new_achievements = list(
+        _UA.objects.filter(
+            user=user,
+            created_at__date__gte=week_start,
+            created_at__date__lte=week_end,
+        ).values("code")
+    )
+    # Map codes to achievement dicts
+    from tgbot.services.achievements import find_achievement
+    ach_dicts = [find_achievement(a["code"]) for a in new_achievements if find_achievement(a["code"])]
+
+    # ── Generate AI text ──────────────────────────────────────────────
+    ai_text = generate_weekly_report(
+        full_name=user.full_name or user.username or "Kitobxon",
+        week_pages=week_pages,
+        prev_week_pages=prev_week_pages,
+        week_audio_minutes=week_audio,
+        prev_week_audio_minutes=prev_week_audio,
+        books_finished_week=books_finished_week,
+        total_books_finished=total_books_finished,
+        total_pages_all_time=total_pages_all_time,
+        streak=streak,
+        new_achievements=ach_dicts,
+        rank_pct_ahead=rank_pct_ahead,
+        avg_pages_per_day_week=avg_pages_per_day,
+        best_day_pages=best_day_pages,
+        language=lang,
+    )
+
+    header = (
+        "💎 <b>Haftalik Premium Hisobot</b> 📊" if lang != "ru"
+        else "💎 <b>Еженедельный Premium Отчёт</b> 📊"
+    )
+    full_text = f"{header}\n\n{ai_text}"
+
+    # ── Achievement Tabriknoma block ─────────────────────────────────
+    if ach_dicts:
+        if lang == "ru":
+            ach_header = "\n\n🏆 <b>Ваши достижения этой недели:</b>\n"
+        else:
+            ach_header = "\n\n🏆 <b>Bu haftadagi yutuqlaringiz:</b>\n"
+        ach_lines = []
+        for ach in ach_dicts[:5]:
+            pts = ach.get("points", 0)
+            t = ach.get("title_ru" if lang == "ru" else "title_uz") or ach.get("title_uz", "")
+            pts_str = f" <i>(+{pts} Kitobcha)</i>" if pts else ""
+            ach_lines.append(f"{ach['emoji']} <b>{t}</b>{pts_str}")
+        full_text += ach_header + "\n".join(ach_lines)
+
+    # ── Try to send with Imagen 3 card image ─────────────────────────
+    url_photo = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+    url_msg = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    ach_titles = [
+        (a.get("title_uz") or a.get("title_ru") or "")
+        for a in ach_dicts
+    ]
+    img_bytes = _generate_report_image(
+        full_name=user.full_name or "Kitobxon",
+        week_pages=week_pages,
+        week_audio_minutes=week_audio,
+        streak=streak,
+        total_pages=total_pages_all_time,
+        books_finished_week=books_finished_week,
+        rank_pct_ahead=rank_pct_ahead,
+        new_achievement_titles=ach_titles,
+    )
+
+    try:
+        if img_bytes:
+            import io
+            resp = requests.post(
+                url_photo,
+                data={"chat_id": user.telegram_id, "parse_mode": "HTML"},
+                files={"photo": ("report.jpg", io.BytesIO(img_bytes), "image/jpeg")},
+                timeout=15,
+            )
+            if resp.ok:
+                # Send text as follow-up message
+                requests.post(
+                    url_msg,
+                    data={"chat_id": user.telegram_id, "text": full_text, "parse_mode": "HTML"},
+                    timeout=10,
+                )
+                return True
+        # Fallback: text only
+        resp = requests.post(
+            url_msg,
+            data={"chat_id": user.telegram_id, "text": full_text, "parse_mode": "HTML"},
+            timeout=10,
+        )
+        return resp.ok
+    except Exception as e:
+        print(f"[weekly_ai_report] send failed uid={user.id}: {e}")
+        return False
+
+
+@shared_task
+def send_weekly_ai_report():
+    """
+    Every Saturday at 20:00 Tashkent — send AI-generated weekly report
+    to all active Premium users.
+    Only users who reported at least once during the week are included.
+    """
+    import datetime as _dt
+    import time as _time
+    from tgbot.models import Payment as _Pay
+
+    today = timezone.localdate()
+    # Week: last 7 days (Mon–Sun or rolling 7 days ending today)
+    week_end = today
+    week_start = today - _dt.timedelta(days=6)
+
+    premium_ids = set(
+        _Pay.objects.filter(
+            status="paid", end_date__gte=today
+        ).values_list("user_id", flat=True)
+    )
+    if not premium_ids:
+        print("[weekly_ai_report] No premium users found.")
+        return
+
+    # Only premium users who reported this week
+    active_premium_user_ids = set(
+        ConfirmationReport.objects.filter(
+            date__date__gte=week_start,
+            date__date__lte=week_end,
+            user_id__in=premium_ids,
+            user__is_blocked=False,
+        ).values_list("user_id", flat=True).distinct()
+    )
+
+    users = list(
+        TelegramProfile.objects.filter(
+            id__in=active_premium_user_ids, is_registered=True, is_blocked=False
+        )
+    )
+    print(f"[weekly_ai_report] Sending to {len(users)} premium users...")
+
+    sent = failed = 0
+    for user in users:
+        try:
+            ok = _send_weekly_report_to_user(
+                user=user,
+                week_start=week_start,
+                week_end=week_end,
+                premium_user_ids=premium_ids,
+            )
+            if ok:
+                sent += 1
+            else:
+                failed += 1
+        except Exception as e:
+            print(f"[weekly_ai_report] user {user.id} failed: {e}")
+            failed += 1
+        _time.sleep(0.15)  # Gemini + Imagen API rate limit protection
+
+    print(f"[weekly_ai_report] done. sent={sent} failed={failed}")
+
+
+# ────────────────────────────────────────────────────────────────────────
 # Kitobxonlik Challenge tasks
 # ────────────────────────────────────────────────────────────────────────
 
