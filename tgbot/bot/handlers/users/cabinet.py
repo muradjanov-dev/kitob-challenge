@@ -218,9 +218,12 @@ async def show_user_cabinet(message: types.Message, state=None):
         user=user, is_audio=False
     ).aggregate(total=Sum('pages_read'))['total'] or 0
 
-    total_audio_minutes = ConfirmationReport.objects.filter(
-        user=user, is_audio=True
-    ).aggregate(total=Sum('minutes_listened'))['total'] or 0
+    audio_reports_qs = ConfirmationReport.objects.filter(user=user, is_audio=True)
+    audio_reports_count = audio_reports_qs.count()
+
+    total_audio_minutes = audio_reports_qs.aggregate(
+        total=Sum('minutes_listened')
+    )['total'] or 0
 
     # 2. Reading speed — separate averages for pages vs audio. Average is per
     # report (≈ per active day for non-premium users who submit one daily).
@@ -302,15 +305,22 @@ async def show_user_cabinet(message: types.Message, state=None):
 
     kitobcha_balance = int(user.ball or 0)
 
-    # Build audio section only if user has any audio activity
+    # Build audio section — show if user has any audio reports (even if minutes NULL)
     audio_section = ""
-    if completed_audio_count or total_audio_minutes or avg_audio_per_day:
+    if completed_audio_count or audio_reports_count or total_audio_minutes:
         audio_books_line = f"🎧 <b>Eshitilgan kitoblar:</b> {completed_audio_count} ta\n" if completed_audio_count else ""
-        audio_total_line = f"⏱ <b>Jami eshitilgan:</b> {total_audio_minutes} daqiqa\n" if total_audio_minutes else ""
+        audio_report_count_line = f"📋 <b>Audio hisobotlar soni:</b> {audio_reports_count} ta\n" if audio_reports_count else ""
+        if total_audio_minutes:
+            audio_total_line = f"⏱ <b>Jami eshitilgan:</b> {total_audio_minutes} daqiqa\n"
+        elif audio_reports_count:
+            audio_total_line = f"⏱ <b>Jami eshitilgan:</b> — daqiqa (ma'lumot saqlanmagan)\n"
+        else:
+            audio_total_line = ""
         audio_avg_line = f"🎧 <b>O'rtacha kunlik eshitish:</b> {int(avg_audio_per_day)} daqiqa\n" if avg_audio_per_day else ""
         audio_section = (
             f"\n🎧 <b>— Audio kitoblar —</b>\n"
             f"{audio_books_line}"
+            f"{audio_report_count_line}"
             f"{audio_total_line}"
             f"{audio_avg_line}"
         )
