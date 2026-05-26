@@ -2069,42 +2069,68 @@ def _generate_report_image(
     Returns raw PNG bytes or None on failure.
     """
     try:
-        import google.generativeai as genai
+        from google import genai as new_genai
+        from google.genai import types as genai_types
+        import datetime as _dt2
         api_key = env.str("GEMINI_API_KEY", default="")
         if not api_key:
             return None
-        genai.configure(api_key=api_key)
-        imagen = genai.ImageGenerationModel("imagen-3.0-generate-002")
+        client = new_genai.Client(api_key=api_key)
 
-        achiev_text = ""
-        if new_achievement_titles:
-            achiev_text = f"Achievement badges: {', '.join(new_achievement_titles[:3])}. "
+        week_end_d = timezone.localdate()
+        week_start_d = week_end_d - _dt2.timedelta(days=6)
+        date_range = f"{week_start_d.strftime('%b %d')} – {week_end_d.strftime('%b %d, %Y')}"
+        ah, am = divmod(week_audio_minutes, 60)
+        audio_label = f"{ah}h {am}m" if ah else f"{week_audio_minutes}m"
 
         prompt = (
-            f"A beautiful personalized weekly reading report card for '{full_name}'. "
-            f"Modern, clean infographic style with warm golden and deep blue colors. "
-            f"Show these stats clearly: "
-            f"{week_pages} pages read this week, "
-            f"{week_audio_minutes} audio minutes, "
-            f"{streak}-day reading streak, "
-            f"{total_pages} total pages all time, "
-            f"{books_finished_week} books finished this week, "
-            f"top {100 - rank_pct_ahead}% reader ranking. "
-            f"{achiev_text}"
-            f"Include decorative book and star elements. "
-            f"Text on card must be in English. No people faces. "
-            f"16:9 landscape orientation, high quality, professional design."
+            "Minimalist luxury weekly reading certificate from 'KITOB CHALLENGE', "
+            "an elite Telegram reading community. "
+            "Style: clean editorial design, lots of negative space, serene and sophisticated. "
+            "PALETTE: soft cream / warm ivory / pearl white background (95% of canvas), "
+            "with luxury accents of deep emerald green, antique gold foil, and matte charcoal black "
+            "used sparingly on key elements only. "
+            "Subtle paper-grain texture, faint gold flecks for premium feel. "
+            "LAYOUT (16:9 landscape, generous whitespace, perfectly balanced): "
+            "TOP — a slim gold horizontal divider line. Above it: tiny minimalist open-book "
+            "logo mark centered. Just below: refined serif wordmark 'KITOB CHALLENGE' in deep "
+            "charcoal, letter-spaced. Tiny sans-serif tagline below: 'WEEKLY READER REPORT'. "
+            f"DATE BADGE — slim outlined gold pill containing '{date_range}'. "
+            f"CENTERPIECE — elegant calligraphic script: 'Presented to {full_name}' "
+            "(large, deep charcoal with subtle gold underline flourish). "
+            "STATS — four minimalist cards in a single row: "
+            f"📖  {week_pages}  PAGES READ  ·  "
+            f"🎧  {audio_label}  AUDIO TIME  ·  "
+            f"🔥  {streak}  DAY STREAK  ·  "
+            f"🏆  TOP {100 - rank_pct_ahead}%  READER. "
+            f"FINE PRINT line below: 'All-time pages: {total_pages}   |   "
+            f"Books finished this week: {books_finished_week}'. "
+            "BOTTOM — italic serif gratitude line, deep emerald: "
+            "'Thank you for your dedication and unwavering perseverance.' "
+            "Corners: small minimalist gold corner-mark brackets. "
+            "Perfect English text, no garbled letters. No people, no faces. "
+            "Hermès / Aesop print-piece aesthetic. 16:9, ultra-detailed."
         )
-        result = imagen.generate_images(
+        result = client.models.generate_images(
+            model="imagen-3.0-generate-002",
             prompt=prompt,
-            number_of_images=1,
-            aspect_ratio="16:9",
-            safety_filter_level="block_only_high",
+            config=genai_types.GenerateImagesConfig(
+                number_of_images=1,
+                aspect_ratio="16:9",
+                safety_filter_level="BLOCK_ONLY_HIGH",
+                person_generation="DONT_ALLOW",
+            ),
         )
-        if result.images:
-            return result.images[0]._pil_image.tobytes("jpeg", "RGB") if hasattr(result.images[0], '_pil_image') else None
+        if result.generated_images:
+            gi = result.generated_images[0]
+            if hasattr(gi, "image") and gi.image is not None:
+                raw = getattr(gi.image, "image_bytes", None)
+                if isinstance(raw, (bytes, bytearray)):
+                    return bytes(raw)
     except Exception as e:
+        import traceback
         print(f"[weekly_ai_report] Imagen error: {e}")
+        traceback.print_exc()
     return None
 
 
@@ -2787,12 +2813,14 @@ def send_ai_report_to_admin(admin_tg_id: int = 917456291, lang: str = "uz"):
     )
     full_text = f"{header}\n\n{ai_text}{ach}"
 
-    # 2. Imagen 3 — branded weekly report card
+    # 2. Imagen 3 — branded weekly report card.
+    # Uses google-genai SDK (not google-generativeai — that one lacks Imagen).
     img_bytes = None
     if gemini_key:
         try:
-            _genai.configure(api_key=gemini_key)
-            imagen = _genai.ImageGenerationModel("imagen-3.0-generate-002")
+            from google import genai as _new_genai
+            from google.genai import types as _genai_types
+            client = _new_genai.Client(api_key=gemini_key)
 
             # Compute the date range for "this week" (last 7 days inclusive)
             week_end_d = timezone.localdate()
@@ -2833,30 +2861,28 @@ def send_ai_report_to_admin(admin_tg_id: int = 917456291, lang: str = "uz"):
                 "No people, no faces. Magazine-quality minimalist luxury aesthetic, "
                 "feels like a Hermès or Aesop print piece. 16:9, ultra-detailed."
             )
-            result = imagen.generate_images(
+            result = client.models.generate_images(
+                model="imagen-3.0-generate-002",
                 prompt=prompt_img,
-                number_of_images=1,
-                aspect_ratio="16:9",
-                safety_filter_level="block_only_high",
+                config=_genai_types.GenerateImagesConfig(
+                    number_of_images=1,
+                    aspect_ratio="16:9",
+                    safety_filter_level="BLOCK_ONLY_HIGH",
+                    person_generation="DONT_ALLOW",
+                ),
             )
-            if result.images:
-                img = result.images[0]
-                for attr in ("_pil_image", "image", "_image"):
-                    pil = getattr(img, attr, None)
-                    if pil is not None:
-                        buf = _io.BytesIO()
-                        pil.save(buf, format="JPEG", quality=90)
-                        img_bytes = buf.getvalue()
-                        break
-                if img_bytes is None:
-                    for attr in ("_image_bytes", "image_bytes", "data"):
-                        raw = getattr(img, attr, None)
-                        if isinstance(raw, (bytes, bytearray)):
-                            img_bytes = bytes(raw)
-                            break
+            if result.generated_images:
+                gen_img = result.generated_images[0]
+                # New SDK exposes raw bytes on .image.image_bytes
+                if hasattr(gen_img, "image") and gen_img.image is not None:
+                    raw = getattr(gen_img.image, "image_bytes", None)
+                    if isinstance(raw, (bytes, bytearray)):
+                        img_bytes = bytes(raw)
             print(f"[send_ai_report_to_admin] Imagen: {'OK' if img_bytes else 'no bytes'}")
         except Exception as e:
+            import traceback
             print(f"[send_ai_report_to_admin] Imagen error: {e}")
+            traceback.print_exc()
 
     # 3. Send
     if img_bytes:
