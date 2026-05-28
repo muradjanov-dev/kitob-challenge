@@ -1177,10 +1177,13 @@ def broadcast_congrats_to_others(user_achievement_id: int, points: int):
             tier = getattr(recipient, "tabriklar_range", "any") or "any"
             if not _achievement_count_matches_range(achiever_total, tier):
                 continue
-            # Nudge: every 10th Tabriklash DM also surfaces the reminder
-            # config button so users can adjust daily reminders without
-            # hunting through the settings menu.
-            keyboard = keyboard_with_reminder if (sent + 1) % 10 == 0 else keyboard_basic
+            # Nudge: every 10th Tabriklash DM a given recipient receives also
+            # surfaces the reminder-config button so users can adjust daily
+            # reminders without hunting through the settings menu. The counter
+            # is per-recipient so the button doesn't land on back-to-back
+            # messages to the same user.
+            recipient_dm_no = (recipient.congrats_dm_count or 0) + 1
+            keyboard = keyboard_with_reminder if recipient_dm_no % 10 == 0 else keyboard_basic
             resp = requests.post(
                 url,
                 data={
@@ -1193,6 +1196,9 @@ def broadcast_congrats_to_others(user_achievement_id: int, points: int):
             )
             if resp.ok:
                 sent += 1
+                TelegramProfile.objects.filter(id=recipient.id).update(
+                    congrats_dm_count=recipient_dm_no
+                )
         except Exception as e:
             print(f"broadcast_congrats_to_others to {recipient.id} failed: {e}")
     print(f"broadcast_congrats_to_others ua={user_achievement_id}: sent={sent}, achiever_total={achiever_total}")

@@ -211,6 +211,11 @@ class TelegramProfile(BaseModel):
         verbose_name=_("Admin contact count"),
         help_text="Number of times the user has successfully messaged the admin.",
     )
+    congrats_dm_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of Tabriklash DMs this user has received; used to "
+                  "surface the reminder-config button on every 10th one.",
+    )
 
     def update_ball(self, is_completed: bool, ball: int) -> int:
         """Add or subtract Kitobcha. Premium users earn 2× on every add.
