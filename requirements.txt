@@ -114,11 +114,12 @@ dj-database-url==1.2.0
 marshmallow<4.0.0
 
 django-modeladmin-reorder
-openai==1.52.2
+openai==1.55.3
 PyMuPDF==1.23.21
 google-generativeai>=0.8.0
 google-genai>=0.3.0
-# Pin httpx<0.28 — openai 1.52.2 passes `proxies=` to httpx.AsyncClient
-# which httpx 0.28+ rejects with TypeError, crashing module import and
-# taking the entire web service down before any handler can register.
-httpx<0.28
+# google-genai (Imagen 3) requires httpx>=0.28.1. openai<1.55.3 passed a
+# `proxies=` kwarg that httpx 0.28+ rejects with TypeError, so openai is
+# pinned to 1.55.3 (the release that dropped `proxies=`) to keep both the
+# OpenAI client and Imagen 3 working on the same httpx.
+httpx>=0.28.1,<1.0
