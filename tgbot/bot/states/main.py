@@ -123,3 +123,7 @@ class ShopProductCreateState(StatesGroup):
     image = State()
     price = State()
     stock = State()
+
+
+class ShopProductEditState(StatesGroup):
+    image = State()

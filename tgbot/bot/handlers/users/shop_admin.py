@@ -21,7 +21,7 @@ from django.utils import timezone
 
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.utils import aget_user
-from tgbot.bot.states.main import ShopProductCreateState
+from tgbot.bot.states.main import ShopProductCreateState, ShopProductEditState
 from tgbot.models import ShopProduct
 
 
@@ -353,8 +353,11 @@ def _product_card_kb(p: ShopProduct) -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup(row_width=2)
     toggle_label = "⏸ O'chirish" if p.is_active else "▶️ Yoqish"
     kb.row(
+        InlineKeyboardButton("🖼 Rasmni yangilash", callback_data=f"shopadm:editimg:{p.id}"),
+    )
+    kb.row(
         InlineKeyboardButton(toggle_label, callback_data=f"shopadm:toggle:{p.id}"),
-        InlineKeyboardButton("🗑 O'chirish (mavjud)", callback_data=f"shopadm:delete:{p.id}"),
+        InlineKeyboardButton("🗑 O'chirish", callback_data=f"shopadm:delete:{p.id}"),
     )
     kb.row(InlineKeyboardButton("📋 Ro'yxatga qaytish", callback_data="shopadm:list:0"))
     return kb
@@ -470,6 +473,76 @@ async def shopadm_delete_yes(call: types.CallbackQuery, state: FSMContext):
         parse_mode="HTML",
         reply_markup=_list_kb(rows),
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Edit-image flow — replace an existing product's image without rebuilding
+# the whole row. Single-state FSM: tap button → send photo → done.
+# ──────────────────────────────────────────────────────────────────────────
+@dp.callback_query_handler(lambda c: c.data.startswith("shopadm:editimg:"), state="*")
+async def shopadm_editimg_start(call: types.CallbackQuery, state: FSMContext):
+    user = await aget_user(call.from_user.id)
+    if not _is_admin(user):
+        await call.answer("Faqat adminlar uchun", show_alert=True)
+        return
+    pid = int(call.data.split(":")[-1])
+    p = await _get_product_sync(pid)
+    if not p:
+        await call.answer("Mahsulot topilmadi", show_alert=True)
+        return
+    await call.answer()
+    await ShopProductEditState.image.set()
+    await state.update_data(edit_product_id=pid)
+    await call.message.answer(
+        f"🖼 <b>{_escape(p.name)}</b> uchun yangi rasm yuboring.\n\n"
+        "Bekor qilish: /bekor",
+        parse_mode="HTML",
+    )
+
+
+@dp.message_handler(commands=["bekor"], state=ShopProductEditState.image)
+async def shopadm_editimg_cancel(message: types.Message, state: FSMContext):
+    await state.finish()
+    await message.answer("❌ Bekor qilindi.", reply_markup=_shop_admin_menu_kb())
+
+
+@dp.message_handler(state=ShopProductEditState.image, content_types=types.ContentTypes.PHOTO)
+async def shopadm_editimg_get(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    pid = data.get("edit_product_id")
+    if not pid:
+        await state.finish()
+        await message.answer("Xatolik: mahsulot ID yo'q. Qaytadan urinib ko'ring.")
+        return
+    p = await _get_product_sync(pid)
+    if not p:
+        await state.finish()
+        await message.answer("Mahsulot topilmadi.")
+        return
+    photo = message.photo[-1]
+    try:
+        buf: io.BytesIO = await bot.download_file_by_id(photo.file_id)
+        buf.seek(0)
+        ts = int(timezone.now().timestamp())
+        await _attach_image_sync(p, f"shop_{p.id}_{ts}.jpg", buf.read())
+    except Exception as e:
+        print(f"shop_admin: editimg attach failed for product {pid}: {e}")
+        await state.finish()
+        await message.answer("⚠️ Rasm yuklashda xatolik.")
+        return
+    await state.finish()
+    p = await _get_product_sync(pid)  # refresh after save
+    await message.answer(
+        f"✅ <b>{_escape(p.name)}</b> rasmi yangilandi!\n\n"
+        "Mini App'ni qayta oching — yangi rasm ko'rinadi.",
+        parse_mode="HTML",
+        reply_markup=_shop_admin_menu_kb(),
+    )
+
+
+@dp.message_handler(state=ShopProductEditState.image)
+async def shopadm_editimg_invalid(message: types.Message, state: FSMContext):
+    await message.answer("Iltimos rasm yuboring yoki /bekor.")
 
 
 # ──────────────────────────────────────────────────────────────────────────
