@@ -1,11 +1,10 @@
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton,
-    InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo,
+    InlineKeyboardMarkup, InlineKeyboardButton,
 )
 from tgbot.bot.loader import gettext as _
 from tgbot.models import TelegramButton, Group, Region
 from utils.bot import get_object_value
-from src.settings import WEB_DOMAIN
 
 
 def confirm_markup():
@@ -47,7 +46,6 @@ def main_markup(language="uz", is_admin=False):
             "report_big": "📚\n\n📚 Отчет о книге 📚\n\n📚",
             "cabinet": "👤 Кабинет",
             "premium": "💎 Подписка",
-            "shop": "🛒 Магазин Kitob Challenge",
             "reyting": "📊 Рейтинг",
             "contact": "📞 Написать администратору",
             "settings": "⚙️ Настройки",
@@ -59,7 +57,6 @@ def main_markup(language="uz", is_admin=False):
             "report_big": "📚\n\n📚 Kitob hisoboti 📚\n\n📚",
             "cabinet": "👤 Kabinet",
             "premium": "💎 Premium obuna",
-            "shop": "🛒 Kitob Challenge Shop",
             "reyting": "📊 Reyting",
             "contact": "📞 Admin bilan bog'lanish",
             "settings": "⚙️ Sozlamalar",
@@ -69,23 +66,14 @@ def main_markup(language="uz", is_admin=False):
 
     kb = InlineKeyboardMarkup(row_width=2)
     kb.row(InlineKeyboardButton(text=labels["report_big"], callback_data="menu:report"))
-    # Shop entry: admins get a Telegram WebApp button that opens the Mini App
-    # directly. Non-admins keep the regular callback button which routes to
-    # the 'Tez kunda' placeholder while the shop is in test mode. To roll out
-    # broadly, drop this conditional and give everyone the WebApp button.
-    if is_admin:
-        shop_btn = InlineKeyboardButton(
-            text=labels["shop"],
-            web_app=WebAppInfo(url=f"{WEB_DOMAIN}/shop/"),
-        )
-    else:
-        shop_btn = InlineKeyboardButton(text=labels["shop"], callback_data="menu:shop")
+    # Shop entry lives on the native chat menu button now (see
+    # set_shop_menu_button management command), so it's removed from the
+    # inline menu entirely.
     kb.row(
         InlineKeyboardButton(text=labels["cabinet"], callback_data="menu:cabinet"),
-        shop_btn,
+        InlineKeyboardButton(text=labels["reyting"], callback_data="menu:reyting"),
     )
     kb.row(
-        InlineKeyboardButton(text=labels["reyting"], callback_data="menu:reyting"),
         InlineKeyboardButton(text=labels["premium"], callback_data="menu:premium"),
     )
     kb.row(InlineKeyboardButton(text=labels["quiz"], callback_data="menu:quiz"))
