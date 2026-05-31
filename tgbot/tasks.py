@@ -1100,13 +1100,21 @@ def _gender_match(achiever, recipient) -> bool:
        - recipient is willing to congratulate achiever's gender, AND
        - achiever accepts congrats from recipient's gender.
     Empty/unknown genders default to 'any'."""
-    a_g = achiever.gender or ""
-    r_g = recipient.gender or ""
-    sender_pref = recipient.send_congrats_to or "any"
-    accept_pref = achiever.accept_congrats_from or "any"
+    a_g = (achiever.gender or "").strip().lower()
+    r_g = (recipient.gender or "").strip().lower()
+    sender_pref = (recipient.send_congrats_to or "any").strip().lower()
+    accept_pref = (achiever.accept_congrats_from or "any").strip().lower()
     if sender_pref != "any" and sender_pref != a_g:
+        print(
+            f"gender_filter: SKIP recipient={recipient.id} send_pref={sender_pref!r} "
+            f"achiever_gender={a_g!r} (recipient won't congrat this gender)"
+        )
         return False
     if accept_pref != "any" and accept_pref != r_g:
+        print(
+            f"gender_filter: SKIP recipient={recipient.id} accept_pref={accept_pref!r} "
+            f"recipient_gender={r_g!r} (achiever won't accept from this gender)"
+        )
         return False
     return True
 
