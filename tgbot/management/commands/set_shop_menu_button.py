@@ -30,19 +30,15 @@ class Command(BaseCommand):
             "--label", default="🛍 Do'kon",
             help="Button label (max 14 chars per Telegram). Default: 🛍 Do'kon.",
         )
+        parser.add_argument(
+            "--all-chats", dest="all_chats", action="store_true",
+            help="Set globally (no chat_id) — default for every bot DM. "
+                 "Use this once the shop is rolled out broadly.",
+        )
 
-    def handle(self, *args, reset=False, label="🛍 Do'kon", **opts):
+    def handle(self, *args, reset=False, label="🛍 Do'kon", all_chats=False, **opts):
         url = f"https://api.telegram.org/bot{settings.API_TOKEN}/setChatMenuButton"
         shop_url = f"{settings.WEB_DOMAIN}/shop/"
-
-        admins = list(
-            TelegramProfile.objects
-            .filter(is_admin=True, is_blocked=False)
-            .values_list("telegram_id", flat=True)
-        )
-        if not admins:
-            self.stdout.write(self.style.WARNING("No is_admin users found."))
-            return
 
         if reset:
             menu_button = {"type": "default"}
@@ -54,6 +50,35 @@ class Command(BaseCommand):
                 "web_app": {"url": shop_url},
             }
             action = "set"
+
+        if all_chats:
+            # One call without chat_id sets the default for all bot DMs.
+            # Chats with an explicit per-user setting keep theirs.
+            try:
+                resp = requests.post(url, data={
+                    "menu_button": json.dumps(menu_button),
+                }, timeout=10)
+                if resp.ok and resp.json().get("ok"):
+                    self.stdout.write(self.style.SUCCESS(
+                        f"GLOBAL {action} OK. Mini App URL: {shop_url}"
+                    ))
+                else:
+                    self.stdout.write(self.style.ERROR(
+                        f"GLOBAL {action} FAILED: {resp.status_code} {resp.text[:200]}"
+                    ))
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f"GLOBAL {action} EXCEPTION: {e}"))
+            return
+
+        # Default: per-admin scoping (legacy admin-only test mode behavior).
+        admins = list(
+            TelegramProfile.objects
+            .filter(is_admin=True, is_blocked=False)
+            .values_list("telegram_id", flat=True)
+        )
+        if not admins:
+            self.stdout.write(self.style.WARNING("No is_admin users found."))
+            return
 
         ok, failed = 0, 0
         for tid in admins:

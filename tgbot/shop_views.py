@@ -104,13 +104,10 @@ def _resolve_profile(init_data: str) -> tuple[TelegramProfile | None, str | None
         return None, "profile_not_found"
     if profile.is_blocked:
         return None, "blocked"
-    if not profile.is_admin:
-        # Gate: admin-only during testing. Remove to roll out broadly.
-        return None, "not_admin"
     return profile, None
 
 
-def _require_authed_admin(view):
+def _require_authed(view):
     @wraps(view)
     def wrapper(request, *args, **kwargs):
         init_data = _read_init_data(request)
@@ -120,6 +117,10 @@ def _require_authed_admin(view):
         request.tg_profile = profile
         return view(request, *args, **kwargs)
     return wrapper
+
+
+# Back-compat alias — earlier code (admin-only test mode) used this name.
+_require_authed_admin = _require_authed
 
 
 # ─────────────────────────────────────────────────────────────────────────────

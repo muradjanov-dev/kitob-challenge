@@ -404,7 +404,7 @@
       <div class="logo">📚</div>
       <div>
         <div class="title">Kitob Challenge Shop</div>
-        <div class="subtitle">Test rejimi • faqat admin</div>
+        <div class="subtitle">Kitobchalaringizni mukofotlarga almashtiring</div>
       </div>
     </div>
     <div class="spacer"></div>
@@ -435,9 +435,9 @@
     <div>Hozircha mahsulotlar yo'q.<br/>Admin panelidan qo'shing.</div>
   </div>
   <div class="locked" id="locked" style="display:none">
-    <div class="em">🔒</div>
-    <h2>Faqat adminlar uchun</h2>
-    <p>Shop hozircha test rejimida. <br/>To'liq ishga tushganda barcha foydalanuvchilar ko'ra oladi.</p>
+    <div class="em">👋</div>
+    <h2>Botda ro'yxatdan o'ting</h2>
+    <p>Do'konni ochish uchun avval Kitob Challenge botida ro'yxatdan o'ting.</p>
   </div>
 
   <!-- Product / purchase sheet -->
@@ -454,11 +454,27 @@
     // ─── Telegram WebApp bridge ──────────────────────────────
     const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
     if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
-    const INIT_DATA = (tg && tg.initData) || "";
+
+    // Resolve initData fresh on each call — some Telegram clients/launch
+    // surfaces (reply keyboard, chat menu button) populate tg.initData a
+    // tick AFTER script-load, so reading it once at top-level can race and
+    // come back empty. If the SDK gives us nothing, fall back to parsing
+    // window.location.hash, where Telegram puts tgWebAppData=<urlencoded>.
+    function getInitData() {
+      if (tg && tg.initData) return tg.initData;
+      const hash = (window.location.hash || "").replace(/^#/, "");
+      if (!hash) return "";
+      try {
+        const p = new URLSearchParams(hash);
+        const d = p.get("tgWebAppData");
+        if (d) return d;
+      } catch (e) {}
+      return "";
+    }
 
     async function api(path, opts = {}) {
       const headers = Object.assign({
-        "X-Telegram-Init-Data": INIT_DATA,
+        "X-Telegram-Init-Data": getInitData(),
         "Accept": "application/json",
       }, opts.headers || {});
       if (opts.body && typeof opts.body !== "string") {
@@ -536,7 +552,7 @@
       const spinner = document.getElementById("spinner");
       spinner.style.display = "none";
       if (!r.ok) {
-        if (r.status === 403 && r.data.error === "not_admin") {
+        if (r.status === 403 && r.data.error === "profile_not_found") {
           document.getElementById("locked").style.display = "block";
         } else {
           document.getElementById("empty").style.display = "block";

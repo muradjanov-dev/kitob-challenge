@@ -88,6 +88,8 @@ def main_markup(language="uz", is_admin=False):
 
 
 def report_reply_keyboard(language="uz", bajardim_label=None, is_admin=False):
+    # is_admin kept for backwards compat with existing call sites; the shop
+    # is now public so the Do'kon button always renders.
     if language == "ru":
         report_text = "📚 Отчет о книге"
         home_text = "🏠 Главное меню"
@@ -99,18 +101,17 @@ def report_reply_keyboard(language="uz", bajardim_label=None, is_admin=False):
         done_text = bajardim_label or "✅ Bajardim!"
         shop_text = "🛍 Do'kon"
 
+    # Persistent shop entry visible above the input on every client. Reply-
+    # keyboard WebApp buttons always render the label (unlike the chat menu
+    # button which collapses to an icon on mobile).
     rows = [
         [KeyboardButton(text=report_text), KeyboardButton(text=done_text)],
-        [KeyboardButton(text=home_text)],
-    ]
-    # Persistent shop entry for admins — label is always visible above the
-    # input bar on every Telegram client (mobile + desktop), unlike the chat
-    # menu button which collapses to a bare icon on mobile.
-    if is_admin:
-        rows.append([KeyboardButton(
+        [KeyboardButton(
             text=shop_text,
             web_app=WebAppInfo(url=f"{WEB_DOMAIN}/shop/"),
-        )])
+        )],
+        [KeyboardButton(text=home_text)],
+    ]
     return ReplyKeyboardMarkup(
         keyboard=rows,
         resize_keyboard=True,
