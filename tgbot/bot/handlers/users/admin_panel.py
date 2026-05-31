@@ -753,6 +753,9 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
         await show_quiz_list(call.message, user)
     elif action == "kitobcha_top":
         await _send_kitobcha_top(call.message)
+    elif action == "shop":
+        from tgbot.bot.handlers.users.shop_admin import shop_admin_menu
+        await shop_admin_menu(call.message, user)
     else:
         await msg.answer("Noma'lum amal.")
 

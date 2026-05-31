@@ -39,16 +39,16 @@ def _shop_admin_menu_kb() -> InlineKeyboardMarkup:
 
 # ──────────────────────────────────────────────────────────────────────────
 # Entry: admin panel → 🛒 Do'kon boshqaruvi
+#
+# Wired into admin_panel.admin_inline_router (the central admin:* router),
+# NOT as its own @dp handler — aiogram dispatches the first matching
+# handler, and the router's broader startswith("admin:") filter would
+# always win, sending users to its "Noma'lum amal." fallback.
 # ──────────────────────────────────────────────────────────────────────────
-@dp.callback_query_handler(lambda c: c.data == "admin:shop", state="*")
-async def shop_admin_menu(call: types.CallbackQuery, state: FSMContext):
-    user = await aget_user(call.from_user.id)
-    if not _is_admin(user):
-        await call.answer("Faqat adminlar uchun", show_alert=True)
-        return
-    await state.finish()
-    await call.answer()
-    await call.message.answer(
+async def shop_admin_menu(message: types.Message, user):
+    """Show the shop admin menu. `user` is the TelegramProfile of the caller;
+    is_admin is already enforced by the router."""
+    await message.answer(
         "🛒 <b>Do'kon boshqaruvi</b>\n\n"
         "Bot orqali mahsulot qo'shish, ko'rish va o'chirish mumkin. "
         "Murakkab tahrirlar uchun Django admin paneldan foydalaning.",
