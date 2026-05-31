@@ -292,10 +292,11 @@ async def challenge_done_reply_button(message: types.Message, state: FSMContext)
         from tgbot.bot.keyboards.reply import report_reply_keyboard
         lang = (user.language if user else None) or "uz"
         new_label = await compute_bajardim_label(user, lang)
+        is_admin = bool(user and getattr(user, "is_admin", False))
         await message.answer(
             f"✅ <b>Bajarildi! {days_done}/3 kun</b>\n\n{end_msg}",
             parse_mode="HTML",
-            reply_markup=report_reply_keyboard(lang, new_label),
+            reply_markup=report_reply_keyboard(lang, new_label, is_admin=is_admin),
         )
 
 

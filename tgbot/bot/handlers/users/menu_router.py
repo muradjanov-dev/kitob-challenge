@@ -68,10 +68,11 @@ async def send_main_menu(message: types.Message, user, header_text=None):
             bajardim_label = await compute_bajardim_label(user, lang)
         except Exception as e:
             print(f"compute_bajardim_label failed: {e}")
+    is_admin = bool(user and getattr(user, "is_admin", False))
     try:
         await message.answer(
             header,
-            reply_markup=report_reply_keyboard(lang, bajardim_label),
+            reply_markup=report_reply_keyboard(lang, bajardim_label, is_admin=is_admin),
         )
     except Exception:
         pass

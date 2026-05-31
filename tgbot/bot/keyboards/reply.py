@@ -1,10 +1,11 @@
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton,
-    InlineKeyboardMarkup, InlineKeyboardButton,
+    InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo,
 )
 from tgbot.bot.loader import gettext as _
 from tgbot.models import TelegramButton, Group, Region
 from utils.bot import get_object_value
+from src.settings import WEB_DOMAIN
 
 
 def confirm_markup():
@@ -75,8 +76,8 @@ def main_markup(language="uz", is_admin=False):
     )
     kb.row(
         InlineKeyboardButton(text=labels["premium"], callback_data="menu:premium"),
+        InlineKeyboardButton(text=labels["quiz"], callback_data="menu:quiz"),
     )
-    kb.row(InlineKeyboardButton(text=labels["quiz"], callback_data="menu:quiz"))
     kb.row(
         InlineKeyboardButton(text=labels["settings"], callback_data="menu:settings"),
         InlineKeyboardButton(text=labels["contact"], callback_data="menu:contact"),
@@ -86,20 +87,32 @@ def main_markup(language="uz", is_admin=False):
     return kb
 
 
-def report_reply_keyboard(language="uz", bajardim_label=None):
+def report_reply_keyboard(language="uz", bajardim_label=None, is_admin=False):
     if language == "ru":
         report_text = "📚 Отчет о книге"
         home_text = "🏠 Главное меню"
         done_text = bajardim_label or "✅ Выполнено!"
+        shop_text = "🛍 Магазин"
     else:
         report_text = "📚 Kitob hisoboti"
         home_text = "🏠 Bosh menyu"
         done_text = bajardim_label or "✅ Bajardim!"
+        shop_text = "🛍 Do'kon"
+
+    rows = [
+        [KeyboardButton(text=report_text), KeyboardButton(text=done_text)],
+        [KeyboardButton(text=home_text)],
+    ]
+    # Persistent shop entry for admins — label is always visible above the
+    # input bar on every Telegram client (mobile + desktop), unlike the chat
+    # menu button which collapses to a bare icon on mobile.
+    if is_admin:
+        rows.append([KeyboardButton(
+            text=shop_text,
+            web_app=WebAppInfo(url=f"{WEB_DOMAIN}/shop/"),
+        )])
     return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=report_text), KeyboardButton(text=done_text)],
-            [KeyboardButton(text=home_text)],
-        ],
+        keyboard=rows,
         resize_keyboard=True,
         is_persistent=True,
     )
