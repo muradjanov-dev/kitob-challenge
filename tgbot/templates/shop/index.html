@@ -239,6 +239,15 @@
       cursor: pointer; user-select: all;
     }
     .code-hint { font-size: 11px; color: var(--text-faint); margin-top: 8px; }
+    .contact-note {
+      margin: 18px auto 0; padding: 12px 14px;
+      background: rgba(74,222,128,0.10);
+      border: 1px solid rgba(74,222,128,0.28);
+      border-radius: 12px;
+      color: #d2f7df; font-size: 13px; line-height: 1.5;
+      max-width: 320px;
+    }
+    .contact-note b { color: var(--success); }
     .close-btn {
       margin-top: 22px; width: 100%; padding: 14px;
       background: var(--card); color: var(--text);
@@ -665,11 +674,12 @@
           '<div class="check">' +
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' +
           '</div>' +
-          '<h2>Tabriklaymiz! 🎉</h2>' +
-          '<p>' + escapeHTML(p.product_name) + ' xarid qilindi.</p>' +
+          '<h2>Tabriklaymiz, Kitobxon! 🎉</h2>' +
+          '<p>Siz <b>' + escapeHTML(p.product_name) + '</b> mukofotini qo\'lga kiritdingiz!</p>' +
           '<div class="code-pill" id="codePill" title="Bosib nusxalash">' + p.code + '</div>' +
-          '<div class="code-hint">Bu kodni adminga ko\'rsating</div>' +
-          '<button class="close-btn" id="okBtn">Yopish</button>' +
+          '<div class="code-hint">Buyurtma kodi — bosib nusxa oling</div>' +
+          '<div class="contact-note">📞 <b>Admin tez orada siz bilan bog\'lanadi</b> va mukofotni topshiradi. Iltimos, kuting.</div>' +
+          '<button class="close-btn" id="okBtn">Ajoyib! Yopish</button>' +
         '</div>'
       );
       document.getElementById("okBtn").addEventListener("click", () => { sound.play("tap"); hideSheet(); });

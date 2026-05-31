@@ -15,12 +15,14 @@ button to non-admins (see tgbot/bot/keyboards/reply.py).
 
 import hashlib
 import hmac
+import html as _html
 import json
 import secrets
 from decimal import Decimal
 from functools import wraps
 from urllib.parse import parse_qsl
 
+import requests
 from django.conf import settings
 from django.db import transaction
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -228,6 +230,13 @@ def api_buy(request: HttpRequest) -> JsonResponse:
     except TelegramProfile.DoesNotExist:
         return JsonResponse({"ok": False, "error": "profile_missing"}, status=403)
 
+    # Fire-and-forget admin notifications. Wrapped in try/except so a Telegram
+    # API hiccup never fails the actual purchase — the user already paid.
+    try:
+        _notify_admins_of_purchase(purchase, user)
+    except Exception as e:
+        print(f"shop: admin notify failed for purchase {purchase.code}: {e}")
+
     return JsonResponse({
         "ok": True,
         "purchase": {
@@ -237,3 +246,40 @@ def api_buy(request: HttpRequest) -> JsonResponse:
         },
         "balance": int(user.ball or 0),
     })
+
+
+def _notify_admins_of_purchase(purchase: ShopPurchase, buyer: TelegramProfile) -> None:
+    """DM every is_admin user about a new purchase so they can hand over the
+    prize. Best-effort: failures are logged and swallowed (caller does this)."""
+    admins = list(
+        TelegramProfile.objects
+        .filter(is_admin=True, is_blocked=False)
+        .values_list("telegram_id", flat=True)
+    )
+    if not admins:
+        return
+    name = _html.escape(buyer.full_name or "Kitobxon")
+    product = _html.escape(purchase.product_name_snapshot or "")
+    # Build a tg://user link so the admin can DM the buyer with one tap even
+    # if the buyer has no @username set.
+    contact_line = f"<a href=\"tg://user?id={buyer.telegram_id}\">DM yuborish</a>"
+    text = (
+        "🛒 <b>Yangi xarid!</b>\n\n"
+        f"👤 <b>{name}</b>\n"
+        f"🎁 {product}\n"
+        f"💰 {purchase.price_at_purchase} Kitobcha\n"
+        f"🎫 <code>{purchase.code}</code>\n\n"
+        f"📞 {contact_line} — mukofotni topshiring va admin paneldan "
+        "<i>Fulfilled</i> deb belgilang."
+    )
+    url = f"https://api.telegram.org/bot{settings.API_TOKEN}/sendMessage"
+    for admin_id in admins:
+        try:
+            requests.post(url, data={
+                "chat_id": admin_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": "true",
+            }, timeout=5)
+        except Exception as e:
+            print(f"shop: notify admin {admin_id} failed: {e}")

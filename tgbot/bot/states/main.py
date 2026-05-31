@@ -115,3 +115,11 @@ class AIQuizCreateState(StatesGroup):
     time_limit = State()
     input_content = State()
     parsing = State()
+
+
+class ShopProductCreateState(StatesGroup):
+    name = State()
+    description = State()
+    image = State()
+    price = State()
+    stock = State()

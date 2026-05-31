@@ -195,6 +195,9 @@ admin_keyboard.row(
 admin_keyboard.row(
     InlineKeyboardButton(text="📝 Quizlar", callback_data="admin:quizzes"),
 )
+admin_keyboard.row(
+    InlineKeyboardButton(text="🛒 Do'kon boshqaruvi", callback_data="admin:shop"),
+)
 
 # The deprecated reply-keyboard version (kept for any legacy callers).
 _admin_reply_keyboard_legacy = ReplyKeyboardMarkup(
