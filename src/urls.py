@@ -28,6 +28,10 @@ if 'rosetta' in settings.INSTALLED_APPS:
         re_path(r'^rosetta/', include('rosetta.urls'))
     ]
 
+# Media is served in prod too — the Mini App shop loads product images via
+# HTTP from /media/. Static is still WhiteNoise in prod, so we only need the
+# dev static() helper for it under DEBUG.
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

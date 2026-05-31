@@ -1,0 +1,239 @@
+"""Kitob Challenge Shop — Telegram Mini App.
+
+Admins upload products via Django admin; users (currently gated to is_admin
+for testing) browse and buy with their Kitobcha balance.
+
+Telegram WebApp authentication: every API request must include the raw
+`initData` query string from `window.Telegram.WebApp.initData` either as a
+header (`X-Telegram-Init-Data`) or as a body field. We verify the HMAC and
+look up the TelegramProfile by `id` from the embedded user payload.
+
+To open the shop to all users later: remove the `is_admin` check in
+`_require_authed_admin` AND switch the menu keyboard to show the WebApp
+button to non-admins (see tgbot/bot/keyboards/reply.py).
+"""
+
+import hashlib
+import hmac
+import json
+import secrets
+from decimal import Decimal
+from functools import wraps
+from urllib.parse import parse_qsl
+
+from django.conf import settings
+from django.db import transaction
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
+
+from tgbot.models import ShopProduct, ShopPurchase, TelegramProfile
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# initData verification.
+#
+# Per https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app,
+# the secret key is HMAC_SHA256(key=b"WebAppData", msg=bot_token).
+# The hash over (k=v) pairs sorted by k, joined by \n, must match the `hash`
+# field.
+# ─────────────────────────────────────────────────────────────────────────────
+def _verify_init_data(init_data: str) -> dict | None:
+    if not init_data:
+        return None
+    try:
+        pairs = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=True))
+    except ValueError:
+        return None
+    received_hash = pairs.pop("hash", None)
+    if not received_hash:
+        return None
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
+    secret_key = hmac.new(b"WebAppData", settings.API_TOKEN.encode(), hashlib.sha256).digest()
+    computed = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(computed, received_hash):
+        return None
+    user_json = pairs.get("user")
+    if not user_json:
+        return None
+    try:
+        user = json.loads(user_json)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(user, dict) or "id" not in user:
+        return None
+    return user
+
+
+def _read_init_data(request: HttpRequest) -> str:
+    """initData may arrive via header (preferred for API calls) or as a query
+    param on the initial HTML page load. We accept both."""
+    return (
+        request.headers.get("X-Telegram-Init-Data")
+        or request.GET.get("initData")
+        or ""
+    )
+
+
+def _resolve_profile(init_data: str) -> tuple[TelegramProfile | None, str | None]:
+    """Returns (profile, error_code). error_code is None on success."""
+    tg_user = _verify_init_data(init_data)
+    if not tg_user:
+        return None, "invalid_init_data"
+    profile = TelegramProfile.objects.filter(telegram_id=str(tg_user["id"])).first()
+    if not profile:
+        return None, "profile_not_found"
+    if profile.is_blocked:
+        return None, "blocked"
+    if not profile.is_admin:
+        # Gate: admin-only during testing. Remove to roll out broadly.
+        return None, "not_admin"
+    return profile, None
+
+
+def _require_authed_admin(view):
+    @wraps(view)
+    def wrapper(request, *args, **kwargs):
+        init_data = _read_init_data(request)
+        profile, err = _resolve_profile(init_data)
+        if err:
+            return JsonResponse({"ok": False, "error": err}, status=403)
+        request.tg_profile = profile
+        return view(request, *args, **kwargs)
+    return wrapper
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Views.
+# ─────────────────────────────────────────────────────────────────────────────
+def shop_index(request: HttpRequest) -> HttpResponse:
+    """Single-page Mini App. The page itself doesn't require a valid initData
+    (the Telegram WebApp SDK injects it client-side); the actual gate is on
+    every API call. This keeps initial render fast and lets us show a friendly
+    'not authorized' state instead of a 403 wall."""
+    return render(request, "shop/index.html", {
+        "shop_currency_label": "Kitobcha",
+    })
+
+
+def _product_payload(p: ShopProduct, request: HttpRequest) -> dict:
+    img = None
+    if p.image:
+        try:
+            img = request.build_absolute_uri(p.image.url)
+        except Exception:
+            img = None
+    return {
+        "id": p.id,
+        "name": p.name,
+        "description": p.description or "",
+        "image_url": img,
+        "price": p.price_kitobcha,
+        "stock_qty": p.stock_qty,
+        "is_available": p.is_available,
+    }
+
+
+@csrf_exempt
+@require_GET
+@_require_authed_admin
+def api_products(request: HttpRequest) -> JsonResponse:
+    products = ShopProduct.objects.filter(is_active=True).order_by("sort_order", "-created_at")
+    return JsonResponse({
+        "ok": True,
+        "products": [_product_payload(p, request) for p in products],
+        "me": {
+            "telegram_id": request.tg_profile.telegram_id,
+            "full_name": request.tg_profile.full_name or "",
+            "balance": int(request.tg_profile.ball or 0),
+        },
+    })
+
+
+@csrf_exempt
+@require_GET
+@_require_authed_admin
+def api_me(request: HttpRequest) -> JsonResponse:
+    return JsonResponse({
+        "ok": True,
+        "telegram_id": request.tg_profile.telegram_id,
+        "full_name": request.tg_profile.full_name or "",
+        "balance": int(request.tg_profile.ball or 0),
+    })
+
+
+def _gen_purchase_code() -> str:
+    """12-char uppercase base32-ish code, e.g. 'KC-7F9X-A2H4'."""
+    alpha = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # avoid look-alike chars
+    rnd = lambda n: "".join(secrets.choice(alpha) for _ in range(n))
+    return f"KC-{rnd(4)}-{rnd(4)}"
+
+
+@csrf_exempt
+@require_POST
+@_require_authed_admin
+def api_buy(request: HttpRequest) -> JsonResponse:
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
+    product_id = body.get("product_id")
+    if not isinstance(product_id, int):
+        return JsonResponse({"ok": False, "error": "product_id_required"}, status=400)
+
+    # Atomic: lock the buyer row and the product row, recheck availability,
+    # decrement balance + stock, write the purchase. select_for_update keeps
+    # double-spend safe under concurrent clicks.
+    try:
+        with transaction.atomic():
+            user = TelegramProfile.objects.select_for_update().get(id=request.tg_profile.id)
+            product = ShopProduct.objects.select_for_update().filter(
+                id=product_id, is_active=True,
+            ).first()
+            if not product:
+                return JsonResponse({"ok": False, "error": "product_unavailable"}, status=400)
+            if product.stock_qty is not None and product.stock_qty <= 0:
+                return JsonResponse({"ok": False, "error": "out_of_stock"}, status=400)
+            price = product.price_kitobcha
+            if int(user.ball or 0) < price:
+                return JsonResponse({
+                    "ok": False, "error": "insufficient_balance",
+                    "balance": int(user.ball or 0), "price": price,
+                }, status=400)
+
+            user.ball = (user.ball or Decimal("0")) - Decimal(price)
+            user.save(update_fields=["ball"])
+            if product.stock_qty is not None:
+                product.stock_qty = product.stock_qty - 1
+                product.save(update_fields=["stock_qty"])
+
+            # Unique code with a few retries to dodge the astronomically rare
+            # collision.
+            for _ in range(5):
+                code = _gen_purchase_code()
+                if not ShopPurchase.objects.filter(code=code).exists():
+                    break
+            else:
+                return JsonResponse({"ok": False, "error": "code_gen_failed"}, status=500)
+
+            purchase = ShopPurchase.objects.create(
+                user=user,
+                product=product,
+                product_name_snapshot=product.name,
+                price_at_purchase=price,
+                code=code,
+                status=ShopPurchase.STATUS_PENDING,
+            )
+    except TelegramProfile.DoesNotExist:
+        return JsonResponse({"ok": False, "error": "profile_missing"}, status=403)
+
+    return JsonResponse({
+        "ok": True,
+        "purchase": {
+            "code": purchase.code,
+            "product_name": purchase.product_name_snapshot,
+            "price": purchase.price_at_purchase,
+        },
+        "balance": int(user.ball or 0),
+    })

@@ -815,3 +815,81 @@ class ChallengeParticipant(models.Model):
 
     def __str__(self):
         return f"{self.user.full_name} — {self.challenge.title} ({self.days_completed}/3)"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shop — Kitob Challenge Mini App marketplace where users redeem their
+# Kitobcha balance (TelegramProfile.ball) for prizes uploaded by admins.
+# Currently gated to is_admin users for testing; flip the gate in the bot
+# keyboard + view to roll out.
+# ─────────────────────────────────────────────────────────────────────────────
+class ShopProduct(BaseModel):
+    name = models.CharField(max_length=120)
+    description = models.TextField(blank=True, default="")
+    image = models.ImageField(upload_to="shop/products/", blank=True, null=True)
+    price_kitobcha = models.PositiveIntegerField(
+        help_text="Cost in Kitobcha. Deducted atomically from the buyer's ball.",
+    )
+    stock_qty = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Leave blank for unlimited. Decremented on each purchase.",
+    )
+    sort_order = models.IntegerField(
+        default=0,
+        help_text="Lower = shown first. Ties broken by newest-first.",
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "Shop Product"
+        verbose_name_plural = "Shop Products"
+        ordering = ("sort_order", "-created_at")
+
+    def __str__(self):
+        return f"{self.name} — {self.price_kitobcha} Kitobcha"
+
+    @property
+    def is_available(self) -> bool:
+        if not self.is_active:
+            return False
+        return self.stock_qty is None or self.stock_qty > 0
+
+
+class ShopPurchase(BaseModel):
+    STATUS_PENDING = "pending"
+    STATUS_FULFILLED = "fulfilled"
+    STATUS_REFUNDED = "refunded"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_FULFILLED, "Fulfilled"),
+        (STATUS_REFUNDED, "Refunded"),
+    ]
+
+    user = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="shop_purchases",
+    )
+    # SET_NULL so deleting a product doesn't wipe historical purchase records.
+    product = models.ForeignKey(
+        ShopProduct, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="purchases",
+    )
+    product_name_snapshot = models.CharField(
+        max_length=120,
+        help_text="Name at time of purchase, kept even if product is deleted.",
+    )
+    price_at_purchase = models.PositiveIntegerField()
+    code = models.CharField(
+        max_length=12, unique=True,
+        help_text="Short pickup code the user shows the admin.",
+    )
+    status = models.CharField(
+        max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING,
+    )
+
+    class Meta:
+        verbose_name = "Shop Purchase"
+        verbose_name_plural = "Shop Purchases"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.code} — {self.user.full_name} — {self.product_name_snapshot}"

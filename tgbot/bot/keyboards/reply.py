@@ -1,10 +1,11 @@
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton,
-    InlineKeyboardMarkup, InlineKeyboardButton,
+    InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo,
 )
 from tgbot.bot.loader import gettext as _
 from tgbot.models import TelegramButton, Group, Region
 from utils.bot import get_object_value
+from src.settings import WEB_DOMAIN
 
 
 def confirm_markup():
@@ -68,11 +69,20 @@ def main_markup(language="uz", is_admin=False):
 
     kb = InlineKeyboardMarkup(row_width=2)
     kb.row(InlineKeyboardButton(text=labels["report_big"], callback_data="menu:report"))
-    # Yutuqlarim moved inside Kabinet — its old slot now hosts the Shop entry,
-    # which is currently a 'Tez kunda' placeholder.
+    # Shop entry: admins get a Telegram WebApp button that opens the Mini App
+    # directly. Non-admins keep the regular callback button which routes to
+    # the 'Tez kunda' placeholder while the shop is in test mode. To roll out
+    # broadly, drop this conditional and give everyone the WebApp button.
+    if is_admin:
+        shop_btn = InlineKeyboardButton(
+            text=labels["shop"],
+            web_app=WebAppInfo(url=f"{WEB_DOMAIN}/shop/"),
+        )
+    else:
+        shop_btn = InlineKeyboardButton(text=labels["shop"], callback_data="menu:shop")
     kb.row(
         InlineKeyboardButton(text=labels["cabinet"], callback_data="menu:cabinet"),
-        InlineKeyboardButton(text=labels["shop"], callback_data="menu:shop"),
+        shop_btn,
     )
     kb.row(
         InlineKeyboardButton(text=labels["reyting"], callback_data="menu:reyting"),

@@ -400,3 +400,36 @@ class QuizSessionAdmin(admin.ModelAdmin):
     list_display = ('quiz', 'creator', 'status', 'is_group', 'created_at')
     list_filter = ('status', 'is_group', 'created_at')
     search_fields = ('quiz__title',)
+
+
+@admin.register(models.ShopProduct)
+class ShopProductAdmin(admin.ModelAdmin):
+    list_display = (
+        'name', 'price_kitobcha', 'stock_qty', 'is_active',
+        'sort_order', 'created_at',
+    )
+    list_filter = ('is_active',)
+    list_editable = ('price_kitobcha', 'stock_qty', 'is_active', 'sort_order')
+    search_fields = ('name', 'description')
+    fields = (
+        'name', 'description', 'image', 'price_kitobcha',
+        'stock_qty', 'sort_order', 'is_active',
+    )
+
+
+@admin.register(models.ShopPurchase)
+class ShopPurchaseAdmin(admin.ModelAdmin):
+    list_display = (
+        'code', 'user', 'product_name_snapshot', 'price_at_purchase',
+        'status', 'created_at',
+    )
+    list_filter = ('status', 'created_at')
+    list_editable = ('status',)
+    search_fields = (
+        'code', 'product_name_snapshot',
+        'user__full_name', 'user__telegram_id',
+    )
+    readonly_fields = (
+        'user', 'product', 'product_name_snapshot',
+        'price_at_purchase', 'code', 'created_at', 'updated_at',
+    )
