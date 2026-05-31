@@ -43,27 +43,43 @@ from tgbot.models import ShopProduct, ShopPurchase, TelegramProfile
 # ─────────────────────────────────────────────────────────────────────────────
 def _verify_init_data(init_data: str) -> dict | None:
     if not init_data:
+        print("shop_verify: init_data empty")
         return None
     try:
-        pairs = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=True))
-    except ValueError:
+        # strict_parsing=False — some Telegram clients put fields with quirky
+        # encoding into initData; strict mode would raise on them.
+        pairs = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=False))
+    except ValueError as e:
+        print(f"shop_verify: parse_qsl failed: {e}")
         return None
     received_hash = pairs.pop("hash", None)
     if not received_hash:
+        print(f"shop_verify: no hash in pairs, keys={list(pairs.keys())}")
         return None
+    # Per Telegram docs: data_check_string is k=v lines sorted by k, joined by \n.
+    # Values are the URL-decoded form (parse_qsl already decoded them).
     data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
     secret_key = hmac.new(b"WebAppData", settings.API_TOKEN.encode(), hashlib.sha256).digest()
     computed = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(computed, received_hash):
+        # Log enough to diagnose without leaking the bot token.
+        print(
+            f"shop_verify: hash mismatch. computed={computed[:12]}... "
+            f"received={received_hash[:12]}... keys={sorted(pairs.keys())} "
+            f"raw_len={len(init_data)}"
+        )
         return None
     user_json = pairs.get("user")
     if not user_json:
+        print(f"shop_verify: no user field in initData, keys={list(pairs.keys())}")
         return None
     try:
         user = json.loads(user_json)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        print(f"shop_verify: user JSON decode failed: {e}")
         return None
     if not isinstance(user, dict) or "id" not in user:
+        print(f"shop_verify: user payload missing id: {user!r}")
         return None
     return user
 
