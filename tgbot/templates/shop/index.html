@@ -455,26 +455,38 @@
     const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
     if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
 
-    // Resolve initData fresh on each call — some Telegram clients/launch
-    // surfaces (reply keyboard, chat menu button) populate tg.initData a
-    // tick AFTER script-load, so reading it once at top-level can race and
-    // come back empty. If the SDK gives us nothing, fall back to parsing
-    // window.location.hash, where Telegram puts tgWebAppData=<urlencoded>.
-    function getInitData() {
+    // Resolve initData fresh on each call. Mobile clients (Android/iOS)
+    // populate tg.initData synchronously when the SDK loads. Telegram
+    // Desktop on Windows hands the payload to the WebView via postMessage
+    // a tick or two AFTER script load, so a synchronous read races and
+    // comes back empty. Poll up to ~1.5s and also try the URL hash
+    // fallback (where some clients put `tgWebAppData=<urlencoded>`).
+    function _readInitDataOnce() {
       if (tg && tg.initData) return tg.initData;
       const hash = (window.location.hash || "").replace(/^#/, "");
-      if (!hash) return "";
-      try {
-        const p = new URLSearchParams(hash);
-        const d = p.get("tgWebAppData");
-        if (d) return d;
-      } catch (e) {}
+      if (hash) {
+        try {
+          const p = new URLSearchParams(hash);
+          const d = p.get("tgWebAppData");
+          if (d) return d;
+        } catch (e) {}
+      }
+      return "";
+    }
+    async function getInitData() {
+      let data = _readInitDataOnce();
+      if (data) return data;
+      for (let i = 0; i < 15; i++) {
+        await new Promise(r => setTimeout(r, 100));
+        data = _readInitDataOnce();
+        if (data) return data;
+      }
       return "";
     }
 
     async function api(path, opts = {}) {
       const headers = Object.assign({
-        "X-Telegram-Init-Data": getInitData(),
+        "X-Telegram-Init-Data": await getInitData(),
         "Accept": "application/json",
       }, opts.headers || {});
       if (opts.body && typeof opts.body !== "string") {

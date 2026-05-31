@@ -131,9 +131,15 @@ def shop_index(request: HttpRequest) -> HttpResponse:
     (the Telegram WebApp SDK injects it client-side); the actual gate is on
     every API call. This keeps initial render fast and lets us show a friendly
     'not authorized' state instead of a 403 wall."""
-    return render(request, "shop/index.html", {
+    resp = render(request, "shop/index.html", {
         "shop_currency_label": "Kitobcha",
     })
+    # Telegram Desktop's embedded WebView2 caches aggressively. Force a fresh
+    # fetch on every open so JS fixes ship immediately to clients that
+    # already loaded the page in this session.
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp["Pragma"] = "no-cache"
+    return resp
 
 
 def _product_payload(p: ShopProduct, request: HttpRequest) -> dict:
