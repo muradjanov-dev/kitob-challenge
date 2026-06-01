@@ -252,10 +252,15 @@ Return ONLY valid JSON in the following format:
         # Call OpenAI
         api_key = os.environ.get("OPENAI_API_KEY")
         openai_client = AsyncOpenAI(api_key=api_key)
+        # max_tokens=1500 was overflowing for 15-20 question requests — the
+        # model emitted ~120+ JSON fields and the response got truncated mid-
+        # string, hitting "Unterminated string at line 98..." on json.loads.
+        # gpt-4o-mini supports 16K output; 8000 is plenty for ~30 questions
+        # with hints and options.
         response = await openai_client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=1500,
+            max_tokens=8000,
             temperature=0.7,
             response_format={"type": "json_object"},
         )
@@ -324,6 +329,21 @@ Return ONLY valid JSON in the following format:
         )
         await state.finish()
 
+    except json.JSONDecodeError as e:
+        # The AI response wasn't valid JSON — most commonly because the
+        # output got truncated (large quiz, hit token cap). Tell the user
+        # in plain language instead of dumping the raw decoder message.
+        print(f"quiz_ai JSON decode failed: {e}")
+        await msg.edit_text(
+            "❌ AI javobi to'liq kelmadi (matn juda uzun bo'lishi mumkin).\n\n"
+            "Iltimos qaytadan urinib ko'ring yoki:\n"
+            "• Kamroq savol soni tanlang (masalan 10)\n"
+            "• Kichikroq matn / PDF yuboring"
+        )
     except Exception as e:
-        await msg.edit_text(f"❌ Xatolik yuz berdi: {e}\nIltimos, qaytadan urinib ko'ring yoki admin bilan bog'laning.")
+        print(f"quiz_ai unexpected error: {e}")
+        await msg.edit_text(
+            "❌ Xatolik yuz berdi. Iltimos qaytadan urinib ko'ring "
+            "yoki admin bilan bog'laning."
+        )
         await state.finish()
