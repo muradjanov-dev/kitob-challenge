@@ -273,7 +273,9 @@ def api_buy(request: HttpRequest) -> JsonResponse:
 
 def _notify_admins_of_purchase(purchase: ShopPurchase, buyer: TelegramProfile) -> None:
     """DM every is_admin user about a new purchase so they can hand over the
-    prize. Best-effort: failures are logged and swallowed (caller does this)."""
+    prize. The message carries the buyer's full profile plus one-tap contact
+    options so the admin can reach out immediately.
+    Best-effort: failures are logged and swallowed (caller does this)."""
     admins = list(
         TelegramProfile.objects
         .filter(is_admin=True, is_blocked=False)
@@ -281,18 +283,44 @@ def _notify_admins_of_purchase(purchase: ShopPurchase, buyer: TelegramProfile) -
     )
     if not admins:
         return
+
     name = _html.escape(buyer.full_name or "Kitobxon")
     product = _html.escape(purchase.product_name_snapshot or "")
-    # Build a tg://user link so the admin can DM the buyer with one tap even
-    # if the buyer has no @username set.
-    contact_line = f"<a href=\"tg://user?id={buyer.telegram_id}\">DM yuborish</a>"
+
+    # Full buyer profile so the admin has everything needed to deliver the prize.
+    username = f"@{buyer.username}" if buyer.username else "—"
+    phone = _html.escape(buyer.phone_number or "—")
+    gender_label = {"male": "Erkak", "female": "Ayol"}.get(buyer.gender or "", "—")
+    try:
+        region_label = buyer.region.name if buyer.region else "—"
+    except Exception:
+        region_label = "—"
+    region_label = _html.escape(region_label or "—")
+    try:
+        referrals_total = buyer.referrals.count()
+    except Exception:
+        referrals_total = 0
+    balance_left = int(buyer.ball or 0)
+
+    # Two ways to reach the buyer: a tg://user deep-link (works even with no
+    # @username) and the @username itself when present.
+    contact_link = f"<a href=\"tg://user?id={buyer.telegram_id}\">✍️ Xabar yozish</a>"
+
     text = (
         "🛒 <b>Yangi xarid!</b>\n\n"
-        f"👤 <b>{name}</b>\n"
-        f"🎁 {product}\n"
-        f"💰 {purchase.price_at_purchase} Kitobcha\n"
-        f"🎫 <code>{purchase.code}</code>\n\n"
-        f"📞 {contact_line} — mukofotni topshiring va admin paneldan "
+        f"🎁 <b>Mahsulot:</b> {product}\n"
+        f"💰 <b>Narx:</b> {purchase.price_at_purchase} Kitobcha\n"
+        f"🎫 <b>Kod:</b> <code>{purchase.code}</code>\n\n"
+        f"👤 <b>Xaridor ma'lumotlari</b>\n"
+        f"• Ism: <b>{name}</b>\n"
+        f"• Username: {username}\n"
+        f"• Telefon: {phone}\n"
+        f"• Telegram ID: <code>{buyer.telegram_id}</code>\n"
+        f"• Jins: {gender_label}\n"
+        f"• Hudud: {region_label}\n"
+        f"• Takliflar soni: {referrals_total} ta\n"
+        f"• Qolgan balans: <b>{balance_left} Kitobcha</b>\n\n"
+        f"📞 {contact_link} — mukofotni topshiring va admin paneldan "
         "<i>Fulfilled</i> deb belgilang."
     )
     url = f"https://api.telegram.org/bot{settings.API_TOKEN}/sendMessage"

@@ -121,11 +121,75 @@ class ReferralService:
 
         awarded_kitobcha = await _award(ref_count)
 
+        # Referral BOOM bonus — only for users who joined the live boom event.
+        boom_payload = await ReferralService._award_boom_bonus(referrer)
+
         # Notify parties
         await ReferralService._notify_admin(referrer, user, referral_code)
         await ReferralService._notify_referrer(referrer, user, ref_count, awarded_kitobcha)
+        if boom_payload:
+            await ReferralService._notify_boom_payout(referrer, boom_payload)
 
         return True
+
+    @staticmethod
+    @sync_to_async
+    def _award_boom_bonus(referrer: TelegramProfile):
+        """If a Referral BOOM is live and `referrer` is a participant, award the
+        tiered per-referral bonus. Returns a dict for the payout DM, or None."""
+        from tgbot.models import ReferralBoom, ReferralBoomParticipant
+        from django.db import transaction as _txn
+
+        boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
+        if not boom or not boom.is_live():
+            return None
+
+        with _txn.atomic():
+            participant = (
+                ReferralBoomParticipant.objects
+                .select_for_update()
+                .filter(boom=boom, user=referrer)
+                .first()
+            )
+            if not participant:
+                return None
+
+            referral_number = participant.referrals_count + 1
+            base_reward = boom.reward_for(referral_number)
+            # update_ball applies the premium 2× multiplier consistently with the
+            # rest of the economy and returns the amount actually credited.
+            awarded = referrer.update_ball(True, base_reward)
+
+            participant.referrals_count = referral_number
+            participant.kitobcha_earned = participant.kitobcha_earned + awarded
+            participant.save(update_fields=["referrals_count", "kitobcha_earned"])
+
+            referrer.refresh_from_db(fields=["ball"])
+            return {
+                "boom": boom,
+                "referral_number": referral_number,
+                "awarded": awarded,
+                "total_earned": participant.kitobcha_earned,
+                "balance": int(referrer.ball or 0),
+            }
+
+    @staticmethod
+    async def _notify_boom_payout(referrer: TelegramProfile, payload: dict):
+        try:
+            from tgbot.services.referral_boom import build_payout_text
+            text = build_payout_text(
+                payload["boom"],
+                payload["referral_number"],
+                payload["awarded"],
+                payload["total_earned"],
+                payload["balance"],
+            )
+            await bot.send_message(
+                chat_id=referrer.telegram_id, text=text, parse_mode="HTML",
+                disable_web_page_preview=True,
+            )
+        except Exception as e:
+            print(f"Failed to send boom payout DM ({referrer.telegram_id}): {e}")
 
     @staticmethod
     async def _notify_admin(referrer: TelegramProfile, new_user: TelegramProfile, code: str):

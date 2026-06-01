@@ -2403,6 +2403,18 @@ CHALLENGE_POOL = [
     {"emoji": "🎼", "title": "20-daqiqa Audio Challenge","description": "Har kuni 20 daqiqa audiokitob eshiting — uch kun davomida!",             "condition_type": "audio_daily",     "condition_value": 20},
     {"emoji": "👥", "title": "Taklif Challenge",        "description": "Har kuni 1 ta do'stingizni Kitob Challengega taklif qiling!",             "condition_type": "referrals_daily", "condition_value": 1},
     {"emoji": "✍️","title": "Taqriz Challenge",        "description": "Har kuni kamida 200 belgidan iborat mazmunli xulosa bilan hisobot yuboring!", "condition_type": "review_daily",  "condition_value": 200},
+    {"emoji": "📕", "title": "30-bet Challenge",        "description": "Har kuni 30 bet — yengil start, mustahkam odat!",                          "condition_type": "pages_daily",     "condition_value": 30},
+    {"emoji": "📓", "title": "40-bet Challenge",        "description": "Har kuni 40 bet o'qing — kichik qadamlar, katta natija!",                  "condition_type": "pages_daily",     "condition_value": 40},
+    {"emoji": "📚", "title": "80-bet Challenge",        "description": "Har kuni 80 bet — kuchli kitobxonlar uchun sinov!",                        "condition_type": "pages_daily",     "condition_value": 80},
+    {"emoji": "📦", "title": "120-bet Challenge",       "description": "Har kuni 120 bet — chinakam marafonchi bo'ling!",                          "condition_type": "pages_daily",     "condition_value": 120},
+    {"emoji": "🏔", "title": "200-bet Challenge",       "description": "Har kuni 200 bet — eng jasur kitobxonlar sinovi!",                         "condition_type": "pages_daily",     "condition_value": 200},
+    {"emoji": "🎙", "title": "15-daqiqa Audio Challenge","description": "Har kuni 15 daqiqa audiokitob — yo'lda ham bilim oling!",                  "condition_type": "audio_daily",     "condition_value": 15},
+    {"emoji": "🎚", "title": "30-daqiqa Audio Challenge","description": "Har kuni 30 daqiqa audiokitob eshiting — uch kun davomida!",               "condition_type": "audio_daily",     "condition_value": 30},
+    {"emoji": "🔊", "title": "45-daqiqa Audio Challenge","description": "Har kuni 45 daqiqa audio — quloqqa ziyofat, aqlga oziq!",                  "condition_type": "audio_daily",     "condition_value": 45},
+    {"emoji": "🤝", "title": "2 Taklif Challenge",      "description": "Har kuni 2 ta do'stingizni Kitob Challengega taklif qiling!",              "condition_type": "referrals_daily", "condition_value": 2},
+    {"emoji": "🌟", "title": "3 Taklif Challenge",      "description": "Har kuni 3 ta yangi do'st — jamoangizni kattalashtiring!",                 "condition_type": "referrals_daily", "condition_value": 3},
+    {"emoji": "📝", "title": "300-belgi Taqriz Challenge","description": "Har kuni 300+ belgili mazmunli xulosa yozing — fikringizni ulashing!",     "condition_type": "review_daily",    "condition_value": 300},
+    {"emoji": "🖋", "title": "500-belgi Taqriz Challenge","description": "Har kuni 500+ belgili to'liq taqriz — chinakam mutafakkir bo'ling!",       "condition_type": "review_daily",    "condition_value": 500},
 ]
 
 
@@ -2425,12 +2437,27 @@ def _finalize_challenge_results(challenge_id: int):
     if not participants:
         return
 
+    # If NOBODY completed even a single day, hand out nothing — just close the
+    # challenge. Prevents rewarding people who didn't do the tasks.
+    if not any(p.days_completed >= 1 for p in participants):
+        ChallengeParticipant.objects.filter(
+            id__in=[p.id for p in participants]
+        ).update(reward_given=True)
+        print(f"_finalize_challenge_results: challenge_id={challenge_id}, "
+              f"no completions — no rewards given ({len(participants)} participants)")
+        return
+
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     prize_map = {1: 200, 2: 100, 3: 50}
 
     # Assign ranks sequentially (sorted above)
     for rank, p in enumerate(participants, start=1):
         days = p.days_completed
+        # Belt-and-suspenders: a 0-day participant never earns anything, even if
+        # they happen to land in the top-3 by rank when completions are sparse.
+        if days < 1:
+            ChallengeParticipant.objects.filter(id=p.id).update(rank=rank, reward_given=True)
+            continue
         if rank <= 3 and days >= 3:
             kitobcha = prize_map[rank]
         elif days >= 3:
@@ -2505,16 +2532,36 @@ def _finalize_challenge_results(challenge_id: int):
 
 @shared_task
 def announce_challenge():
-    """Every 3 days: finalize previous challenge, pick next, announce to groups + users."""
+    """Every 3 days: finalize previous challenge (and any active boom), then
+    either launch a queued Referral BOOM for this slot or pick the next pool
+    challenge, and announce to groups + users."""
     import datetime as _dt
     import random as _rand
     import time as _time
-    from tgbot.models import Challenge
+    from tgbot.models import Challenge, ReferralBoom
 
     # Finalize any still-active challenge
     prev = Challenge.objects.filter(is_active=True).first()
     if prev:
         _finalize_challenge_results(prev.id)
+
+    # Finalize any boom left over from the previous slot (normally already
+    # finalized by boom_reminder_tick when its window closed; this is a safety net).
+    for _b in ReferralBoom.objects.filter(is_active=True):
+        finalize_referral_boom(_b.id)
+
+    # If a boom is queued for this rotation slot, launch it INSTEAD of a normal
+    # challenge. Clears the flag so the pool resumes next slot.
+    queued = ReferralBoom.objects.filter(is_queued=True).order_by("created_at").first()
+    if queued:
+        now = timezone.now()
+        ReferralBoom.objects.filter(id=queued.id).update(
+            is_queued=False, is_active=True, announced_at=None,
+            start_at=now, end_at=now + _dt.timedelta(days=3),
+        )
+        announce_referral_boom(queued.id)
+        print(f"announce_challenge: launched queued Referral BOOM id={queued.id}")
+        return
 
     # Avoid repeating last 3 challenge titles
     recent = list(Challenge.objects.order_by("-created_at").values_list("title", flat=True)[:3])
@@ -2629,7 +2676,11 @@ def daily_challenge_check():
         return
 
     ctype = challenge.condition_type
-    cval = challenge.condition_value
+    # Never treat zero (or a misconfigured non-positive) threshold as auto-pass:
+    # `pages >= 0` / `referrals >= 0` would be true for everyone who merely
+    # joined, handing out Kitobcha to users who did nothing. Require real,
+    # strictly-positive activity. Legit challenges (cval >= 1) are unaffected.
+    cval = max(int(challenge.condition_value or 0), 1)
 
     participants = list(
         ChallengeParticipant.objects.filter(challenge=challenge).select_related("user")
@@ -2912,3 +2963,334 @@ def send_ai_report_to_admin(admin_tg_id: int = 917456291, lang: str = "uz"):
         timeout=10,
     )
     print(f"[send_ai_report_to_admin] done → {admin_tg_id}")
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Referral BOOM — 3-day referral blitz.
+#   launch_referral_boom  → create + announce (admin-triggered, one command)
+#   boom_reminder_tick     → beat (every 5 min): drip playful reminders + finalize
+#   finalize_referral_boom → deactivate + wrap-up DMs + admin summary
+# ────────────────────────────────────────────────────────────────────────
+def _get_bot_username():
+    try:
+        r = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getMe", timeout=5)
+        if r.ok:
+            return r.json().get("result", {}).get("username")
+    except Exception:
+        pass
+    return None
+
+
+def _ensure_referral_code(user):
+    """Return the user's referral code, generating+saving one if missing.
+    Mirrors ReferralService.get_or_create_code but synchronous for Celery."""
+    if user.referral_code:
+        return user.referral_code
+    import string as _s
+    chars = _s.ascii_letters + _s.digits
+    while True:
+        code = "".join(random.choice(chars) for _ in range(8))
+        if not TelegramProfile.objects.filter(referral_code=code).exists():
+            user.referral_code = code
+            user.save(update_fields=["referral_code"])
+            return code
+
+
+def _boom_join_keyboard(boom_id):
+    return json.dumps({
+        "inline_keyboard": [[{
+            "text": "💥 BOOM'ga qo'shilaman!",
+            "callback_data": f"join_boom:{boom_id}",
+        }]]
+    })
+
+
+@shared_task
+def launch_referral_boom(days=3, tier1_reward=150, tier1_cap=10,
+                         tier2_reward=300, total_reminders=21, title=None):
+    """Admin entrypoint: finalize any running boom, create a fresh one and
+    announce it immediately. Returns the new boom id."""
+    import datetime as _dt
+    from tgbot.models import ReferralBoom
+
+    for b in ReferralBoom.objects.filter(is_active=True):
+        finalize_referral_boom(b.id)
+
+    now = timezone.now()
+    boom = ReferralBoom.objects.create(
+        title=title or "3 Kunlik Referal BOOM",
+        start_at=now,
+        end_at=now + _dt.timedelta(days=days),
+        tier1_reward=tier1_reward,
+        tier1_cap=tier1_cap,
+        tier2_reward=tier2_reward,
+        total_reminders=total_reminders,
+        is_active=True,
+    )
+    announce_referral_boom(boom.id)
+    return boom.id
+
+
+@shared_task
+def queue_referral_boom(tier1_reward=150, tier1_cap=10, tier2_reward=300,
+                        total_reminders=21, title=None):
+    """Queue a Referral BOOM for the NEXT regular 3-day challenge rotation
+    instead of launching now. The rotation (`announce_challenge`) picks it up,
+    runs it for one slot, then resumes the normal challenge pool.
+    Idempotent: updates the existing queued boom rather than stacking duplicates.
+    Returns the queued boom id."""
+    from tgbot.models import ReferralBoom
+
+    now = timezone.now()
+    defaults = dict(
+        title=title or "3 Kunlik Referal BOOM",
+        tier1_reward=tier1_reward, tier1_cap=tier1_cap, tier2_reward=tier2_reward,
+        total_reminders=total_reminders,
+        # Placeholder window — overwritten with real start/end when the rotation
+        # actually launches it.
+        start_at=now, end_at=now,
+        is_active=False, is_queued=True, announced_at=None,
+    )
+    existing = ReferralBoom.objects.filter(is_queued=True).order_by("created_at").first()
+    if existing:
+        ReferralBoom.objects.filter(id=existing.id).update(**defaults)
+        return existing.id
+    boom = ReferralBoom.objects.create(**defaults)
+    return boom.id
+
+
+@shared_task
+def announce_referral_boom(boom_id):
+    """Broadcast the boom to all groups + every registered user with a join
+    button, then send an admin summary."""
+    import time as _time
+    import os as _os
+    from tgbot.models import ReferralBoom
+
+    boom = ReferralBoom.objects.filter(id=boom_id, is_active=True).first()
+    if not boom:
+        return
+
+    start_l = timezone.localtime(boom.start_at)
+    end_l = timezone.localtime(boom.end_at)
+    date_range = f"{start_l.strftime('%d.%m %H:%M')} – {end_l.strftime('%d.%m %H:%M')}"
+
+    text = (
+        f"💥💥💥 <b>REFERAL BOOM BOSHLANDI!</b> 💥💥💥\n\n"
+        f"⚡️ Faqat <b>3 KUN</b> — har taklif qilgan do'stingiz uchun "
+        f"<b>{boom.tier1_reward} Kitobcha</b>!\n"
+        f"🤯 <b>{boom.tier1_cap} tadan</b> oshsa — har biri uchun "
+        f"<b>{boom.tier2_reward} Kitobcha</b>!\n\n"
+        f"📅 <b>Muddat:</b> {date_range}\n\n"
+        f"🎁 Yiqqan Kitobchalaringizga <b>Kitob Challenge do'koni</b>dan "
+        f"qimmatbaho sovg'alar oling — qancha ko'p Kitobcha, shuncha zo'r sovg'a!\n\n"
+        f"👇 Qo'shiling — shaxsiy havolangizni darhol yuboramiz!"
+    )
+    keyboard = _boom_join_keyboard(boom.id)
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    for group_id in _group_chat_ids():
+        try:
+            requests.post(
+                url,
+                data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                      "reply_markup": keyboard, "disable_web_page_preview": "true"},
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"boom announce group {group_id}: {e}")
+
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent = 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                      "reply_markup": keyboard, "disable_web_page_preview": "true"},
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            elif resp.status_code == 429:
+                _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
+        except Exception:
+            pass
+        _time.sleep(0.05)
+
+    from tgbot.models import ReferralBoom as _RB
+    _RB.objects.filter(id=boom.id).update(announced_at=timezone.now())
+    print(f"announce_referral_boom: boom_id={boom.id} sent={sent}")
+
+    try:
+        admin_gid = _os.environ.get("ADMIN_GROUP_ID", "")
+        if admin_gid:
+            total_users = qs.count()
+            requests.post(
+                url,
+                data={
+                    "chat_id": admin_gid,
+                    "text": (
+                        f"🚀 <b>Referal BOOM e'lon qilindi!</b>\n\n"
+                        f"💥 {boom.title}\n"
+                        f"📅 {date_range}\n"
+                        f"🪙 {boom.tier1_reward}/taklif (1-{boom.tier1_cap}), "
+                        f"{boom.tier2_reward}/taklif ({boom.tier1_cap}+)\n"
+                        f"⏰ Har ishtirokchiga {boom.total_reminders} ta eslatma\n\n"
+                        f"📨 Jo'natildi: <b>{sent}</b> / {total_users}"
+                    ),
+                    "parse_mode": "HTML",
+                },
+                timeout=5,
+            )
+    except Exception as e:
+        print(f"boom announce admin notif failed: {e}")
+
+
+@shared_task
+def boom_reminder_tick():
+    """Beat (every ~5 min): for each participant whose next scheduled reminder
+    is due, send ONE playful nudge (one per tick avoids bursts). Finalizes the
+    boom when the window has closed."""
+    from tgbot.models import ReferralBoom, ReferralBoomParticipant
+    from tgbot.services.referral_boom import pick_reminder, parse_iso, humanize_left
+
+    boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
+    if not boom:
+        return
+
+    now = timezone.now()
+    if now > boom.end_at:
+        finalize_referral_boom(boom.id)
+        return
+    if now < boom.start_at:
+        return
+
+    bot_username = _get_bot_username()
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    participants = list(
+        ReferralBoomParticipant.objects.filter(boom=boom).select_related("user")
+    )
+    sent = 0
+    for p in participants:
+        schedule = p.reminder_schedule or []
+        if p.reminders_sent >= len(schedule):
+            continue
+        due_dt = parse_iso(schedule[p.reminders_sent])
+        if not due_dt or due_dt > now:
+            continue
+
+        user = p.user
+        key, tmpl = pick_reminder(p.used_reminder_keys)
+        code = _ensure_referral_code(user)
+        link = (
+            f"https://t.me/{bot_username}?start={code}"
+            if bot_username and code else "Kabinet → 🌟 Referal"
+        )
+        ctx = {
+            "referrals": p.referrals_count,
+            "earned": p.kitobcha_earned,
+            "balance": int(user.ball or 0),
+            "left": humanize_left(boom.end_at),
+            "link": link,
+            "tier1": boom.tier1_reward,
+            "tier2": boom.tier2_reward,
+            "cap": boom.tier1_cap,
+        }
+        try:
+            body = tmpl["text"].format(**ctx)
+        except Exception:
+            body = tmpl["text"]
+        try:
+            requests.post(
+                url,
+                data={"chat_id": user.telegram_id, "text": body,
+                      "parse_mode": "HTML", "disable_web_page_preview": "true"},
+                timeout=5,
+            )
+        except Exception as e:
+            print(f"boom reminder failed uid={user.id}: {e}")
+
+        used = list(p.used_reminder_keys or [])
+        used.append(key)
+        # Advance the pointer even on send failure so one bad chat can't wedge
+        # the whole schedule.
+        ReferralBoomParticipant.objects.filter(id=p.id).update(
+            reminders_sent=p.reminders_sent + 1,
+            used_reminder_keys=used,
+        )
+        sent += 1
+
+    if sent:
+        print(f"boom_reminder_tick: boom={boom.id} sent={sent}")
+
+
+@shared_task
+def finalize_referral_boom(boom_id):
+    """Deactivate the boom, DM each participant their final tally, and send an
+    admin summary. Idempotent — the is_active guard makes it run once."""
+    import os as _os
+    from tgbot.models import ReferralBoom, ReferralBoomParticipant
+
+    boom = ReferralBoom.objects.filter(id=boom_id).first()
+    if not boom or not boom.is_active:
+        return
+    ReferralBoom.objects.filter(id=boom_id).update(is_active=False)
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    participants = list(
+        ReferralBoomParticipant.objects.filter(boom=boom).select_related("user")
+    )
+    total_referrals = 0
+    total_kitobcha = 0
+    for p in participants:
+        total_referrals += p.referrals_count
+        total_kitobcha += p.kitobcha_earned
+        if p.referrals_count == 0:
+            continue
+        dm = (
+            f"🏁 <b>BOOM yakunlandi!</b>\n\n"
+            f"💥 {boom.title}\n"
+            f"👥 Takliflaringiz: <b>{p.referrals_count}</b> ta\n"
+            f"🪙 Boomdan yig'ildingiz: <b>{p.kitobcha_earned} Kitobcha</b>\n"
+            f"💰 Balans: <b>{int(p.user.ball or 0)} Kitobcha</b>\n\n"
+            f"🛍 Endi do'kondan sovg'angizni tanlang! Rahmat 🙌"
+        )
+        try:
+            requests.post(
+                url,
+                data={"chat_id": p.user.telegram_id, "text": dm, "parse_mode": "HTML"},
+                timeout=5,
+            )
+        except Exception as e:
+            print(f"boom finalize DM failed uid={p.user.id}: {e}")
+
+    print(f"finalize_referral_boom: boom={boom_id} participants={len(participants)} "
+          f"referrals={total_referrals} kitobcha={total_kitobcha}")
+
+    try:
+        admin_gid = _os.environ.get("ADMIN_GROUP_ID", "")
+        if admin_gid:
+            top = sorted(participants, key=lambda x: x.referrals_count, reverse=True)[:5]
+            lines = [
+                f"{i}. {(p.user.full_name or 'Kitobxon')[:30]} — "
+                f"{p.referrals_count} taklif / {p.kitobcha_earned} Kitobcha"
+                for i, p in enumerate(top, 1) if p.referrals_count
+            ]
+            requests.post(
+                url,
+                data={
+                    "chat_id": admin_gid,
+                    "text": (
+                        f"📊 <b>Referal BOOM yakunlandi: {boom.title}</b>\n\n"
+                        f"👥 Ishtirokchilar: <b>{len(participants)}</b>\n"
+                        f"🔗 Jami takliflar: <b>{total_referrals}</b>\n"
+                        f"🪙 Jami tarqatilgan: <b>{total_kitobcha} Kitobcha</b>\n\n"
+                        + ("<b>TOP:</b>\n" + "\n".join(lines) if lines else "Takliflar bo'lmadi.")
+                    ),
+                    "parse_mode": "HTML",
+                },
+                timeout=5,
+            )
+    except Exception as e:
+        print(f"boom finalize admin notif failed: {e}")

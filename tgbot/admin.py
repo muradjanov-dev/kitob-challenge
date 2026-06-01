@@ -433,3 +433,51 @@ class ShopPurchaseAdmin(admin.ModelAdmin):
         'user', 'product', 'product_name_snapshot',
         'price_at_purchase', 'code', 'created_at', 'updated_at',
     )
+
+
+@admin.register(models.ReferralBoom)
+class ReferralBoomAdmin(admin.ModelAdmin):
+    list_display = (
+        'title', 'is_active', 'is_queued', 'start_at', 'end_at',
+        'tier1_reward', 'tier1_cap', 'tier2_reward', 'total_reminders',
+    )
+    list_filter = ('is_active', 'is_queued')
+    actions = ('queue_next_rotation', 'launch_now', 'finalize_now')
+
+    @admin.action(description="📌 Keyingi navbatga BOOM qo'yish (rotatsiya)")
+    def queue_next_rotation(self, request, queryset):
+        from tgbot.tasks import queue_referral_boom
+        boom_id = queue_referral_boom()
+        self.message_user(
+            request,
+            f"Referal BOOM keyingi 3-kunlik challenge navbatiga qo'yildi — id={boom_id}",
+            messages.SUCCESS,
+        )
+
+    @admin.action(description="🚀 Hozir e'lon qilish (yangi BOOM)")
+    def launch_now(self, request, queryset):
+        from tgbot.tasks import launch_referral_boom
+        boom_id = launch_referral_boom()
+        self.message_user(request, f"Referal BOOM e'lon qilindi — id={boom_id}", messages.SUCCESS)
+
+    @admin.action(description="🏁 Tanlangan BOOM(lar)ni yakunlash")
+    def finalize_now(self, request, queryset):
+        from tgbot.tasks import finalize_referral_boom
+        for boom in queryset:
+            finalize_referral_boom(boom.id)
+        self.message_user(request, "Yakunlandi.", messages.SUCCESS)
+
+
+@admin.register(models.ReferralBoomParticipant)
+class ReferralBoomParticipantAdmin(admin.ModelAdmin):
+    list_display = (
+        'user', 'boom', 'referrals_count', 'kitobcha_earned',
+        'reminders_sent', 'rules_sent', 'joined_at',
+    )
+    list_filter = ('boom', 'rules_sent')
+    search_fields = ('user__full_name', 'user__telegram_id')
+    readonly_fields = (
+        'boom', 'user', 'joined_at', 'rules_sent', 'referrals_count',
+        'kitobcha_earned', 'reminder_schedule', 'reminders_sent',
+        'used_reminder_keys', 'created_at', 'updated_at',
+    )

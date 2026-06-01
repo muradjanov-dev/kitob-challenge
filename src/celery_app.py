@@ -181,6 +181,13 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.send_weekly_ai_report',
         'schedule': crontab(hour=20, minute=0, day_of_week=6),  # 6 = Saturday
     },
+
+    # Referral BOOM — every 5 min drip the playful reminders and finalize when
+    # the 3-day window closes. No-ops cheaply when no boom is active.
+    'boom-reminder-tick': {
+        'task': 'tgbot.tasks.boom_reminder_tick',
+        'schedule': crontab(minute='*/5'),
+    },
 }
 
 # Use Tashkent local time for crontab schedules (matches admin-set HH:MM).

@@ -33,7 +33,9 @@ def _verify_and_mark_done(user, challenge_id, today, today_str):
         return "already_done", challenge, participant.days_completed, ""
 
     ctype = challenge.condition_type
-    cval = challenge.condition_value
+    # Guard against a zero/misconfigured threshold auto-passing everyone who
+    # merely joined (e.g. `pages >= 0` is always true). Require real activity.
+    cval = max(int(challenge.condition_value or 0), 1)
     verified = False
     hint = ""
 

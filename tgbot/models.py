@@ -893,3 +893,89 @@ class ShopPurchase(BaseModel):
 
     def __str__(self):
         return f"{self.code} — {self.user.full_name} — {self.product_name_snapshot}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Referral BOOM — a time-boxed (3-day) referral blitz. While a boom is live,
+# every NEW referral a participant brings pays a flat Kitobcha bonus:
+#   • the first `tier1_cap` referrals  → `tier1_reward` each (e.g. 150)
+#   • every referral beyond that        → `tier2_reward` each (e.g. 300)
+# On joining, the bot DMs the user their personal referral link + the rules
+# (once), then drip-feeds `total_reminders` playful reminders over the window.
+# This is intentionally separate from the daily-completion `Challenge` system.
+# ─────────────────────────────────────────────────────────────────────────────
+class ReferralBoom(BaseModel):
+    title = models.CharField(max_length=200, default="3 Kunlik Referal BOOM")
+    start_at = models.DateTimeField(verbose_name=_("Start"))
+    end_at = models.DateTimeField(verbose_name=_("End"))
+    tier1_reward = models.PositiveIntegerField(
+        default=150, help_text="Kitobcha per referral for the first tier1_cap referrals.",
+    )
+    tier1_cap = models.PositiveIntegerField(
+        default=10, help_text="Referrals up to and including this count earn tier1_reward.",
+    )
+    tier2_reward = models.PositiveIntegerField(
+        default=300, help_text="Kitobcha per referral once tier1_cap is exceeded.",
+    )
+    total_reminders = models.PositiveIntegerField(
+        default=21, help_text="How many playful reminders each participant receives across the window.",
+    )
+    is_active = models.BooleanField(default=False)
+    is_queued = models.BooleanField(
+        default=False,
+        help_text="If set, the next regular 3-day challenge rotation launches "
+                  "this boom instead of a normal challenge (then resumes the pool).",
+    )
+    announced_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Referral BOOM"
+        verbose_name_plural = "Referral BOOMlar"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.title} ({self.start_at:%d.%m %H:%M} – {self.end_at:%d.%m %H:%M})"
+
+    def is_live(self) -> bool:
+        now = timezone.now()
+        return bool(self.is_active and self.start_at <= now <= self.end_at)
+
+    def reward_for(self, referral_number: int) -> int:
+        """Kitobcha paid for the participant's Nth boom referral (1-indexed)."""
+        return self.tier1_reward if referral_number <= self.tier1_cap else self.tier2_reward
+
+
+class ReferralBoomParticipant(BaseModel):
+    boom = models.ForeignKey(
+        ReferralBoom, on_delete=models.CASCADE, related_name="participants",
+    )
+    user = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="boom_participations",
+    )
+    joined_at = models.DateTimeField(auto_now_add=True)
+    rules_sent = models.BooleanField(
+        default=False, help_text="True once the welcome+rules DM has been sent (sent exactly once).",
+    )
+    referrals_count = models.PositiveIntegerField(
+        default=0, help_text="Referrals brought in DURING this boom window.",
+    )
+    kitobcha_earned = models.PositiveIntegerField(
+        default=0, help_text="Total boom-bonus Kitobcha earned by this participant.",
+    )
+    reminder_schedule = models.JSONField(
+        default=list, help_text="Ascending list of ISO datetimes when reminders fire.",
+    )
+    reminders_sent = models.PositiveIntegerField(
+        default=0, help_text="Pointer into reminder_schedule — index of the next reminder to send.",
+    )
+    used_reminder_keys = models.JSONField(
+        default=list, help_text="Template keys already used, to avoid repeating copy.",
+    )
+
+    class Meta:
+        verbose_name = "Referral BOOM Qatnashchisi"
+        verbose_name_plural = "Referral BOOM Qatnashchilari"
+        unique_together = ("boom", "user")
+
+    def __str__(self):
+        return f"{self.user.full_name} — {self.boom.title} ({self.referrals_count} taklif)"

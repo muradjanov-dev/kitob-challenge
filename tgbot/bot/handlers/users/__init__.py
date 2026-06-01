@@ -20,5 +20,6 @@ from . import menu_router
 from . import quiz_admin
 from . import quiz_play
 from . import challenge
+from . import referral_boom
 from . import quiz_ai
 from . import shop_admin
