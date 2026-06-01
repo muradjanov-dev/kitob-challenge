@@ -203,8 +203,13 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
         from django.utils import timezone
         from tgbot.models import Payment
         from tgbot.bot.states.main import AIQuizCreateState
-        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-        
+        # NOTE: do NOT re-import InlineKeyboardMarkup/InlineKeyboardButton here.
+        # A nested `from ... import` is a local assignment, which makes Python
+        # treat those names as locals for the entire enclosing function. Any
+        # OTHER branch (e.g. action == "del") that uses them before this branch
+        # runs then crashes with UnboundLocalError. They're already imported
+        # at module top.
+
         is_premium = await sync_to_async(
             Payment.objects.filter(user=user, status="paid", end_date__gte=timezone.localdate()).exists
         )()
