@@ -45,13 +45,28 @@ _active_timers: dict[int, asyncio.Task] = {}
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
 
+# Buttons get short A/B/C/D labels because Telegram clips long inline-button
+# text mid-word with '…'. Full option text is rendered in the question body.
+_OPT_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"]
+
+
+def _opt_label(idx: int) -> str:
+    return _OPT_LETTERS[idx] if idx < len(_OPT_LETTERS) else str(idx + 1)
+
+
 def _answer_kb(session_id: int, question_id: int, options) -> InlineKeyboardMarkup:
-    kb = InlineKeyboardMarkup(row_width=1)
-    for opt in options:
-        kb.add(InlineKeyboardButton(
-            text=opt.text,
+    kb = InlineKeyboardMarkup(row_width=2)
+    buttons = [
+        InlineKeyboardButton(
+            text=_opt_label(i),
             callback_data=f"qans:{session_id}:{question_id}:{opt.id}",
-        ))
+        )
+        for i, opt in enumerate(options)
+    ]
+    # Pair buttons two-per-row for compactness; works cleanly for 2, 4, 6, ...
+    # and falls back to a trailing single button for odd counts.
+    for i in range(0, len(buttons), 2):
+        kb.row(*buttons[i:i+2])
     return kb
 
 
@@ -62,10 +77,19 @@ def _bar(elapsed: int, total: int, width: int = 10) -> str:
     return f"{'▓' * filled}{'░' * (width - filled)} {remaining}s{warn}"
 
 
-def _q_text(q_idx: int, total: int, text: str, timer_str: str) -> str:
+def _q_text(q_idx: int, total: int, text: str, timer_str: str, options=None) -> str:
+    import html as _html
+    opt_lines = ""
+    if options:
+        opt_lines = "\n\n" + "\n".join(
+            f"<b>{_opt_label(i)}.</b>  {_html.escape(o.text)}"
+            for i, o in enumerate(options)
+        )
+    progress = "🟢" * (q_idx + 1) + "⚪️" * (total - q_idx - 1)
     return (
-        f"❓ <b>Savol {q_idx + 1}/{total}</b>\n\n"
-        f"{text}\n\n"
+        f"🎯 <b>Savol {q_idx + 1}</b> <i>/ {total}</i>   {progress}\n"
+        f"━━━━━━━━━━━━━━━━━\n\n"
+        f"<b>{text}</b>{opt_lines}\n\n"
         f"⏱ {timer_str}"
     )
 
@@ -134,9 +158,10 @@ def _record_answer(session_id: int, user_id: int, question_id: int, option_id: i
 
 async def _question_timer(
     chat_id: int, session_id: int, q_idx: int, msg_id: int,
-    q_text: str, total: int, kb, time_limit: int,
+    q_text: str, total: int, kb, time_limit: int, options=None,
 ):
-    """Edits question message at 50% and 80% elapsed; auto-advances on expiry."""
+    """Edits question message at 50% and 80% elapsed; auto-advances on expiry.
+    `options` is threaded so countdown re-renders keep the A/B/C/D list visible."""
     try:
         half = max(1, time_limit // 2)
         eight = max(half + 1, int(time_limit * 0.8))
@@ -145,7 +170,7 @@ async def _question_timer(
         try:
             await bot.edit_message_text(
                 chat_id=chat_id, message_id=msg_id,
-                text=_q_text(q_idx, total, q_text, _bar(half, time_limit)),
+                text=_q_text(q_idx, total, q_text, _bar(half, time_limit), options),
                 parse_mode="HTML", reply_markup=kb,
             )
         except Exception:
@@ -155,7 +180,7 @@ async def _question_timer(
         try:
             await bot.edit_message_text(
                 chat_id=chat_id, message_id=msg_id,
-                text=_q_text(q_idx, total, q_text, _bar(eight, time_limit)),
+                text=_q_text(q_idx, total, q_text, _bar(eight, time_limit), options),
                 parse_mode="HTML", reply_markup=kb,
             )
         except Exception:
@@ -165,7 +190,7 @@ async def _question_timer(
         try:
             await bot.edit_message_text(
                 chat_id=chat_id, message_id=msg_id,
-                text=_q_text(q_idx, total, q_text, "⌛ Vaqt tugadi!"),
+                text=_q_text(q_idx, total, q_text, "⌛ Vaqt tugadi!", options),
                 parse_mode="HTML", reply_markup=None,
             )
         except Exception:
@@ -451,7 +476,7 @@ async def _send_question(chat_id: int, session_id: int, q_idx: int):
     initial_bar = _bar(0, time_limit)
     msg = await bot.send_message(
         chat_id=chat_id,
-        text=_q_text(q_idx, total, question.text, initial_bar),
+        text=_q_text(q_idx, total, question.text, initial_bar, opts),
         parse_mode="HTML",
         reply_markup=kb,
     )
@@ -459,7 +484,7 @@ async def _send_question(chat_id: int, session_id: int, q_idx: int):
     # Cancel any previous timer then start a fresh one
     _cancel_timer(session_id)
     task = asyncio.create_task(
-        _question_timer(chat_id, session_id, q_idx, msg.message_id, question.text, total, kb, time_limit)
+        _question_timer(chat_id, session_id, q_idx, msg.message_id, question.text, total, kb, time_limit, opts)
     )
     _active_timers[session_id] = task
 
@@ -486,25 +511,30 @@ async def _finish_session_solo(session_id: int, chat_id: int):
 
     pct = int(score * 100 / total) if total else 0
     if pct == 100:
-        emoji = "🏆"
+        emoji, headline, blurb = "🏆", "Mukammal!", "Bironta xatosiz — bu daraja juda kam kitobxonga nasib qiladi!"
     elif pct >= 70:
-        emoji = "🥇"
+        emoji, headline, blurb = "🥇", "Zo'r natija!", "Bilimingiz tagiga yetadi. Yana bir-ikki o'qish — va siz ekspertsiz."
     elif pct >= 40:
-        emoji = "👍"
+        emoji, headline, blurb = "👍", "Yomon emas!", "Asoslar bor — endi kitobga qaytib, qiziqarli joylarini sekinroq o'qing."
     else:
-        emoji = "📚"
+        emoji, headline, blurb = "📚", "Hali oldindasiz!", "Bu — boshlanish. Kitobni qo'lga olib, mazasini totib chiqsangiz, keyingi safar yorishasiz."
 
+    bot_link = f"https://t.me/{BOT_USERNAME}"
     await bot.send_message(
         chat_id=chat_id,
         text=(
-            f"{emoji} <b>Natija</b>\n\n"
-            f"📝 {session.quiz.title}\n\n"
-            f"✅ To'g'ri: <b>{score}/{total}</b> ({pct}%)\n\n"
-            + ("Ajoyib natija! 🎉" if pct == 100 else
-               "Yaxshi ishlading! Ko'proq o'qi. 💪" if pct >= 70 else
-               "Kitobni qayta o'qib chiq! 📖")
+            f"{emoji} <b>{headline}</b>\n"
+            f"━━━━━━━━━━━━━━━━━\n\n"
+            f"📖 <b>{session.quiz.title}</b>\n\n"
+            f"🎯 To'g'ri:  <b>{score}/{total}</b>   ·   {pct}%\n\n"
+            f"<i>{blurb}</i>\n\n"
+            f"━━━━━━━━━━━━━━━━━\n"
+            f"🚀 Yanada ko'proq quiz ishlash va o'zingiz quiz tuzish uchun:\n"
+            f"👉 <a href=\"{bot_link}\">Kitob Challenge bot</a>\n\n"
+            f"💎 <b>Premium</b>'da AI yordamida quiz tuzish, kengaytirilgan statistikalar va boshqa imkoniyatlar ochiladi."
         ),
         parse_mode="HTML",
+        disable_web_page_preview=True,
     )
 
 
@@ -662,7 +692,7 @@ async def _send_group_question(chat_id: int, session_id: int, q_idx: int):
     initial_bar = _bar(0, time_limit)
     msg = await bot.send_message(
         chat_id=chat_id,
-        text=_q_text(q_idx, total, question.text, initial_bar),
+        text=_q_text(q_idx, total, question.text, initial_bar, opts),
         parse_mode="HTML",
         reply_markup=kb,
     )
@@ -673,14 +703,14 @@ async def _send_group_question(chat_id: int, session_id: int, q_idx: int):
     _cancel_timer(session_id)
     task = asyncio.create_task(
         _group_question_timer(chat_id, session_id, q_idx, msg.message_id,
-                              question.text, question.id, total, kb, time_limit)
+                              question.text, question.id, total, kb, time_limit, opts)
     )
     _active_timers[session_id] = task
 
 
 async def _group_question_timer(
     chat_id: int, session_id: int, q_idx: int, msg_id: int,
-    q_text: str, question_id: int, total: int, kb, time_limit: int,
+    q_text: str, question_id: int, total: int, kb, time_limit: int, options=None,
 ):
     """Edits at 50% and 80%; on expiry reveals correct answer and advances."""
     try:
@@ -734,13 +764,14 @@ async def _group_question_timer(
             ", ".join(sorted(answered_correct)) if answered_correct else "hech kim"
         )
         reveal_text = (
-            f"⏱ <b>Vaqt tugadi — Savol {q_idx + 1}/{total}</b>\n\n"
-            f"{q_text}\n\n"
-            f"✅ To'g'ri javob: <b>{correct_text}</b>\n"
-            f"🎯 To'g'ri javob berganlar: {winners_line}"
+            f"⏰ <b>Vaqt tugadi!</b>   <i>Savol {q_idx + 1}/{total}</i>\n"
+            f"━━━━━━━━━━━━━━━━━\n\n"
+            f"<b>{q_text}</b>\n\n"
+            f"🎉 To'g'ri javob:  <b>{correct_text}</b>\n"
+            f"🏅 Bilganlar:  {winners_line}"
         )
         if hint_text:
-            reveal_text += f"\n\n💡 {hint_text}"
+            reveal_text += f"\n\n💡 <i>{hint_text}</i>"
         try:
             await bot.edit_message_text(
                 chat_id=chat_id, message_id=msg_id,
@@ -802,24 +833,48 @@ async def _finish_group_session(session_id: int, chat_id: int):
         return
 
     if not participants:
+        bot_link = f"https://t.me/{BOT_USERNAME}"
         await bot.send_message(
             chat_id=chat_id,
-            text=f"🏁 <b>{session.quiz.title}</b> tugadi — hech kim qatnashmadi.",
+            text=(
+                f"🏁 <b>{session.quiz.title}</b> tugadi — hech kim qatnashmadi.\n\n"
+                f"📚 Quiz ishlash juda foydali — keyingisiga qo'shiling!\n"
+                f"👉 <a href=\"{bot_link}\">Kitob Challenge bot</a>"
+            ),
             parse_mode="HTML",
+            disable_web_page_preview=True,
         )
         return
 
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-    lines = [f"🏁 <b>{session.quiz.title}</b> — yakuniy natijalar\n"]
+    lines = [
+        f"🎊 <b>{session.quiz.title}</b>",
+        "<i>Yakuniy natijalar</i>",
+        "━━━━━━━━━━━━━━━━━",
+        "",
+    ]
     for i, p in enumerate(participants, 1):
-        marker = medals.get(i, f"{i}.")
+        marker = medals.get(i, f"  {i}.")
         pct = int((p.score or 0) * 100 / total) if total else 0
         name = p.user.full_name or "Kitobxon"
-        lines.append(f"{marker} {name}: <b>{p.score}/{total}</b> ({pct}%)")
-    lines.append(f"\n👥 Jami ishtirokchilar: <b>{len(participants)}</b>")
+        lines.append(f"{marker} <b>{name}</b>  —  {p.score}/{total}  ({pct}%)")
+    lines.append("")
+    lines.append(f"👥 Jami ishtirokchilar:  <b>{len(participants)}</b>")
+    lines.append("━━━━━━━━━━━━━━━━━")
+    lines.append("")
+    bot_link = f"https://t.me/{BOT_USERNAME}"
+    lines.append(
+        f"🚀 Yanada ko'proq quiz ishlash va o'zingiz quiz tuzish uchun:\n"
+        f"👉 <a href=\"{bot_link}\">Kitob Challenge bot</a>"
+    )
+    lines.append(
+        "💎 <b>Premium</b>'da AI yordamida quiz tuzish, kengaytirilgan "
+        "statistikalar va boshqa imkoniyatlar ochiladi."
+    )
 
     await bot.send_message(
         chat_id=chat_id,
         text="\n".join(lines),
         parse_mode="HTML",
+        disable_web_page_preview=True,
     )
