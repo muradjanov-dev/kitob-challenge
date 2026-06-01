@@ -1,4 +1,5 @@
 """Kitobxonlik Challenge handlers: join, daily mark, cabinet widget, history."""
+import html
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
@@ -176,11 +177,22 @@ async def join_challenge_handler(call: types.CallbackQuery, state: FSMContext):
         from tgbot.models import Challenge, ChallengeParticipant
         challenge = Challenge.objects.filter(id=challenge_id, is_active=True).first()
         if not challenge:
-            return None, "expired"
+            return None, "expired", [], 0
         _, created = ChallengeParticipant.objects.get_or_create(challenge=challenge, user=user)
-        return challenge, "joined" if created else "already"
+        # Pull recent participants (excluding current user) for the
+        # 'who else joined' section. Cap at 20 names; total count still shown.
+        others_qs = (
+            ChallengeParticipant.objects
+            .filter(challenge=challenge).exclude(user=user)
+            .select_related("user").order_by("-joined_at")
+        )
+        total_others = others_qs.count()
+        recent_names = [
+            (p.user.full_name or "Kitobxon") for p in others_qs[:20]
+        ]
+        return challenge, ("joined" if created else "already"), recent_names, total_others
 
-    challenge, status = await _join()
+    challenge, status, recent_names, total_others = await _join()
 
     if status == "expired":
         await call.answer("❌ Bu challenge tugadi yoki mavjud emas.", show_alert=True)
@@ -189,14 +201,28 @@ async def join_challenge_handler(call: types.CallbackQuery, state: FSMContext):
         await call.answer("✅ Siz allaqachon bu challengeda qatnashyapsiz!", show_alert=True)
         return
 
+    others_block = ""
+    if total_others > 0:
+        shown = ", ".join(html.escape(n) for n in recent_names)
+        if total_others > len(recent_names):
+            shown += f" <i>va yana {total_others - len(recent_names)} kishi</i>"
+        others_block = (
+            f"\n👥 <b>Siz bilan birga ({total_others + 1} kishi):</b>\n"
+            f"{shown}\n"
+        )
+    else:
+        others_block = "\n👥 Siz birinchi bo'lib qo'shildingiz — do'stlaringizni ham taklif qiling! 🚀\n"
+
     await call.answer("✅ Qo'shildingiz!", show_alert=False)
     await call.message.answer(
         f"🎉 <b>{challenge.emoji} {challenge.title}</b> ga muvaffaqiyatli qo'shildingiz!\n\n"
         f"📋 <b>Shart:</b> {challenge.description}\n"
-        f"📅 <b>Muddat:</b> {challenge.start_date.strftime('%d.%m')} – {challenge.end_date.strftime('%d.%m.%Y')}\n\n"
+        f"📅 <b>Muddat:</b> {challenge.start_date.strftime('%d.%m')} – {challenge.end_date.strftime('%d.%m.%Y')}\n"
+        f"{others_block}\n"
         "Har kuni shartni bajargach, <b>Kabinetingiz</b>dan ✅ Bajarldim tugmasini bosing.\n"
         "Omad! 🚀",
         parse_mode="HTML",
+        disable_web_page_preview=True,
     )
 
 
