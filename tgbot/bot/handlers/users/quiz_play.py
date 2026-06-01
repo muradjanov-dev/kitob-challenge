@@ -73,13 +73,23 @@ def _bar(elapsed: int, total: int, width: int = 10) -> str:
 
 
 def _q_text(q_idx: int, total: int, text: str, timer_str: str, options=None) -> str:
-    # options arg kept for back-compat with timers but no longer rendered in
-    # the body — the answer text now lives on the buttons themselves.
+    # Show option list in the body too. Telegram may clip very long inline-
+    # button labels mid-word, but the body listing is never clipped — so the
+    # buttons stay tappable while the body guarantees the full text is
+    # always visible. This also makes the message resilient to mid-quiz
+    # redeploys (timer re-renders can't strip what they pass back in).
+    import html as _html
+    opt_lines = ""
+    if options:
+        opt_lines = "\n\n" + "\n".join(
+            f"<b>{_opt_label(i)}.</b>  {_html.escape(o.text)}"
+            for i, o in enumerate(options)
+        )
     progress = "🟢" * (q_idx + 1) + "⚪️" * (total - q_idx - 1)
     return (
         f"🎯 <b>Savol {q_idx + 1}</b> <i>/ {total}</i>   {progress}\n"
         f"━━━━━━━━━━━━━━━━━\n\n"
-        f"<b>{text}</b>\n\n"
+        f"<b>{text}</b>{opt_lines}\n\n"
         f"⏱ {timer_str}"
     )
 
