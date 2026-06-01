@@ -45,8 +45,6 @@ _active_timers: dict[int, asyncio.Task] = {}
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
 
-# Buttons get short A/B/C/D labels because Telegram clips long inline-button
-# text mid-word with '…'. Full option text is rendered in the question body.
 _OPT_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"]
 
 
@@ -55,18 +53,15 @@ def _opt_label(idx: int) -> str:
 
 
 def _answer_kb(session_id: int, question_id: int, options) -> InlineKeyboardMarkup:
-    kb = InlineKeyboardMarkup(row_width=2)
-    buttons = [
-        InlineKeyboardButton(
-            text=_opt_label(i),
+    # One option per row, full text on the button. Long answers may get clipped
+    # by Telegram on narrow screens, but having the text on the button itself
+    # is what users expect — duplicating it in the question body felt redundant.
+    kb = InlineKeyboardMarkup(row_width=1)
+    for i, opt in enumerate(options):
+        kb.add(InlineKeyboardButton(
+            text=f"{_opt_label(i)}.  {opt.text}",
             callback_data=f"qans:{session_id}:{question_id}:{opt.id}",
-        )
-        for i, opt in enumerate(options)
-    ]
-    # Pair buttons two-per-row for compactness; works cleanly for 2, 4, 6, ...
-    # and falls back to a trailing single button for odd counts.
-    for i in range(0, len(buttons), 2):
-        kb.row(*buttons[i:i+2])
+        ))
     return kb
 
 
@@ -78,18 +73,13 @@ def _bar(elapsed: int, total: int, width: int = 10) -> str:
 
 
 def _q_text(q_idx: int, total: int, text: str, timer_str: str, options=None) -> str:
-    import html as _html
-    opt_lines = ""
-    if options:
-        opt_lines = "\n\n" + "\n".join(
-            f"<b>{_opt_label(i)}.</b>  {_html.escape(o.text)}"
-            for i, o in enumerate(options)
-        )
+    # options arg kept for back-compat with timers but no longer rendered in
+    # the body — the answer text now lives on the buttons themselves.
     progress = "🟢" * (q_idx + 1) + "⚪️" * (total - q_idx - 1)
     return (
         f"🎯 <b>Savol {q_idx + 1}</b> <i>/ {total}</i>   {progress}\n"
         f"━━━━━━━━━━━━━━━━━\n\n"
-        f"<b>{text}</b>{opt_lines}\n\n"
+        f"<b>{text}</b>\n\n"
         f"⏱ {timer_str}"
     )
 
@@ -721,7 +711,7 @@ async def _group_question_timer(
         try:
             await bot.edit_message_text(
                 chat_id=chat_id, message_id=msg_id,
-                text=_q_text(q_idx, total, q_text, _bar(half, time_limit)),
+                text=_q_text(q_idx, total, q_text, _bar(half, time_limit), options),
                 parse_mode="HTML", reply_markup=kb,
             )
         except Exception:
@@ -731,7 +721,7 @@ async def _group_question_timer(
         try:
             await bot.edit_message_text(
                 chat_id=chat_id, message_id=msg_id,
-                text=_q_text(q_idx, total, q_text, _bar(eight, time_limit)),
+                text=_q_text(q_idx, total, q_text, _bar(eight, time_limit), options),
                 parse_mode="HTML", reply_markup=kb,
             )
         except Exception:

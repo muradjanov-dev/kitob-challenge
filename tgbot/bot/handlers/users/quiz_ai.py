@@ -66,9 +66,26 @@ in EXACTLY the SAME LANGUAGE and the SAME ALPHABET/SCRIPT as the provided source
 Matching the source script is mandatory and overrides everything else.
 
 CRITICAL CONTENT REQUIREMENT:
-Focus ONLY on the actual content, story, characters, or core educational topic of the book/document.
-Absolutely IGNORE any publisher advertisements, library introductions (such as 'ziyouz.com', 'Ziyouz kutubxonasi', library flyers, website purposes, etc.), copyright notices, or web link flyers at the beginning or end of the document.
-The quiz must be about the BOOK'S actual content, not the website or library from which it was downloaded.
+The quiz MUST be about the actual STORY, EVENTS, CHARACTERS, and IDEAS inside the book.
+Concretely, GOOD question topics are:
+  - Who did what to whom, when, and why (plot events, decisions, motivations)
+  - Conversations and what characters said
+  - Cause-and-effect relationships in the narrative
+  - Concrete details from scenes (objects, places mentioned in the story)
+  - Lessons, morals, or themes that emerge from the events described
+
+DO NOT ask about (these are FORBIDDEN topic areas — pretend the user can't see them):
+  - The author's biography or life
+  - The book's publication year, publisher, or page count
+  - The book's purpose statement or who it is dedicated to
+  - The book's chapter structure, table of contents, or preface
+  - Anything from the title page, library introduction, or 'about this book' section
+  - Generic 'what is the main goal of this book' meta-questions
+  - Translator, editor, or library website (e.g. 'ziyouz.com', 'Ziyouz kutubxonasi')
+
+Ignore the front matter (title page, preface, author bio, dedication, table of contents,
+publisher notes) and the back matter (afterword, bibliography, library flyers) entirely.
+Build every question from the actual narrative text in between.
 """
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
