@@ -333,6 +333,17 @@ def _build_user_detail(user_id: int) -> str:
         "u18": "<18", "18_25": "18–25", "26_35": "26–35", "36p": "36+",
     }.get(user.age_range or "", "—")
 
+    from tgbot.models import Payment as _Payment
+    prem_payment = (
+        _Payment.objects
+        .filter(user=user, status="paid", end_date__gte=timezone.localdate())
+        .order_by("-end_date").first()
+    )
+    premium_line = (
+        f"💎 <b>Premium:</b> faol — {prem_payment.end_date.strftime('%d.%m.%Y')} gacha"
+        if prem_payment else "💎 <b>Premium:</b> yo'q"
+    )
+
     username_str = f"@{user.username}" if user.username else "—"
     full_name = user.full_name or "—"
     reg_status = "✅ Ro'yxatdan to'liq o'tgan" if user.is_registered else "🚫 Tugatmagan"
@@ -361,6 +372,7 @@ def _build_user_detail(user_id: int) -> str:
         f"📅 A'zo bo'lgan: {days_since_join} kun oldin\n"
         f"{reg_status}{(' · ' + blocked) if blocked else ''}{(' · ' + admin_flag) if admin_flag else ''}\n\n"
         f"🪙 <b>Kitobcha balansi:</b> {int(user.ball or 0)}\n"
+        f"{premium_line}\n"
         f"📚 Hisobotlar: <b>{reports_count}</b>\n"
         f"📄 Jami betlar: <b>{total_pages}</b>\n"
         f"⚡️ O'rtacha: <b>{int(avg_pages)} bet/hisobot</b>\n"
@@ -394,6 +406,60 @@ async def adm_user_page(call: types.CallbackQuery):
     await call.answer()
 
 
+def _is_user_premium(user) -> bool:
+    """True if the user has an active paid subscription today."""
+    from tgbot.models import Payment
+    return Payment.objects.filter(
+        user=user, status="paid", end_date__gte=timezone.localdate()
+    ).exists()
+
+
+def _user_detail_markup(target_user, is_premium: bool) -> InlineKeyboardMarkup:
+    """Shared admin detail-card keyboard: contact, premium toggle, block toggle,
+    and back. Used by the detail view and both toggle handlers so the buttons
+    never diverge."""
+    kb = InlineKeyboardMarkup(row_width=1)
+    if target_user and target_user.telegram_id:
+        kb.add(InlineKeyboardButton(
+            "✉️ Xabar yozish (Loyiha asoschisidan)",
+            callback_data=f"owner_reply:{target_user.telegram_id}",
+        ))
+        # Premium grant / revoke — admin-only.
+        if is_premium:
+            kb.add(InlineKeyboardButton(
+                "❌ Premiumni o'chirish",
+                callback_data=f"adm_prem_toggle:{target_user.id}:0",
+            ))
+        else:
+            kb.add(InlineKeyboardButton(
+                "💎 Premium berish (30 kun)",
+                callback_data=f"adm_prem_toggle:{target_user.id}:1",
+            ))
+        # Block / Unblock toggle — admin-only control over user access.
+        if target_user.is_blocked:
+            kb.add(InlineKeyboardButton(
+                "✅ Blokdan chiqarish",
+                callback_data=f"adm_block_toggle:{target_user.id}:0",
+            ))
+        else:
+            kb.add(InlineKeyboardButton(
+                "🚫 Bloklash",
+                callback_data=f"adm_block_toggle:{target_user.id}:1",
+            ))
+    kb.add(InlineKeyboardButton(
+        "⬅️ Ro'yxatga qaytish", callback_data="adm_userp:1",
+    ))
+    return kb
+
+
+def _detail_text_user_premium(target_id: int):
+    """Sync helper: returns (text, target_user, is_premium) in one DB round."""
+    text = _build_user_detail(target_id)
+    target_user = TelegramProfile.objects.filter(id=target_id).first()
+    is_premium = _is_user_premium(target_user) if target_user else False
+    return text, target_user, is_premium
+
+
 @dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("adm_userd:"), state="*")
 async def adm_user_detail(call: types.CallbackQuery):
     actor = await aget_user(call.from_user.id)
@@ -401,27 +467,8 @@ async def adm_user_detail(call: types.CallbackQuery):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return
     target_id = int(call.data.split(":", 1)[1])
-    text = await sync_to_async(_build_user_detail)(target_id)
-    target_user = await sync_to_async(TelegramProfile.objects.filter(id=target_id).first)()
-    back_kb = InlineKeyboardMarkup(row_width=1)
-    if target_user and target_user.telegram_id:
-        back_kb.add(
-            InlineKeyboardButton("✉️ Xabar yozish (Loyiha asoschisidan)", callback_data=f"owner_reply:{target_user.telegram_id}")
-        )
-        # Block / Unblock toggle — admin-only control over user access.
-        if target_user.is_blocked:
-            back_kb.add(InlineKeyboardButton(
-                "✅ Blokdan chiqarish",
-                callback_data=f"adm_block_toggle:{target_user.id}:0",
-            ))
-        else:
-            back_kb.add(InlineKeyboardButton(
-                "🚫 Bloklash",
-                callback_data=f"adm_block_toggle:{target_user.id}:1",
-            ))
-    back_kb.add(
-        InlineKeyboardButton("⬅️ Ro'yxatga qaytish", callback_data="adm_userp:1")
-    )
+    text, target_user, is_premium = await sync_to_async(_detail_text_user_premium)(target_id)
+    back_kb = _user_detail_markup(target_user, is_premium)
     try:
         await call.message.edit_text(text, parse_mode="HTML", reply_markup=back_kb)
     except Exception:
@@ -491,29 +538,97 @@ async def adm_block_toggle(call: types.CallbackQuery):
     )
 
     # Re-render the detail card so the button flips immediately.
-    text = await sync_to_async(_build_user_detail)(target_id)
-    target_user = await sync_to_async(
-        TelegramProfile.objects.filter(id=target_id).first
-    )()
-    back_kb = InlineKeyboardMarkup(row_width=1)
-    if target_user and target_user.telegram_id:
-        back_kb.add(InlineKeyboardButton(
-            "✉️ Xabar yozish (Loyiha asoschisidan)",
-            callback_data=f"owner_reply:{target_user.telegram_id}",
-        ))
-        if target_user.is_blocked:
-            back_kb.add(InlineKeyboardButton(
-                "✅ Blokdan chiqarish",
-                callback_data=f"adm_block_toggle:{target_user.id}:0",
-            ))
+    text, target_user, is_premium = await sync_to_async(_detail_text_user_premium)(target_id)
+    back_kb = _user_detail_markup(target_user, is_premium)
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=back_kb)
+    except Exception:
+        pass
+
+
+@dp.callback_query_handler(
+    IsPrivate(),
+    lambda c: c.data and c.data.startswith("adm_prem_toggle:"),
+    state="*",
+)
+async def adm_prem_toggle(call: types.CallbackQuery):
+    """Grant or revoke Premium for any user from the admin user-detail card.
+    Grant = a 30-day paid Payment (extends an existing active one). Revoke =
+    expire every active paid Payment. Notifies the target and re-renders."""
+    actor = await aget_user(call.from_user.id)
+    if not (actor and actor.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+
+    parts = call.data.split(":")
+    if len(parts) < 3:
+        await call.answer()
+        return
+    target_id = int(parts[1])
+    grant = parts[2] == "1"
+
+    @sync_to_async
+    def _apply():
+        from datetime import timedelta
+        from tgbot.models import Payment
+        target = TelegramProfile.objects.filter(id=target_id).first()
+        if not target:
+            return None, None
+        today = timezone.localdate()
+        if grant:
+            active = Payment.objects.filter(
+                user=target, status="paid", end_date__gte=today
+            ).order_by("-end_date").first()
+            if active:
+                active.end_date = active.end_date + timedelta(days=30)
+                active.save(update_fields=["end_date"])
+                new_until = active.end_date
+            else:
+                p = Payment.objects.create(
+                    user=target, amount=0, start_date=today,
+                    end_date=today + timedelta(days=30), status="paid",
+                )
+                new_until = p.end_date
+            return target, new_until
         else:
-            back_kb.add(InlineKeyboardButton(
-                "🚫 Bloklash",
-                callback_data=f"adm_block_toggle:{target_user.id}:1",
-            ))
-    back_kb.add(InlineKeyboardButton(
-        "⬅️ Ro'yxatga qaytish", callback_data="adm_userp:1",
-    ))
+            Payment.objects.filter(
+                user=target, status="paid", end_date__gte=today
+            ).update(end_date=today - timedelta(days=1))
+            return target, None
+
+    target_user, new_until = await _apply()
+    if not target_user:
+        await call.answer("Foydalanuvchi topilmadi.", show_alert=True)
+        return
+
+    # Notify the affected user.
+    try:
+        if grant:
+            await bot.send_message(
+                target_user.telegram_id,
+                "💎 <b>Sizga Premium obuna faollashtirildi!</b>\n\n"
+                f"📅 Amal qilish muddati: <b>{new_until.strftime('%d.%m.%Y')}</b> gacha\n\n"
+                "Barcha Premium imtiyozlardan bahramand bo'ling! 🔥",
+                parse_mode="HTML",
+            )
+        else:
+            await bot.send_message(
+                target_user.telegram_id,
+                "💎 <b>Premium obunangiz to'xtatildi.</b>\n\n"
+                "Qayta faollashtirish uchun «💎 Premium obuna» bo'limiga o'ting.",
+                parse_mode="HTML",
+            )
+    except Exception as e:
+        print(f"prem-toggle notify failed for {target_user.telegram_id}: {e}")
+
+    await call.answer(
+        "💎 Premium berildi (30 kun)" if grant else "❌ Premium o'chirildi",
+        show_alert=False,
+    )
+
+    # Re-render the detail card so the button flips immediately.
+    text, target_user, is_premium = await sync_to_async(_detail_text_user_premium)(target_id)
+    back_kb = _user_detail_markup(target_user, is_premium)
     try:
         await call.message.edit_text(text, parse_mode="HTML", reply_markup=back_kb)
     except Exception:
