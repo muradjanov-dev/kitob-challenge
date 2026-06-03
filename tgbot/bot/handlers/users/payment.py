@@ -177,7 +177,16 @@ async def buy_plan_callback(call: types.CallbackQuery, state: FSMContext):
     price = SUPER_PREMIUM_PRICE if plan == "super" else PREMIUM_PRICE
     await state.update_data(payment_price=price, payment_plan=plan)
 
-    await call.message.edit_text(
+    # Must SEND a new message (not edit_text): the payment step uses a reply
+    # keyboard (back_keyboard), and editMessageText only accepts inline
+    # keyboards — passing a ReplyKeyboardMarkup raises InlineKeyboardExpected,
+    # which silently aborted the whole "buy premium" flow.
+    # Strip the inline buttons off the original menu so it can't be re-clicked.
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await call.message.answer(
         premium_features_text(lang, plan) + "\n\n" + payment_info_text(lang, price),
         parse_mode="HTML",
         reply_markup=back_keyboard
