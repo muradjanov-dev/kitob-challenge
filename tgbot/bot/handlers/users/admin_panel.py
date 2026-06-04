@@ -809,6 +809,27 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
             "✅ Kitobxon nominatsiyalari e'lon qilinmoqda — barcha guruh va "
             "foydalanuvchilarga yuborilyapti! 🏅"
         )
+    elif action == "founder_gift":
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(InlineKeyboardButton(
+            "✅ Ha, hammaga 24h Premium berish", callback_data="admin:founder_gift_go",
+        ))
+        await call.message.answer(
+            "🎁 <b>Loyiha asoschisidan sovg'a</b>\n\n"
+            "Barcha ro'yxatdan o'tgan foydalanuvchilarga <b>24 soatlik 💎 Premium</b> "
+            "beriladi va hamma joyda (guruhlar + shaxsiy) e'lon qilinadi.\n\n"
+            "Davom etamizmi?",
+            parse_mode="HTML",
+            reply_markup=kb,
+        )
+    elif action == "founder_gift_go":
+        from tgbot.tasks import grant_everyone_premium
+        grant_everyone_premium.delay(days=1, announce=True)
+        await call.message.answer(
+            "✅ Sovg'a ulashilmoqda — barchaga 24 soatlik 💎 Premium berilib, "
+            "e'lon qilinyapti! 🎁🔥"
+        )
     elif action == "top_readers":
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
         kb = InlineKeyboardMarkup(row_width=2)

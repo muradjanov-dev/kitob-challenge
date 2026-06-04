@@ -195,6 +195,9 @@ admin_keyboard.row(
     InlineKeyboardButton(text="🏅 Kitobxon nominatsiyalari", callback_data="admin:reader_titles"),
 )
 admin_keyboard.row(
+    InlineKeyboardButton(text="🎁 Sovg'a: 24h Premium (hammaga)", callback_data="admin:founder_gift"),
+)
+admin_keyboard.row(
     InlineKeyboardButton(text="🪙 Kitobcha reytingi", callback_data="admin:kitobcha_top"),
 )
 admin_keyboard.row(
