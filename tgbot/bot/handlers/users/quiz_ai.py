@@ -186,6 +186,20 @@ async def process_ai_input(message: types.Message, state: FSMContext):
             )
             return
 
+        # Telegram bots can only download files up to 20 MB via getFile. A
+        # larger file would fail deep inside bot.get_file() and surface as the
+        # generic "Xatolik" — so reject it up front with a clear reason.
+        MAX_PDF_BYTES = 20 * 1024 * 1024
+        if message.document.file_size and message.document.file_size > MAX_PDF_BYTES:
+            size_mb = message.document.file_size / (1024 * 1024)
+            await message.answer(
+                f"⚠️ <b>Fayl juda katta ({size_mb:.0f} MB).</b>\n\n"
+                f"Telegram bot orqali eng ko'pi bilan <b>20 MB</b> gacha PDF qabul qila oladi.\n"
+                f"Iltimos, kichikroq fayl yoki kitobning bir bo'limini alohida PDF qilib yuboring.",
+                parse_mode="HTML",
+            )
+            return
+
         # Premium PDF cap: 1 generation per day (the 10/day general cap still
         # applies on top, so this is a separate, stricter PDF-only counter).
         if cache.get(pdf_cache_key, 0) >= 1:
