@@ -41,6 +41,19 @@ async def _can_manage_quizzes(user) -> bool:
     return await _is_active_premium(user)
 
 
+def _visible_quizzes(user):
+    """Quizzes shown in 'Mening quizlarim': admins see ALL quizzes, regular
+    Premium users see only the ones they created."""
+    if _is_admin(user):
+        return Quiz.objects.all()
+    return Quiz.objects.filter(creator=user)
+
+
+def _can_edit_quiz(quiz, user) -> bool:
+    """Admins can manage any quiz; others only their own."""
+    return bool(quiz) and (_is_admin(user) or quiz.creator_id == user.id)
+
+
 def _quiz_link(code: str) -> str:
     return f"https://t.me/{BOT_USERNAME}?start=quiz_{code}"
 
@@ -133,7 +146,7 @@ async def _render_question_view(call, q_id: int):
 
 async def show_quiz_list(message: types.Message, user):
     quizzes = await sync_to_async(list)(
-        Quiz.objects.filter(creator=user).prefetch_related("questions")
+        _visible_quizzes(user).prefetch_related("questions")
     )
     if not quizzes:
         kb = InlineKeyboardMarkup()
@@ -175,7 +188,7 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
     if action == "ls":
         await call.answer()
         quizzes = await sync_to_async(list)(
-            Quiz.objects.filter(creator=user).prefetch_related("questions")
+            _visible_quizzes(user).prefetch_related("questions")
         )
         if not quizzes:
             kb = InlineKeyboardMarkup()
@@ -240,7 +253,7 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "v" and len(parts) > 2:
         await call.answer()
         quiz = await sync_to_async(Quiz.objects.filter(id=parts[2]).first)()
-        if not quiz or quiz.creator_id != user.id:
+        if not _can_edit_quiz(quiz, user):
             await call.answer("Topilmadi", show_alert=True)
             return
         text = await _quiz_view_text(quiz)
@@ -358,7 +371,7 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
     # Toggle shuffle
     elif action == "sh" and len(parts) > 2:
         quiz = await sync_to_async(Quiz.objects.filter(id=parts[2]).first)()
-        if not quiz or quiz.creator_id != user.id:
+        if not _can_edit_quiz(quiz, user):
             await call.answer("Topilmadi", show_alert=True)
             return
         new_val = not quiz.shuffle
@@ -389,13 +402,13 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
     # Delete confirmed
     elif action == "dc" and len(parts) > 2:
         quiz = await sync_to_async(Quiz.objects.filter(id=parts[2]).first)()
-        if not quiz or quiz.creator_id != user.id:
+        if not _can_edit_quiz(quiz, user):
             await call.answer("Topilmadi", show_alert=True)
             return
         await sync_to_async(quiz.delete)()
         await call.answer("✅ O'chirildi")
         quizzes = await sync_to_async(list)(
-            Quiz.objects.filter(creator=user).prefetch_related("questions")
+            _visible_quizzes(user).prefetch_related("questions")
         )
         if not quizzes:
             kb = InlineKeyboardMarkup()
@@ -411,7 +424,7 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "viz" and len(parts) > 2:
         await call.answer()
         quiz = await sync_to_async(Quiz.objects.filter(id=parts[2]).first)()
-        if not quiz or quiz.creator_id != user.id:
+        if not _can_edit_quiz(quiz, user):
             await call.answer("Topilmadi", show_alert=True)
             return
         q_count = await sync_to_async(quiz.questions.count)()

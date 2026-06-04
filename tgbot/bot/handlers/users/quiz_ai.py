@@ -127,7 +127,9 @@ async def process_time_limit(call: types.CallbackQuery, state: FSMContext):
         "🤖 <b>AI yordamida Quiz yaratish</b>\n\n"
         f"Savollar soni: <b>{q_count} ta</b>\n"
         f"Savol vaqti: <b>{t_limit} soniya</b>\n\n"
-        "Sozlamalar saqlandi. Endi, quiz yaratish uchun matn yuboring, rasm yuklang yoki PDF fayl jo'nating:",
+        "Sozlamalar saqlandi. Endi, quiz yaratish uchun matn yuboring, rasm yuklang yoki PDF fayl jo'nating.\n\n"
+        "📎 <i>Eslatma: PDF fayl hajmi eng ko'pi bilan <b>20 MB</b> bo'lishi mumkin "
+        "(Telegram bot cheklovi). Kattaroq kitobning bir bo'limini alohida yuboring.</i>",
         parse_mode="HTML"
     )
     await AIQuizCreateState.input_content.set()
