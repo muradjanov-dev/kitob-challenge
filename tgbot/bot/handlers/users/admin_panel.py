@@ -803,8 +803,12 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
             reply_markup=kb,
         )
     elif action == "reader_titles_go":
+        # Run on THIS (web) process in a background thread rather than dispatching
+        # to the celery worker — admin one-off broadcasts shouldn't depend on a
+        # separate worker deploy. Fire-and-forget so the handler returns at once.
+        import asyncio
         from tgbot.tasks import announce_reader_titles
-        announce_reader_titles.delay()
+        asyncio.get_event_loop().run_in_executor(None, announce_reader_titles)
         await call.message.answer(
             "✅ Kitobxon nominatsiyalari e'lon qilinmoqda — barcha guruh va "
             "foydalanuvchilarga yuborilyapti! 🏅"
@@ -824,11 +828,18 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
             reply_markup=kb,
         )
     elif action == "founder_gift_go":
+        # Run on THIS (web) process in a background thread (see note above).
+        import asyncio
         from tgbot.tasks import grant_everyone_premium
-        grant_everyone_premium.delay(days=1, announce=True)
+        asyncio.get_event_loop().run_in_executor(
+            None, lambda: grant_everyone_premium(days=1, announce=True)
+        )
         await call.message.answer(
             "✅ Sovg'a ulashilmoqda — barchaga 24 soatlik 💎 Premium berilib, "
-            "e'lon qilinyapti! 🎁🔥"
+            "e'lon qilinyapti! 🎁🔥\n\n"
+            "<i>E'lon barcha guruhlar va foydalanuvchilarga yuborilmoqda — "
+            "bir-ikki daqiqada yakunlanadi.</i>",
+            parse_mode="HTML",
         )
     elif action == "top_readers":
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
