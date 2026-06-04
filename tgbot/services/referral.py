@@ -130,6 +130,16 @@ class ReferralService:
         if boom_payload:
             await ReferralService._notify_boom_payout(referrer, boom_payload)
 
+        # Re-evaluate the REFERRER's referral-milestone achievements now that
+        # they've gained one. Without this, rf_5 / rf_20 / rf_50 ("o'rmon") /
+        # rf_100 only unlock the next time the referrer submits their own
+        # report — so an active inviter who never reads wouldn't get them.
+        try:
+            from tgbot.tasks import check_user_achievements
+            check_user_achievements.delay(referrer.id)
+        except Exception as e:
+            print(f"referrer achievement check dispatch failed: {e}")
+
         return True
 
     @staticmethod

@@ -54,6 +54,54 @@ async def _delete_message_after(chat_id: int, message_id: int, delay: int = 60):
         pass
 
 
+# ── Reader-title nomination congrats (rtc:<winner_tg_id>:<category_key>) ──────
+_RT_NOMINATIONS = {
+    "night":   ("🌙", "Tungi kitobxon"),
+    "morning": ("🌅", "Saharxez kitobxon"),
+    "day":     ("☀️", "Kunduzgi kitobxon"),
+    "audio":   ("🎧", "Audio shaydosi"),
+    "review":  ("✍️", "So'z ustasi"),
+}
+
+
+@dp.callback_query_handler(
+    lambda c: c.data and c.data.startswith("rtc:"),
+    state="*",
+)
+async def reader_title_congrats(call: types.CallbackQuery, state: FSMContext):
+    """Someone tapped 'Tabriklash' under a reader-title nomination. DM the
+    winner that this user congratulated them for that nomination."""
+    parts = call.data.split(":")
+    if len(parts) < 3:
+        await call.answer()
+        return
+    try:
+        winner_tg = int(parts[1])
+    except ValueError:
+        await call.answer()
+        return
+    key = parts[2]
+    emoji, nom = _RT_NOMINATIONS.get(key, ("🏅", "Nominatsiya"))
+
+    congratulator = await aget_user(call.from_user.id)
+    if congratulator and str(congratulator.telegram_id) == str(winner_tg):
+        await call.answer("O'zingizni tabriklay olmaysiz 🙂", show_alert=True)
+        return
+
+    cong_name = (congratulator.full_name if congratulator else None) or "Kitobxon"
+    try:
+        await bot.send_message(
+            winner_tg,
+            f"🎉 <b>{cong_name}</b> sizni «{emoji} {nom}» nominatsiyangiz bilan "
+            f"tabrikladi!\n\nTabriklar, davom eting! 📚🔥",
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        print(f"reader_title_congrats DM to {winner_tg} failed: {e}")
+
+    await call.answer(f"✅ {nom} g'olibini tabrikladingiz! 🎉", show_alert=False)
+
+
 @dp.callback_query_handler(
     lambda c: c.data and c.data.startswith("congrats:"),
     state="*",

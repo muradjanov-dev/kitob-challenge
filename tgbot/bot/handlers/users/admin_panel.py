@@ -788,6 +788,26 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "poll_results":
         from tgbot.bot.handlers.users.polls_admin import poll_results_list
         await poll_results_list(msg, state, _admin_id=admin_id)
+    elif action == "reader_titles":
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(InlineKeyboardButton(
+            "✅ Hammaga e'lon qilish", callback_data="admin:reader_titles_go",
+        ))
+        await call.message.answer(
+            "🏅 <b>Kitobxon nominatsiyalari</b> (oxirgi 30 kun) — 5 ta toifa:\n"
+            "🌙 Tungi · 🌅 Saharxez · ☀️ Kunduzgi · 🎧 Audio shaydosi · ✍️ So'z ustasi\n\n"
+            "Barcha guruhlar va foydalanuvchilarga yuborilsinmi?",
+            parse_mode="HTML",
+            reply_markup=kb,
+        )
+    elif action == "reader_titles_go":
+        from tgbot.tasks import announce_reader_titles
+        announce_reader_titles.delay()
+        await call.message.answer(
+            "✅ Kitobxon nominatsiyalari e'lon qilinmoqda — barcha guruh va "
+            "foydalanuvchilarga yuborilyapti! 🏅"
+        )
     elif action == "top_readers":
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
         kb = InlineKeyboardMarkup(row_width=2)

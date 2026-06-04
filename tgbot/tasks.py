@@ -1053,17 +1053,8 @@ def check_user_achievements(user_id: int):
                     data={"chat_id": _gid, "text": group_text, "parse_mode": "HTML"},
                     timeout=5,
                 )
-                if resp.ok:
-                    msg_id = resp.json().get("result", {}).get("message_id")
-                    if msg_id:
-                        try:
-                            ScheduledMessageDeletion.objects.create(
-                                chat_id=int(_gid),
-                                message_id=msg_id,
-                                delete_at=timezone.now() + _dt.timedelta(minutes=2),
-                            )
-                        except Exception:
-                            pass
+                # Achievement congrats messages stay in the group permanently —
+                # they're celebratory announcements, not transient noise.
             except Exception as e:
                 print(f"tabriklash group broadcast failed for {_gid}/{ach['code']}: {e}")
 
@@ -3294,3 +3285,191 @@ def finalize_referral_boom(boom_id):
             )
     except Exception as e:
         print(f"boom finalize admin notif failed: {e}")
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Reader title nominations — community "titles" across 5 categories over the
+# last 30 days. Admin-triggered broadcast to all groups + every user, with a
+# "send report" CTA so others are nudged to compete for a title.
+# ────────────────────────────────────────────────────────────────────────
+@shared_task
+def announce_reader_titles():
+    import datetime as _dt
+    import time as _time
+    from zoneinfo import ZoneInfo
+    from django.db.models import Count, Sum
+    from django.db.models.functions import ExtractHour, Length
+
+    TASHKENT = ZoneInfo("Asia/Tashkent")
+    since = timezone.now() - _dt.timedelta(days=30)
+    base = ConfirmationReport.objects.filter(date__gte=since, user__is_blocked=False)
+
+    def _name(uid):
+        u = TelegramProfile.objects.filter(id=uid).first()
+        return escape((u.full_name if u else None) or "Kitobxon")
+
+    def _top_hours(hours):
+        return (
+            base.annotate(h=ExtractHour("date", tzinfo=TASHKENT))
+            .filter(h__in=hours).values("user_id")
+            .annotate(c=Count("id")).order_by("-c").first()
+        )
+
+    def _top_audio():
+        return (
+            base.filter(is_audio=True).values("user_id")
+            .annotate(t=Sum("minutes_listened")).filter(t__gt=0)
+            .order_by("-t").first()
+        )
+
+    def _top_reviews():
+        return (
+            base.annotate(_l=Length("conclusion")).filter(_l__gte=200)
+            .values("user_id").annotate(c=Count("id")).order_by("-c").first()
+        )
+
+    night   = _top_hours([22, 23, 0, 1, 2, 3, 4])       # 22:00–04:59
+    morning = _top_hours([5, 6, 7, 8, 9])               # 05:00–09:59
+    day     = _top_hours([10, 11, 12, 13, 14, 15, 16, 17])  # 10:00–17:59
+    audio   = _top_audio()
+    reviews = _top_reviews()
+
+    lines = ["🏅 <b>KITOBXON NOMINATSIYALARI</b>\n<i>(oxirgi 30 kun)</i>\n"]
+    # Collect winners to build per-category "Tabriklash" buttons. Each entry:
+    # (category_key, button_label, winner_telegram_id).
+    winners = []
+
+    def _add(key, emoji, title, row, unit, statkey="c"):
+        if row:
+            uid = row["user_id"]
+            lines.append(f"{emoji} <b>{title}:</b>\n   🏆 {_name(uid)} — {row[statkey]} {unit}")
+            w = TelegramProfile.objects.filter(id=uid).first()
+            if w and w.telegram_id:
+                winners.append((key, f"🎉 {emoji} {title}ni tabriklash", w.telegram_id))
+        else:
+            lines.append(f"{emoji} <b>{title}:</b>\n   — hali nomzod yo'q —")
+
+    _add("night",   "🌙", "Tungi kitobxon",    night,   "ta hisobot")
+    _add("morning", "🌅", "Saharxez kitobxon", morning, "ta hisobot")
+    _add("day",     "☀️", "Kunduzgi kitobxon", day,     "ta hisobot")
+    _add("audio",   "🎧", "Audio shaydosi",    audio,   "daqiqa", statkey="t")
+    _add("review",  "✍️", "So'z ustasi",       reviews, "ta xulosa")
+    lines.append("\n📚 Siz ham hisobot yuboring va o'z nominatsiyangizni egallang! 🔥")
+    lines.append("👇 G'oliblarni tabriklang!")
+    text = "\n".join(lines)
+
+    # Inline keyboard: one Tabriklash button per category winner + a report CTA.
+    kb_rows = [
+        [{"text": label, "callback_data": f"rtc:{tg_id}:{key}"}]
+        for (key, label, tg_id) in winners
+    ]
+    kb_rows.append([{"text": "📚 Hisobot jo'natish", "callback_data": "cta_send_report"}])
+    keyboard = json.dumps({"inline_keyboard": kb_rows})
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    for group_id in _group_chat_ids():
+        try:
+            requests.post(
+                url,
+                data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                      "reply_markup": keyboard},
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"reader_titles group {group_id}: {e}")
+
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent = 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                      "reply_markup": keyboard},
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            elif resp.status_code == 429:
+                _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
+        except Exception:
+            pass
+        _time.sleep(0.05)
+    print(f"announce_reader_titles: sent={sent}")
+    return sent
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Founder's gift — grant every registered user a short Premium window and
+# announce it everywhere. Premium badge + 2x Kitobcha etc. apply automatically
+# since they key off an active paid Payment.
+# ────────────────────────────────────────────────────────────────────────
+@shared_task
+def grant_everyone_premium(days=1, announce=True):
+    import datetime as _dt
+    import time as _time
+    from tgbot.models import Payment
+
+    today = timezone.localdate()
+    end = today + _dt.timedelta(days=days)
+
+    user_ids = list(
+        TelegramProfile.objects
+        .filter(is_registered=True, is_blocked=False)
+        .values_list("id", flat=True)
+    )
+    rows = [
+        Payment(user_id=uid, amount=0, start_date=today, end_date=end, status="paid")
+        for uid in user_ids
+    ]
+    Payment.objects.bulk_create(rows, batch_size=500)
+    granted = len(rows)
+    print(f"grant_everyone_premium: granted={granted} end={end}")
+
+    if not announce:
+        return granted
+
+    text = (
+        "🎁 <b>LOYIHA ASOSCHISIDAN SOVG'A!</b> 🎁\n\n"
+        "Barcha kitobxonlarga <b>24 soatlik 💎 Premium</b> sovg'a qilindi! 🔥\n\n"
+        "Shu 24 soat ichida sizda:\n"
+        "🪙 <b>2 barobar ko'p Kitobcha</b> — har bir hisobot, yutuq va referal uchun\n"
+        "♾️ <b>Kuniga cheksiz hisobot</b>\n"
+        "📊 <b>Kunlik shaxsiy hisobot</b> va 📈 <b>o'sish grafigi</b>\n"
+        "🏆 <b>Challenge tarixi</b>\n"
+        "💎 <b>Premium belgisi</b> — reyting va guruhlarda ajralib turasiz\n\n"
+        "Imkoniyatdan unumli foydalaning — ko'proq o'qing, ko'proq yutuqqa erishing! 📚🚀"
+    )
+    keyboard = _cta_reply_markup()
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    for group_id in _group_chat_ids():
+        try:
+            requests.post(
+                url,
+                data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                      "reply_markup": keyboard},
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"founder gift group {group_id}: {e}")
+
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent = 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                      "reply_markup": keyboard},
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            elif resp.status_code == 429:
+                _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
+        except Exception:
+            pass
+        _time.sleep(0.05)
+    print(f"grant_everyone_premium: announced sent={sent}")
+    return granted
