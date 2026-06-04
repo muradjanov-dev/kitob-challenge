@@ -78,6 +78,17 @@ async def do_start(message: types.Message, state: FSMContext):
         # Not registered yet — save code for after registration
         await state.update_data(pending_quiz_code=args[len("quiz_"):])
 
+    # Report deep link: /start report — from the "Hisobot jo'natish" button in
+    # group broadcasts. Open the report flow directly in the bot DM.
+    if args == "report" and already_registered:
+        if user and not user.is_registered:
+            user.is_registered = True
+            await sync_to_async(user.save)(update_fields=["is_registered"])
+        await state.finish()
+        from tgbot.bot.handlers.users.report import send_daily_report_handler
+        await send_daily_report_handler(message, state)
+        return
+
     if already_registered:
         if user and not user.is_registered:
             user.is_registered = True

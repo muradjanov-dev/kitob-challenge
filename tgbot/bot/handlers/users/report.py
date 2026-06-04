@@ -385,6 +385,17 @@ async def _compute_reading_day(user, today):
 
 @dp.callback_query_handler(lambda c: c.data == "cta_send_report", state="*")
 async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
+    # If tapped inside a group/channel, the report flow can't run there — open
+    # the bot's private chat instead. answerCallbackQuery's url is allowed to be
+    # the bot's own deep link, which opens the DM and sends /start report.
+    if call.message and getattr(call.message.chat, "type", "private") != "private":
+        try:
+            bot_username = (await call.bot.get_me()).username
+            await call.answer(url=f"https://t.me/{bot_username}?start=report")
+        except Exception:
+            await call.answer("Hisobot yuborish uchun botga shaxsiy yozing 👇", show_alert=True)
+        return
+
     user = await aget_user(call.from_user.id)
     if not user:
         await call.answer("Avval /start bosing", show_alert=True)
