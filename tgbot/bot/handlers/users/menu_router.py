@@ -1315,7 +1315,7 @@ def _settings_markup(user, lang: str = "uz") -> InlineKeyboardMarkup:
         sec_congrats = "── 🎉 Поздравления ──"
         lbl_accept   = "📥 Принимать:"
         lbl_send     = "📤 Отправлять:"
-        lbl_range    = "🔔 Уведомлять при достижениях:"
+        lbl_range    = "🔔 Чьи поздравления получать (больше всего — «Все»):"
         sec_other    = "── ⚙️ Прочее ──"
         lbl_lang     = "🌐 Язык"
         lbl_how      = "❓ Как работает?"
@@ -1323,7 +1323,9 @@ def _settings_markup(user, lang: str = "uz") -> InlineKeyboardMarkup:
         lbl_reset    = "🗑 Удалить все данные"
         accept_labels = {"any": "Все", "male": "Мужчины", "female": "Женщины"}
         send_labels   = {"any": "Всем", "male": "Мужч.", "female": "Женщ."}
-        range_labels  = {"any": "Все", "3-10": "3–10", "11-20": "11–20", "21-40": "21–40", "41+": "41+"}
+        # Filter = the achiever's total achievements. Higher band = rarer people
+        # = FEWER messages. "Все" = receive every invitation (the most).
+        range_labels  = {"any": "Все 🔝", "3-10": "3–10", "11-20": "11–20", "21-40": "21–40", "41+": "41+ (мало)"}
     else:
         sec_books    = "── 📚 Kitoblar ──"
         btn_manage   = "📖 Kitoblarni boshqarish"
@@ -1335,7 +1337,7 @@ def _settings_markup(user, lang: str = "uz") -> InlineKeyboardMarkup:
         sec_congrats = "── 🎉 Tabriklash ──"
         lbl_accept   = "📥 Qabul qilish:"
         lbl_send     = "📤 Yuborish:"
-        lbl_range    = "🔔 Yutuq eslatmalari:"
+        lbl_range    = "🔔 Kimlarning tabriklarini olish (eng ko'pi — «Hammasi»):"
         sec_other    = "── ⚙️ Boshqalar ──"
         lbl_lang     = "🌐 Til"
         lbl_how      = "❓ Qanday ishlaydi?"
@@ -1343,7 +1345,9 @@ def _settings_markup(user, lang: str = "uz") -> InlineKeyboardMarkup:
         lbl_reset    = "🗑 Ma'lumotlarni o'chirish"
         accept_labels = {"any": "Hammadan", "male": "Erkak", "female": "Ayol"}
         send_labels   = {"any": "Hammaga", "male": "Erkak", "female": "Ayol"}
-        range_labels  = {"any": "Hammasi", "3-10": "3–10", "11-20": "11–20", "21-40": "21–40", "41+": "41+"}
+        # Filtr = tabriklanayotgan kishining umumiy yutuqlari soni. Yuqori daraja
+        # = kam odam = KAM xabar. "Hammasi" = barcha takliflarni olasiz (eng ko'p).
+        range_labels  = {"any": "Hammasi 🔝", "3-10": "3–10", "11-20": "11–20", "21-40": "21–40", "41+": "41+ (kam)"}
 
     # ── 📚 Kitoblar ──
     kb.row(InlineKeyboardButton(sec_books, callback_data="noop"))
@@ -1436,7 +1440,9 @@ def _settings_text(user, lang: str) -> str:
             "🎉 <b>Поздравления</b>\n"
             f"  📥 Принимать: <b>{a_lbl.get(accept, accept)}</b>\n"
             f"  📤 Отправлять: <b>{s_lbl.get(send_to, send_to)}</b>\n"
-            f"  🔔 Уведомлять при: <b>{r_lbl.get(tab_range, tab_range)} достиж.</b>\n\n"
+            f"  🔔 Фильтр поздравлений: <b>{r_lbl.get(tab_range, tab_range)}</b>\n"
+            "  <i>«Все» — получаете все поздравления (больше всего). Числовые\n"
+            "  уровни — только самые активные читатели, сообщений меньше.</i>\n\n"
             "⚙️ <b>Прочее</b>\n"
             "  🌐 Язык — 🔄 Перезапуск — 🗑 Удаление данных"
         )
@@ -1457,7 +1463,9 @@ def _settings_text(user, lang: str) -> str:
             "🎉 <b>Tabriklash</b>\n"
             f"  📥 Qabul qilish: <b>{a_lbl.get(accept, accept)}</b>\n"
             f"  📤 Yuborish: <b>{s_lbl.get(send_to, send_to)}</b>\n"
-            f"  🔔 Eslatma: <b>{r_lbl.get(tab_range, tab_range)} yutuq</b>\n\n"
+            f"  🔔 Tabrik filtri: <b>{r_lbl.get(tab_range, tab_range)}</b>\n"
+            "  <i>«Hammasi» — barcha tabriklarni olasiz (eng ko'p). Raqamli\n"
+            "  darajalar faqat eng faol kitobxonlar uchun — kamroq xabar keladi.</i>\n\n"
             "⚙️ <b>Boshqalar</b>\n"
             "  🌐 Til — 🔄 Qayta boshlash — 🗑 Ma'lumotlarni o'chirish"
         )
