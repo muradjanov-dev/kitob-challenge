@@ -3432,12 +3432,14 @@ def announce_reader_titles():
 
     for group_id in _group_chat_ids():
         try:
-            requests.post(
+            resp = requests.post(
                 url,
                 data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
                       "reply_markup": keyboard},
                 timeout=10,
             )
+            if not resp.ok:
+                print(f"reader_titles group {group_id} FAILED: {resp.status_code} {resp.text[:200]}")
         except Exception as e:
             print(f"reader_titles group {group_id}: {e}")
 
@@ -3508,12 +3510,14 @@ def grant_everyone_premium(days=1, announce=True):
 
     for group_id in _group_chat_ids():
         try:
-            requests.post(
+            resp = requests.post(
                 url,
                 data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
                       "reply_markup": keyboard},
                 timeout=10,
             )
+            if not resp.ok:
+                print(f"founder gift group {group_id} FAILED: {resp.status_code} {resp.text[:200]}")
         except Exception as e:
             print(f"founder gift group {group_id}: {e}")
 
