@@ -67,13 +67,76 @@ _RT_NOMINATIONS = {
 }
 
 
+@sync_to_async
+def _claim_congrats_all(ann_id: int, congratulator_tg: int):
+    """Register this congratulator on the announcement (idempotent). Returns
+    (status, winners) where status is 'ok' | 'already' | 'missing'. winners is a
+    list of {"k","t"} excluding the congratulator themselves."""
+    from tgbot.models import ReaderTitleAnnouncement
+    ann = ReaderTitleAnnouncement.objects.filter(id=ann_id).first()
+    if not ann:
+        return "missing", []
+    congratulators = list(ann.congratulators or [])
+    if congratulator_tg in congratulators:
+        return "already", []
+    congratulators.append(congratulator_tg)
+    ReaderTitleAnnouncement.objects.filter(id=ann_id).update(congratulators=congratulators)
+    winners = [w for w in (ann.winners or []) if w.get("t") != congratulator_tg]
+    return "ok", winners
+
+
+@dp.callback_query_handler(
+    lambda c: c.data and c.data.startswith("rtc_all:"),
+    state="*",
+)
+async def reader_title_congrats_all(call: types.CallbackQuery, state: FSMContext):
+    """Single 'Tabriklash' button on the nominations post — DM every winner that
+    this user congratulated them for their nomination."""
+    parts = call.data.split(":")
+    if len(parts) < 2:
+        await call.answer()
+        return
+    try:
+        ann_id = int(parts[1])
+    except ValueError:
+        await call.answer()
+        return
+
+    congratulator = await aget_user(call.from_user.id)
+    cong_tg = congratulator.telegram_id if congratulator else call.from_user.id
+    status, winners = await _claim_congrats_all(ann_id, cong_tg)
+
+    if status == "missing":
+        await call.answer("Bu e'lon eskirgan.", show_alert=True)
+        return
+    if status == "already":
+        await call.answer("Siz allaqachon g'oliblarni tabrikladingiz 🙂", show_alert=True)
+        return
+
+    cong_name = (congratulator.full_name if congratulator else None) or "Kitobxon"
+    sent = 0
+    for w in winners:
+        emoji, nom = _RT_NOMINATIONS.get(w.get("k"), ("🏅", "Nominatsiya"))
+        try:
+            await bot.send_message(
+                w["t"],
+                f"🎉 <b>{cong_name}</b> sizni «{emoji} {nom}» nominatsiyangiz bilan "
+                f"tabrikladi!\n\nTabriklaymiz, davom eting! 📚🔥",
+                parse_mode="HTML",
+            )
+            sent += 1
+        except Exception as e:
+            print(f"rtc_all DM to {w.get('t')} failed: {e}")
+
+    await call.answer(f"✅ {sent} ta g'olibni tabrikladingiz! 🎉", show_alert=False)
+
+
+# Back-compat: older nomination posts used a per-winner button (rtc:<tg>:<key>).
 @dp.callback_query_handler(
     lambda c: c.data and c.data.startswith("rtc:"),
     state="*",
 )
 async def reader_title_congrats(call: types.CallbackQuery, state: FSMContext):
-    """Someone tapped 'Tabriklash' under a reader-title nomination. DM the
-    winner that this user congratulated them for that nomination."""
     parts = call.data.split(":")
     if len(parts) < 3:
         await call.answer()

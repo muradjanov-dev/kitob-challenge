@@ -895,6 +895,28 @@ class ShopPurchase(BaseModel):
         return f"{self.code} — {self.user.full_name} — {self.product_name_snapshot}"
 
 
+class ReaderTitleAnnouncement(BaseModel):
+    """Snapshot of one "Kitobxon nominatsiyalari" broadcast. Stores the winners
+    so a single 🎉 Tabriklash button (shared across every copy of the message)
+    can DM all of them, and so repeat clicks per user are de-duplicated."""
+    winners = models.JSONField(
+        default=list,
+        help_text='List of {"k": category_key, "t": winner_telegram_id}.',
+    )
+    congratulators = models.JSONField(
+        default=list,
+        help_text="Telegram ids who already congratulated (dedupe).",
+    )
+
+    class Meta:
+        verbose_name = "Reader Title Announcement"
+        verbose_name_plural = "Reader Title Announcements"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"Nominatsiyalar #{self.id} — {len(self.winners or [])} g'olib"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Referral BOOM — a time-boxed (3-day) referral blitz. While a boom is live,
 # every NEW referral a participant brings pays a flat Kitobcha bonus:

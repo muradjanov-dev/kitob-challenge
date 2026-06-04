@@ -3381,38 +3381,51 @@ def announce_reader_titles():
     receiver = _top_receiver()
     streak   = _top_streak()
 
-    lines = ["🏅 <b>KITOBXON NOMINATSIYALARI</b>\n<i>(oxirgi 30 kun)</i>\n"]
-    # Collect winners to build per-category "Tabriklash" buttons. Each entry:
-    # (category_key, button_label, winner_telegram_id).
+    lines = [
+        "🏅 <b>KITOBXON NOMINATSIYALARI</b>\n<i>(oxirgi 30 kun natijalari)</i>\n",
+        "<i>Quyidagi g'oliblar har bir toifada eng faol bo'lgan kitobxonlardir. "
+        "Ularni bitta tugma bilan tabriklashingiz mumkin 👇</i>\n",
+    ]
+    # Collect winners for the single shared "Tabriklash" button.
+    # Each entry: {"k": category_key, "t": winner_telegram_id}.
     winners = []
 
-    def _add(key, emoji, title, row, unit, statkey="c"):
+    def _add(key, emoji, title, desc, row, unit, statkey="c"):
         if row:
             uid = row["user_id"]
-            lines.append(f"{emoji} <b>{title}:</b>\n   🏆 {_name(uid)} — {row[statkey]} {unit}")
+            lines.append(
+                f"{emoji} <b>{title}</b>\n"
+                f"   <i>{desc}</i>\n"
+                f"   🏆 {_name(uid)} — <b>{row[statkey]} {unit}</b>"
+            )
             w = TelegramProfile.objects.filter(id=uid).first()
             if w and w.telegram_id:
-                winners.append((key, f"🎉 {emoji} {title}ni tabriklash", w.telegram_id))
+                winners.append({"k": key, "t": w.telegram_id})
         else:
-            lines.append(f"{emoji} <b>{title}:</b>\n   — hali nomzod yo'q —")
+            lines.append(f"{emoji} <b>{title}</b>\n   <i>{desc}</i>\n   — hali nomzod yo'q —")
 
-    _add("night",    "🌙", "Tungi kitobxon",        night,    "ta hisobot")
-    _add("morning",  "🌅", "Saharxez kitobxon",     morning,  "ta hisobot")
-    _add("day",      "☀️", "Kunduzgi kitobxon",     day,      "ta hisobot")
-    _add("audio",    "🎧", "Audio shaydosi",        audio,    "daqiqa", statkey="t")
-    _add("review",   "✍️", "So'z ustasi",           reviews,  "ta xulosa")
-    _add("giver",    "🤝", "Sahiy tabriklovchi",    giver,    "ta tabrik")
-    _add("receiver", "🎁", "Eng ko'p tabriklangan", receiver, "ta tabrik")
-    _add("streak",   "🔥", "Eng intizomli",         streak,   "kun streak")
+    _add("night",    "🌙", "Tungi kitobxon",        "Tunda (22:00–05:00) eng ko'p hisobot yuborgan", night,    "ta hisobot")
+    _add("morning",  "🌅", "Saharxez kitobxon",     "Saharda (05:00–10:00) eng faol — erta turar", morning,  "ta hisobot")
+    _add("day",      "☀️", "Kunduzgi kitobxon",     "Kunduzi (10:00–18:00) eng ko'p o'qigan",       day,      "ta hisobot")
+    _add("audio",    "🎧", "Audio shaydosi",        "Eng ko'p audiokitob tinglagan",                audio,    "daqiqa", statkey="t")
+    _add("review",   "✍️", "So'z ustasi",           "Eng ko'p mazmunli xulosa (200+ belgi) yozgan", reviews,  "ta xulosa")
+    _add("giver",    "🤝", "Sahiy tabriklovchi",    "Boshqalarni eng ko'p tabriklagan sahiy inson", giver,    "ta tabrik")
+    _add("receiver", "🎁", "Eng ko'p tabriklangan", "Yutuqlari uchun eng ko'p tabrik olgan",        receiver, "ta tabrik")
+    _add("streak",   "🔥", "Eng intizomli",         "Eng uzoq uzluksiz (har kuni) o'qigan — intizom timsoli", streak, "kun streak")
     lines.append("\n📚 Siz ham hisobot yuboring va o'z nominatsiyangizni egallang! 🔥")
-    lines.append("👇 G'oliblarni tabriklang!")
     text = "\n".join(lines)
 
-    # Inline keyboard: one Tabriklash button per category winner + a report CTA.
-    kb_rows = [
-        [{"text": label, "callback_data": f"rtc:{tg_id}:{key}"}]
-        for (key, label, tg_id) in winners
-    ]
+    # Persist the winners so the single shared button can DM all of them.
+    from tgbot.models import ReaderTitleAnnouncement
+    ann = ReaderTitleAnnouncement.objects.create(winners=winners)
+
+    # Single 🎉 Tabriklash button (congratulates every winner) + report CTA.
+    kb_rows = []
+    if winners:
+        kb_rows.append([{
+            "text": "🎉 G'oliblarni tabriklash",
+            "callback_data": f"rtc_all:{ann.id}",
+        }])
     kb_rows.append([{"text": "📚 Hisobot jo'natish", "callback_data": "cta_send_report"}])
     keyboard = json.dumps({"inline_keyboard": kb_rows})
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
