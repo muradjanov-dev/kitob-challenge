@@ -65,11 +65,17 @@ def _answer_kb(session_id: int, question_id: int, options) -> InlineKeyboardMark
     return kb
 
 
-def _bar(elapsed: int, total: int, width: int = 10) -> str:
+def _bar(elapsed: int, total: int, width: int = 12) -> str:
+    """Reading-progress timer: a book 📖 glides left→right across the track as
+    time elapses. The trailing '═' is the path already 'read', the leading '─'
+    is what's left. The remaining seconds (and a ⚠️ near the end) are shown."""
     remaining = max(0, total - elapsed)
-    filled = round(remaining / total * width) if total else 0
+    frac = min(1.0, (elapsed / total) if total else 1.0)
+    pos = min(width - 1, int(round(frac * (width - 1))))
+    done = "═" * pos
+    left = "─" * (width - 1 - pos)
     warn = " ⚠️" if remaining <= max(1, total // 5) else ""
-    return f"{'▓' * filled}{'░' * (width - filled)} {remaining}s{warn}"
+    return f"{done}📖{left}  {remaining}s{warn}"
 
 
 def _q_text(q_idx: int, total: int, text: str, timer_str: str, options=None) -> str:
