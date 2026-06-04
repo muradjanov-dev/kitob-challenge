@@ -812,7 +812,7 @@ async def _menu_how_it_works(call, user, _state: FSMContext):
 # ──────────────────────────────────────────────────────────────────────────
 # Reyting — top readers for 5 periods, user-selectable via inline buttons.
 # ──────────────────────────────────────────────────────────────────────────
-_VALID_PERIODS = ("today", "week", "month", "3months", "yearly", "referral", "top_books")
+_VALID_PERIODS = ("today", "week", "month", "3months", "yearly", "referral", "top_books", "finished_books")
 
 
 def _reyting_kb(lang: str, active: str, is_admin: bool = False) -> InlineKeyboardMarkup:
@@ -843,6 +843,11 @@ def _reyting_kb(lang: str, active: str, is_admin: bool = False) -> InlineKeyboar
         kb.row(InlineKeyboardButton(
             text=_t(lang, f"{marker} 📚 Eng ko'p o'qilgan kitoblar", f"{marker} 📚 Самые читаемые книги"),
             callback_data="reyting:top_books",
+        ))
+        marker_f = "●" if active == "finished_books" else "○"
+        kb.row(InlineKeyboardButton(
+            text=_t(lang, f"{marker_f} ✅ Eng ko'p tugatilgan kitoblar", f"{marker_f} ✅ Самые завершённые книги"),
+            callback_data="reyting:finished_books",
         ))
     return kb
 
@@ -1083,8 +1088,11 @@ def _top_books_text(lang: str) -> str:
 
     header = _t(
         lang,
-        "📚 <b>Eng ko'p o'qilgan kitoblar</b> (Admin)\n\n",
-        "📚 <b>Самые читаемые книги</b> (Admin)\n\n",
+        "📚 <b>Eng ko'p o'qilgan kitoblar</b> (Admin)\n"
+        "<i>Har bir kitob nechta hisobotda tilga olingani bo'yicha "
+        "(tugatilgan kitoblar emas).</i>\n\n",
+        "📚 <b>Самые читаемые книги</b> (Admin)\n"
+        "<i>По числу отчётов, где упомянута книга (не завершённые книги).</i>\n\n",
     )
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
     unit = _t(lang, "marta", "раз")
@@ -1093,6 +1101,48 @@ def _top_books_text(lang: str) -> str:
         medal = medals.get(i, f"{i}.")
         lines.append(
             f"{medal} <b>{escape(book.title)}</b> — {book.read_count} {unit}"
+        )
+    return header + "\n".join(lines)
+
+
+@sync_to_async
+def _finished_books_text(lang: str) -> str:
+    """Most-finished books: counts how many users have completed each book
+    (a BooksToRead with current_page >= total_pages > 0)."""
+    from tgbot.models import GlobalBook
+    from django.db.models import Count, Q, F
+
+    top_books = list(
+        GlobalBook.objects
+        .annotate(finished_count=Count(
+            "user_books",
+            filter=Q(
+                user_books__total_pages__gt=0,
+                user_books__current_page__gte=F("user_books__total_pages"),
+            ),
+            distinct=True,
+        ))
+        .filter(finished_count__gt=0)
+        .order_by("-finished_count")[:30]
+    )
+
+    if not top_books:
+        return _t(lang, "📭 Hali tugatilgan kitob yo'q.", "📭 Завершённых книг пока нет.")
+
+    header = _t(
+        lang,
+        "✅ <b>Eng ko'p tugatilgan kitoblar</b> (Admin)\n"
+        "<i>Nechta foydalanuvchi kitobni to'liq o'qib tugatgani bo'yicha.</i>\n\n",
+        "✅ <b>Самые завершённые книги</b> (Admin)\n"
+        "<i>По числу пользователей, полностью прочитавших книгу.</i>\n\n",
+    )
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    unit = _t(lang, "kishi", "чел.")
+    lines = []
+    for i, book in enumerate(top_books, 1):
+        medal = medals.get(i, f"{i}.")
+        lines.append(
+            f"{medal} <b>{escape(book.title)}</b> — {book.finished_count} {unit}"
         )
     return header + "\n".join(lines)
 
@@ -1110,8 +1160,8 @@ async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
     lang = _user_lang(user)
     is_admin = bool(user and getattr(user, "is_admin", False))
 
-    # top_books is admin-only
-    if period == "top_books" and not is_admin:
+    # Book stats are admin-only
+    if period in ("top_books", "finished_books") and not is_admin:
         await call.answer(_t(lang, "Bu bo'lim faqat adminlar uchun.", "Этот раздел только для админов."), show_alert=True)
         return
 
@@ -1121,6 +1171,8 @@ async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
             text = await _referral_top_text(lang, user)
         elif period == "top_books":
             text = await _top_books_text(lang)
+        elif period == "finished_books":
+            text = await _finished_books_text(lang)
         else:
             text = await _top_readers_text(period, lang)
     except Exception as e:
