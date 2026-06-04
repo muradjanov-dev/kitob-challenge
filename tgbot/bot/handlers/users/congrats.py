@@ -56,11 +56,14 @@ async def _delete_message_after(chat_id: int, message_id: int, delay: int = 60):
 
 # ── Reader-title nomination congrats (rtc:<winner_tg_id>:<category_key>) ──────
 _RT_NOMINATIONS = {
-    "night":   ("🌙", "Tungi kitobxon"),
-    "morning": ("🌅", "Saharxez kitobxon"),
-    "day":     ("☀️", "Kunduzgi kitobxon"),
-    "audio":   ("🎧", "Audio shaydosi"),
-    "review":  ("✍️", "So'z ustasi"),
+    "night":    ("🌙", "Tungi kitobxon"),
+    "morning":  ("🌅", "Saharxez kitobxon"),
+    "day":      ("☀️", "Kunduzgi kitobxon"),
+    "audio":    ("🎧", "Audio shaydosi"),
+    "review":   ("✍️", "So'z ustasi"),
+    "giver":    ("🤝", "Sahiy tabriklovchi"),
+    "receiver": ("🎁", "Eng ko'p tabriklangan"),
+    "streak":   ("🔥", "Eng intizomli"),
 }
 
 

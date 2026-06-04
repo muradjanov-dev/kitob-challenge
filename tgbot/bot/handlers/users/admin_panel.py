@@ -795,8 +795,9 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
             "✅ Hammaga e'lon qilish", callback_data="admin:reader_titles_go",
         ))
         await call.message.answer(
-            "🏅 <b>Kitobxon nominatsiyalari</b> (oxirgi 30 kun) — 5 ta toifa:\n"
-            "🌙 Tungi · 🌅 Saharxez · ☀️ Kunduzgi · 🎧 Audio shaydosi · ✍️ So'z ustasi\n\n"
+            "🏅 <b>Kitobxon nominatsiyalari</b> (oxirgi 30 kun) — 8 ta toifa:\n"
+            "🌙 Tungi · 🌅 Saharxez · ☀️ Kunduzgi · 🎧 Audio · ✍️ So'z ustasi · "
+            "🤝 Sahiy tabriklovchi · 🎁 Eng ko'p tabriklangan · 🔥 Eng intizomli\n\n"
             "Barcha guruhlar va foydalanuvchilarga yuborilsinmi?",
             parse_mode="HTML",
             reply_markup=kb,

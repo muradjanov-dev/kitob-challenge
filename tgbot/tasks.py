@@ -3328,11 +3328,58 @@ def announce_reader_titles():
             .values("user_id").annotate(c=Count("id")).order_by("-c").first()
         )
 
-    night   = _top_hours([22, 23, 0, 1, 2, 3, 4])       # 22:00–04:59
-    morning = _top_hours([5, 6, 7, 8, 9])               # 05:00–09:59
-    day     = _top_hours([10, 11, 12, 13, 14, 15, 16, 17])  # 10:00–17:59
-    audio   = _top_audio()
-    reviews = _top_reviews()
+    def _top_giver():
+        from tgbot.models import Congratulation
+        row = (
+            Congratulation.objects
+            .filter(created_at__gte=since, congratulator__is_blocked=False)
+            .values("congratulator_id").annotate(c=Count("id")).order_by("-c").first()
+        )
+        return {"user_id": row["congratulator_id"], "c": row["c"]} if row else None
+
+    def _top_receiver():
+        from tgbot.models import Congratulation
+        row = (
+            Congratulation.objects
+            .filter(created_at__gte=since)
+            .values("achievement__user_id").annotate(c=Count("id")).order_by("-c").first()
+        )
+        return {"user_id": row["achievement__user_id"], "c": row["c"]} if row else None
+
+    def _top_streak():
+        """Longest unbroken run of consecutive report-days, across all time."""
+        from collections import defaultdict
+        from django.db.models.functions import TruncDate
+        rows = (
+            ConfirmationReport.objects.filter(user__is_blocked=False)
+            .annotate(d=TruncDate("date")).values_list("user_id", "d").distinct()
+        )
+        days = defaultdict(set)
+        for uid, d in rows:
+            if d:
+                days[uid].add(d)
+        best_uid, best = None, 0
+        for uid, dset in days.items():
+            sd = sorted(dset)
+            cur = longest = 1
+            for i in range(1, len(sd)):
+                if (sd[i] - sd[i - 1]).days == 1:
+                    cur += 1
+                    longest = max(longest, cur)
+                else:
+                    cur = 1
+            if longest > best:
+                best, best_uid = longest, uid
+        return {"user_id": best_uid, "c": best} if best_uid else None
+
+    night    = _top_hours([22, 23, 0, 1, 2, 3, 4])       # 22:00–04:59
+    morning  = _top_hours([5, 6, 7, 8, 9])               # 05:00–09:59
+    day      = _top_hours([10, 11, 12, 13, 14, 15, 16, 17])  # 10:00–17:59
+    audio    = _top_audio()
+    reviews  = _top_reviews()
+    giver    = _top_giver()
+    receiver = _top_receiver()
+    streak   = _top_streak()
 
     lines = ["🏅 <b>KITOBXON NOMINATSIYALARI</b>\n<i>(oxirgi 30 kun)</i>\n"]
     # Collect winners to build per-category "Tabriklash" buttons. Each entry:
@@ -3349,11 +3396,14 @@ def announce_reader_titles():
         else:
             lines.append(f"{emoji} <b>{title}:</b>\n   — hali nomzod yo'q —")
 
-    _add("night",   "🌙", "Tungi kitobxon",    night,   "ta hisobot")
-    _add("morning", "🌅", "Saharxez kitobxon", morning, "ta hisobot")
-    _add("day",     "☀️", "Kunduzgi kitobxon", day,     "ta hisobot")
-    _add("audio",   "🎧", "Audio shaydosi",    audio,   "daqiqa", statkey="t")
-    _add("review",  "✍️", "So'z ustasi",       reviews, "ta xulosa")
+    _add("night",    "🌙", "Tungi kitobxon",        night,    "ta hisobot")
+    _add("morning",  "🌅", "Saharxez kitobxon",     morning,  "ta hisobot")
+    _add("day",      "☀️", "Kunduzgi kitobxon",     day,      "ta hisobot")
+    _add("audio",    "🎧", "Audio shaydosi",        audio,    "daqiqa", statkey="t")
+    _add("review",   "✍️", "So'z ustasi",           reviews,  "ta xulosa")
+    _add("giver",    "🤝", "Sahiy tabriklovchi",    giver,    "ta tabrik")
+    _add("receiver", "🎁", "Eng ko'p tabriklangan", receiver, "ta tabrik")
+    _add("streak",   "🔥", "Eng intizomli",         streak,   "kun streak")
     lines.append("\n📚 Siz ham hisobot yuboring va o'z nominatsiyangizni egallang! 🔥")
     lines.append("👇 G'oliblarni tabriklang!")
     text = "\n".join(lines)
