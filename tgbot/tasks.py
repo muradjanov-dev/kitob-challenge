@@ -1053,8 +1053,14 @@ def check_user_achievements(user_id: int):
                     data={"chat_id": _gid, "text": group_text, "parse_mode": "HTML"},
                     timeout=5,
                 )
-                # Achievement congrats messages stay in the group permanently —
-                # they're celebratory announcements, not transient noise.
+                if resp.ok:
+                    msg_id = resp.json().get("result", {}).get("message_id")
+                    if msg_id:
+                        ScheduledMessageDeletion.objects.create(
+                            chat_id=_gid,
+                            message_id=msg_id,
+                            delete_at=timezone.now() + _dt.timedelta(minutes=2),
+                        )
             except Exception as e:
                 print(f"tabriklash group broadcast failed for {_gid}/{ach['code']}: {e}")
 

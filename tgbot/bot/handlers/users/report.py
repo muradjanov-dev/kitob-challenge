@@ -1357,27 +1357,54 @@ async def _do_confirm_report(message, user, state: FSMContext):
         else:
             target_thread_id = E_GIRLS_THREAD_ID
 
-    # Delete prior group messages for today (premium aggregation).
+    # Premium aggregation: edit the existing group message in-place (no delete
+    # permission needed). Fall back to delete+send if the edit fails.
+    final_group_chat_id = target_chat_id
+    final_group_message_id = None
+    final_group_thread_id = target_thread_id
+    edited_in_place = False
+
     if is_aggregating:
-        seen = set()
-        for prev in prior_reports:
-            key = (prev.group_chat_id, prev.group_message_id)
-            if not prev.group_chat_id or not prev.group_message_id or key in seen:
-                continue
-            seen.add(key)
+        latest_with_msg = next(
+            (p for p in reversed(prior_reports) if p.group_chat_id and p.group_message_id),
+            None,
+        )
+        if latest_with_msg and latest_with_msg.group_chat_id == target_chat_id:
             try:
-                await bot.delete_message(
-                    chat_id=prev.group_chat_id, message_id=prev.group_message_id,
+                await bot.edit_message_text(
+                    chat_id=latest_with_msg.group_chat_id,
+                    message_id=latest_with_msg.group_message_id,
+                    text=report_message,
+                    parse_mode='HTML',
                 )
+                final_group_chat_id = latest_with_msg.group_chat_id
+                final_group_message_id = latest_with_msg.group_message_id
+                final_group_thread_id = latest_with_msg.group_thread_id
+                edited_in_place = True
             except Exception as e:
-                print(f"delete prior aggregated msg failed (chat={prev.group_chat_id}, msg={prev.group_message_id}): {e}")
-        # Clear references on prior rows so we don't re-attempt deletion.
+                print(f"edit_group_msg failed, falling back to delete+send: {e}")
+
+        if not edited_in_place:
+            # Fallback: delete all prior group messages then send a fresh one.
+            seen = set()
+            for prev in prior_reports:
+                key = (prev.group_chat_id, prev.group_message_id)
+                if not prev.group_chat_id or not prev.group_message_id or key in seen:
+                    continue
+                seen.add(key)
+                try:
+                    await bot.delete_message(
+                        chat_id=prev.group_chat_id, message_id=prev.group_message_id,
+                    )
+                except Exception as e:
+                    print(f"delete prior aggregated msg failed (chat={prev.group_chat_id}, msg={prev.group_message_id}): {e}")
+
+        # Clear group-message references on all prior reports.
         await sync_to_async(
             ConfirmationReport.objects.filter(user=user, date__date=today).exclude(id=report.id).update
         )(group_chat_id=None, group_message_id=None, group_thread_id=None)
 
-    sent_msg = None
-    if target_chat_id:
+    if not edited_in_place and target_chat_id:
         try:
             sent_msg = await bot.send_message(
                 chat_id=target_chat_id,
@@ -1385,17 +1412,19 @@ async def _do_confirm_report(message, user, state: FSMContext):
                 text=report_message,
                 parse_mode='HTML',
             )
+            final_group_message_id = sent_msg.message_id
         except Exception as e:
-            print(
-                f"Error sending report to group {target_chat_id} thread {target_thread_id}: {e}")
+            print(f"Error sending report to group {target_chat_id} thread {target_thread_id}: {e}")
+    else:
+        sent_msg = None
 
-    if sent_msg:
+    if final_group_message_id:
         await sync_to_async(
             ConfirmationReport.objects.filter(id=report.id).update
         )(
-            group_chat_id=target_chat_id,
-            group_message_id=sent_msg.message_id,
-            group_thread_id=target_thread_id,
+            group_chat_id=final_group_chat_id,
+            group_message_id=final_group_message_id,
+            group_thread_id=final_group_thread_id,
             reading_day=reading_day,
         )
 
@@ -1408,11 +1437,11 @@ async def _do_confirm_report(message, user, state: FSMContext):
         )
     else:
         done_text = "Ваш отчёт отправлен." if lang == "ru" else "Hisobotingiz yuborildi."
-    if sent_msg:
-        chat_id_str = str(target_chat_id).lstrip("-")
+    if final_group_message_id:
+        chat_id_str = str(final_group_chat_id).lstrip("-")
         if chat_id_str.startswith("100"):
             chat_id_str = chat_id_str[3:]
-        link = f"https://t.me/c/{chat_id_str}/{sent_msg.message_id}"
+        link = f"https://t.me/c/{chat_id_str}/{final_group_message_id}"
         link_label = "📨 Открыть отчёт" if lang == "ru" else "📨 Hisobotni ko'rish"
         confirmation_text = f'{done_text}\n\n<a href="{link}">{link_label}</a>'
     else:
