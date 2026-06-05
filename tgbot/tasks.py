@@ -74,6 +74,19 @@ def send_notification_with_celery(user_id, notification_message, photo=None, rep
         return str(e)
 
 
+@shared_task
+def delete_message_after_delay(chat_id, message_id):
+    """Delete a Telegram message. Scheduled via apply_async(countdown=N)."""
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/deleteMessage",
+            data={"chat_id": chat_id, "message_id": message_id},
+            timeout=5,
+        )
+    except Exception as e:
+        print(f"delete_message_after_delay failed for {chat_id}/{message_id}: {e}")
+
+
 
 
 def send_message(chat_id, text):
@@ -1053,16 +1066,15 @@ def check_user_achievements(user_id: int):
                     data={"chat_id": _gid, "text": group_text, "parse_mode": "HTML"},
                     timeout=5,
                 )
-                if resp.ok:
-                    msg_id = resp.json().get("result", {}).get("message_id")
-                    if msg_id:
-                        ScheduledMessageDeletion.objects.create(
-                            chat_id=_gid,
-                            message_id=msg_id,
-                            delete_at=timezone.now() + _dt.timedelta(minutes=2),
-                        )
             except Exception as e:
                 print(f"tabriklash group broadcast failed for {_gid}/{ach['code']}: {e}")
+                continue
+            if resp.ok:
+                msg_id = resp.json().get("result", {}).get("message_id")
+                if msg_id:
+                    delete_message_after_delay.apply_async(
+                        args=[_gid, msg_id], countdown=120
+                    )
 
         try:
             UserAchievement.objects.filter(
