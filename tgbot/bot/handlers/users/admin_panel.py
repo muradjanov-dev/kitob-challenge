@@ -594,6 +594,9 @@ def _search_users(query: str, limit: int = 20):
         return []
 
     # Score every user by how close their (normalized) name is to the query.
+    # Tiered so exact/prefix/substring matches win and only genuinely-close
+    # typos slip through fuzzy — keeps unrelated names out of the results.
+    FUZZY_MIN = 0.72
     scored = []  # (score, id)
     rows = TelegramProfile.objects.values_list("id", "full_name", "username")
     for uid, full_name, username in rows.iterator():
@@ -601,24 +604,26 @@ def _search_users(query: str, limit: int = 20):
         norm_name = normalize_uzbek_text(name)
         if not norm_name:
             continue
-        if norm_q in norm_name:
-            # Substring hit — strongest; reward matches near the start.
-            pos = norm_name.index(norm_q)
-            score = 0.9 + 0.1 * (1.0 - pos / max(len(norm_name), 1))
+        tokens = norm_name.split()
+        if norm_q == norm_name or norm_q in tokens:
+            score = 1.0                       # exact name or exact word
+        elif any(t.startswith(norm_q) for t in tokens) or norm_name.startswith(norm_q):
+            score = 0.95                      # a word starts with the query
+        elif len(norm_q) >= 3 and norm_q in norm_name:
+            score = 0.85                      # query is a substring
         else:
             best = difflib.SequenceMatcher(None, norm_q, norm_name).ratio()
-            for tok in norm_name.split():
+            for tok in tokens:
                 r = difflib.SequenceMatcher(None, norm_q, tok).ratio()
                 if r > best:
                     best = r
+            if best < FUZZY_MIN:
+                continue                      # too far — skip (no junk)
             score = best
         scored.append((score, uid))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    # Prefer reasonably-close matches; if none clear the bar, still return the
-    # nearest few so the admin always gets the closest candidates.
-    good = [uid for s, uid in scored if s >= 0.45][:limit]
-    top_ids = good or [uid for _, uid in scored[:5]]
+    top_ids = [uid for _s, uid in scored[:limit]]
     if not top_ids:
         return []
 
