@@ -20,7 +20,7 @@ from tgbot.bot.utils import aget_user
 
 
 AGE_LABELS = {
-    "u18": "<18",
+    "u18": "&lt;18",
     "18_25": "18-25",
     "26_35": "26-35",
     "36p": "36+",
