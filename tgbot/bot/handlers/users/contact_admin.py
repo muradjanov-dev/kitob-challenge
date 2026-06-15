@@ -38,6 +38,34 @@ async def contact_admin_entry(message: types.Message, state: FSMContext):
     await ContactAdminState.message.set()
 
 
+@dp.callback_query_handler(
+    lambda c: c.data and c.data.startswith("user_reply:"),
+    state="*",
+)
+async def user_reply_to_admin_start(call: types.CallbackQuery, state: FSMContext):
+    """A user taps '✍️ Javob berish' on a message they got from an admin/owner.
+    Routes their reply straight back to that specific admin."""
+    admin_id = call.data.split(":", 1)[1]
+    user = await aget_user(call.from_user.id)
+    lang = _user_lang(user)
+    await state.finish()
+    await state.update_data(direct_admin_id=admin_id)
+    await call.answer()
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await call.message.answer(
+        _t(
+            lang,
+            "✍️ Javobingizni yozing:",
+            "✍️ Напишите ваш ответ:",
+        ),
+        reply_markup=back_keyboard,
+    )
+    await ContactAdminState.message.set()
+
+
 def _confirm_kb(lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(row_width=2).add(
         InlineKeyboardButton(
@@ -120,8 +148,14 @@ async def contact_admin_confirm_send(call: types.CallbackQuery, state: FSMContex
         await state.finish()
         return
 
-    admins_raw = os.environ.get("ADMINS", "")
-    admin_ids = [a.strip() for a in admins_raw.split(",") if a.strip()]
+    # If this is a reply to a specific admin (user tapped '✍️ Javob berish' on a
+    # message that admin sent), deliver only to them; otherwise to all admins.
+    direct_admin_id = data.get("direct_admin_id")
+    if direct_admin_id:
+        admin_ids = [str(direct_admin_id)]
+    else:
+        admins_raw = os.environ.get("ADMINS", "")
+        admin_ids = [a.strip() for a in admins_raw.split(",") if a.strip()]
 
     username = call.from_user.username
     full_name = (user.full_name if user else None) or call.from_user.full_name or "—"
@@ -347,6 +381,14 @@ async def admin_reply_confirm_send(call: types.CallbackQuery, state: FSMContext)
             "✉️ <b>Adminstratordan javob:</b>",
             "✉️ <b>Ответ от администратора:</b>",
         )
+    # Let the user reply straight back to THIS admin — routes the answer to the
+    # sender (call.from_user.id), who can then reply again, forming a thread.
+    reply_back_kb = InlineKeyboardMarkup().add(
+        InlineKeyboardButton(
+            _t(target_lang, "✍️ Javob berish", "✍️ Ответить"),
+            callback_data=f"user_reply:{call.from_user.id}",
+        )
+    )
     try:
         await bot.send_message(
             chat_id=target_user_id, text=header, parse_mode="HTML",
@@ -355,6 +397,7 @@ async def admin_reply_confirm_send(call: types.CallbackQuery, state: FSMContext)
             chat_id=int(target_user_id),
             from_chat_id=draft_chat_id,
             message_id=draft_message_id,
+            reply_markup=reply_back_kb,
         )
         await call.message.answer("✅ Xabar foydalanuvchiga yuborildi.")
     except Exception as e:
