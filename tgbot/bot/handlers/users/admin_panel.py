@@ -546,13 +546,15 @@ async def admin_userlist_pick(message: types.Message, state: FSMContext):
 
 
 @dp.message_handler(IsPrivate(), state=AdminUserBrowse.listing)
-async def admin_userlist_exit(message: types.Message, state: FSMContext):
-    await state.finish()
-    await message.answer(
-        "Ro'yxat rejimi yopildi. Qaytadan ochish uchun «👑 Admin panel» → "
-        "«👨‍👩‍👦‍👦 Foydalanuvchilar ro'yxati».",
-        reply_markup=main_markup(),
-    )
+async def admin_userlist_text(message: types.Message, state: FSMContext):
+    # In the list, a non-numeric text is treated as a search query (the digit
+    # handler above caught the numbers). Stays in listing mode so the admin can
+    # keep browsing/searching freely.
+    actor = await aget_user(message.from_user.id)
+    if not (actor and actor.is_admin):
+        await state.finish()
+        return
+    await _do_user_search(message, (message.text or "").strip())
 
 
 def _search_users(query: str, limit: int = 20):
@@ -624,21 +626,17 @@ def _search_users(query: str, limit: int = 20):
     return [by_id[i] for i in top_ids if i in by_id]
 
 
-@dp.message_handler(IsPrivate(), state=AdminUserBrowse.searching)
-async def admin_user_search_query(message: types.Message, state: FSMContext):
+async def _do_user_search(message: types.Message, query: str):
+    """Run a user search and render results. Shared by the list-mode text path,
+    the searching state, and the /find command — so search works no matter how
+    the admin got here (and even if FSM state was lost)."""
     from django.utils.html import escape as _escape
 
-    actor = await aget_user(message.from_user.id)
-    if not (actor and actor.is_admin):
-        await state.finish()
-        return
-    query = (message.text or "").strip()
     if not query:
-        await message.answer("Bo'sh so'rov. Ism, username, telefon yoki ID yuboring.")
+        await message.answer("Ism, username, telefon yoki ID yuboring.")
         return
 
     results = await sync_to_async(_search_users)(query)
-    await state.finish()
 
     if not results:
         await message.answer(f"🔍 «{_escape(query)}» bo'yicha hech narsa topilmadi.")
@@ -662,6 +660,28 @@ async def admin_user_search_query(message: types.Message, state: FSMContext):
         label = f"{name}"[:40]
         kb.add(InlineKeyboardButton(f"👤 {label}", callback_data=f"adm_userd:{u.id}"))
     await message.answer("\n".join(lines), parse_mode="HTML", reply_markup=kb)
+
+
+@dp.message_handler(IsPrivate(), commands=["find", "qidir"], state="*")
+async def admin_find_command(message: types.Message, state: FSMContext = None):
+    """Bulletproof search that works in ANY state: /find <name|phone|id>."""
+    actor = await aget_user(message.from_user.id)
+    if not (actor and actor.is_admin):
+        await message.answer("Siz admin emassiz!")
+        return
+    await _do_user_search(message, (message.get_args() or "").strip())
+
+
+@dp.message_handler(IsPrivate(), state=AdminUserBrowse.searching)
+async def admin_user_search_query(message: types.Message, state: FSMContext):
+    actor = await aget_user(message.from_user.id)
+    if not (actor and actor.is_admin):
+        await state.finish()
+        return
+    # Switch to listing mode so further plain numbers/names keep working even if
+    # this message landed on a worker that had lost the 'searching' state.
+    await AdminUserBrowse.listing.set()
+    await _do_user_search(message, (message.text or "").strip())
 
 
 @dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("adm_userp:"), state="*")
@@ -1049,11 +1069,12 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "all_users":
         await all_users(msg, state)
     elif action == "user_search":
-        await AdminUserBrowse.searching.set()
+        await AdminUserBrowse.listing.set()
         await call.message.answer(
             "🔍 <b>Foydalanuvchi qidirish</b>\n\n"
-            "Ism, username, telefon raqam yoki ID yuboring.\n"
-            "<i>Bekor qilish uchun «👑 Admin panel» bosing.</i>",
+            "Ism, username, telefon yoki ID yuboring — eng yaqin mosliklar chiqadi.\n"
+            "Yoki istalgan paytda: <code>/find ism</code>\n"
+            "Ro'yxatdan tartib raqamini yuborsangiz — o'sha foydalanuvchi ochiladi.",
             parse_mode="HTML",
         )
     elif action == "stats":
