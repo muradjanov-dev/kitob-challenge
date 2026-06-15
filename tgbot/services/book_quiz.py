@@ -142,14 +142,57 @@ def build_quiz_round():
 
 # ── Copy + keyboards ─────────────────────────────────────────────────────────
 def build_quiz_text(quiz_round) -> str:
+    consolation = getattr(quiz_round, "consolation", 5)
     return (
-        "🧩 <b>KITOB VIKTORINASI</b>\n\n"
-        "Quyidagi xulosa/iqtibos qaysi kitobdan olingan?\n\n"
-        f"💡 «<i>{_escape(quiz_round.conclusion)}</i>»\n\n"
-        f"✅ To'g'ri topgan har bir kishiga <b>+{quiz_round.reward} Kitobcha</b> "
-        "(💎 Premiumlarga ×2)!\n"
-        "👇 Variantlardan birini tanlang:"
+        "🧩 <b>KITOB VIKTORINASI</b>\n"
+        "━━━━━━━━━━━━━━━\n"
+        "📖 <b>Bu iqtibos qaysi kitobdan?</b>\n\n"
+        f"💬 <i>«{_escape(quiz_round.conclusion)}»</i>\n\n"
+        f"🎯 To'g'ri javob → <b>+{quiz_round.reward}</b> 🪙\n"
+        f"🎁 Noto'g'ri ham → <b>+{consolation}</b> 🪙 <i>(urinish uchun)</i>\n"
+        "💎 Premium → <b>×2</b>\n\n"
+        "👇 <b>Variantni tanlang:</b>"
     )
+
+
+def build_results_block(quiz_round) -> str:
+    """The live 'who answered right / wrong' board, rebuilt from the DB. Empty
+    string until the first answer lands. Names are clickable mentions."""
+    from tgbot.models import BookQuizAnswer
+
+    answers = list(
+        BookQuizAnswer.objects.filter(quiz_round=quiz_round)
+        .select_related("user").order_by("created_at")
+    )
+    if not answers:
+        return ""
+
+    correct = [a for a in answers if a.is_correct]
+    wrong = [a for a in answers if not a.is_correct]
+
+    def _names(lst, cap=25):
+        out = []
+        for a in lst[:cap]:
+            u = a.user
+            nm = _escape((u.full_name if u and u.full_name else "Kitobxon"))
+            tid = u.telegram_id if u else 0
+            out.append(f"<a href='tg://user?id={tid}'>{nm}</a>")
+        s = ", ".join(out)
+        extra = len(lst) - cap
+        if extra > 0:
+            s += f" <i>+{extra}</i>"
+        return s
+
+    parts = ["\n━━━━━━━━━━━━━━━", "📊 <b>Natijalar</b>"]
+    if correct:
+        parts.append(f"✅ <b>To'g'ri ({len(correct)}):</b> {_names(correct)}")
+    if wrong:
+        parts.append(f"❌ <b>Noto'g'ri ({len(wrong)}):</b> {_names(wrong)}")
+    return "\n".join(parts)
+
+
+def build_quiz_text_with_board(quiz_round) -> str:
+    return build_quiz_text(quiz_round) + build_results_block(quiz_round)
 
 
 def quiz_keyboard(quiz_round) -> str:

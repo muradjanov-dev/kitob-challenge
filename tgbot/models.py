@@ -994,6 +994,14 @@ class BookQuizRound(BaseModel):
     reward = models.PositiveIntegerField(
         default=100, help_text="Kitobcha granted to each correct guesser.",
     )
+    consolation = models.PositiveIntegerField(
+        default=5, help_text="Kitobcha granted to wrong guessers as motivation.",
+    )
+    group_messages = models.JSONField(
+        default=list,
+        help_text='Posted group copies as [{"chat_id":…, "message_id":…}], '
+                  "edited live to show the right/wrong board.",
+    )
     is_active = models.BooleanField(
         default=True,
         help_text="Only the latest round accepts answers; older ones are closed.",

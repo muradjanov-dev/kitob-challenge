@@ -3593,16 +3593,25 @@ def _broadcast_quiz_round(quiz_round):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
     # 1) Groups — everyone sees it; any group-member can answer (Premium = ×2).
+    #    Remember each posted copy so the live right/wrong board can edit them.
+    posted = []
     for group_id in _group_chat_ids():
         try:
-            requests.post(
+            resp = requests.post(
                 url,
                 data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
-                      "reply_markup": keyboard},
+                      "reply_markup": keyboard, "disable_web_page_preview": "true"},
                 timeout=10,
             )
+            if resp.ok:
+                mid = resp.json().get("result", {}).get("message_id")
+                if mid:
+                    posted.append({"chat_id": str(group_id), "message_id": mid})
         except Exception as e:
             print(f"post_book_quiz group {group_id}: {e}")
+    if posted:
+        quiz_round.group_messages = posted
+        quiz_round.save(update_fields=["group_messages"])
 
     # 2) DM to every registered user — answering is open, so everyone gets the
     #    nudge (they still must be a group member to actually answer).
@@ -3625,6 +3634,33 @@ def _broadcast_quiz_round(quiz_round):
             pass
         _time.sleep(0.05)
     print(f"post_book_quiz: round #{quiz_round.id} posted, DMs sent={sent}")
+
+
+def refresh_quiz_boards(quiz_round):
+    """Edit every posted group copy of the quiz to show the live right/wrong
+    board. Called after each answer. Best-effort: ignores rate-limit / unchanged
+    errors so a busy round never breaks answering."""
+    from tgbot.services.book_quiz import build_quiz_text_with_board, quiz_keyboard
+
+    msgs = quiz_round.group_messages or []
+    if not msgs:
+        return
+    text = build_quiz_text_with_board(quiz_round)
+    keyboard = quiz_keyboard(quiz_round)
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText"
+    for m in msgs:
+        try:
+            requests.post(
+                url,
+                data={
+                    "chat_id": m["chat_id"], "message_id": m["message_id"],
+                    "text": text, "parse_mode": "HTML",
+                    "reply_markup": keyboard, "disable_web_page_preview": "true",
+                },
+                timeout=8,
+            )
+        except Exception:
+            pass
 
 
 @shared_task

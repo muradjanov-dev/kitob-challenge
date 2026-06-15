@@ -27,6 +27,15 @@ def _is_premium(user_id: int) -> bool:
     ).exists()
 
 
+def _refresh_boards(quiz_round):
+    """Update the live right/wrong board on the group messages (best-effort)."""
+    try:
+        from tgbot.tasks import refresh_quiz_boards
+        refresh_quiz_boards(quiz_round)
+    except Exception:
+        pass
+
+
 def _is_group_member(telegram_id: int) -> bool:
     """True if the user belongs to at least one configured reading group."""
     from tgbot.tasks import _group_chat_ids, _is_user_in_chat
@@ -67,23 +76,33 @@ def _process_answer(user_id: int, telegram_id: int, round_id: int, chosen_idx: i
 
     # First answer locked in. Author of the quote can't farm their own report.
     if quiz_round.source_user_id == user_id:
+        _refresh_boards(quiz_round)
         return ("🙂 Bu o'zingiz yuborgan xulosa — mukofot yo'q, lekin "
                 f"ishtirokingiz uchun rahmat!{promo}")
 
-    if not is_correct:
-        return (f"❌ Noto'g'ri.\n\nTo'g'ri javob: «{quiz_round.correct_title}»\n"
-                f"Keyingi viktorinada omad! 🍀{promo}")
-
-    # Correct first guess → pay the reward. update_ball doubles it for Premium.
     profile = TelegramProfile.objects.get(id=user_id)
-    awarded = profile.update_ball(True, quiz_round.reward)
-    answer.is_correct = True
-    answer.rewarded = True
-    answer.save(update_fields=["is_correct", "rewarded"])
-    prem_note = " 💎 ×2!" if awarded > quiz_round.reward else ""
-    return (f"✅ To'g'ri! «{quiz_round.correct_title}»\n\n"
-            f"🪙 +{awarded} Kitobcha{prem_note}\n"
-            f"💰 Balans: {int(profile.ball)}{promo}")
+    if is_correct:
+        # Correct → full reward. update_ball doubles it for Premium.
+        awarded = profile.update_ball(True, quiz_round.reward)
+        answer.rewarded = True
+        answer.save(update_fields=["rewarded"])
+        prem_note = " 💎 ×2!" if awarded > quiz_round.reward else ""
+        result = (f"✅ To'g'ri! «{quiz_round.correct_title}»\n\n"
+                  f"🪙 +{awarded} Kitobcha{prem_note}\n"
+                  f"💰 Balans: {int(profile.ball)}{promo}")
+    else:
+        # Wrong → consolation reward so trying still pays off.
+        awarded = profile.update_ball(True, quiz_round.consolation)
+        answer.rewarded = True
+        answer.save(update_fields=["rewarded"])
+        prem_note = " 💎 ×2!" if awarded > quiz_round.consolation else ""
+        result = (f"❌ Noto'g'ri. To'g'ri javob: «{quiz_round.correct_title}»\n\n"
+                  f"🎁 Urinish uchun: +{awarded} Kitobcha{prem_note}\n"
+                  f"💰 Balans: {int(profile.ball)}\n"
+                  f"Keyingi viktorinada omad! 🍀{promo}")
+
+    _refresh_boards(quiz_round)
+    return result
 
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("bq:"))
