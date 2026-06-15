@@ -967,6 +967,88 @@ class ReferralBoom(BaseModel):
         return self.tier1_reward if referral_number <= self.tier1_cap else self.tier2_reward
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Kitob Viktorina — twice-a-day "guess the book" quiz built from the conclusions
+# (xulosa/iqtibos) users have submitted with their daily reports. One real quote
+# is shown with 4 book options (1 correct + 3 random books pulled from the whole
+# library). Correct guessers earn a flat Kitobcha reward. Premium-only feature;
+# answering also requires being a member of one of the reading groups.
+# ─────────────────────────────────────────────────────────────────────────────
+class BookQuizRound(BaseModel):
+    source_report = models.ForeignKey(
+        ConfirmationReport, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="quiz_rounds",
+        help_text="Report the quoted conclusion was taken from.",
+    )
+    source_user = models.ForeignKey(
+        TelegramProfile, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="authored_quiz_rounds",
+        help_text="Author of the quote — excluded from the reward (they'd know it).",
+    )
+    conclusion = models.TextField(verbose_name=_("Quoted conclusion"))
+    correct_title = models.CharField(max_length=255)
+    options = models.JSONField(
+        default=list, help_text="The 4 shuffled book titles shown as answers.",
+    )
+    correct_index = models.PositiveSmallIntegerField(default=0)
+    reward = models.PositiveIntegerField(
+        default=100, help_text="Kitobcha granted to each correct guesser.",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Only the latest round accepts answers; older ones are closed.",
+    )
+
+    class Meta:
+        db_table = "book_quiz_rounds"
+        verbose_name = _("Book Quiz Round")
+        verbose_name_plural = _("Book Quiz Rounds")
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"Viktorina #{self.id} — {self.correct_title}"
+
+
+class BookQuizAnswer(BaseModel):
+    quiz_round = models.ForeignKey(
+        BookQuizRound, on_delete=models.CASCADE, related_name="answers",
+    )
+    user = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="book_quiz_answers",
+    )
+    chosen_index = models.PositiveSmallIntegerField()
+    is_correct = models.BooleanField(default=False)
+    rewarded = models.BooleanField(
+        default=False, help_text="True once the Kitobcha reward was paid out.",
+    )
+
+    class Meta:
+        db_table = "book_quiz_answers"
+        verbose_name = _("Book Quiz Answer")
+        verbose_name_plural = _("Book Quiz Answers")
+        unique_together = ("quiz_round", "user")
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.user_id} → round {self.quiz_round_id} ({'✓' if self.is_correct else '✗'})"
+
+
+class BookQuizPromoState(SingletonModel):
+    """Tracks the rollout of the Viktorina promo reminders: once a day for the
+    first 10 days after launch, then only on a random subset of days."""
+    launched_on = models.DateField(
+        null=True, blank=True,
+        help_text="Set automatically on the first promo run; day 1 of the 10-day daily window.",
+    )
+    last_sent_on = models.DateField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("Book Quiz Promo State")
+
+    def __str__(self):
+        return f"Viktorina promo (launched {self.launched_on})"
+
+
 class ReferralBoomParticipant(BaseModel):
     boom = models.ForeignKey(
         ReferralBoom, on_delete=models.CASCADE, related_name="participants",

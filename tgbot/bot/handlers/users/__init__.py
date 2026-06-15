@@ -23,3 +23,4 @@ from . import challenge
 from . import referral_boom
 from . import quiz_ai
 from . import shop_admin
+from . import book_quiz

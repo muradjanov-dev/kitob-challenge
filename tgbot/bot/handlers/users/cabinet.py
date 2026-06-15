@@ -305,6 +305,24 @@ async def show_user_cabinet(message: types.Message, state=None):
 
     kitobcha_balance = int(user.ball or 0)
 
+    # Viktorina — correct-guess count is a Premium-only stat. Free users see a
+    # teaser; answering itself is free, only the statistics are gated.
+    from tgbot.models import BookQuizAnswer, Payment
+    is_premium = Payment.objects.filter(
+        user=user, status="paid", end_date__gte=timezone.localdate()
+    ).exists()
+    if is_premium:
+        quiz_correct_count = BookQuizAnswer.objects.filter(
+            user=user, is_correct=True
+        ).count()
+        quiz_section = (
+            f"\n🧩 <b>Viktorinada topilgan iqtiboslar:</b> {quiz_correct_count} ta\n"
+        )
+    else:
+        quiz_section = (
+            "\n🧩 <b>Viktorina statistikasi:</b> 💎 Premiumda ko'rinadi\n"
+        )
+
     # Build audio section — show if user has any audio reports (even if minutes NULL)
     audio_section = ""
     if completed_audio_count or audio_reports_count or total_audio_minutes:
@@ -338,6 +356,7 @@ async def show_user_cabinet(message: types.Message, state=None):
         f"⏰ <b>Sevimli vaqtingiz:</b> {active_hour}\n"
         f"{rank_text}"
         f"{pages_to_overtake_text}"
+        f"{quiz_section}"
         f"{conclusion_text}"
         f"\n<i>Ma'lumotlar avtomatik yangilanib boradi.</i>"
     )

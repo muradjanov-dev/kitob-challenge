@@ -481,3 +481,32 @@ class ReferralBoomParticipantAdmin(admin.ModelAdmin):
         'kitobcha_earned', 'reminder_schedule', 'reminders_sent',
         'used_reminder_keys', 'created_at', 'updated_at',
     )
+
+
+@admin.register(models.BookQuizRound)
+class BookQuizRoundAdmin(admin.ModelAdmin):
+    list_display = ('id', 'correct_title', 'is_active', 'reward', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('correct_title', 'conclusion')
+    readonly_fields = ('created_at', 'updated_at')
+
+    actions = ['post_quiz_now']
+
+    @admin.action(description="Hozir yangi viktorina yuborish")
+    def post_quiz_now(self, request, queryset):
+        from tgbot.tasks import post_book_quiz
+        post_book_quiz.delay()
+        self.message_user(request, "Yangi viktorina yuborilmoqda…")
+
+
+@admin.register(models.BookQuizAnswer)
+class BookQuizAnswerAdmin(admin.ModelAdmin):
+    list_display = ('user', 'quiz_round', 'chosen_index', 'is_correct', 'rewarded', 'created_at')
+    list_filter = ('is_correct', 'rewarded')
+    search_fields = ('user__full_name', 'user__telegram_id')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(models.BookQuizPromoState)
+class BookQuizPromoStateAdmin(admin.ModelAdmin):
+    list_display = ('launched_on', 'last_sent_on')

@@ -3558,3 +3558,132 @@ def grant_everyone_premium(days=1, announce=True):
         _time.sleep(0.05)
     print(f"grant_everyone_premium: announced sent={sent}")
     return granted
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Kitob Viktorina — twice-daily "guess the book" quiz + its promo reminders.
+# ────────────────────────────────────────────────────────────────────────
+def _viktorina_join_keyboard():
+    """Inline keyboard for the promo: a deep-link into /start so users can
+    upgrade to Premium, plus the group invite when one is configured."""
+    from tgbot.models import RequiredGroup
+
+    rows = []
+    invite = (
+        RequiredGroup.objects
+        .exclude(invite_link__isnull=True).exclude(invite_link__exact="")
+        .values_list("invite_link", flat=True)
+        .first()
+    )
+    if invite:
+        rows.append([{"text": "📚 Guruhga qo'shilish", "url": invite}])
+    username = _get_bot_username()
+    if username:
+        rows.append([{"text": "💎 Premium / Botni ochish", "url": f"https://t.me/{username}?start=viktorina"}])
+    return json.dumps({"inline_keyboard": rows}) if rows else None
+
+
+@shared_task
+def post_book_quiz():
+    """Build one fresh Viktorina round and post it to every reading group plus
+    DM it to every Premium user. Skips silently when there isn't enough material
+    or no quote could be built."""
+    from tgbot.services.book_quiz import build_quiz_round, build_quiz_text, quiz_keyboard
+
+    quiz_round = build_quiz_round()
+    if not quiz_round:
+        print("post_book_quiz: no quiz could be built (not enough conclusions yet)")
+        return
+
+    text = build_quiz_text(quiz_round)
+    keyboard = quiz_keyboard(quiz_round)
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    # 1) Groups — everyone sees it; any group-member can answer (Premium = ×2).
+    for group_id in _group_chat_ids():
+        try:
+            requests.post(
+                url,
+                data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                      "reply_markup": keyboard},
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"post_book_quiz group {group_id}: {e}")
+
+    # 2) DM to every registered user — answering is open, so everyone gets the
+    #    nudge (they still must be a group member to actually answer).
+    import time as _time
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent = 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                      "reply_markup": keyboard},
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            elif resp.status_code == 429:
+                _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
+        except Exception:
+            pass
+        _time.sleep(0.05)
+    print(f"post_book_quiz: round #{quiz_round.id} posted, DMs sent={sent}")
+
+
+@shared_task
+def send_viktorina_promo():
+    """Promote the Viktorina to everyone: once a day for the first 10 days after
+    launch, then only on a random ~40% of days. Each send pulls a fresh creative
+    message (jokes / mood-lifters / reading nudges) from the pool."""
+    from tgbot.models import BookQuizPromoState
+    from tgbot.services.book_quiz import pick_promo_text
+
+    state = BookQuizPromoState.get_solo()
+    today = timezone.localdate()
+    if state.launched_on is None:
+        state.launched_on = today
+        state.save(update_fields=["launched_on"])
+
+    if state.last_sent_on == today:
+        return  # never twice in one day
+
+    day_index = (today - state.launched_on).days  # 0 on launch day
+    if day_index < 10:
+        should_send = True
+    else:
+        should_send = random.random() < 0.4
+    if not should_send:
+        return
+
+    text = pick_promo_text()
+    keyboard = _viktorina_join_keyboard()
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    data_extra = {"reply_markup": keyboard} if keyboard else {}
+
+    import time as _time
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent = failed = 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={"chat_id": chat_id, "text": text, "parse_mode": "HTML", **data_extra},
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+                if resp.status_code == 429:
+                    _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
+        except Exception:
+            failed += 1
+        _time.sleep(0.05)
+
+    state.last_sent_on = today
+    state.save(update_fields=["last_sent_on"])
+    print(f"send_viktorina_promo: day_index={day_index} sent={sent} failed={failed}")

@@ -182,6 +182,22 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=20, minute=0, day_of_week=6),  # 6 = Saturday
     },
 
+    # Kitob Viktorina — "guess the book" quiz from real conclusions, twice daily.
+    'book-quiz-morning': {
+        'task': 'tgbot.tasks.post_book_quiz',
+        'schedule': crontab(hour=8, minute=30),
+    },
+    'book-quiz-evening': {
+        'task': 'tgbot.tasks.post_book_quiz',
+        'schedule': crontab(hour=21, minute=0),
+    },
+
+    # Viktorina promo — once a day for the first 10 days, then random (~40%).
+    'viktorina-promo': {
+        'task': 'tgbot.tasks.send_viktorina_promo',
+        'schedule': crontab(hour=19, minute=30),
+    },
+
     # Referral BOOM — every 5 min drip the playful reminders and finalize when
     # the 3-day window closes. No-ops cheaply when no boom is active.
     'boom-reminder-tick': {
