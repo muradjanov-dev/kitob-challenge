@@ -380,7 +380,7 @@ def _build_user_detail(user_id: int) -> str:
     region_name = user.region.name if user.region else "—"
     gender_label = {"male": "Erkak", "female": "Ayol"}.get(user.gender or "", "—")
     age_label = {
-        "u18": "<18", "18_25": "18–25", "26_35": "26–35", "36p": "36+",
+        "u18": "&lt;18", "18_25": "18–25", "26_35": "26–35", "36p": "36+",
     }.get(user.age_range or "", "—")
 
     from tgbot.models import Payment as _Payment
