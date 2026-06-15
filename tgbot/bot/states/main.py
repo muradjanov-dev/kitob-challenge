@@ -127,3 +127,8 @@ class ShopProductCreateState(StatesGroup):
 
 class ShopProductEditState(StatesGroup):
     image = State()
+
+
+class AdminUserBrowse(StatesGroup):
+    listing = State()    # showing the numbered users list; a sent number → detail
+    searching = State()  # waiting for a search query (name / username / phone / id)

@@ -3583,17 +3583,10 @@ def _viktorina_join_keyboard():
     return json.dumps({"inline_keyboard": rows}) if rows else None
 
 
-@shared_task
-def post_book_quiz():
-    """Build one fresh Viktorina round and post it to every reading group plus
-    DM it to every Premium user. Skips silently when there isn't enough material
-    or no quote could be built."""
-    from tgbot.services.book_quiz import build_quiz_round, build_quiz_text, quiz_keyboard
-
-    quiz_round = build_quiz_round()
-    if not quiz_round:
-        print("post_book_quiz: no quiz could be built (not enough conclusions yet)")
-        return
+def _broadcast_quiz_round(quiz_round):
+    """Post an already-built Viktorina round to every reading group and DM it to
+    every registered user. Shared by the scheduled task and the admin button."""
+    from tgbot.services.book_quiz import build_quiz_text, quiz_keyboard
 
     text = build_quiz_text(quiz_round)
     keyboard = quiz_keyboard(quiz_round)
@@ -3632,6 +3625,19 @@ def post_book_quiz():
             pass
         _time.sleep(0.05)
     print(f"post_book_quiz: round #{quiz_round.id} posted, DMs sent={sent}")
+
+
+@shared_task
+def post_book_quiz():
+    """Build one fresh Viktorina round and broadcast it. Skips silently when
+    there isn't enough material to build a quote."""
+    from tgbot.services.book_quiz import build_quiz_round
+
+    quiz_round = build_quiz_round()
+    if not quiz_round:
+        print("post_book_quiz: no quiz could be built (not enough conclusions yet)")
+        return
+    _broadcast_quiz_round(quiz_round)
 
 
 @shared_task

@@ -8,7 +8,7 @@ from tgbot.bot import dp
 from tgbot.models import TelegramProfile, BookReport, ConfirmationReport, BooksToRead, UserAchievement
 from aiogram import types
 from aiogram.dispatcher import FSMContext
-from tgbot.bot.states.main import StatisticState, NotificationState
+from tgbot.bot.states.main import StatisticState, NotificationState, AdminUserBrowse
 from tgbot.bot.filters import IsPrivate
 from tgbot.bot.utils import aget_user
 from tgbot.bot.loader import gettext as _, bot
@@ -269,6 +269,56 @@ def _build_users_overview(page: int):
     return text, markup
 
 
+def _format_books_section(user) -> str:
+    """Finished + in-progress book lists with titles, for the admin detail card.
+    Audio books are flagged; long lists are capped with a '+N more' tail."""
+    from django.db.models import F
+    from django.utils.html import escape
+
+    CAP = 20
+
+    finished = list(
+        BooksToRead.objects.filter(
+            user=user, current_page__gte=F("total_pages"), total_pages__gt=0
+        ).order_by("title").values("title", "is_audio")
+    )
+    in_progress = list(
+        BooksToRead.objects.filter(
+            user=user, current_page__lt=F("total_pages"), total_pages__gt=0
+        ).order_by("title").values("title", "current_page", "total_pages", "is_audio")
+    )
+
+    def _unit(is_audio):
+        return "daq" if is_audio else "bet"
+
+    section = ""
+    if finished:
+        lines = []
+        for b in finished[:CAP]:
+            tag = " 🎧" if b["is_audio"] else ""
+            lines.append(f"  ✅ {escape(b['title'])}{tag}")
+        if len(finished) > CAP:
+            lines.append(f"  …va yana {len(finished) - CAP} ta")
+        section += (
+            f"\n\n📖 <b>Tugatgan kitoblar ({len(finished)}):</b>\n" + "\n".join(lines)
+        )
+    if in_progress:
+        lines = []
+        for b in in_progress[:CAP]:
+            tag = " 🎧" if b["is_audio"] else ""
+            lines.append(
+                f"  📕 {escape(b['title'])}{tag} — {b['current_page']}/{b['total_pages']} {_unit(b['is_audio'])}"
+            )
+        if len(in_progress) > CAP:
+            lines.append(f"  …va yana {len(in_progress) - CAP} ta")
+        section += (
+            f"\n\n📕 <b>Tugatilmagan kitoblar ({len(in_progress)}):</b>\n" + "\n".join(lines)
+        )
+    if not finished and not in_progress:
+        section += "\n\n📚 <i>Kitoblar ro'yxati bo'sh.</i>"
+    return section
+
+
 def _build_user_detail(user_id: int) -> str:
     """Returns full HTML detail for a single TelegramProfile (admin view)."""
     from django.db.models import Count, Avg, Sum, F
@@ -381,14 +431,194 @@ def _build_user_detail(user_id: int) -> str:
         f"📕 O'qilayotgan: <b>{in_progress_books}</b>\n"
         f"🗓 Eng faol kun: <b>{most_active_day}</b>\n"
         f"⏰ Eng faol vaqt: <b>{active_hour}</b>"
+        f"{_format_books_section(user)}"
         f"{ach_text}"
     )
 
 
-@dp.message_handler(IsPrivate(), Text(contains="‍👩‍👦‍👦 Barcha foydalanuvchilar"))
-async def all_users(message: types.Message):
-    text, markup = _build_users_overview(page=1)
+USERS_LIST_PER_PAGE = 50
+
+
+def _active_users_qs():
+    """Users shown in the admin list: everyone who hasn't blocked the bot,
+    ordered stably by id so ordinal numbers are reproducible across pages."""
+    return TelegramProfile.objects.filter(is_blocked=False).order_by("id")
+
+
+def _user_by_ordinal(n: int):
+    """Resolve the 1-based ordinal shown in the list back to a TelegramProfile."""
+    if n < 1:
+        return None
+    return _active_users_qs()[n - 1:n].first()
+
+
+def _build_users_numbered(page: int):
+    """(text, markup, total_pages) for the numbered, blocked-excluded users list.
+    Ordinals are global: page 2 continues from where page 1 stopped."""
+    from tgbot.models import Payment
+    from django.utils.html import escape
+
+    qs = _active_users_qs()
+    total = qs.count()
+    total_pages = max(1, (total + USERS_LIST_PER_PAGE - 1) // USERS_LIST_PER_PAGE)
+    page = max(1, min(page, total_pages))
+    offset = (page - 1) * USERS_LIST_PER_PAGE
+    page_users = list(qs[offset:offset + USERS_LIST_PER_PAGE])
+
+    page_ids = [u.id for u in page_users]
+    prem_ids = set(
+        Payment.objects.filter(
+            user_id__in=page_ids, status="paid", end_date__gte=timezone.localdate()
+        ).values_list("user_id", flat=True)
+    )
+
+    lines = [
+        "👨‍👩‍👦‍👦 <b>Foydalanuvchilar ro'yxati</b>",
+        f"📊 Jami (bloklanmagan): <b>{total}</b> · 📄 Sahifa <b>{page}/{total_pages}</b>\n",
+    ]
+    for i, u in enumerate(page_users, start=offset + 1):
+        name = escape(u.full_name or (("@" + u.username) if u.username else "Ism yo'q"))
+        badges = ""
+        if u.id in prem_ids:
+            badges += " 💎"
+        if not u.is_registered:
+            badges += " 🚫"
+        if u.is_admin:
+            badges += " 👑"
+        lines.append(f"<b>{i}.</b> {name}{badges}")
+    lines.append(
+        "\n🔢 Foydalanuvchi ma'lumotini ko'rish uchun uning <b>raqamini</b> yuboring."
+    )
+    text = "\n".join(lines)
+
+    kb = InlineKeyboardMarkup(row_width=3)
+    nav = []
+    if page > 1:
+        nav.append(InlineKeyboardButton("⬅️", callback_data=f"adm_ulist:{page - 1}"))
+    nav.append(InlineKeyboardButton(f"{page}/{total_pages}", callback_data="noop"))
+    if page < total_pages:
+        nav.append(InlineKeyboardButton("➡️", callback_data=f"adm_ulist:{page + 1}"))
+    kb.row(*nav)
+    return text, kb, total_pages
+
+
+@dp.message_handler(IsPrivate(), Text(contains="Foydalanuvchilar ro'yxati"))
+async def all_users(message: types.Message, state: FSMContext = None):
+    text, markup, _tp = _build_users_numbered(page=1)
+    if state is not None:
+        await AdminUserBrowse.listing.set()
     await message.answer(text, parse_mode="HTML", reply_markup=markup)
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("adm_ulist:"), state="*")
+async def adm_users_list_page(call: types.CallbackQuery, state: FSMContext):
+    actor = await aget_user(call.from_user.id)
+    if not (actor and actor.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    page = int(call.data.split(":", 1)[1])
+    text, markup, _tp = await sync_to_async(_build_users_numbered)(page)
+    await AdminUserBrowse.listing.set()
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    except Exception:
+        await call.message.answer(text, parse_mode="HTML", reply_markup=markup)
+    await call.answer()
+
+
+@dp.message_handler(IsPrivate(), state=AdminUserBrowse.listing, regexp=r"^\s*\d+\s*$")
+async def admin_userlist_pick(message: types.Message, state: FSMContext):
+    actor = await aget_user(message.from_user.id)
+    if not (actor and actor.is_admin):
+        await state.finish()
+        return
+    n = int(message.text.strip())
+    target = await sync_to_async(_user_by_ordinal)(n)
+    if not target:
+        await message.answer("❌ Bunday raqamli foydalanuvchi yo'q. Boshqa raqam yuboring.")
+        return
+    text, target_user, is_premium = await sync_to_async(_detail_text_user_premium)(target.id)
+    await message.answer(
+        text, parse_mode="HTML",
+        reply_markup=_user_detail_markup(target_user, is_premium),
+    )
+
+
+@dp.message_handler(IsPrivate(), state=AdminUserBrowse.listing)
+async def admin_userlist_exit(message: types.Message, state: FSMContext):
+    await state.finish()
+    await message.answer(
+        "Ro'yxat rejimi yopildi. Qaytadan ochish uchun «👑 Admin panel» → "
+        "«👨‍👩‍👦‍👦 Foydalanuvchilar ro'yxati».",
+        reply_markup=main_markup(),
+    )
+
+
+def _search_users(query: str):
+    """Find users by name / username / phone / id. Numeric queries match
+    telegram_id or DB id exactly first; otherwise a substring match. Blocked
+    users are included (so admins can find and unblock them). Capped at 30."""
+    from django.db.models import Q
+
+    q = (query or "").strip()
+    digits = q.lstrip("+").replace(" ", "").replace("-", "")
+    if digits.isdigit():
+        exact = list(
+            TelegramProfile.objects.filter(
+                Q(telegram_id=int(digits)) | Q(id=int(digits))
+            )[:30]
+        )
+        if exact:
+            return exact
+
+    filt = (
+        Q(full_name__icontains=q)
+        | Q(username__icontains=q)
+        | Q(phone_number__icontains=q)
+    )
+    if digits.isdigit():
+        filt |= Q(phone_number__icontains=digits)
+    return list(TelegramProfile.objects.filter(filt).order_by("id")[:30])
+
+
+@dp.message_handler(IsPrivate(), state=AdminUserBrowse.searching)
+async def admin_user_search_query(message: types.Message, state: FSMContext):
+    from django.utils.html import escape as _escape
+
+    actor = await aget_user(message.from_user.id)
+    if not (actor and actor.is_admin):
+        await state.finish()
+        return
+    query = (message.text or "").strip()
+    if not query:
+        await message.answer("Bo'sh so'rov. Ism, username, telefon yoki ID yuboring.")
+        return
+
+    results = await sync_to_async(_search_users)(query)
+    await state.finish()
+
+    if not results:
+        await message.answer(f"🔍 «{_escape(query)}» bo'yicha hech narsa topilmadi.")
+        return
+
+    if len(results) == 1:
+        u = results[0]
+        text, target_user, is_premium = await sync_to_async(_detail_text_user_premium)(u.id)
+        await message.answer(
+            text, parse_mode="HTML",
+            reply_markup=_user_detail_markup(target_user, is_premium),
+        )
+        return
+
+    kb = InlineKeyboardMarkup(row_width=1)
+    lines = [f"🔍 «{_escape(query)}» — <b>{len(results)}</b> ta natija:\n"]
+    for u in results:
+        name = u.full_name or (("@" + u.username) if u.username else "Ism yo'q")
+        flag = "🚫" if u.is_blocked else ("✅" if u.is_registered else "·")
+        lines.append(f"{flag} {_escape(name)} — <code>{u.telegram_id}</code>")
+        label = f"{name}"[:40]
+        kb.add(InlineKeyboardButton(f"👤 {label}", callback_data=f"adm_userd:{u.id}"))
+    await message.answer("\n".join(lines), parse_mode="HTML", reply_markup=kb)
 
 
 @dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("adm_userp:"), state="*")
@@ -447,7 +677,7 @@ def _user_detail_markup(target_user, is_premium: bool) -> InlineKeyboardMarkup:
                 callback_data=f"adm_block_toggle:{target_user.id}:1",
             ))
     kb.add(InlineKeyboardButton(
-        "⬅️ Ro'yxatga qaytish", callback_data="adm_userp:1",
+        "⬅️ Ro'yxatga qaytish", callback_data="adm_ulist:1",
     ))
     return kb
 
@@ -774,7 +1004,15 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "unregistered":
         await unregistered_lists(msg)
     elif action == "all_users":
-        await all_users(msg)
+        await all_users(msg, state)
+    elif action == "user_search":
+        await AdminUserBrowse.searching.set()
+        await call.message.answer(
+            "🔍 <b>Foydalanuvchi qidirish</b>\n\n"
+            "Ism, username, telefon raqam yoki ID yuboring.\n"
+            "<i>Bekor qilish uchun «👑 Admin panel» bosing.</i>",
+            parse_mode="HTML",
+        )
     elif action == "stats":
         await show_global_statistics(msg)
     elif action == "notify":
@@ -788,6 +1026,32 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "poll_results":
         from tgbot.bot.handlers.users.polls_admin import poll_results_list
         await poll_results_list(msg, state, _admin_id=admin_id)
+    elif action == "book_quiz":
+        # Build one fresh Viktorina round now and broadcast it. Build runs
+        # synchronously so the admin gets immediate feedback (incl. the
+        # "not enough material" case); the broadcast is fired in the background
+        # on THIS process so it doesn't depend on a separate worker deploy.
+        import asyncio
+        from asgiref.sync import sync_to_async
+        from tgbot.services.book_quiz import build_quiz_round
+        from tgbot.tasks import _broadcast_quiz_round
+
+        quiz_round = await sync_to_async(build_quiz_round)()
+        if not quiz_round:
+            await call.message.answer(
+                "⚠️ Hozircha yetarli xulosa yo'q — viktorina qurib bo'lmadi.\n"
+                "Foydalanuvchilar ko'proq xulosa yuborgach qayta urinib ko'ring."
+            )
+        else:
+            asyncio.get_event_loop().run_in_executor(
+                None, lambda: _broadcast_quiz_round(quiz_round)
+            )
+            await call.message.answer(
+                f"✅ Yangi viktorina yuborilmoqda!\n\n"
+                f"📖 To'g'ri javob: <b>{quiz_round.correct_title}</b>\n"
+                f"<i>Guruhlar va barcha foydalanuvchilarga tarqatilyapti…</i>",
+                parse_mode="HTML",
+            )
     elif action == "reader_titles":
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
         kb = InlineKeyboardMarkup(row_width=1)

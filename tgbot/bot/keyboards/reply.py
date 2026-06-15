@@ -175,7 +175,10 @@ back_keyboard = ReplyKeyboardMarkup(
 
 admin_keyboard = InlineKeyboardMarkup(row_width=2)
 admin_keyboard.row(
-    InlineKeyboardButton(text="👨‍👩‍👦‍👦 Barcha foydalanuvchilar", callback_data="admin:all_users"),
+    InlineKeyboardButton(text="👨‍👩‍👦‍👦 Foydalanuvchilar ro'yxati", callback_data="admin:all_users"),
+)
+admin_keyboard.row(
+    InlineKeyboardButton(text="🔍 Foydalanuvchi qidirish", callback_data="admin:user_search"),
 )
 admin_keyboard.row(
     InlineKeyboardButton(text="📊 Statistikani ko'rish", callback_data="admin:stats"),
@@ -202,6 +205,9 @@ admin_keyboard.row(
 )
 admin_keyboard.row(
     InlineKeyboardButton(text="📝 Quizlar", callback_data="admin:quizzes"),
+)
+admin_keyboard.row(
+    InlineKeyboardButton(text="🧩 Viktorina yuborish", callback_data="admin:book_quiz"),
 )
 admin_keyboard.row(
     InlineKeyboardButton(text="🛒 Do'kon boshqaruvi", callback_data="admin:shop"),
