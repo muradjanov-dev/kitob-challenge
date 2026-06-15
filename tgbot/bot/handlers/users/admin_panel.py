@@ -801,21 +801,23 @@ def _detail_text_user_premium(target_id: int):
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("adm_userd:"), state="*")
 async def adm_user_detail(call: types.CallbackQuery):
     await call.answer()
-    actor = await aget_user(call.from_user.id)
-    if not (actor and actor.is_admin):
-        return
-    target_id = int(call.data.split(":", 1)[1])
     try:
+        actor = await aget_user(call.from_user.id)
+        if not (actor and actor.is_admin):
+            await call.message.answer("⛔ Admin emas")
+            return
+        raw = call.data.split(":", 1)[1]
+        target_id = int(raw)
         text, target_user, is_premium = await sync_to_async(_detail_text_user_premium)(target_id)
+        back_kb = _user_detail_markup(target_user, is_premium)
+        try:
+            await call.message.edit_text(text, parse_mode="HTML", reply_markup=back_kb)
+        except Exception:
+            await call.message.answer(text, parse_mode="HTML", reply_markup=back_kb)
     except Exception as e:
-        print(f"adm_user_detail error for id={target_id}: {e}")
-        await call.message.answer(f"❌ Xatolik: {e}")
-        return
-    back_kb = _user_detail_markup(target_user, is_premium)
-    try:
-        await call.message.edit_text(text, parse_mode="HTML", reply_markup=back_kb)
-    except Exception:
-        await call.message.answer(text, parse_mode="HTML", reply_markup=back_kb)
+        import traceback
+        print(f"[adm_user_detail] CRASH id={call.data}: {e}\n{traceback.format_exc()}")
+        await call.message.answer(f"❌ Xatolik:\n<code>{e}</code>", parse_mode="HTML")
 
 
 @dp.callback_query_handler(
