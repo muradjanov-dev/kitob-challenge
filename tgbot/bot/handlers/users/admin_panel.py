@@ -449,7 +449,8 @@ def _user_by_ordinal(n: int):
     """Resolve the 1-based ordinal shown in the list back to a TelegramProfile."""
     if n < 1:
         return None
-    return _active_users_qs()[n - 1:n].first()
+    rows = list(_active_users_qs()[n - 1:n])
+    return rows[0] if rows else None
 
 
 def _build_users_numbered(page: int):
