@@ -436,13 +436,14 @@ def _build_user_detail(user_id: int) -> str:
     )
 
 
-USERS_LIST_PER_PAGE = 50
+USERS_LIST_PER_PAGE = 100
 
 
 def _active_users_qs():
-    """Users shown in the admin list: everyone who hasn't blocked the bot,
-    ordered stably by id so ordinal numbers are reproducible across pages."""
-    return TelegramProfile.objects.filter(is_blocked=False).order_by("id")
+    """Users shown in the admin list: everyone who hasn't blocked the bot.
+    Registered/active users come first (then unregistered), with a stable id
+    tiebreak so ordinal numbers stay reproducible across pages."""
+    return TelegramProfile.objects.filter(is_blocked=False).order_by("-is_registered", "id")
 
 
 def _user_by_ordinal(n: int):
@@ -473,24 +474,36 @@ def _build_users_numbered(page: int):
         ).values_list("user_id", flat=True)
     )
 
-    lines = [
-        "👨‍👩‍👦‍👦 <b>Foydalanuvchilar ro'yxati</b>",
-        f"📊 Jami (bloklanmagan): <b>{total}</b> · 📄 Sahifa <b>{page}/{total_pages}</b>\n",
-    ]
-    for i, u in enumerate(page_users, start=offset + 1):
+    # Render each user as a compact cell, then pack two cells per line so a
+    # 100-user page stays scrollable. Registered users come first (queryset
+    # order); unregistered (🚫) land at the end.
+    def _cell(i, u):
         name = escape(u.full_name or (("@" + u.username) if u.username else "Ism yo'q"))
+        if len(name) > 18:
+            name = name[:17] + "…"
         badges = ""
         if u.id in prem_ids:
-            badges += " 💎"
-        if not u.is_registered:
-            badges += " 🚫"
+            badges += "💎"
         if u.is_admin:
-            badges += " 👑"
-        lines.append(f"<b>{i}.</b> {name}{badges}")
-    lines.append(
-        "\n🔢 Foydalanuvchi ma'lumotini ko'rish uchun uning <b>raqamini</b> yuboring."
+            badges += "👑"
+        if not u.is_registered:
+            badges += "🚫"
+        return f"<b>{i}.</b> {name}{(' ' + badges) if badges else ''}"
+
+    cells = [_cell(offset + idx + 1, u) for idx, u in enumerate(page_users)]
+    body = []
+    for j in range(0, len(cells), 2):
+        pair = cells[j:j + 2]
+        body.append("   ".join(pair))
+
+    text = (
+        "👨‍👩‍👦‍👦 <b>Foydalanuvchilar ro'yxati</b>\n"
+        f"📊 Jami (bloklanmagan): <b>{total}</b> · 📄 Sahifa <b>{page}/{total_pages}</b>\n"
+        "<i>Avval faol/ro'yxatdan o'tganlar · 🚫 o'tmaganlar oxirida</i>\n\n"
+        + "\n".join(body)
+        + "\n\n🔢 Ko'rish: <b>raqamini</b> yuboring yoki <code>/u 661</code>"
+          "\n🔍 Qidirish: <code>/find ism</code>"
     )
-    text = "\n".join(lines)
 
     kb = InlineKeyboardMarkup(row_width=3)
     nav = []
@@ -507,7 +520,7 @@ def _build_users_numbered(page: int):
 async def all_users(message: types.Message, state: FSMContext = None):
     text, markup, _tp = _build_users_numbered(page=1)
     if state is not None:
-        await AdminUserBrowse.listing.set()
+        await state.set_state(AdminUserBrowse.listing.state)
     await message.answer(text, parse_mode="HTML", reply_markup=markup)
 
 
@@ -519,7 +532,7 @@ async def adm_users_list_page(call: types.CallbackQuery, state: FSMContext):
         return
     page = int(call.data.split(":", 1)[1])
     text, markup, _tp = await sync_to_async(_build_users_numbered)(page)
-    await AdminUserBrowse.listing.set()
+    await state.set_state(AdminUserBrowse.listing.state)
     try:
         await call.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
     except Exception:
@@ -589,46 +602,52 @@ def _search_users(query: str, limit: int = 20):
         if phone_hits:
             return phone_hits
 
+    # 1) Reliable DB substring match (case-insensitive) — always catches the
+    #    obvious hits, e.g. "maryam" → "Maryam", "Maryamoy", "Maryam Karimova".
+    db_hits = list(
+        TelegramProfile.objects.filter(
+            Q(full_name__icontains=q)
+            | Q(username__icontains=q)
+            | Q(phone_number__icontains=q)
+        ).order_by("-is_registered", "id")[:limit]
+    )
+    seen = {u.id for u in db_hits}
+
+    # 2) Fuzzy / transliteration pass for typos and Cyrillic spellings that a
+    #    raw substring can't catch (e.g. "maryam" → "Марям", "Mariam").
     norm_q = normalize_uzbek_text(q)
-    if not norm_q:
-        return []
-
-    # Score every user by how close their (normalized) name is to the query.
-    # Tiered so exact/prefix/substring matches win and only genuinely-close
-    # typos slip through fuzzy — keeps unrelated names out of the results.
-    FUZZY_MIN = 0.72
     scored = []  # (score, id)
-    rows = TelegramProfile.objects.values_list("id", "full_name", "username")
-    for uid, full_name, username in rows.iterator():
-        name = (full_name or username or "")
-        norm_name = normalize_uzbek_text(name)
-        if not norm_name:
-            continue
-        tokens = norm_name.split()
-        if norm_q == norm_name or norm_q in tokens:
-            score = 1.0                       # exact name or exact word
-        elif any(t.startswith(norm_q) for t in tokens) or norm_name.startswith(norm_q):
-            score = 0.95                      # a word starts with the query
-        elif len(norm_q) >= 3 and norm_q in norm_name:
-            score = 0.85                      # query is a substring
-        else:
-            best = difflib.SequenceMatcher(None, norm_q, norm_name).ratio()
-            for tok in tokens:
-                r = difflib.SequenceMatcher(None, norm_q, tok).ratio()
-                if r > best:
-                    best = r
-            if best < FUZZY_MIN:
-                continue                      # too far — skip (no junk)
-            score = best
-        scored.append((score, uid))
+    if norm_q and len(db_hits) < limit:
+        rows = (
+            TelegramProfile.objects.exclude(id__in=seen)
+            .values_list("id", "full_name", "username")
+        )
+        for uid, full_name, username in rows.iterator():
+            norm_name = normalize_uzbek_text(full_name or username or "")
+            if not norm_name:
+                continue
+            tokens = norm_name.split()
+            if (norm_q == norm_name or norm_q in tokens
+                    or any(t.startswith(norm_q) for t in tokens)
+                    or norm_name.startswith(norm_q)):
+                score = 1.0
+            elif len(norm_q) >= 3 and norm_q in norm_name:
+                score = 0.9
+            else:
+                best = difflib.SequenceMatcher(None, norm_q, norm_name).ratio()
+                for tok in tokens:
+                    best = max(best, difflib.SequenceMatcher(None, norm_q, tok).ratio())
+                if best < 0.6:           # near-similar yes, junk no
+                    continue
+                score = best
+            scored.append((score, uid))
+        scored.sort(key=lambda x: x[0], reverse=True)
 
-    scored.sort(key=lambda x: x[0], reverse=True)
-    top_ids = [uid for _s, uid in scored[:limit]]
-    if not top_ids:
-        return []
-
-    by_id = {u.id: u for u in TelegramProfile.objects.filter(id__in=top_ids)}
-    return [by_id[i] for i in top_ids if i in by_id]
+    remaining = max(0, limit - len(db_hits))
+    fuzzy_ids = [uid for _s, uid in scored[:remaining]]
+    by_id = {u.id: u for u in TelegramProfile.objects.filter(id__in=fuzzy_ids)}
+    fuzzy_users = [by_id[i] for i in fuzzy_ids if i in by_id]
+    return db_hits + fuzzy_users
 
 
 async def _do_user_search(message: types.Message, query: str):
@@ -677,6 +696,27 @@ async def admin_find_command(message: types.Message, state: FSMContext = None):
     await _do_user_search(message, (message.get_args() or "").strip())
 
 
+@dp.message_handler(IsPrivate(), commands=["u", "user"], state="*")
+async def admin_user_by_number_command(message: types.Message, state: FSMContext = None):
+    """Bulletproof view-by-number that works in ANY state: /u <ro'yxat raqami>."""
+    actor = await aget_user(message.from_user.id)
+    if not (actor and actor.is_admin):
+        await message.answer("Siz admin emassiz!")
+        return
+    arg = (message.get_args() or "").strip()
+    if not arg.isdigit():
+        await message.answer("Foydalanish: <code>/u 661</code> (ro'yxatdagi tartib raqami).",
+                             parse_mode="HTML")
+        return
+    target = await sync_to_async(_user_by_ordinal)(int(arg))
+    if not target:
+        await message.answer("❌ Bunday raqamli foydalanuvchi yo'q.")
+        return
+    text, target_user, is_premium = await sync_to_async(_detail_text_user_premium)(target.id)
+    await message.answer(text, parse_mode="HTML",
+                         reply_markup=_user_detail_markup(target_user, is_premium))
+
+
 @dp.message_handler(IsPrivate(), state=AdminUserBrowse.searching)
 async def admin_user_search_query(message: types.Message, state: FSMContext):
     actor = await aget_user(message.from_user.id)
@@ -685,7 +725,7 @@ async def admin_user_search_query(message: types.Message, state: FSMContext):
         return
     # Switch to listing mode so further plain numbers/names keep working even if
     # this message landed on a worker that had lost the 'searching' state.
-    await AdminUserBrowse.listing.set()
+    await state.set_state(AdminUserBrowse.listing.state)
     await _do_user_search(message, (message.text or "").strip())
 
 
@@ -1074,7 +1114,7 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "all_users":
         await all_users(msg, state)
     elif action == "user_search":
-        await AdminUserBrowse.listing.set()
+        await state.set_state(AdminUserBrowse.listing.state)
         await call.message.answer(
             "🔍 <b>Foydalanuvchi qidirish</b>\n\n"
             "Ism, username, telefon yoki ID yuboring — eng yaqin mosliklar chiqadi.\n"
