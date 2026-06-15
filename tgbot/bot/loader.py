@@ -108,3 +108,25 @@ class BigBrother(BaseMiddleware):
 
 
 dp.middleware.setup(BigBrother())
+
+
+class GroupMessageFilter(BaseMiddleware):
+    """Delete user messages in group chats when they accidentally trigger FSM-based handlers."""
+
+    async def on_pre_process_message(self, message: types.Message, data: dict):
+        if message.chat.type not in (types.ChatType.GROUP, types.ChatType.SUPERGROUP):
+            return
+        # Check if user has an active FSM state
+        state = dp.current_state(chat=message.from_user.id, user=message.from_user.id)
+        current = await state.get_state()
+        if current is None:
+            return
+        # User is mid-flow in a private chat — silently delete their group message and cancel
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        raise CancelHandler()
+
+
+dp.middleware.setup(GroupMessageFilter())
