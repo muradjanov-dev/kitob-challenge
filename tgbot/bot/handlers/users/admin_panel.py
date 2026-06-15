@@ -555,31 +555,73 @@ async def admin_userlist_exit(message: types.Message, state: FSMContext):
     )
 
 
-def _search_users(query: str):
-    """Find users by name / username / phone / id. Numeric queries match
-    telegram_id or DB id exactly first; otherwise a substring match. Blocked
-    users are included (so admins can find and unblock them). Capped at 30."""
+def _search_users(query: str, limit: int = 20):
+    """Find users by name / username / phone / id.
+
+    Numeric queries match telegram_id / db-id / phone exactly first. Name
+    queries use a fuzzy, transliteration-aware match: the query and every
+    stored name are normalized (Cyrillic→Latin, apostrophes stripped) so
+    "Maryam" finds "Марям"/"Maryamoy"/"Mariam". Results are ranked by closeness
+    and the nearest ones are always returned even on typos. Blocked users are
+    included so admins can find and unblock them."""
     from django.db.models import Q
+    import difflib
+    from tgbot.models import normalize_uzbek_text
 
     q = (query or "").strip()
+    if not q:
+        return []
+
     digits = q.lstrip("+").replace(" ", "").replace("-", "")
     if digits.isdigit():
         exact = list(
             TelegramProfile.objects.filter(
                 Q(telegram_id=int(digits)) | Q(id=int(digits))
-            )[:30]
+            )[:limit]
         )
         if exact:
             return exact
+        phone_hits = list(
+            TelegramProfile.objects.filter(phone_number__icontains=digits)[:limit]
+        )
+        if phone_hits:
+            return phone_hits
 
-    filt = (
-        Q(full_name__icontains=q)
-        | Q(username__icontains=q)
-        | Q(phone_number__icontains=q)
-    )
-    if digits.isdigit():
-        filt |= Q(phone_number__icontains=digits)
-    return list(TelegramProfile.objects.filter(filt).order_by("id")[:30])
+    norm_q = normalize_uzbek_text(q)
+    if not norm_q:
+        return []
+
+    # Score every user by how close their (normalized) name is to the query.
+    scored = []  # (score, id)
+    rows = TelegramProfile.objects.values_list("id", "full_name", "username")
+    for uid, full_name, username in rows.iterator():
+        name = (full_name or username or "")
+        norm_name = normalize_uzbek_text(name)
+        if not norm_name:
+            continue
+        if norm_q in norm_name:
+            # Substring hit — strongest; reward matches near the start.
+            pos = norm_name.index(norm_q)
+            score = 0.9 + 0.1 * (1.0 - pos / max(len(norm_name), 1))
+        else:
+            best = difflib.SequenceMatcher(None, norm_q, norm_name).ratio()
+            for tok in norm_name.split():
+                r = difflib.SequenceMatcher(None, norm_q, tok).ratio()
+                if r > best:
+                    best = r
+            score = best
+        scored.append((score, uid))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    # Prefer reasonably-close matches; if none clear the bar, still return the
+    # nearest few so the admin always gets the closest candidates.
+    good = [uid for s, uid in scored if s >= 0.45][:limit]
+    top_ids = good or [uid for _, uid in scored[:5]]
+    if not top_ids:
+        return []
+
+    by_id = {u.id: u for u in TelegramProfile.objects.filter(id__in=top_ids)}
+    return [by_id[i] for i in top_ids if i in by_id]
 
 
 @dp.message_handler(IsPrivate(), state=AdminUserBrowse.searching)
