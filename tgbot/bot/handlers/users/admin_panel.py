@@ -798,20 +798,24 @@ def _detail_text_user_premium(target_id: int):
     return text, target_user, is_premium
 
 
-@dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("adm_userd:"), state="*")
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith("adm_userd:"), state="*")
 async def adm_user_detail(call: types.CallbackQuery):
+    await call.answer()
     actor = await aget_user(call.from_user.id)
     if not (actor and actor.is_admin):
-        await call.answer("Siz admin emassiz!", show_alert=True)
         return
     target_id = int(call.data.split(":", 1)[1])
-    text, target_user, is_premium = await sync_to_async(_detail_text_user_premium)(target_id)
+    try:
+        text, target_user, is_premium = await sync_to_async(_detail_text_user_premium)(target_id)
+    except Exception as e:
+        print(f"adm_user_detail error for id={target_id}: {e}")
+        await call.message.answer(f"❌ Xatolik: {e}")
+        return
     back_kb = _user_detail_markup(target_user, is_premium)
     try:
         await call.message.edit_text(text, parse_mode="HTML", reply_markup=back_kb)
     except Exception:
         await call.message.answer(text, parse_mode="HTML", reply_markup=back_kb)
-    await call.answer()
 
 
 @dp.callback_query_handler(
