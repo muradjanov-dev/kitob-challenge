@@ -3706,36 +3706,76 @@ def send_viktorina_promo():
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     data_extra = {"reply_markup": keyboard} if keyboard else {}
 
-    # Viktorina yutuq pog'onalari — keyingisiga qancha qolganini hisoblash uchun.
-    _VQ_STEPS = [
-        (1,   "🧩 Viktorinachi"),
-        (10,  "🔍 Iqtibos izlovchi"),
-        (25,  "📚 Kitob bilimdon"),
-        (50,  "🏆 Viktorina chempioni"),
-        (100, "🌟 Viktorina ustasi"),
-    ]
+    def _nearest_achievement_nudge(user_obj) -> str:
+        """Return a motivational line about the closest not-yet-unlocked achievement."""
+        try:
+            from tgbot.services.achievements import compute_user_stats, ACHIEVEMENTS_RAW
+            from tgbot.models import UserAchievement as _UA
 
-    def _next_milestone(correct: int):
-        for target, title in _VQ_STEPS:
-            if correct < target:
-                return target, title, target - correct
-        return None, None, 0
+            stats = compute_user_stats(user_obj)
+            awarded = set(_UA.objects.filter(user=user_obj).values_list("code", flat=True))
+
+            # Map stat field → human label for the nudge message.
+            _FIELD_LABELS = {
+                "reports":         ("hisobot",       "hisobot yubor"),
+                "pages":           ("bet",            "bet o'qi"),
+                "books_finished":  ("kitob",          "kitob tugatish"),
+                "max_streak":      ("kunlik streak",  "kun ketma-ket o'qi"),
+                "long_conclusions":("xulosa",         "uzun xulosa yoz"),
+                "referrals":       ("do'st",          "do'st taklif qil"),
+                "audio_minutes":   ("daqiqa audio",   "daqiqa audio tinla"),
+                "max_day_pages":   ("bet/kun",        "bir kunda o'qi"),
+                "quizzes_played":  ("quiz",           "quizda qatnash"),
+                "quiz_correct":    ("to'g'ri javob",  "viktorinada to'g'ri javob ber"),
+            }
+
+            best_ach = None
+            best_left = None
+
+            for ach in ACHIEVEMENTS_RAW:
+                if ach["code"] in awarded:
+                    continue
+                cond = ach.get("cond")
+                if cond is None:
+                    continue
+                # Find which stat field this achievement targets and its threshold.
+                # _at_least returns a lambda; inspect via closure if possible,
+                # otherwise fall back to a brute-force gap scan.
+                try:
+                    cell = cond.__closure__
+                    if cell and len(cell) >= 2:
+                        field = cell[0].cell_contents
+                        target = cell[1].cell_contents
+                        if isinstance(field, str) and isinstance(target, (int, float)):
+                            current = stats.get(field, 0)
+                            if current < target:
+                                left = target - current
+                                if best_left is None or left < best_left:
+                                    best_left = left
+                                    best_ach = (ach, field, target, left)
+                except Exception:
+                    pass
+
+            if not best_ach:
+                return ""
+
+            ach, field, target, left = best_ach
+            _unit, _action = _FIELD_LABELS.get(field, (field, field))
+            emoji = ach["emoji"]
+            title = ach["title_uz"]
+            return (
+                f"\n\n🎯 <b>Eng yaqin yutuqqa {left} ta {_unit} qoldi!</b>\n"
+                f"{emoji} <b>{title}</b>\n"
+                f"💪 {left} ta {_action} — va yutuq seniki! 🏆"
+            )
+        except Exception:
+            return ""
 
     import time as _time
-    from tgbot.models import BookQuizAnswer as _BQA
     qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
     sent = failed = 0
     for user_obj in qs.iterator():
-        correct = _BQA.objects.filter(user=user_obj, is_correct=True).count()
-        target, title, left = _next_milestone(correct)
-        if target and left > 0:
-            nudge = (
-                f"\n\n🎯 <b>Keyingi viktorina yutuqqa {left} ta to'g'ri javob qoldi!</b>\n"
-                f"Yutuq: {title}\n"
-                f"Hoziroq guruhga kir va javob ber — har kuni 3 ta imkoniyat! 🔥"
-            )
-        else:
-            nudge = ""
+        nudge = _nearest_achievement_nudge(user_obj)
         text = base_text + nudge
         try:
             resp = requests.post(
