@@ -194,12 +194,12 @@ def build_quiz_text_with_board(quiz_round) -> str:
 
 def quiz_keyboard(quiz_round) -> str:
     """JSON inline keyboard: one button per option, A/B/C/D labelled."""
-    labels = ["🅰️", "🅱️", "🇨", "🇩"]
+    labels = ["A", "B", "C", "D"]
     rows = []
     for idx, opt in enumerate(quiz_round.options):
         label = labels[idx] if idx < len(labels) else str(idx + 1)
         rows.append([{
-            "text": f"{label} {opt}"[:60],
+            "text": f"  {label}  ·  {opt}",
             "callback_data": f"bq:{quiz_round.id}:{idx}",
         }])
     return json.dumps({"inline_keyboard": rows})
