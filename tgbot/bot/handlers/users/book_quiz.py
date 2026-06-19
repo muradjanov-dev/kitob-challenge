@@ -51,9 +51,6 @@ def _process_answer(user_id: int, telegram_id: int, round_id: int, chosen_idx: i
     quiz_round = BookQuizRound.objects.filter(id=round_id).first()
     if not quiz_round:
         return "Bu viktorina topilmadi."
-    if not quiz_round.is_active:
-        return "⏳ Bu viktorina yopilgan. Keyingisini kuting!"
-
     # Answering is free for any group member — only the stats are Premium.
     if not _is_group_member(telegram_id):
         return ("📚 Javob berish uchun avval kitobxonlar guruhiga a'zo bo'ling, "

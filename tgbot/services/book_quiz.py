@@ -21,7 +21,7 @@ MIN_MEANINGFUL_CHARS = 20
 # Cap the quoted text so a giant xulosa doesn't blow past Telegram limits.
 MAX_CONCLUSION_LEN = 700
 # Don't reuse a report that was the source of one of the last N rounds.
-RECENT_ROUNDS_EXCLUDE = 40
+RECENT_ROUNDS_EXCLUDE = 60
 # How many candidate reports to pull and shuffle when picking a fresh quote.
 CANDIDATE_POOL = 120
 
@@ -122,9 +122,6 @@ def build_quiz_round():
         options = decoys + [correct]
         random.shuffle(options)
         correct_index = options.index(correct)
-
-        # Close any still-open round before opening the new one.
-        BookQuizRound.objects.filter(is_active=True).update(is_active=False)
 
         return BookQuizRound.objects.create(
             source_report=report,
