@@ -1,10 +1,5 @@
-"""Kitob Viktorina — answer handling.
-
-The quiz message (one quote, four book buttons) is posted to the groups and
-DM'd to Premium users by the `post_book_quiz` Celery task. This module handles
-the button taps: it gates answering to Premium group-members, locks one answer
-per user per round, and pays out the Kitobcha reward for a correct first guess.
-"""
+"""Kitob Viktorina — answer handling."""
+import asyncio
 from asgiref.sync import sync_to_async
 from aiogram import types
 from django.utils import timezone
@@ -14,8 +9,6 @@ from tgbot.bot.utils import aget_user
 from tgbot.models import BookQuizRound, BookQuizAnswer, Payment, TelegramProfile
 
 
-# Shown after every answer to non-Premium users — earning is free, but seeing
-# the full Viktorina statistics is a Premium perk.
 _STATS_PROMO = (
     "\n\n💎 To'liq viktorina statistikangizni ko'rish uchun Premiumga o'ting!"
 )
@@ -27,34 +20,11 @@ def _is_premium(user_id: int) -> bool:
     ).exists()
 
 
-def _refresh_boards(quiz_round):
-    """Update the live right/wrong board on the group messages (best-effort)."""
-    try:
-        from tgbot.tasks import refresh_quiz_boards
-        refresh_quiz_boards(quiz_round)
-    except Exception:
-        pass
-
-
-def _is_group_member(telegram_id: int) -> bool:
-    """True if the user belongs to at least one configured reading group."""
-    from tgbot.tasks import _group_chat_ids, _is_user_in_chat
-    for chat_id in _group_chat_ids():
-        if _is_user_in_chat(chat_id, telegram_id):
-            return True
-    return False
-
-
-def _process_answer(user_id: int, telegram_id: int, round_id: int, chosen_idx: int) -> str:
-    """Validate + record one answer, returning the alert text to show the user.
-    Runs fully in a sync context (DB + membership network call)."""
+def _process_answer(user_id: int, round_id: int, chosen_idx: int) -> str:
+    """Validate + record one answer. Pure DB — no external HTTP calls."""
     quiz_round = BookQuizRound.objects.filter(id=round_id).first()
     if not quiz_round:
         return "Bu viktorina topilmadi."
-    # Answering is free for any group member — only the stats are Premium.
-    if not _is_group_member(telegram_id):
-        return ("📚 Javob berish uchun avval kitobxonlar guruhiga a'zo bo'ling, "
-                "so'ng qaytadan urinib ko'ring.")
 
     if not (0 <= chosen_idx < len(quiz_round.options)):
         return "Bu variant topilmadi."
@@ -71,21 +41,17 @@ def _process_answer(user_id: int, telegram_id: int, round_id: int, chosen_idx: i
         verdict = "to'g'ri ✅" if answer.is_correct else "noto'g'ri ❌"
         return f"Siz allaqachon javob bergansiz (javobingiz {verdict}).{promo}"
 
-    # First answer locked in. Author of the quote can't farm their own report.
     if quiz_round.source_user_id == user_id:
-        _refresh_boards(quiz_round)
-        return ("🙂 Bu o'zingiz yuborgan xulosa — mukofot yo'q, lekin "
+        return (f"🙂 Bu o'zingiz yuborgan xulosa — mukofot yo'q, lekin "
                 f"ishtirokingiz uchun rahmat!{promo}")
 
     profile = TelegramProfile.objects.get(id=user_id)
     if is_correct:
-        # Correct → full reward. update_ball doubles it for Premium.
         awarded = profile.update_ball(True, quiz_round.reward)
         answer.rewarded = True
         answer.save(update_fields=["rewarded"])
         prem_note = " 💎 ×2!" if awarded > quiz_round.reward else ""
 
-        # Check viktorina achievements after correct answer.
         try:
             from tgbot.services.achievements import award_new_achievements
             newly = award_new_achievements(profile)
@@ -96,22 +62,30 @@ def _process_answer(user_id: int, telegram_id: int, round_id: int, chosen_idx: i
         except Exception:
             ach_note = ""
 
-        result = (f"✅ To'g'ri! «{quiz_round.correct_title}»\n\n"
-                  f"🪙 +{awarded} Kitobcha{prem_note}\n"
-                  f"💰 Balans: {int(profile.ball)}{ach_note}{promo}")
+        return (f"✅ To'g'ri! «{quiz_round.correct_title}»\n\n"
+                f"🪙 +{awarded} Kitobcha{prem_note}\n"
+                f"💰 Balans: {int(profile.ball)}{ach_note}{promo}")
     else:
-        # Wrong → consolation reward so trying still pays off.
         awarded = profile.update_ball(True, quiz_round.consolation)
         answer.rewarded = True
         answer.save(update_fields=["rewarded"])
         prem_note = " 💎 ×2!" if awarded > quiz_round.consolation else ""
-        result = (f"❌ Noto'g'ri. To'g'ri javob: «{quiz_round.correct_title}»\n\n"
-                  f"🎁 Urinish uchun: +{awarded} Kitobcha{prem_note}\n"
-                  f"💰 Balans: {int(profile.ball)}\n"
-                  f"Keyingi viktorinada omad! 🍀{promo}")
+        return (f"❌ Noto'g'ri. To'g'ri javob: «{quiz_round.correct_title}»\n\n"
+                f"🎁 Urinish uchun: +{awarded} Kitobcha{prem_note}\n"
+                f"💰 Balans: {int(profile.ball)}\n"
+                f"Keyingi viktorinada omad! 🍀{promo}")
 
-    _refresh_boards(quiz_round)
-    return result
+
+def _refresh_boards_bg(quiz_round_id: int):
+    """Refresh group boards in background — does not block the answer popup."""
+    try:
+        from tgbot.tasks import refresh_quiz_boards
+        from tgbot.models import BookQuizRound as _BQR
+        qr = _BQR.objects.filter(id=quiz_round_id).first()
+        if qr:
+            refresh_quiz_boards(qr)
+    except Exception:
+        pass
 
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("bq:"))
@@ -131,7 +105,8 @@ async def book_quiz_answer(call: types.CallbackQuery):
         await call.answer("Avval botda /start bosing.", show_alert=True)
         return
 
-    text = await sync_to_async(_process_answer)(
-        user.id, call.from_user.id, round_id, chosen_idx
-    )
+    text = await sync_to_async(_process_answer)(user.id, round_id, chosen_idx)
+
+    # Answer popup fires immediately — board refresh runs in background.
     await call.answer(text, show_alert=True)
+    asyncio.get_event_loop().run_in_executor(None, _refresh_boards_bg, round_id)
