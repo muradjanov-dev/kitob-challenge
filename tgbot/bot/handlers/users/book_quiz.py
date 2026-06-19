@@ -84,9 +84,21 @@ def _process_answer(user_id: int, telegram_id: int, round_id: int, chosen_idx: i
         answer.rewarded = True
         answer.save(update_fields=["rewarded"])
         prem_note = " 💎 ×2!" if awarded > quiz_round.reward else ""
+
+        # Check viktorina achievements after correct answer.
+        try:
+            from tgbot.services.achievements import award_new_achievements
+            newly = award_new_achievements(profile)
+            ach_note = ""
+            if newly:
+                names = ", ".join(f"{a['emoji']} {a['title_uz']}" for a in newly)
+                ach_note = f"\n\n🏆 Yangi yutuq: {names}!"
+        except Exception:
+            ach_note = ""
+
         result = (f"✅ To'g'ri! «{quiz_round.correct_title}»\n\n"
                   f"🪙 +{awarded} Kitobcha{prem_note}\n"
-                  f"💰 Balans: {int(profile.ball)}{promo}")
+                  f"💰 Balans: {int(profile.ball)}{ach_note}{promo}")
     else:
         # Wrong → consolation reward so trying still pays off.
         awarded = profile.update_ball(True, quiz_round.consolation)

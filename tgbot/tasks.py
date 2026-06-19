@@ -3701,19 +3701,47 @@ def send_viktorina_promo():
     if not should_send:
         return
 
-    text = pick_promo_text()
+    base_text = pick_promo_text()
     keyboard = _viktorina_join_keyboard()
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     data_extra = {"reply_markup": keyboard} if keyboard else {}
 
+    # Viktorina yutuq pog'onalari — keyingisiga qancha qolganini hisoblash uchun.
+    _VQ_STEPS = [
+        (1,   "🧩 Viktorinachi"),
+        (10,  "🔍 Iqtibos izlovchi"),
+        (25,  "📚 Kitob bilimdon"),
+        (50,  "🏆 Viktorina chempioni"),
+        (100, "🌟 Viktorina ustasi"),
+    ]
+
+    def _next_milestone(correct: int):
+        for target, title in _VQ_STEPS:
+            if correct < target:
+                return target, title, target - correct
+        return None, None, 0
+
     import time as _time
+    from tgbot.models import BookQuizAnswer as _BQA
     qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
     sent = failed = 0
-    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+    for user_obj in qs.iterator():
+        correct = _BQA.objects.filter(user=user_obj, is_correct=True).count()
+        target, title, left = _next_milestone(correct)
+        if target and left > 0:
+            nudge = (
+                f"\n\n🎯 <b>Keyingi viktorina yutuqqa {left} ta to'g'ri javob qoldi!</b>\n"
+                f"Yutuq: {title}\n"
+                f"Hoziroq guruhga kir va javob ber — har kuni 3 ta imkoniyat! 🔥"
+            )
+        else:
+            nudge = ""
+        text = base_text + nudge
         try:
             resp = requests.post(
                 url,
-                data={"chat_id": chat_id, "text": text, "parse_mode": "HTML", **data_extra},
+                data={"chat_id": user_obj.telegram_id, "text": text,
+                      "parse_mode": "HTML", **data_extra},
                 timeout=5,
             )
             if resp.ok:

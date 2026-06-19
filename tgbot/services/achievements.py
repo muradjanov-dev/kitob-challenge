@@ -38,10 +38,11 @@ class Stats(TypedDict):
     audio_minutes: int
     max_day_pages: int
     quizzes_played: int
+    quiz_correct: int
 
 
 def compute_user_stats(user: TelegramProfile) -> Stats:
-    from tgbot.models import QuizParticipant
+    from tgbot.models import QuizParticipant, BookQuizAnswer
     from django.db.models.functions import TruncDate as _TD
 
     reports = ConfirmationReport.objects.filter(user=user)
@@ -79,6 +80,7 @@ def compute_user_stats(user: TelegramProfile) -> Stats:
     max_day_pages = day_rows[0]["dp"] if day_rows else 0
 
     quizzes_played = QuizParticipant.objects.filter(user=user).count()
+    quiz_correct = BookQuizAnswer.objects.filter(user=user, is_correct=True).count()
 
     return {
         "reports": reports_count,
@@ -92,6 +94,7 @@ def compute_user_stats(user: TelegramProfile) -> Stats:
         "audio_minutes": audio_minutes,
         "max_day_pages": max_day_pages,
         "quizzes_played": quizzes_played,
+        "quiz_correct": quiz_correct,
     }
 
 
@@ -233,6 +236,13 @@ ACHIEVEMENTS_RAW = [
     {"code": "qz_1",  "emoji": "🧩", "title_uz": "Birinchi quiz",               "title_ru": "Первый квиз",               "cond": _at_least("quizzes_played", 1),  "points": 25},
     {"code": "qz_5",  "emoji": "🎮", "title_uz": "Beshta quiz",                 "title_ru": "Пять квизов",               "cond": _at_least("quizzes_played", 5),  "points": 100},
     {"code": "qz_10", "emoji": "🏆", "title_uz": "O'n quiz — chempion",         "title_ru": "Десять квизов — чемпион",   "cond": _at_least("quizzes_played", 10), "points": 250},
+
+    # — Viktorina correct-answer milestones —
+    {"code": "vq_1",   "emoji": "🧩", "title_uz": "Viktorinachi",                "title_ru": "Викторинщик",               "cond": _at_least("quiz_correct", 1),   "points": 30},
+    {"code": "vq_10",  "emoji": "🔍", "title_uz": "Iqtibos izlovchi",            "title_ru": "Искатель цитат",            "cond": _at_least("quiz_correct", 10),  "points": 100},
+    {"code": "vq_25",  "emoji": "📚", "title_uz": "Kitob bilimdon",              "title_ru": "Книжный знаток",            "cond": _at_least("quiz_correct", 25),  "points": 250},
+    {"code": "vq_50",  "emoji": "🏆", "title_uz": "Viktorina chempioni",         "title_ru": "Чемпион викторины",         "cond": _at_least("quiz_correct", 50),  "points": 500},
+    {"code": "vq_100", "emoji": "🌟", "title_uz": "Viktorina ustasi — 100 ta",   "title_ru": "Мастер викторины — 100",    "cond": _at_least("quiz_correct", 100), "points": 1000},
 ]
 
 
