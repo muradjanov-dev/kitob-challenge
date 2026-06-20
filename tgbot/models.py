@@ -216,6 +216,15 @@ class TelegramProfile(BaseModel):
         help_text="Number of Tabriklash DMs this user has received; used to "
                   "surface the reminder-config button on every 10th one.",
     )
+    optimal_send_hour = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Hour (0-23, Tashkent time) when this user is most likely to submit a report. "
+            "Computed from their ConfirmationReport history by compute_optimal_send_hours. "
+            "NULL = not enough data yet; falls back to fixed broadcast slots."
+        ),
+    )
 
     def update_ball(self, is_completed: bool, ball: int) -> int:
         """Add or subtract Kitobcha. Premium users earn 2× on every add.

@@ -889,6 +889,60 @@ def send_random_inspiration():
 
 
 @shared_task
+def send_personalized_inspiration():
+    """Hourly task: send an inspiration message only to users whose
+    optimal_send_hour matches the current hour (Tashkent time).
+
+    This replaces the blunt fixed-slot broadcasts for users who have enough
+    report history.  Users with NULL optimal_send_hour are skipped here —
+    they continue to receive the fixed-slot send_random_inspiration messages.
+
+    The reminder_count preference is still respected:
+      0 → never send anything to this user
+      1 → send at their optimal hour (evening-biased if hour >= 17)
+      2 → send at optimal hour if it is <= 16 or >= 17
+      3 → always send at optimal hour
+    """
+    current_hour = timezone.localtime().hour
+
+    qs = TelegramProfile.objects.filter(
+        is_registered=True,
+        is_blocked=False,
+        optimal_send_hour=current_hour,
+        reminder_count__gte=1,          # user hasn't opted out entirely
+    )
+
+    if not qs.exists():
+        return
+
+    text = random.choice(INSPIRATION_POOL)
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    reply_markup = _cta_reply_markup()
+    sent = failed = 0
+
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": chat_id,
+                    "text": text,
+                    "parse_mode": "HTML",
+                    "reply_markup": reply_markup,
+                },
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+
+    print(f"send_personalized_inspiration [hour={current_hour}]: sent={sent} failed={failed}")
+
+
+@shared_task
 def broadcast_random_pool_reminder():
     """Pick ONE random text from all active ScheduledReminder rows and
     broadcast it. Designed to fire at fixed times (09:00, 21:00) via celery
@@ -2398,6 +2452,96 @@ def send_weekly_ai_report():
 
 
 # ────────────────────────────────────────────────────────────────────────
+# Book Recommendation task — Premium only, weekly
+# ────────────────────────────────────────────────────────────────────────
+
+@shared_task
+def send_book_recommendations():
+    """
+    Every Sunday at 21:00 Tashkent — send personalised "you might also like"
+    book recommendations to all active Premium users.
+
+    Uses item-based collaborative filtering (Jaccard similarity) over the
+    full ConfirmationReport history.  The similarity index is built once
+    per run and cached in-process for 6 hours.
+
+    Only sent to Premium users who have read at least 2 distinct books
+    (MIN_USER_BOOKS threshold in book_recommendations.py).
+    """
+    import time as _time
+    from tgbot.models import Payment as _Pay
+    from tgbot.services.book_recommendations import (
+        build_similarity_index,
+        get_recommendations,
+        format_recommendations,
+    )
+
+    today = timezone.localdate()
+
+    premium_user_ids = set(
+        _Pay.objects.filter(
+            status="paid", end_date__gte=today
+        ).values_list("user_id", flat=True)
+    )
+    if not premium_user_ids:
+        print("[book_recs] No premium users found.")
+        return
+
+    # Build (or refresh) the similarity index once before the loop
+    index = build_similarity_index(force=True)
+    if not index:
+        print("[book_recs] Similarity index is empty — not enough shared books yet.")
+        return
+
+    print(f"[book_recs] Index built: {len(index)} books with similar neighbours.")
+
+    users = list(
+        TelegramProfile.objects.filter(
+            id__in=premium_user_ids,
+            is_registered=True,
+            is_blocked=False,
+        ).only("id", "telegram_id", "full_name", "language")
+    )
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    sent = skipped = failed = 0
+
+    for user in users:
+        recs = get_recommendations(user_id=user.id, top_n=3)
+        if not recs:
+            skipped += 1
+            continue
+
+        text = format_recommendations(
+            full_name=user.full_name or "Kitobxon",
+            recs=recs,
+            language=user.language or "uz",
+        )
+
+        try:
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": user.telegram_id,
+                    "text": text,
+                    "parse_mode": "HTML",
+                },
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+        except Exception as e:
+            print(f"[book_recs] send failed uid={user.id}: {e}")
+            failed += 1
+
+        _time.sleep(0.05)
+
+    print(f"[book_recs] done. sent={sent} skipped(no recs)={skipped} failed={failed}")
+
+
+# ────────────────────────────────────────────────────────────────────────
 # Kitobxonlik Challenge tasks
 # ────────────────────────────────────────────────────────────────────────
 
@@ -3797,3 +3941,69 @@ def send_viktorina_promo():
     state.last_sent_on = today
     state.save(update_fields=["last_sent_on"])
     print(f"send_viktorina_promo: day_index={day_index} sent={sent} failed={failed}")
+
+
+@shared_task
+def recompute_optimal_send_hours():
+    """Weekly task: refresh optimal_send_hour for all users.
+
+    Delegates to the compute_optimal_send_hours management command so the
+    exact same logic is used whether you run it manually or via beat.
+    """
+    from django.core.management import call_command
+    call_command("compute_optimal_send_hours", verbosity=1)
+
+
+@shared_task
+def send_premium_upsell():
+    """
+    Weekly task (Wednesday 20:00 Tashkent) — send a personalised Premium
+    upsell message to free users who score >= 40 on the conversion predictor.
+
+    Each message references the user's own strongest reading signal
+    (streak length, avg pages, total reports, long conclusions) so it
+    reads like an observation, not a broadcast ad.
+
+    Only the top 200 scoring free users are contacted per run to keep the
+    volume manageable and avoid spamming low-signal users.
+    """
+    import time as _time
+    from tgbot.services.premium_conversion import (
+        get_top_candidates,
+        format_upsell_message,
+    )
+
+    candidates = get_top_candidates(limit=200, min_score=40)
+    if not candidates:
+        print("[premium_upsell] No eligible candidates found.")
+        return
+
+    print(f"[premium_upsell] Sending to {len(candidates)} candidates...")
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    sent = skipped = failed = 0
+
+    for result in candidates:
+        text = format_upsell_message(result, language=result.language)
+        try:
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": result.telegram_id,
+                    "text": text,
+                    "parse_mode": "HTML",
+                },
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+                if resp.status_code == 429:
+                    _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
+        except Exception as e:
+            print(f"[premium_upsell] send failed uid={result.user_id}: {e}")
+            failed += 1
+        _time.sleep(0.05)
+
+    print(f"[premium_upsell] done. sent={sent} skipped={skipped} failed={failed}")
