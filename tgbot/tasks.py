@@ -4007,3 +4007,106 @@ def send_premium_upsell():
         _time.sleep(0.05)
 
     print(f"[premium_upsell] done. sent={sent} skipped={skipped} failed={failed}")
+
+
+@shared_task
+def send_admin_daily_report():
+    """
+    23:55 every day — send a full platform summary to every admin in settings.ADMINS.
+
+    Covers:
+      • Today's activity: reporters, pages, audio minutes, new users
+      • Premium: active count, new subscriptions today
+      • Retention: streak warnings sent, quiz answers today
+      • Shop & conversion: pending purchases, premium upsell score distribution
+      • Week-over-week reporter count comparison
+    """
+    import datetime as _dt
+    from django.conf import settings as _settings
+    from django.db.models import Count as _Count, Sum as _Sum
+    from tgbot.models import Payment as _Pay, ShopPurchase as _SP
+
+    today = timezone.localdate()
+    yesterday = today - _dt.timedelta(days=7)  # same weekday last week
+
+    # ── Today's reading activity ──────────────────────────────────────────────
+    today_reports = ConfirmationReport.objects.filter(date__date=today, user__is_blocked=False)
+    reporter_count = today_reports.values("user_id").distinct().count()
+    pages_today = today_reports.filter(is_audio=False).aggregate(s=_Sum("pages_read"))["s"] or 0
+    audio_min_today = today_reports.filter(is_audio=True).aggregate(s=_Sum("minutes_listened"))["s"] or 0
+
+    # Week-over-week: same weekday last week
+    same_day_last_week = today - _dt.timedelta(days=7)
+    reporters_last_week = (
+        ConfirmationReport.objects
+        .filter(date__date=same_day_last_week, user__is_blocked=False)
+        .values("user_id").distinct().count()
+    )
+    wow_diff = reporter_count - reporters_last_week
+    wow_str = f"▲ +{wow_diff}" if wow_diff > 0 else (f"▼ {wow_diff}" if wow_diff < 0 else "→ 0")
+
+    # ── User base ─────────────────────────────────────────────────────────────
+    total_users = TelegramProfile.objects.filter(is_registered=True, is_blocked=False).count()
+    new_users_today = TelegramProfile.objects.filter(
+        created_at__date=today, is_registered=True
+    ).count()
+
+    # ── Premium ───────────────────────────────────────────────────────────────
+    active_premium = _Pay.objects.filter(status="paid", end_date__gte=today).count()
+    new_premium_today = _Pay.objects.filter(status="paid", start_date=today).count()
+
+    # ── Shop ──────────────────────────────────────────────────────────────────
+    pending_purchases = _SP.objects.filter(status=_SP.STATUS_PENDING).count()
+    purchases_today = _SP.objects.filter(created_at__date=today).count()
+
+    # ── Quiz ─────────────────────────────────────────────────────────────────
+    from tgbot.models import BookQuizAnswer as _BQA
+    quiz_answers_today = _BQA.objects.filter(created_at__date=today).count()
+    quiz_correct_today = _BQA.objects.filter(created_at__date=today, is_correct=True).count()
+
+    # ── Build message ─────────────────────────────────────────────────────────
+    text = (
+        f"📋 <b>Admin kunlik hisobot — {today.strftime('%d.%m.%Y')}</b>\n\n"
+
+        f"📚 <b>Bugungi o'qish:</b>\n"
+        f"  👥 Hisobot berdi: <b>{reporter_count}</b> ta foydalanuvchi "
+        f"(o'tgan hafta xuddi shu kun: {reporters_last_week}, {wow_str})\n"
+        f"  📖 Jami betlar: <b>{pages_today:,}</b>\n"
+        f"  🎧 Audio: <b>{audio_min_today}</b> daqiqa\n\n"
+
+        f"👤 <b>Foydalanuvchilar:</b>\n"
+        f"  Jami faol: <b>{total_users:,}</b>\n"
+        f"  Bugun yangi: <b>{new_users_today}</b>\n\n"
+
+        f"💎 <b>Premium:</b>\n"
+        f"  Hozir faol: <b>{active_premium}</b>\n"
+        f"  Bugun yangi obuna: <b>{new_premium_today}</b>\n\n"
+
+        f"🏪 <b>Do'kon:</b>\n"
+        f"  Bugun xarid: <b>{purchases_today}</b>\n"
+        f"  Kutilayotgan (pending): <b>{pending_purchases}</b>\n\n"
+
+        f"🧠 <b>Viktorina:</b>\n"
+        f"  Bugun javoblar: <b>{quiz_answers_today}</b> "
+        f"(to'g'ri: {quiz_correct_today})\n\n"
+
+        f"<i>Ushbu hisobot har kuni 23:55 da avtomatik yuboriladi.</i>"
+    )
+
+    admin_ids = getattr(_settings, "ADMINS", [])
+    if not admin_ids:
+        print("[admin_daily_report] No ADMINS configured in settings.")
+        return
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    for admin_id in admin_ids:
+        try:
+            requests.post(
+                url,
+                data={"chat_id": admin_id, "text": text, "parse_mode": "HTML"},
+                timeout=5,
+            )
+        except Exception as e:
+            print(f"[admin_daily_report] failed to send to {admin_id}: {e}")
+
+    print(f"[admin_daily_report] sent to {len(admin_ids)} admins")

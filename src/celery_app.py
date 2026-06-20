@@ -181,6 +181,13 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.send_premium_upsell',
         'schedule': crontab(hour=20, minute=0, day_of_week=3),  # Wednesday
     },
+
+    # Admin daily summary — 23:55 every day, 2 minutes before the personal
+    # reports go out so the admin sees platform totals first.
+    'send-admin-daily-report': {
+        'task': 'tgbot.tasks.send_admin_daily_report',
+        'schedule': crontab(hour=23, minute=55),
+    },
 }
 
 # Use Tashkent local time for crontab schedules (matches admin-set HH:MM).
