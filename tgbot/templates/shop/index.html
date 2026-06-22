@@ -7,20 +7,23 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
-      --bg-0: #0d0f17;
-      --bg-1: #151827;
-      --bg-2: #1d2236;
-      --card: rgba(255,255,255,0.04);
-      --card-border: rgba(255,255,255,0.08);
-      --text: #eef1ff;
-      --text-dim: rgba(238,241,255,0.62);
-      --text-faint: rgba(238,241,255,0.42);
-      --accent: #ffd166;
-      --accent-2: #ff8e3c;
+      --bg-0: #0f1714;
+      --bg-1: #14201b;
+      --bg-2: #1b2a23;
+      --card: rgba(243,234,217,0.045);
+      --card-border: rgba(243,234,217,0.10);
+      --text: #f3ead9;
+      --text-dim: rgba(243,234,217,0.62);
+      --text-faint: rgba(243,234,217,0.40);
+      --accent: #e6b450;
+      --accent-2: #c8922e;
+      --green: #1f6b4c;
+      --green-2: #2a8a63;
       --success: #4ade80;
       --error: #f87171;
       --radius: 18px;
       --radius-sm: 12px;
+      --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body {
@@ -34,8 +37,8 @@
     }
     body {
       background:
-        radial-gradient(1100px 600px at 12% -10%, rgba(255,142,60,0.18), transparent 70%),
-        radial-gradient(900px 700px at 110% 10%, rgba(255,209,102,0.13), transparent 65%),
+        radial-gradient(1100px 600px at 12% -10%, rgba(31,107,76,0.30), transparent 70%),
+        radial-gradient(900px 700px at 110% 10%, rgba(230,180,80,0.14), transparent 65%),
         linear-gradient(180deg, var(--bg-0), var(--bg-1) 60%, var(--bg-0));
       padding-bottom: 32px;
     }
@@ -45,7 +48,7 @@
       position: sticky; top: 0; z-index: 20;
       backdrop-filter: blur(18px);
       -webkit-backdrop-filter: blur(18px);
-      background: linear-gradient(180deg, rgba(13,15,23,0.85), rgba(13,15,23,0.55));
+      background: linear-gradient(180deg, rgba(15,23,20,0.85), rgba(15,23,20,0.55));
       border-bottom: 1px solid var(--card-border);
       padding: 14px 16px;
       display: flex; align-items: center; gap: 12px;
@@ -56,12 +59,12 @@
     }
     .brand .logo {
       width: 32px; height: 32px; border-radius: 10px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      background: linear-gradient(135deg, var(--green), var(--green-2));
       display: grid; place-items: center;
-      box-shadow: 0 8px 24px rgba(255,142,60,0.35);
+      box-shadow: 0 8px 24px rgba(31,107,76,0.40);
       font-size: 18px;
     }
-    .brand .title { font-size: 15px; line-height: 1; }
+    .brand .title { font-family: var(--serif); font-size: 16px; line-height: 1; }
     .brand .subtitle { font-size: 11px; color: var(--text-faint); margin-top: 3px; }
     .topbar .spacer { flex: 1; }
     .icon-btn {
@@ -78,8 +81,8 @@
     .balance-wrap { padding: 14px 16px 0; }
     .balance {
       display: flex; align-items: center; gap: 12px;
-      background: linear-gradient(135deg, rgba(255,209,102,0.16), rgba(255,142,60,0.10));
-      border: 1px solid rgba(255,209,102,0.28);
+      background: linear-gradient(135deg, rgba(230,180,80,0.16), rgba(31,107,76,0.14));
+      border: 1px solid rgba(230,180,80,0.30);
       padding: 14px 18px; border-radius: 16px;
       animation: slideDown .55s cubic-bezier(.16,1,.3,1) both;
     }
@@ -90,7 +93,7 @@
       color: #6d4500; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.05), 0 6px 20px rgba(255,209,102,0.32);
     }
     .balance .label { font-size: 11px; color: var(--text-dim); letter-spacing: .5px; text-transform: uppercase; }
-    .balance .value { font-size: 22px; font-weight: 800; line-height: 1.1; }
+    .balance .value { font-family: var(--serif); font-size: 24px; font-weight: 700; line-height: 1.1; }
     .balance .value .unit { font-size: 12px; color: var(--text-dim); font-weight: 600; margin-left: 6px; }
 
     /* ─── Grid ───────────────────────────────────────────────── */
@@ -120,10 +123,10 @@
     .card .img-wrap {
       aspect-ratio: 1 / 1;
       background:
-        linear-gradient(135deg, rgba(255,142,60,0.18), rgba(255,209,102,0.08)),
+        linear-gradient(135deg, rgba(31,107,76,0.22), rgba(230,180,80,0.08)),
         var(--bg-2);
       display: grid; place-items: center;
-      font-size: 44px; color: rgba(255,255,255,0.25);
+      font-size: 44px; color: rgba(243,234,217,0.25);
     }
     .card img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .card .body { padding: 12px 12px 14px; display: flex; flex-direction: column; gap: 6px; }
@@ -195,7 +198,7 @@
       display: grid; place-items: center; font-size: 56px; color: rgba(255,255,255,0.2);
     }
     .sheet .preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .sheet h2 { margin: 4px 0 8px; font-size: 20px; }
+    .sheet h2 { font-family: var(--serif); margin: 4px 0 8px; font-size: 21px; }
     .sheet .desc { color: var(--text-dim); font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
     .sheet .price-big {
       margin: 16px 0; display: flex; align-items: center; gap: 10px;
@@ -210,7 +213,7 @@
       border: 0; cursor: pointer;
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: #2a1500; font-weight: 800; font-size: 15px; letter-spacing: 0.3px;
-      box-shadow: 0 14px 28px rgba(255,142,60,0.32);
+      box-shadow: 0 14px 28px rgba(230,180,80,0.30);
       transition: transform .12s ease, filter .15s ease;
     }
     .buy-btn:active { transform: scale(0.98); }
@@ -229,7 +232,7 @@
       animation: pop .5s cubic-bezier(.16,1,.3,1) both;
     }
     .success-wrap .check svg { width: 44px; height: 44px; color: #052e1a; }
-    .success-wrap h2 { font-size: 22px; margin: 6px 0 4px; }
+    .success-wrap h2 { font-family: var(--serif); font-size: 22px; margin: 6px 0 4px; }
     .success-wrap p { color: var(--text-dim); margin: 0 0 16px; font-size: 14px; }
     .code-pill {
       display: inline-block; padding: 12px 18px; border-radius: 12px;
@@ -337,8 +340,8 @@
     .welcome {
       position: fixed; inset: 0; z-index: 100;
       background:
-        radial-gradient(800px 500px at 50% 30%, rgba(255,142,60,0.25), transparent 70%),
-        radial-gradient(700px 600px at 50% 80%, rgba(255,209,102,0.18), transparent 70%),
+        radial-gradient(800px 500px at 50% 30%, rgba(31,107,76,0.32), transparent 70%),
+        radial-gradient(700px 600px at 50% 80%, rgba(230,180,80,0.16), transparent 70%),
         linear-gradient(180deg, var(--bg-0), var(--bg-1));
       display: grid; place-items: center;
       animation: welcomeFade 2.2s ease forwards;
@@ -351,15 +354,16 @@
     }
     .welcome .logo-big {
       width: 86px; height: 86px; border-radius: 24px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      background: linear-gradient(135deg, var(--green), var(--green-2));
       display: grid; place-items: center;
       font-size: 44px;
-      box-shadow: 0 22px 60px rgba(255,142,60,0.45);
+      box-shadow: 0 22px 60px rgba(31,107,76,0.45);
       animation: welcomeFloat 2s ease-in-out infinite;
     }
     .welcome .msg {
-      font-size: 22px; font-weight: 800; line-height: 1.3;
-      background: linear-gradient(135deg, #fff5cc, var(--accent) 60%, var(--accent-2));
+      font-family: var(--serif);
+      font-size: 23px; font-weight: 700; line-height: 1.3;
+      background: linear-gradient(135deg, #fff5cc, var(--accent) 55%, var(--green-2));
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
