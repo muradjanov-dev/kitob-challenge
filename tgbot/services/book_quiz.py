@@ -49,13 +49,27 @@ def _is_meaningful(text: str) -> bool:
 
 
 def _resolve_title(report) -> str:
-    """The book a conclusion belongs to: the free-text `book`, else the first
-    linked book title. Returns '' when nothing usable is found."""
+    """The single book a conclusion belongs to. Returns '' when the source is
+    ambiguous — a conclusion that spans several books can't be a fair
+    "guess THE book" quiz, so the caller skips it.
+
+    A report covering multiple books (combined submission) stores all of them
+    in the M2M and a comma-joined string in the free-text `book` field; both
+    are treated as ambiguous and rejected.
+    """
+    # Prefer the M2M links — the authoritative set of books this report covers.
+    m2m = [t.strip() for t in report.books.values_list("title", flat=True) if t and t.strip()]
+    distinct = list(dict.fromkeys(m2m))  # de-dupe, keep order
+    if len(distinct) > 1:
+        return ""                        # one xulosa, many books → ambiguous
+    if distinct:
+        return distinct[0]
+    # No M2M links: fall back to the free-text title, but reject the comma-joined
+    # multi-book string the combined-report flow stores there.
     title = (report.book or "").strip()
-    if title:
-        return title
-    m2m = list(report.books.values_list("title", flat=True))
-    return (m2m[0].strip() if m2m and m2m[0] else "")
+    if not title or "," in title:
+        return ""
+    return title
 
 
 def _library_titles() -> list:
@@ -69,12 +83,19 @@ def _library_titles() -> list:
         .values_list("book", flat=True)
         .distinct()
     )
+    # Combined reports store a comma-joined "Book A, Book B" string in the
+    # free-text `book` field; split those back into individual titles so decoys
+    # are always single real books, never a multi-book blob.
+    expanded = []
+    for t in titles:
+        for part in (t or "").split(","):
+            part = part.strip()
+            if part:
+                expanded.append(part)
+
     # De-duplicate on the normalized form, keep the first display spelling.
     seen, unique = set(), []
-    for t in titles:
-        t = (t or "").strip()
-        if not t:
-            continue
+    for t in expanded:
         norm = normalize_uzbek_text(t)
         if norm and norm not in seen:
             seen.add(norm)
@@ -96,6 +117,7 @@ def build_quiz_round():
         .exclude(conclusion__exact="")
         .exclude(id__in=used_report_ids)
         .select_related("user")
+        .prefetch_related("books")
         .order_by("-id")[:CANDIDATE_POOL]
     )
     random.shuffle(candidates)
