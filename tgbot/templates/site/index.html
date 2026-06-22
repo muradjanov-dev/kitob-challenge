@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Kitob Challenge — Telegramdagi o'qish hamjamiyati</title>
+  <meta name="description" content="Kitob Challenge — har kuni kitob o'qing, hisobot yuboring, Kitobcha yig'ing va reytingda yuqoriga chiqing. Telegramdagi eng faol o'qish hamjamiyati." />
+  <meta property="og:title" content="Kitob Challenge — Telegramdagi o'qish hamjamiyati" />
+  <meta property="og:description" content="Har kuni o'qing, Kitobcha yig'ing, mukofotlar yutib oling." />
+  <style>
+    :root {
+      --bg-0: #0f1714;
+      --bg-1: #14201b;
+      --bg-2: #1b2a23;
+      --card: rgba(243,234,217,0.045);
+      --card-border: rgba(243,234,217,0.10);
+      --text: #f3ead9;
+      --text-dim: rgba(243,234,217,0.66);
+      --text-faint: rgba(243,234,217,0.40);
+      --accent: #e6b450;
+      --accent-2: #c8922e;
+      --green: #1f6b4c;
+      --green-2: #2a8a63;
+      --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+      --maxw: 1120px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html { scroll-behavior: smooth; }
+    body {
+      background:
+        radial-gradient(1200px 700px at 8% -8%, rgba(31,107,76,0.28), transparent 65%),
+        radial-gradient(1000px 800px at 112% 4%, rgba(230,180,80,0.12), transparent 62%),
+        linear-gradient(180deg, var(--bg-0), var(--bg-1) 55%, var(--bg-0));
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
+    h1, h2, h3, .serif { font-family: var(--serif); font-weight: 700; line-height: 1.18; }
+    a { color: inherit; text-decoration: none; }
+    .gold { color: var(--accent); }
+    .em { color: var(--green-2); }
+
+    /* ─── Header ─── */
+    header {
+      position: sticky; top: 0; z-index: 50;
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      background: linear-gradient(180deg, rgba(15,23,20,0.92), rgba(15,23,20,0.62));
+      border-bottom: 1px solid var(--card-border);
+    }
+    .nav { display: flex; align-items: center; gap: 18px; height: 64px; }
+    .logo { display: flex; align-items: center; gap: 10px; font-family: var(--serif); font-size: 18px; font-weight: 700; }
+    .logo .mark {
+      width: 36px; height: 36px; border-radius: 11px;
+      background: linear-gradient(135deg, var(--green), var(--green-2));
+      display: grid; place-items: center; font-size: 19px;
+      box-shadow: 0 8px 22px rgba(31,107,76,0.42);
+    }
+    .nav .links { display: flex; gap: 22px; margin-left: 14px; }
+    .nav .links a { color: var(--text-dim); font-size: 14px; transition: color .15s; }
+    .nav .links a:hover { color: var(--text); }
+    .nav .spacer { flex: 1; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 11px 20px; border-radius: 12px; font-weight: 700; font-size: 14px;
+      cursor: pointer; border: 1px solid transparent; transition: transform .12s, filter .15s, background .15s;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #2a1500; box-shadow: 0 12px 26px rgba(230,180,80,0.30);
+    }
+    .btn-primary:hover { filter: brightness(1.05); }
+    .btn-ghost { background: var(--card); border-color: var(--card-border); color: var(--text); }
+    .btn-ghost:hover { background: rgba(243,234,217,0.08); }
+    .nav .menu-toggle { display: none; background: none; border: 0; color: var(--text); font-size: 24px; cursor: pointer; }
+
+    /* ─── Hero ─── */
+    .hero { padding: 70px 0 40px; }
+    .hero-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: center; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+      background: rgba(31,107,76,0.18); border: 1px solid rgba(42,138,99,0.35); color: #bfe6d3;
+      margin-bottom: 20px;
+    }
+    .hero h1 { font-size: 46px; letter-spacing: -0.5px; }
+    .hero h1 .grad {
+      background: linear-gradient(135deg, #fff5cc, var(--accent) 55%, var(--green-2));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .hero p.lead { color: var(--text-dim); font-size: 17px; margin: 18px 0 28px; max-width: 540px; }
+    .hero .cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .stats { display: flex; gap: 30px; margin-top: 38px; flex-wrap: wrap; }
+    .stat .n { font-family: var(--serif); font-size: 26px; font-weight: 700; }
+    .stat .l { color: var(--text-faint); font-size: 12.5px; }
+
+    /* Phone mockup */
+    .phone {
+      justify-self: center;
+      width: 280px; border-radius: 34px; padding: 12px;
+      background: linear-gradient(160deg, #20302a, #16221d);
+      border: 1px solid var(--card-border);
+      box-shadow: 0 40px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(243,234,217,0.06);
+      animation: float 5s ease-in-out infinite;
+    }
+    @keyframes float { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-12px);} }
+    .phone .screen { background: var(--bg-0); border-radius: 24px; padding: 16px; }
+    .phone .chat-head { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--card-border); }
+    .phone .chat-head .av { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg,var(--green),var(--green-2)); display: grid; place-items: center; }
+    .phone .chat-head .nm { font-size: 13px; font-weight: 700; }
+    .phone .chat-head .st { font-size: 11px; color: var(--green-2); }
+    .bubble {
+      background: var(--bg-2); border: 1px solid var(--card-border);
+      border-radius: 14px; padding: 12px 14px; margin-top: 12px; font-size: 13px;
+    }
+    .bubble .row { display: flex; justify-content: space-between; color: var(--text-dim); margin-top: 4px; }
+    .bubble.reward { background: rgba(230,180,80,0.10); border-color: rgba(230,180,80,0.32); color: var(--accent); font-weight: 700; text-align: center; }
+
+    /* ─── Section ─── */
+    section { padding: 64px 0; }
+    .sec-label { text-align: center; color: var(--accent); font-size: 13px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; }
+    .sec-title { text-align: center; font-size: 34px; margin: 10px auto 14px; max-width: 720px; }
+    .sec-sub { text-align: center; color: var(--text-dim); max-width: 620px; margin: 0 auto 44px; }
+
+    /* Steps */
+    .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+    .step { background: var(--card); border: 1px solid var(--card-border); border-radius: 18px; padding: 24px; position: relative; }
+    .step .num { font-family: var(--serif); font-size: 14px; color: var(--accent); font-weight: 700; }
+    .step .ic { font-size: 30px; margin: 8px 0 12px; }
+    .step h3 { font-size: 17px; margin-bottom: 6px; }
+    .step p { color: var(--text-dim); font-size: 13.5px; }
+
+    /* Features */
+    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .feature { background: var(--card); border: 1px solid var(--card-border); border-radius: 18px; padding: 24px; transition: transform .18s, border-color .18s, box-shadow .18s; }
+    .feature:hover { transform: translateY(-4px); border-color: rgba(230,180,80,0.30); box-shadow: 0 16px 32px rgba(0,0,0,0.32); }
+    .feature .ic { width: 48px; height: 48px; border-radius: 13px; display: grid; place-items: center; font-size: 24px; background: rgba(31,107,76,0.18); border: 1px solid rgba(42,138,99,0.30); margin-bottom: 14px; }
+    .feature h3 { font-size: 17px; margin-bottom: 7px; }
+    .feature p { color: var(--text-dim); font-size: 14px; }
+
+    /* Viktorina spotlight */
+    .spotlight { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center;
+      background: linear-gradient(135deg, rgba(31,107,76,0.16), rgba(230,180,80,0.06));
+      border: 1px solid var(--card-border); border-radius: 26px; padding: 40px; }
+    .spotlight h2 { font-size: 30px; margin-bottom: 12px; }
+    .spotlight p { color: var(--text-dim); margin-bottom: 18px; }
+    .quiz-card { background: var(--bg-0); border: 1px solid var(--card-border); border-radius: 18px; padding: 20px; }
+    .quiz-card .q { font-style: italic; color: var(--text); font-size: 14.5px; padding: 12px; background: var(--bg-2); border-radius: 12px; margin-bottom: 14px; }
+    .quiz-opt { padding: 11px 14px; border-radius: 11px; border: 1px solid var(--card-border); margin-top: 8px; font-size: 13.5px; cursor: pointer; transition: background .15s, border-color .15s; }
+    .quiz-opt:hover { border-color: var(--green-2); background: rgba(31,107,76,0.12); }
+    .quiz-opt.correct { border-color: var(--green-2); background: rgba(31,107,76,0.20); color: #bfe6d3; font-weight: 700; }
+
+    /* Premium */
+    .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 760px; margin: 0 auto; }
+    .plan { background: var(--card); border: 1px solid var(--card-border); border-radius: 22px; padding: 30px; }
+    .plan.premium { border-color: rgba(230,180,80,0.45); background: linear-gradient(160deg, rgba(230,180,80,0.10), rgba(31,107,76,0.06)); position: relative; }
+    .plan.premium .tag { position: absolute; top: -12px; right: 24px; background: linear-gradient(135deg,var(--accent),var(--accent-2)); color: #2a1500; font-size: 11px; font-weight: 800; padding: 5px 12px; border-radius: 999px; }
+    .plan h3 { font-size: 20px; }
+    .plan .price { font-family: var(--serif); font-size: 30px; margin: 6px 0 16px; }
+    .plan ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .plan li { color: var(--text-dim); font-size: 14px; display: flex; gap: 9px; }
+    .plan li::before { content: "✓"; color: var(--green-2); font-weight: 800; }
+    .plan.premium li::before { color: var(--accent); }
+
+    /* FAQ */
+    .faq { max-width: 760px; margin: 0 auto; }
+    .qa { border: 1px solid var(--card-border); border-radius: 14px; margin-bottom: 12px; overflow: hidden; background: var(--card); }
+    .qa button { width: 100%; text-align: left; background: none; border: 0; color: var(--text); font-size: 15.5px; font-weight: 600; padding: 18px 20px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .qa .ans { max-height: 0; overflow: hidden; transition: max-height .3s ease; color: var(--text-dim); font-size: 14px; padding: 0 20px; }
+    .qa.open .ans { max-height: 240px; padding: 0 20px 18px; }
+    .qa .chev { transition: transform .25s; color: var(--accent); }
+    .qa.open .chev { transform: rotate(180deg); }
+
+    /* Final CTA */
+    .final { text-align: center; background: linear-gradient(135deg, rgba(31,107,76,0.22), rgba(230,180,80,0.10)); border: 1px solid var(--card-border); border-radius: 28px; padding: 56px 28px; }
+    .final h2 { font-size: 34px; margin-bottom: 12px; }
+    .final p { color: var(--text-dim); margin-bottom: 26px; }
+
+    /* Footer */
+    footer { border-top: 1px solid var(--card-border); padding: 36px 0; color: var(--text-faint); font-size: 13.5px; }
+    .foot { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+    footer a { color: var(--text-dim); }
+    footer a:hover { color: var(--text); }
+
+    /* Reveal */
+    .reveal { opacity: 0; transform: translateY(20px); transition: opacity .6s ease, transform .6s ease; }
+    .reveal.in { opacity: 1; transform: none; }
+
+    @media (max-width: 880px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .phone { display: none; }
+      .steps { grid-template-columns: repeat(2, 1fr); }
+      .features { grid-template-columns: 1fr; }
+      .spotlight { grid-template-columns: 1fr; padding: 28px; }
+      .plans { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 36px; }
+      .nav .links { display: none; }
+      .nav .menu-toggle { display: block; }
+      .nav .links.open { display: flex; position: absolute; top: 64px; left: 0; right: 0; flex-direction: column; background: var(--bg-1); padding: 16px 20px; border-bottom: 1px solid var(--card-border); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <a href="#" class="logo"><span class="mark">📚</span> Kitob Challenge</a>
+      <nav class="links" id="navLinks">
+        <a href="#imkoniyatlar">Imkoniyatlar</a>
+        <a href="#viktorina">Viktorina</a>
+        <a href="#premium">Premium</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="spacer"></div>
+      <a href="https://t.me/kitob_challenge_bot" class="btn btn-primary" target="_blank" rel="noopener">Telegramda boshlash</a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Menyu">☰</button>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="reveal in">
+        <span class="pill">🟢 Telegramdagi o'qish hamjamiyati</span>
+        <h1>Har kuni o'qing,<br/><span class="grad">Kitobcha yig'ing</span>,<br/>yuqoriga chiqing.</h1>
+        <p class="lead">Kitob Challenge — kitobxonlar uchun Telegram platformasi. Kunlik hisobot yuboring, mukofot tangalar (Kitobcha) ishlang, viktorinada qatnashing va reytingda peshqadam bo'ling.</p>
+        <div class="cta-row">
+          <a href="https://t.me/kitob_challenge_bot" class="btn btn-primary" target="_blank" rel="noopener">📚 Bepul boshlash</a>
+          <a href="#premium" class="btn btn-ghost">💎 Premium haqida</a>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="n gold">10 000+</div><div class="l">Kitobxon</div></div>
+          <div class="stat"><div class="n gold">1M+</div><div class="l">O'qilgan bet</div></div>
+          <div class="stat"><div class="n gold">2×</div><div class="l">Kunlik viktorina</div></div>
+        </div>
+      </div>
+      <div class="phone reveal in">
+        <div class="screen">
+          <div class="chat-head">
+            <div class="av">📖</div>
+            <div><div class="nm">Kitob Challenge</div><div class="st">bot</div></div>
+          </div>
+          <div class="bubble">
+            <b>📊 #kun — 47</b>
+            <div class="row"><span>🎧 Ishqqa oshiqman</span><span>230 daq</span></div>
+            <div class="row"><span>📖 Atomic Habits</span><span>40 bet</span></div>
+            <div class="row"><span>💡 Xulosa</span><span>yozildi</span></div>
+          </div>
+          <div class="bubble reward">🪙 +120 Kitobcha qo'shildi!</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEPS -->
+  <section id="qanday">
+    <div class="wrap">
+      <div class="sec-label reveal">Qanday ishlaydi</div>
+      <h2 class="sec-title reveal">4 ta oddiy qadam</h2>
+      <div class="steps">
+        <div class="step reveal"><div class="num">01</div><div class="ic">📝</div><h3>Ro'yxatdan o'ting</h3><p>Botni oching, til va ma'lumotlaringizni kiriting.</p></div>
+        <div class="step reveal"><div class="num">02</div><div class="ic">📚</div><h3>Kitob o'qing</h3><p>Bet yoki audiokitob daqiqalarini hisoblang.</p></div>
+        <div class="step reveal"><div class="num">03</div><div class="ic">📤</div><h3>Hisobot yuboring</h3><p>Kunlik #kun hisobotini bir tugma bilan jo'nating.</p></div>
+        <div class="step reveal"><div class="num">04</div><div class="ic">🪙</div><h3>Kitobcha yutib oling</h3><p>Tangalarni mukofotlarga almashtiring.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="imkoniyatlar">
+    <div class="wrap">
+      <div class="sec-label reveal">Imkoniyatlar</div>
+      <h2 class="sec-title reveal">O'qishni odatga aylantiruvchi hamma narsa</h2>
+      <p class="sec-sub reveal">O'yin elementlari, hamjamiyat va sun'iy intellekt — bir joyda.</p>
+      <div class="features">
+        <div class="feature reveal"><div class="ic">📊</div><h3>Kunlik hisobot</h3><p>Bir nechta kitob, bet va audiokitob daqiqalari — bitta hisobotda. Guruhga avtomatik joylanadi.</p></div>
+        <div class="feature reveal"><div class="ic">🪙</div><h3>Kitobcha tangalari</h3><p>O'qish, viktorina va takliflar uchun tanga ishlang. Do'konda mukofotlarga almashtiring.</p></div>
+        <div class="feature reveal"><div class="ic">🏆</div><h3>Reytinglar</h3><p>Kunlik, haftalik, oylik va yillik Top kitobxonlar — guruhda avtomatik e'lon qilinadi.</p></div>
+        <div class="feature reveal"><div class="ic">🧩</div><h3>Kitob Viktorinasi</h3><p>Kuniga 2 marta haqiqiy iqtibos — qaysi kitobdan ekanini toping, +100 Kitobcha.</p></div>
+        <div class="feature reveal"><div class="ic">🔥</div><h3>Streak va odatlar</h3><p>Kunlik eslatmalar va ketma-ketlik (streak) bilan o'qish odatini mustahkamlang.</p></div>
+        <div class="feature reveal"><div class="ic">🎖</div><h3>Yutuq nishonlari</h3><p>O'qish, streak, viktorina va takliflar bo'yicha bosqichli nishonlar yig'ing.</p></div>
+        <div class="feature reveal"><div class="ic">🎁</div><h3>Referal BOOM</h3><p>Cheklangan 3 kunlik taklif marafoni — har bir do'st uchun ko'paygan tanga.</p></div>
+        <div class="feature reveal"><div class="ic">🤖</div><h3>AI yordamchi</h3><p>Shaxsiy haftalik AI hisobot, kitob tavsiyalari va sizga qulay vaqtda eslatmalar.</p></div>
+        <div class="feature reveal"><div class="ic">🌐</div><h3>Ikki tilda</h3><p>To'liq o'zbek va rus tillarida ishlaydi.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIKTORINA -->
+  <section id="viktorina">
+    <div class="wrap">
+      <div class="spotlight reveal">
+        <div>
+          <span class="sec-label" style="text-align:left">Kitob Viktorinasi</span>
+          <h2>Bu iqtibos qaysi kitobdan?</h2>
+          <p>Har kuni ertalab 08:30 va kechqurun 21:00 — guruhga haqiqiy kitobxon yuborgan iqtibos tashlanadi. To'g'ri javob bering — <b class="gold">+100 Kitobcha</b> cho'ntakda. Premium bo'lsangiz — <b class="gold">×2</b>!</p>
+          <a href="https://t.me/kitob_challenge_bot" class="btn btn-primary" target="_blank" rel="noopener">Viktorinada qatnashish</a>
+        </div>
+        <div class="quiz-card">
+          <div class="q">«Kitob — insonni tarbiyalaydi, ruhini uyg'otadi va baxtli hayotga umid beradi. Eng sodiq do'st — kitobdir.»</div>
+          <div class="quiz-opt">A · Sohilsiz dengiz</div>
+          <div class="quiz-opt correct">B · O'tkan kunlar ✓</div>
+          <div class="quiz-opt">C · Qaytalardasan, bolaligim</div>
+          <div class="quiz-opt">D · Mehrobdan chayon</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PREMIUM -->
+  <section id="premium">
+    <div class="wrap">
+      <div class="sec-label reveal">Premium</div>
+      <h2 class="sec-title reveal">Ko'proq imkoniyat, ikki barobar mukofot</h2>
+      <p class="sec-sub reveal">Bepul ham zo'r. Premium bilan — yana zo'rroq.</p>
+      <div class="plans">
+        <div class="plan reveal">
+          <h3>Bepul</h3>
+          <div class="price">0 so'm</div>
+          <ul>
+            <li>Kunlik hisobot va reyting</li>
+            <li>Kitob Viktorinasida qatnashish</li>
+            <li>Kitobcha yig'ish va do'kon</li>
+            <li>Yutuq nishonlari</li>
+          </ul>
+        </div>
+        <div class="plan premium reveal">
+          <span class="tag">TAVSIYA</span>
+          <h3 class="gold">Premium 💎</h3>
+          <div class="price">×2 mukofot</div>
+          <ul>
+            <li>Barcha mukofotlar <b>×2</b></li>
+            <li>Bir kunda bir nechta hisobotni birlashtirish</li>
+            <li>Shaxsiy statistika va AI hisobot</li>
+            <li>Viktorinada ikki barobar Kitobcha</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq">
+    <div class="wrap">
+      <div class="sec-label reveal">Savol-javob</div>
+      <h2 class="sec-title reveal">Tez-tez beriladigan savollar</h2>
+      <div class="faq">
+        <div class="qa reveal"><button>Qanday qo'shilaman? <span class="chev">▾</span></button><div class="ans"><p>Telegramda <b>@kitob_challenge_bot</b> ni oching, "Boshlash" tugmasini bosing va ro'yxatdan o'ting. Bepul.</p></div></div>
+        <div class="qa reveal"><button>Bu bepulmi? <span class="chev">▾</span></button><div class="ans"><p>Ha, asosiy imkoniyatlar bepul. Premium — qo'shimcha mukofot va funksiyalar uchun ixtiyoriy.</p></div></div>
+        <div class="qa reveal"><button>Kitobcha nima? <span class="chev">▾</span></button><div class="ans"><p>Kitobcha — o'qish, viktorina va takliflar uchun ishlanadigan mukofot tangasi. Uni do'konda real mukofotlarga almashtirasiz.</p></div></div>
+        <div class="qa reveal"><button>Audiokitoblar hisoblanadimi? <span class="chev">▾</span></button><div class="ans"><p>Ha. Eshitilgan daqiqalarni bet bilan bir qatorda hisobotga kiritishingiz mumkin.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section>
+    <div class="wrap">
+      <div class="final reveal">
+        <h2>Bugun o'qishni boshlang 📚</h2>
+        <p>Minglab kitobxonlar allaqachon qatnashmoqda. Siz ham qo'shiling — bepul.</p>
+        <a href="https://t.me/kitob_challenge_bot" class="btn btn-primary" target="_blank" rel="noopener">Telegramda boshlash</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap foot">
+      <div><span class="logo" style="font-size:15px"><span class="mark" style="width:28px;height:28px;font-size:15px">📚</span> Kitob Challenge</span></div>
+      <div>© 2026 Kitob Challenge · <a href="https://t.me/kitob_challenge_bot" target="_blank" rel="noopener">@kitob_challenge_bot</a></div>
+    </div>
+  </footer>
+
+  <script>
+    // Mobile nav
+    document.getElementById("menuToggle").addEventListener("click", () => {
+      document.getElementById("navLinks").classList.toggle("open");
+    });
+    document.querySelectorAll("#navLinks a").forEach(a =>
+      a.addEventListener("click", () => document.getElementById("navLinks").classList.remove("open")));
+
+    // FAQ accordion
+    document.querySelectorAll(".qa button").forEach(btn => {
+      btn.addEventListener("click", () => btn.parentElement.classList.toggle("open"));
+    });
+
+    // Quiz demo — reveal correct on click
+    document.querySelectorAll(".quiz-opt").forEach(opt => {
+      opt.addEventListener("click", () => {
+        document.querySelectorAll(".quiz-opt").forEach(o => o.style.opacity = o.classList.contains("correct") ? "1" : "0.5");
+      });
+    });
+
+    // Scroll reveal
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll(".reveal:not(.in)").forEach(el => io.observe(el));
+  </script>
+</body>
+</html>

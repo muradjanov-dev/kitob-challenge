@@ -46,7 +46,7 @@ async def _process_with_cleanup(body_bytes: bytes) -> None:
 
 
 def home(request: HttpRequest):
-    return HttpResponse('Hello world')
+    return render(request, 'site/index.html')
 
 
 @csrf_exempt
