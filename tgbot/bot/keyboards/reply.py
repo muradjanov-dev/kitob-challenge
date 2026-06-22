@@ -95,21 +95,24 @@ def report_reply_keyboard(language="uz", bajardim_label=None, is_admin=False):
         home_text = "🏠 Главное меню"
         done_text = bajardim_label or "✅ Выполнено!"
         shop_text = "🛍 Магазин"
+        site_text = "🌐 Сайт"
     else:
         report_text = "📚 Kitob hisoboti"
         home_text = "🏠 Bosh menyu"
         done_text = bajardim_label or "✅ Bajardim!"
         shop_text = "🛍 Do'kon"
+        site_text = "🌐 Sayt"
 
-    # Persistent shop entry visible above the input on every client. Reply-
-    # keyboard WebApp buttons always render the label (unlike the chat menu
-    # button which collapses to an icon on mobile).
+    # Persistent shop + site entries visible above the input on every client.
+    # Reply-keyboard WebApp buttons always render the label (unlike the chat
+    # menu button which collapses to an icon on mobile). Both open inside
+    # Telegram as Mini Apps.
     rows = [
         [KeyboardButton(text=report_text), KeyboardButton(text=done_text)],
-        [KeyboardButton(
-            text=shop_text,
-            web_app=WebAppInfo(url=f"{WEB_DOMAIN}/shop/"),
-        )],
+        [
+            KeyboardButton(text=shop_text, web_app=WebAppInfo(url=f"{WEB_DOMAIN}/shop/")),
+            KeyboardButton(text=site_text, web_app=WebAppInfo(url=f"{WEB_DOMAIN}/")),
+        ],
         [KeyboardButton(text=home_text)],
     ]
     return ReplyKeyboardMarkup(
