@@ -53,7 +53,12 @@ def home(request: HttpRequest):
     except Exception:
         count = 0
     readers_count = f"{count:,}".replace(",", " ")  # 5 315 (nbsp separator)
-    return render(request, 'site/index.html', {"readers_count": readers_count})
+    resp = render(request, 'site/index.html', {"readers_count": readers_count})
+    # Served as a Telegram Mini App — WebView2 caches aggressively, so force a
+    # fresh fetch on every open (same as the shop page).
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp["Pragma"] = "no-cache"
+    return resp
 
 
 @csrf_exempt
