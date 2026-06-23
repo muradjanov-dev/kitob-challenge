@@ -10,28 +10,29 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
-      --bg-0: #0f1714;
-      --bg-1: #14201b;
-      --bg-2: #1b2a23;
-      --card: rgba(243,234,217,0.045);
-      --card-border: rgba(243,234,217,0.10);
-      --text: #f3ead9;
-      --text-dim: rgba(243,234,217,0.66);
-      --text-faint: rgba(243,234,217,0.40);
-      --accent: #e6b450;
-      --accent-2: #c8922e;
+      --bg-0: #f7f1e3;
+      --bg-1: #fffdf7;
+      --paper: #fffdf8;
+      --card: #ffffff;
+      --card-border: rgba(31,67,52,0.12);
+      --text: #1b2a23;
+      --text-dim: rgba(27,42,35,0.66);
+      --text-faint: rgba(27,42,35,0.46);
+      --accent: #c8922e;
+      --accent-2: #e6b450;
       --green: #1f6b4c;
       --green-2: #2a8a63;
       --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+      --shadow: 0 8px 26px rgba(31,67,52,0.08);
       --maxw: 1120px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html { scroll-behavior: smooth; }
     body {
       background:
-        radial-gradient(1200px 700px at 8% -8%, rgba(31,107,76,0.28), transparent 65%),
-        radial-gradient(1000px 800px at 112% 4%, rgba(230,180,80,0.12), transparent 62%),
-        linear-gradient(180deg, var(--bg-0), var(--bg-1) 55%, var(--bg-0));
+        radial-gradient(1100px 650px at 8% -10%, rgba(31,107,76,0.10), transparent 60%),
+        radial-gradient(900px 700px at 112% 0%, rgba(230,180,80,0.16), transparent 60%),
+        linear-gradient(180deg, var(--bg-0), var(--bg-1) 55%, #f3ead9);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       line-height: 1.6;
@@ -39,16 +40,16 @@
       overflow-x: hidden;
     }
     .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
-    h1, h2, h3, .serif { font-family: var(--serif); font-weight: 700; line-height: 1.18; }
+    h1, h2, h3, .serif { font-family: var(--serif); font-weight: 700; line-height: 1.18; color: #16241d; }
     a { color: inherit; text-decoration: none; }
     .gold { color: var(--accent); }
-    .em { color: var(--green-2); }
+    .em { color: var(--green); }
 
     /* ─── Header ─── */
     header {
       position: sticky; top: 0; z-index: 50;
-      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-      background: linear-gradient(180deg, rgba(15,23,20,0.92), rgba(15,23,20,0.62));
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      background: linear-gradient(180deg, rgba(255,253,247,0.94), rgba(255,253,247,0.74));
       border-bottom: 1px solid var(--card-border);
     }
     .nav { display: flex; align-items: center; gap: 18px; height: 64px; }
@@ -57,11 +58,11 @@
       width: 36px; height: 36px; border-radius: 11px;
       background: linear-gradient(135deg, var(--green), var(--green-2));
       display: grid; place-items: center; font-size: 19px;
-      box-shadow: 0 8px 22px rgba(31,107,76,0.42);
+      box-shadow: 0 8px 20px rgba(31,107,76,0.28);
     }
     .nav .links { display: flex; gap: 22px; margin-left: 14px; }
     .nav .links a { color: var(--text-dim); font-size: 14px; transition: color .15s; }
-    .nav .links a:hover { color: var(--text); }
+    .nav .links a:hover { color: var(--green); }
     .nav .spacer { flex: 1; }
     .btn {
       display: inline-flex; align-items: center; gap: 8px;
@@ -71,12 +72,12 @@
     }
     .btn:active { transform: scale(0.97); }
     .btn-primary {
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: #2a1500; box-shadow: 0 12px 26px rgba(230,180,80,0.30);
+      background: linear-gradient(135deg, var(--green), var(--green-2));
+      color: #f6f1e6; box-shadow: 0 12px 24px rgba(31,107,76,0.26);
     }
-    .btn-primary:hover { filter: brightness(1.05); }
-    .btn-ghost { background: var(--card); border-color: var(--card-border); color: var(--text); }
-    .btn-ghost:hover { background: rgba(243,234,217,0.08); }
+    .btn-primary:hover { filter: brightness(1.04); }
+    .btn-ghost { background: var(--card); border-color: var(--card-border); color: var(--text); box-shadow: var(--shadow); }
+    .btn-ghost:hover { background: #fbf7ee; }
     .nav .menu-toggle { display: none; background: none; border: 0; color: var(--text); font-size: 24px; cursor: pointer; }
 
     /* ─── Hero ─── */
@@ -85,18 +86,18 @@
     .pill {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 6px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
-      background: rgba(31,107,76,0.18); border: 1px solid rgba(42,138,99,0.35); color: #bfe6d3;
+      background: rgba(31,107,76,0.10); border: 1px solid rgba(31,107,76,0.26); color: var(--green);
       margin-bottom: 20px;
     }
     .hero h1 { font-size: 46px; letter-spacing: -0.5px; }
     .hero h1 .grad {
-      background: linear-gradient(135deg, #fff5cc, var(--accent) 55%, var(--green-2));
+      background: linear-gradient(135deg, var(--green-2), var(--accent) 60%, var(--green));
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
     .hero p.lead { color: var(--text-dim); font-size: 17px; margin: 18px 0 28px; max-width: 540px; }
     .hero .cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
     .stats { display: flex; gap: 30px; margin-top: 38px; flex-wrap: wrap; }
-    .stat .n { font-family: var(--serif); font-size: 26px; font-weight: 700; }
+    .stat .n { font-family: var(--serif); font-size: 26px; font-weight: 700; color: var(--green); }
     .stat .l { color: var(--text-faint); font-size: 12.5px; }
 
     /* Phone mockup */
@@ -104,22 +105,22 @@
       justify-self: center;
       width: 280px; border-radius: 34px; padding: 12px;
       background: linear-gradient(160deg, #20302a, #16221d);
-      border: 1px solid var(--card-border);
-      box-shadow: 0 40px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(243,234,217,0.06);
+      border: 1px solid rgba(0,0,0,0.18);
+      box-shadow: 0 30px 60px rgba(31,67,52,0.22), inset 0 1px 0 rgba(255,255,255,0.06);
       animation: float 5s ease-in-out infinite;
     }
     @keyframes float { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-12px);} }
-    .phone .screen { background: var(--bg-0); border-radius: 24px; padding: 16px; }
-    .phone .chat-head { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--card-border); }
+    .phone .screen { background: #0f1714; color: #f3ead9; border-radius: 24px; padding: 16px; }
+    .phone .chat-head { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid rgba(243,234,217,0.12); }
     .phone .chat-head .av { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg,var(--green),var(--green-2)); display: grid; place-items: center; }
-    .phone .chat-head .nm { font-size: 13px; font-weight: 700; }
+    .phone .chat-head .nm { font-size: 13px; font-weight: 700; color: #f3ead9; }
     .phone .chat-head .st { font-size: 11px; color: var(--green-2); }
     .bubble {
-      background: var(--bg-2); border: 1px solid var(--card-border);
+      background: #1b2a23; border: 1px solid rgba(243,234,217,0.10);
       border-radius: 14px; padding: 12px 14px; margin-top: 12px; font-size: 13px;
     }
-    .bubble .row { display: flex; justify-content: space-between; color: var(--text-dim); margin-top: 4px; }
-    .bubble.reward { background: rgba(230,180,80,0.10); border-color: rgba(230,180,80,0.32); color: var(--accent); font-weight: 700; text-align: center; }
+    .bubble .row { display: flex; justify-content: space-between; color: rgba(243,234,217,0.62); margin-top: 4px; }
+    .bubble.reward { background: rgba(230,180,80,0.16); border-color: rgba(230,180,80,0.38); color: #e6b450; font-weight: 700; text-align: center; }
 
     /* ─── Section ─── */
     section { padding: 64px 0; }
@@ -129,7 +130,7 @@
 
     /* Steps */
     .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
-    .step { background: var(--card); border: 1px solid var(--card-border); border-radius: 18px; padding: 24px; position: relative; }
+    .step { background: var(--card); border: 1px solid var(--card-border); border-radius: 18px; padding: 24px; box-shadow: var(--shadow); position: relative; }
     .step .num { font-family: var(--serif); font-size: 14px; color: var(--accent); font-weight: 700; }
     .step .ic { font-size: 30px; margin: 8px 0 12px; }
     .step h3 { font-size: 17px; margin-bottom: 6px; }
@@ -137,29 +138,30 @@
 
     /* Features */
     .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-    .feature { background: var(--card); border: 1px solid var(--card-border); border-radius: 18px; padding: 24px; transition: transform .18s, border-color .18s, box-shadow .18s; }
-    .feature:hover { transform: translateY(-4px); border-color: rgba(230,180,80,0.30); box-shadow: 0 16px 32px rgba(0,0,0,0.32); }
-    .feature .ic { width: 48px; height: 48px; border-radius: 13px; display: grid; place-items: center; font-size: 24px; background: rgba(31,107,76,0.18); border: 1px solid rgba(42,138,99,0.30); margin-bottom: 14px; }
+    .feature { background: var(--card); border: 1px solid var(--card-border); border-radius: 18px; padding: 24px; box-shadow: var(--shadow); transition: transform .18s, border-color .18s, box-shadow .18s; }
+    .feature:hover { transform: translateY(-4px); border-color: rgba(31,107,76,0.30); box-shadow: 0 16px 34px rgba(31,67,52,0.12); }
+    .feature .ic { width: 48px; height: 48px; border-radius: 13px; display: grid; place-items: center; font-size: 24px; background: rgba(31,107,76,0.10); border: 1px solid rgba(31,107,76,0.22); margin-bottom: 14px; }
     .feature h3 { font-size: 17px; margin-bottom: 7px; }
     .feature p { color: var(--text-dim); font-size: 14px; }
 
-    /* Viktorina spotlight */
+    /* Spotlight (Viktorina + Do'kon) */
     .spotlight { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center;
-      background: linear-gradient(135deg, rgba(31,107,76,0.16), rgba(230,180,80,0.06));
-      border: 1px solid var(--card-border); border-radius: 26px; padding: 40px; }
+      background: linear-gradient(135deg, rgba(31,107,76,0.10), rgba(230,180,80,0.12));
+      border: 1px solid var(--card-border); border-radius: 26px; padding: 40px; box-shadow: var(--shadow); }
     .spotlight h2 { font-size: 30px; margin-bottom: 12px; }
     .spotlight p { color: var(--text-dim); margin-bottom: 18px; }
-    .quiz-card { background: var(--bg-0); border: 1px solid var(--card-border); border-radius: 18px; padding: 20px; }
-    .quiz-card .q { font-style: italic; color: var(--text); font-size: 14.5px; padding: 12px; background: var(--bg-2); border-radius: 12px; margin-bottom: 14px; }
+    .quiz-card { background: var(--card); border: 1px solid var(--card-border); border-radius: 18px; padding: 20px; box-shadow: var(--shadow); }
+    .quiz-card .q { font-style: italic; color: var(--text); font-size: 14.5px; padding: 12px; background: #f4eee0; border-radius: 12px; margin-bottom: 14px; }
     .quiz-opt { padding: 11px 14px; border-radius: 11px; border: 1px solid var(--card-border); margin-top: 8px; font-size: 13.5px; cursor: pointer; transition: background .15s, border-color .15s; }
-    .quiz-opt:hover { border-color: var(--green-2); background: rgba(31,107,76,0.12); }
-    .quiz-opt.correct { border-color: var(--green-2); background: rgba(31,107,76,0.20); color: #bfe6d3; font-weight: 700; }
+    .quiz-opt:hover { border-color: var(--green-2); background: rgba(31,107,76,0.08); }
+    .quiz-opt.correct { border-color: var(--green-2); background: rgba(31,107,76,0.14); color: var(--green); font-weight: 700; }
+    .coin-dot { width: 36px; height: 36px; border-radius: 50%; display: inline-block; background: radial-gradient(circle at 30% 30%, #fff5cc, var(--accent-2) 55%, #b87b1d); box-shadow: 0 4px 12px rgba(200,146,46,0.30); }
 
     /* Premium */
     .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 760px; margin: 0 auto; }
-    .plan { background: var(--card); border: 1px solid var(--card-border); border-radius: 22px; padding: 30px; }
-    .plan.premium { border-color: rgba(230,180,80,0.45); background: linear-gradient(160deg, rgba(230,180,80,0.10), rgba(31,107,76,0.06)); position: relative; }
-    .plan.premium .tag { position: absolute; top: -12px; right: 24px; background: linear-gradient(135deg,var(--accent),var(--accent-2)); color: #2a1500; font-size: 11px; font-weight: 800; padding: 5px 12px; border-radius: 999px; }
+    .plan { background: var(--card); border: 1px solid var(--card-border); border-radius: 22px; padding: 30px; box-shadow: var(--shadow); }
+    .plan.premium { border-color: rgba(200,146,46,0.45); background: linear-gradient(160deg, rgba(230,180,80,0.14), rgba(31,107,76,0.06)); position: relative; }
+    .plan.premium .tag { position: absolute; top: -12px; right: 24px; background: linear-gradient(135deg,var(--accent-2),var(--accent)); color: #3a2400; font-size: 11px; font-weight: 800; padding: 5px 12px; border-radius: 999px; }
     .plan h3 { font-size: 20px; }
     .plan .price { font-family: var(--serif); font-size: 30px; margin: 6px 0 16px; }
     .plan ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
@@ -169,7 +171,7 @@
 
     /* FAQ */
     .faq { max-width: 760px; margin: 0 auto; }
-    .qa { border: 1px solid var(--card-border); border-radius: 14px; margin-bottom: 12px; overflow: hidden; background: var(--card); }
+    .qa { border: 1px solid var(--card-border); border-radius: 14px; margin-bottom: 12px; overflow: hidden; background: var(--card); box-shadow: var(--shadow); }
     .qa button { width: 100%; text-align: left; background: none; border: 0; color: var(--text); font-size: 15.5px; font-weight: 600; padding: 18px 20px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
     .qa .ans { max-height: 0; overflow: hidden; transition: max-height .3s ease; color: var(--text-dim); font-size: 14px; padding: 0 20px; }
     .qa.open .ans { max-height: 240px; padding: 0 20px 18px; }
@@ -177,7 +179,7 @@
     .qa.open .chev { transform: rotate(180deg); }
 
     /* Final CTA */
-    .final { text-align: center; background: linear-gradient(135deg, rgba(31,107,76,0.22), rgba(230,180,80,0.10)); border: 1px solid var(--card-border); border-radius: 28px; padding: 56px 28px; }
+    .final { text-align: center; background: linear-gradient(135deg, rgba(31,107,76,0.12), rgba(230,180,80,0.16)); border: 1px solid var(--card-border); border-radius: 28px; padding: 56px 28px; box-shadow: var(--shadow); }
     .final h2 { font-size: 34px; margin-bottom: 12px; }
     .final p { color: var(--text-dim); margin-bottom: 26px; }
 
@@ -185,7 +187,7 @@
     footer { border-top: 1px solid var(--card-border); padding: 36px 0; color: var(--text-faint); font-size: 13.5px; }
     .foot { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
     footer a { color: var(--text-dim); }
-    footer a:hover { color: var(--text); }
+    footer a:hover { color: var(--green); }
 
     /* Reveal */
     .reveal { opacity: 0; transform: translateY(20px); transition: opacity .6s ease, transform .6s ease; }
@@ -212,6 +214,7 @@
       <nav class="links" id="navLinks">
         <a href="#imkoniyatlar">Imkoniyatlar</a>
         <a href="#viktorina">Viktorina</a>
+        <a href="#dokon">Do'kon</a>
         <a href="#premium">Premium</a>
         <a href="#faq">FAQ</a>
       </nav>
@@ -233,9 +236,9 @@
           <a href="#premium" class="btn btn-ghost">💎 Premium haqida</a>
         </div>
         <div class="stats">
-          <div class="stat"><div class="n gold">10 000+</div><div class="l">Kitobxon</div></div>
-          <div class="stat"><div class="n gold">1M+</div><div class="l">O'qilgan bet</div></div>
-          <div class="stat"><div class="n gold">2×</div><div class="l">Kunlik viktorina</div></div>
+          <div class="stat"><div class="n">{{ readers_count }}</div><div class="l">Ro'yxatdan o'tgan kitobxon</div></div>
+          <div class="stat"><div class="n">2×</div><div class="l">Kunlik viktorina</div></div>
+          <div class="stat"><div class="n">🪙</div><div class="l">Har kuni mukofot</div></div>
         </div>
       </div>
       <div class="phone reveal in">
@@ -311,6 +314,32 @@
     </div>
   </section>
 
+  <!-- DO'KON -->
+  <section id="dokon">
+    <div class="wrap">
+      <div class="spotlight reveal">
+        <div>
+          <span class="sec-label" style="text-align:left">Do'kon</span>
+          <h2>Kitobchalaringizni mukofotlarga almashtiring</h2>
+          <p>O'qib yig'gan tangalaringizni (🪙 Kitobcha) haqiqiy sovrinlarga — Premium obuna, kitoblar va boshqa mukofotlarga almashtiring. Do'kon to'g'ridan-to'g'ri shu yerda, sayt ichida ochiladi.</p>
+          <a href="/shop/" class="btn btn-primary">🛍 Do'konni ochish</a>
+        </div>
+        <div class="quiz-card">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+            <span class="coin-dot"></span>
+            <div>
+              <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;">Sizning balansingiz</div>
+              <div class="serif" style="font-size:22px;">5 315 <span style="font-size:12px;color:var(--text-dim);font-weight:600;">Kitobcha</span></div>
+            </div>
+          </div>
+          <div class="quiz-opt">🎫 Mutolaa 1 oylik Premium — 🪙 20 000</div>
+          <div class="quiz-opt">📕 Sunniy aqidalar — 🪙 25 000</div>
+          <div class="quiz-opt">🎧 Audiokitob to'plami — 🪙 15 000</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- PREMIUM -->
   <section id="premium">
     <div class="wrap">
@@ -351,7 +380,7 @@
       <div class="faq">
         <div class="qa reveal"><button>Qanday qo'shilaman? <span class="chev">▾</span></button><div class="ans"><p>Telegramda <b>@kitob_challenge_bot</b> ni oching, "Boshlash" tugmasini bosing va ro'yxatdan o'ting. Bepul.</p></div></div>
         <div class="qa reveal"><button>Bu bepulmi? <span class="chev">▾</span></button><div class="ans"><p>Ha, asosiy imkoniyatlar bepul. Premium — qo'shimcha mukofot va funksiyalar uchun ixtiyoriy.</p></div></div>
-        <div class="qa reveal"><button>Kitobcha nima? <span class="chev">▾</span></button><div class="ans"><p>Kitobcha — o'qish, viktorina va takliflar uchun ishlanadigan mukofot tangasi. Uni do'konda real mukofotlarga almashtirasiz.</p></div></div>
+        <div class="qa reveal"><button>Kitobcha nima? <span class="chev">▾</span></button><div class="ans"><p>Kitobcha — o'qish, viktorina va takliflar uchun ishlanadigan mukofot tangasi. Uni Do'konda real mukofotlarga almashtirasiz.</p></div></div>
         <div class="qa reveal"><button>Audiokitoblar hisoblanadimi? <span class="chev">▾</span></button><div class="ans"><p>Ha. Eshitilgan daqiqalarni bet bilan bir qatorda hisobotga kiritishingiz mumkin.</p></div></div>
       </div>
     </div>
@@ -378,8 +407,8 @@
   <script>
     // ─── Telegram Mini App bridge ───────────────────────────
     // When opened inside Telegram (via the 🌐 Sayt web_app button), expand to
-    // full height and route t.me links through the native opener so they don't
-    // get stuck in the Mini App's in-page WebView.
+    // full height and route t.me links through the native opener. Internal
+    // links (e.g. /shop/) navigate within the same Mini App session.
     const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
     if (tg) {
       try { tg.ready(); tg.expand(); } catch (e) {}
@@ -404,10 +433,10 @@
       btn.addEventListener("click", () => btn.parentElement.classList.toggle("open"));
     });
 
-    // Quiz demo — reveal correct on click
-    document.querySelectorAll(".quiz-opt").forEach(opt => {
+    // Quiz demo — dim the wrong answers on click
+    document.querySelectorAll("#viktorina .quiz-opt").forEach(opt => {
       opt.addEventListener("click", () => {
-        document.querySelectorAll(".quiz-opt").forEach(o => o.style.opacity = o.classList.contains("correct") ? "1" : "0.5");
+        document.querySelectorAll("#viktorina .quiz-opt").forEach(o => o.style.opacity = o.classList.contains("correct") ? "1" : "0.5");
       });
     });
 

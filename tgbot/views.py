@@ -46,7 +46,14 @@ async def _process_with_cleanup(body_bytes: bytes) -> None:
 
 
 def home(request: HttpRequest):
-    return render(request, 'site/index.html')
+    # Real, live count of registered readers for the landing hero stat.
+    from tgbot.models import TelegramProfile
+    try:
+        count = TelegramProfile.objects.filter(is_registered=True).count()
+    except Exception:
+        count = 0
+    readers_count = f"{count:,}".replace(",", " ")  # 5 315 (nbsp separator)
+    return render(request, 'site/index.html', {"readers_count": readers_count})
 
 
 @csrf_exempt
