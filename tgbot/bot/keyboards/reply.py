@@ -94,12 +94,12 @@ def report_reply_keyboard(language="uz", bajardim_label=None, is_admin=False):
         report_text = "📚 Отчет о книге"
         home_text = "🏠 Главное меню"
         done_text = bajardim_label or "✅ Выполнено!"
-        site_text = "🌐 Сайт"
+        site_text = "✨ Сайт"
     else:
         report_text = "📚 Kitob hisoboti"
         home_text = "🏠 Bosh menyu"
         done_text = bajardim_label or "✅ Bajardim!"
-        site_text = "🌐 Sayt"
+        site_text = "✨ Sayt"
 
     # Single persistent site entry above the input on every client. The shop
     # (Do'kon) now lives INSIDE the site, reachable from its nav — so one
