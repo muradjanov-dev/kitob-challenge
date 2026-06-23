@@ -97,15 +97,20 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=3, minute=0, day_of_week=0),
     },
 
-    # ── User DMs — capped at 3–5 per day ─────────────────────────────────────
+    # ── User DMs — hard cap of 3 per day ─────────────────────────────────────
     #
-    # Slot 1 — 08:30  Kitob Viktorina (group post, but the only morning touch)
+    # Slot 1 — 08:30  Kitob Viktorina (GROUP post only — never a DM)
     # Slot 2 — 10:00  Single inspiration (personalized hour OR fixed 10:00 fallback)
-    # Slot 3 — 12:00  "Haven't reported yet" nudge (non-reporters only)
-    # Slot 4 — 20:00  Streak warning (non-reporters only, replaces old 22:00)
-    # Slot 5 — 23:57  Personal daily report (everyone)
+    # Slot 3 — 20:00  Streak warning (non-reporters only)
+    # Slot 4 — 23:57  Personal daily report (everyone)
+    #
+    # At most 3 reminder DMs/day to any user (congratulations are event-driven
+    # and are NOT counted):
+    #   reporters     → inspiration + personal report            = 2
+    #   non-reporters → inspiration + streak warning + report    = 3
     #
     # REMOVED to stay within budget:
+    #   daily_no_report_reminder (12:00) — redundant with the 20:00 streak warning
     #   send_daily_message      (09:00 + 21:00) — duplicate of inspiration
     #   broadcast_random_pool_reminder (09:00 + 21:00) — duplicate of inspiration
     #   send_daily_features     (11:00) — bot-feature ad every day = spam; moved to weekly
@@ -134,12 +139,6 @@ app.conf.beat_schedule = {
     'personalized-inspiration': {
         'task': 'tgbot.tasks.send_personalized_inspiration',
         'schedule': crontab(minute=5),
-    },
-
-    # Midday nudge — only to users who haven't reported yet.
-    'daily-no-report-reminder': {
-        'task': 'tgbot.tasks.daily_no_report_reminder',
-        'schedule': crontab(hour=12, minute=0),
     },
 
     # Evening streak warning — moved earlier (20:00 → gives users 2+ hrs to act).
