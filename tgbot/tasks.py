@@ -3728,8 +3728,9 @@ def _viktorina_join_keyboard():
 
 
 def _broadcast_quiz_round(quiz_round):
-    """Post an already-built Viktorina round to every reading group and DM it to
-    every registered user. Shared by the scheduled task and the admin button."""
+    """Post an already-built Viktorina round to every reading group only.
+    Shared by the scheduled task and the admin button. The Viktorina is
+    group-only by design — it is NOT DM'd to users."""
     from tgbot.services.book_quiz import build_quiz_text, quiz_keyboard
 
     text = build_quiz_text(quiz_round)
@@ -3757,27 +3758,9 @@ def _broadcast_quiz_round(quiz_round):
         quiz_round.group_messages = posted
         quiz_round.save(update_fields=["group_messages"])
 
-    # 2) DM to every registered user — answering is open, so everyone gets the
-    #    nudge (they still must be a group member to actually answer).
-    import time as _time
-    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
-    sent = 0
-    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
-        try:
-            resp = requests.post(
-                url,
-                data={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
-                      "reply_markup": keyboard},
-                timeout=5,
-            )
-            if resp.ok:
-                sent += 1
-            elif resp.status_code == 429:
-                _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
-        except Exception:
-            pass
-        _time.sleep(0.05)
-    print(f"post_book_quiz: round #{quiz_round.id} posted, DMs sent={sent}")
+    # Group-only by design: the Viktorina is no longer DM'd to users — it lives
+    # in the reading groups, not in the bot's private chats.
+    print(f"post_book_quiz: round #{quiz_round.id} posted to {len(posted)} group(s)")
 
 
 def refresh_quiz_boards(quiz_round):
