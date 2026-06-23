@@ -500,6 +500,20 @@
     const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
     if (tg) {
       try { tg.ready(); tg.expand(); } catch (e) {}
+      // Telegram does NOT re-inject initData when you navigate to another page
+      // inside the same Mini App, so the shop would fail auth (invalid_init_data).
+      // Carry the launch initData to /shop/ via the URL hash (the shop reads
+      // tgWebAppData from the hash). Done at click time so a late-arriving
+      // initData (Telegram Desktop race) is already available.
+      document.querySelectorAll('a[href^="/shop"]').forEach(a => {
+        a.addEventListener("click", () => {
+          const id = tg.initData || "";
+          if (id) {
+            const base = a.getAttribute("href").split("#")[0];
+            a.setAttribute("href", base + "#tgWebAppData=" + encodeURIComponent(id));
+          }
+        });
+      });
       document.querySelectorAll('a[href^="https://t.me/"]').forEach(a => {
         a.addEventListener("click", (e) => {
           e.preventDefault();
