@@ -120,10 +120,15 @@ app.conf.beat_schedule = {
     #                                     percentile is now shown inside personal report
     #   challenge_reminder      (18:00) — folded into streak warning at 20:00
 
-    # Kitob Viktorina — 2x daily (group posts, not personal DMs).
+    # Kitob Viktorina — 3x daily (GROUP posts only, never personal DMs, so they
+    # don't count against the 3-DM/day budget above).
     'book-quiz-morning': {
         'task': 'tgbot.tasks.post_book_quiz',
         'schedule': crontab(hour=8, minute=30),
+    },
+    'book-quiz-midday': {
+        'task': 'tgbot.tasks.post_book_quiz',
+        'schedule': crontab(hour=14, minute=0),
     },
     'book-quiz-evening': {
         'task': 'tgbot.tasks.post_book_quiz',

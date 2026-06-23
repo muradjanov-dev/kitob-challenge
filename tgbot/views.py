@@ -45,15 +45,96 @@ async def _process_with_cleanup(body_bytes: bytes) -> None:
             print(f"webhook handler took {elapsed_ms} ms")
 
 
+def _fmt_num(n):
+    return f"{int(n or 0):,}".replace(",", " ")
+
+
+def _empty_landing_ctx():
+    return {
+        "readers_count": "0", "total_pages": "0",
+        "finished_books": "0", "reading_books": "0",
+        "lb_pages": {"daily": [], "weekly": [], "monthly": [], "yearly": []},
+        "lb_books": [], "lb_reports": [], "lb_active": [],
+    }
+
+
+def _build_landing_context():
+    """Live platform stats + leaderboards for the landing page. Heavy-ish
+    aggregations, so the caller caches the result for a few minutes."""
+    import datetime as _dt
+    from django.utils import timezone
+    from django.db.models import Sum, Count, F
+    from tgbot.models import TelegramProfile, ConfirmationReport, BooksToRead
+
+    today = timezone.localdate()
+
+    readers = TelegramProfile.objects.filter(is_registered=True).count()
+    total_pages = (ConfirmationReport.objects.filter(is_audio=False)
+                   .aggregate(s=Sum('pages_read'))['s']) or 0
+    finished_books = BooksToRead.objects.filter(
+        total_pages__gt=0, current_page__gte=F('total_pages')).count()
+    reading_books = (BooksToRead.objects
+                     .filter(current_page__gt=0, total_pages__gt=0)
+                     .exclude(current_page__gte=F('total_pages')).count())
+
+    def _rows(qs, key):
+        return [{'name': (r['user__full_name'] or 'Kitobxon'),
+                 'value': _fmt_num(r[key])} for r in qs]
+
+    def top_pages(start, end, limit=10):
+        qs = (ConfirmationReport.objects
+              .filter(date__date__gte=start, date__date__lte=end,
+                      is_audio=False, user__is_blocked=False)
+              .values('user__full_name').annotate(total=Sum('pages_read'))
+              .filter(total__gt=0).order_by('-total')[:limit])
+        return _rows(qs, 'total')
+
+    lb_pages = {
+        'daily':   top_pages(today, today),
+        'weekly':  top_pages(today - _dt.timedelta(days=6), today),
+        'monthly': top_pages(today - _dt.timedelta(days=29), today),
+        'yearly':  top_pages(today - _dt.timedelta(days=364), today),
+    }
+    lb_books = _rows(
+        BooksToRead.objects
+        .filter(total_pages__gt=0, current_page__gte=F('total_pages'),
+                user__is_blocked=False)
+        .values('user__full_name').annotate(c=Count('id'))
+        .order_by('-c')[:10], 'c')
+    lb_reports = _rows(
+        ConfirmationReport.objects.filter(user__is_blocked=False)
+        .values('user__full_name').annotate(c=Count('id'))
+        .order_by('-c')[:10], 'c')
+    lb_active = _rows(
+        ConfirmationReport.objects
+        .filter(user__is_blocked=False, reading_day__isnull=False)
+        .values('user__full_name')
+        .annotate(c=Count('reading_day', distinct=True))
+        .order_by('-c')[:10], 'c')
+
+    return {
+        'readers_count': _fmt_num(readers),
+        'total_pages': _fmt_num(total_pages),
+        'finished_books': _fmt_num(finished_books),
+        'reading_books': _fmt_num(reading_books),
+        'lb_pages': lb_pages,
+        'lb_books': lb_books,
+        'lb_reports': lb_reports,
+        'lb_active': lb_active,
+    }
+
+
 def home(request: HttpRequest):
-    # Real, live count of registered readers for the landing hero stat.
-    from tgbot.models import TelegramProfile
-    try:
-        count = TelegramProfile.objects.filter(is_registered=True).count()
-    except Exception:
-        count = 0
-    readers_count = f"{count:,}".replace(",", " ")  # 5 315 (nbsp separator)
-    resp = render(request, 'site/index.html', {"readers_count": readers_count})
+    from django.core.cache import cache
+    ctx = cache.get("landing_ctx_v1")
+    if ctx is None:
+        try:
+            ctx = _build_landing_context()
+        except Exception as e:
+            print(f"landing context build failed: {e}")
+            ctx = _empty_landing_ctx()
+        cache.set("landing_ctx_v1", ctx, 600)  # refresh every 10 min
+    resp = render(request, 'site/index.html', ctx)
     # Served as a Telegram Mini App — WebView2 caches aggressively, so force a
     # fresh fetch on every open (same as the shop page).
     resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"

@@ -32,7 +32,11 @@
       background:
         radial-gradient(1100px 650px at 8% -10%, rgba(31,107,76,0.10), transparent 60%),
         radial-gradient(900px 700px at 112% 0%, rgba(230,180,80,0.16), transparent 60%),
+        radial-gradient(760px 540px at 100% 100%, rgba(255,107,53,0.13), transparent 62%),
+        radial-gradient(520px 380px at -5% 60%, rgba(255,122,69,0.10), transparent 60%),
+        repeating-linear-gradient(125deg, rgba(255,107,53,0.05) 0px, rgba(255,107,53,0.05) 2px, transparent 2px, transparent 30px),
         linear-gradient(180deg, var(--bg-0), var(--bg-1) 55%, #f3ead9);
+      background-attachment: fixed;
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       line-height: 1.6;
@@ -72,10 +76,10 @@
     }
     .btn:active { transform: scale(0.97); }
     .btn-primary {
-      background: linear-gradient(135deg, var(--green), var(--green-2));
-      color: #f6f1e6; box-shadow: 0 12px 24px rgba(31,107,76,0.26);
+      background: linear-gradient(135deg, #103d2b, #1a6044);
+      color: #f6f1e6; box-shadow: 0 12px 24px rgba(16,60,42,0.32);
     }
-    .btn-primary:hover { filter: brightness(1.04); }
+    .btn-primary:hover { filter: brightness(1.08); }
     .btn-ghost { background: var(--card); border-color: var(--card-border); color: var(--text); box-shadow: var(--shadow); }
     .btn-ghost:hover { background: #fbf7ee; }
     .nav .menu-toggle { display: none; background: none; border: 0; color: var(--text); font-size: 24px; cursor: pointer; }
@@ -189,6 +193,27 @@
     footer a { color: var(--text-dim); }
     footer a:hover { color: var(--green); }
 
+    /* Leaderboards */
+    .lb-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 16px; }
+    .lb-tab { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--card-border); background: var(--bg-1); color: var(--text-dim); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+    .lb-tab.active { background: linear-gradient(135deg, #103d2b, #1a6044); color: #f6f1e6; border-color: transparent; }
+    .lb-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+    .lb-card { background: var(--card); border: 1px solid var(--card-border); border-radius: 18px; padding: 22px; box-shadow: var(--shadow); }
+    .lb-card h3 { font-size: 16px; margin-bottom: 3px; display: flex; align-items: center; gap: 8px; }
+    .lb-card .sub { color: var(--text-faint); font-size: 12px; margin-bottom: 12px; }
+    .lb-list { display: flex; flex-direction: column; }
+    .lb-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--card-border); }
+    .lb-row:last-child { border-bottom: 0; }
+    .lb-rank { width: 26px; height: 26px; flex: none; border-radius: 8px; display: grid; place-items: center; font-size: 12px; font-weight: 800; background: rgba(31,107,76,0.10); color: var(--green); }
+    .lb-row:nth-child(1) .lb-rank { background: linear-gradient(135deg, #ffd76a, #d99a1e); color: #5a3c00; }
+    .lb-row:nth-child(2) .lb-rank { background: linear-gradient(135deg, #e7e7ea, #b9bcc4); color: #3a3a3a; }
+    .lb-row:nth-child(3) .lb-rank { background: linear-gradient(135deg, #f0b486, #c97f45); color: #4a2400; }
+    .lb-name { flex: 1; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lb-val { font-weight: 800; font-size: 14px; color: var(--green); white-space: nowrap; }
+    .lb-empty { color: var(--text-faint); font-size: 13px; padding: 16px 0; text-align: center; }
+    .lb-period { display: none; }
+    .lb-period.active { display: block; }
+
     /* Reveal */
     .reveal { opacity: 0; transform: translateY(20px); transition: opacity .6s ease, transform .6s ease; }
     .reveal.in { opacity: 1; transform: none; }
@@ -214,12 +239,13 @@
       <nav class="links" id="navLinks">
         <a href="#imkoniyatlar">Imkoniyatlar</a>
         <a href="#viktorina">Viktorina</a>
+        <a href="#reyting">Reyting</a>
         <a href="#dokon">Do'kon</a>
         <a href="#premium">Premium</a>
         <a href="#faq">FAQ</a>
       </nav>
       <div class="spacer"></div>
-      <a href="https://t.me/kitob_challenge_bot" class="btn btn-primary" target="_blank" rel="noopener">Telegramda boshlash</a>
+      <a href="https://t.me/kitob_challange_bot" class="btn btn-primary" target="_blank" rel="noopener">Telegramda boshlash</a>
       <button class="menu-toggle" id="menuToggle" aria-label="Menyu">☰</button>
     </div>
   </header>
@@ -232,13 +258,14 @@
         <h1>Har kuni o'qing,<br/><span class="grad">Kitobcha yig'ing</span>,<br/>yuqoriga chiqing.</h1>
         <p class="lead">Kitob Challenge — kitobxonlar uchun Telegram platformasi. Kunlik hisobot yuboring, mukofot tangalar (Kitobcha) ishlang, viktorinada qatnashing va reytingda peshqadam bo'ling.</p>
         <div class="cta-row">
-          <a href="https://t.me/kitob_challenge_bot" class="btn btn-primary" target="_blank" rel="noopener">📚 Bepul boshlash</a>
+          <a href="https://t.me/kitob_challange_bot" class="btn btn-primary" target="_blank" rel="noopener">📚 Bepul boshlash</a>
           <a href="#premium" class="btn btn-ghost">💎 Premium haqida</a>
         </div>
         <div class="stats">
-          <div class="stat"><div class="n">{{ readers_count }}</div><div class="l">Ro'yxatdan o'tgan kitobxon</div></div>
-          <div class="stat"><div class="n">2×</div><div class="l">Kunlik viktorina</div></div>
-          <div class="stat"><div class="n">🪙</div><div class="l">Har kuni mukofot</div></div>
+          <div class="stat"><div class="n">{{ readers_count }}</div><div class="l">Kitobxon</div></div>
+          <div class="stat"><div class="n">{{ total_pages }}</div><div class="l">O'qilgan bet</div></div>
+          <div class="stat"><div class="n">{{ finished_books }}</div><div class="l">Tugatilgan kitob</div></div>
+          <div class="stat"><div class="n">{{ reading_books }}</div><div class="l">O'qilayotgan kitob</div></div>
         </div>
       </div>
       <div class="phone reveal in">
@@ -301,7 +328,7 @@
           <span class="sec-label" style="text-align:left">Kitob Viktorinasi</span>
           <h2>Bu iqtibos qaysi kitobdan?</h2>
           <p>Har kuni ertalab 08:30 va kechqurun 21:00 — guruhga haqiqiy kitobxon yuborgan iqtibos tashlanadi. To'g'ri javob bering — <b class="gold">+100 Kitobcha</b> cho'ntakda. Premium bo'lsangiz — <b class="gold">×2</b>!</p>
-          <a href="https://t.me/kitob_challenge_bot" class="btn btn-primary" target="_blank" rel="noopener">Viktorinada qatnashish</a>
+          <a href="https://t.me/kitob_challange_bot" class="btn btn-primary" target="_blank" rel="noopener">Viktorinada qatnashish</a>
         </div>
         <div class="quiz-card">
           <div class="q">«Kitob — insonni tarbiyalaydi, ruhini uyg'otadi va baxtli hayotga umid beradi. Eng sodiq do'st — kitobdir.»</div>
@@ -335,6 +362,67 @@
           <div class="quiz-opt">🎫 Mutolaa 1 oylik Premium — 🪙 20 000</div>
           <div class="quiz-opt">📕 Sunniy aqidalar — 🪙 25 000</div>
           <div class="quiz-opt">🎧 Audiokitob to'plami — 🪙 15 000</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REYTING / NOMINATSIYALAR -->
+  <section id="reyting">
+    <div class="wrap">
+      <div class="sec-label reveal">Reytinglar</div>
+      <h2 class="sec-title reveal">Nominatsiyalar va peshqadamlar</h2>
+      <p class="sec-sub reveal">Eng ko'p o'qiganlar, kitob tugatganlar va eng faollar — jonli ma'lumotlar (har 10 daqiqada yangilanadi).</p>
+
+      <div class="lb-card reveal" style="margin-bottom:18px;">
+        <h3>📖 Eng ko'p bet o'qiganlar</h3>
+        <div class="sub">Davrni tanlang</div>
+        <div class="lb-tabs">
+          <div class="lb-tab active" data-period="daily">Kunlik</div>
+          <div class="lb-tab" data-period="weekly">Haftalik</div>
+          <div class="lb-tab" data-period="monthly">Oylik</div>
+          <div class="lb-tab" data-period="yearly">Yillik</div>
+        </div>
+        {% for key, rows in lb_pages.items %}
+        <div class="lb-period {% if key == 'daily' %}active{% endif %}" data-period="{{ key }}">
+          <div class="lb-list">
+            {% for r in rows %}
+            <div class="lb-row"><div class="lb-rank">{{ forloop.counter }}</div><div class="lb-name">{{ r.name }}</div><div class="lb-val">{{ r.value }} bet</div></div>
+            {% empty %}
+            <div class="lb-empty">Hozircha ma'lumot yo'q</div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="lb-grid">
+        <div class="lb-card reveal">
+          <h3>🏁 Eng ko'p kitob tugatganlar</h3>
+          <div class="sub">Jami tugatilgan kitoblar</div>
+          <div class="lb-list">
+            {% for r in lb_books %}
+            <div class="lb-row"><div class="lb-rank">{{ forloop.counter }}</div><div class="lb-name">{{ r.name }}</div><div class="lb-val">{{ r.value }} kitob</div></div>
+            {% empty %}<div class="lb-empty">Hozircha ma'lumot yo'q</div>{% endfor %}
+          </div>
+        </div>
+        <div class="lb-card reveal">
+          <h3>📤 Eng ko'p hisobot yuborganlar</h3>
+          <div class="sub">Jami hisobotlar soni</div>
+          <div class="lb-list">
+            {% for r in lb_reports %}
+            <div class="lb-row"><div class="lb-rank">{{ forloop.counter }}</div><div class="lb-name">{{ r.name }}</div><div class="lb-val">{{ r.value }}</div></div>
+            {% empty %}<div class="lb-empty">Hozircha ma'lumot yo'q</div>{% endfor %}
+          </div>
+        </div>
+        <div class="lb-card reveal">
+          <h3>🔥 Eng faol kitobxonlar</h3>
+          <div class="sub">Faol kunlar soni</div>
+          <div class="lb-list">
+            {% for r in lb_active %}
+            <div class="lb-row"><div class="lb-rank">{{ forloop.counter }}</div><div class="lb-name">{{ r.name }}</div><div class="lb-val">{{ r.value }} kun</div></div>
+            {% empty %}<div class="lb-empty">Hozircha ma'lumot yo'q</div>{% endfor %}
+          </div>
         </div>
       </div>
     </div>
@@ -378,7 +466,7 @@
       <div class="sec-label reveal">Savol-javob</div>
       <h2 class="sec-title reveal">Tez-tez beriladigan savollar</h2>
       <div class="faq">
-        <div class="qa reveal"><button>Qanday qo'shilaman? <span class="chev">▾</span></button><div class="ans"><p>Telegramda <b>@kitob_challenge_bot</b> ni oching, "Boshlash" tugmasini bosing va ro'yxatdan o'ting. Bepul.</p></div></div>
+        <div class="qa reveal"><button>Qanday qo'shilaman? <span class="chev">▾</span></button><div class="ans"><p>Telegramda <b>@kitob_challange_bot</b> ni oching, "Boshlash" tugmasini bosing va ro'yxatdan o'ting. Bepul.</p></div></div>
         <div class="qa reveal"><button>Bu bepulmi? <span class="chev">▾</span></button><div class="ans"><p>Ha, asosiy imkoniyatlar bepul. Premium — qo'shimcha mukofot va funksiyalar uchun ixtiyoriy.</p></div></div>
         <div class="qa reveal"><button>Kitobcha nima? <span class="chev">▾</span></button><div class="ans"><p>Kitobcha — o'qish, viktorina va takliflar uchun ishlanadigan mukofot tangasi. Uni Do'konda real mukofotlarga almashtirasiz.</p></div></div>
         <div class="qa reveal"><button>Audiokitoblar hisoblanadimi? <span class="chev">▾</span></button><div class="ans"><p>Ha. Eshitilgan daqiqalarni bet bilan bir qatorda hisobotga kiritishingiz mumkin.</p></div></div>
@@ -392,7 +480,7 @@
       <div class="final reveal">
         <h2>Bugun o'qishni boshlang 📚</h2>
         <p>Minglab kitobxonlar allaqachon qatnashmoqda. Siz ham qo'shiling — bepul.</p>
-        <a href="https://t.me/kitob_challenge_bot" class="btn btn-primary" target="_blank" rel="noopener">Telegramda boshlash</a>
+        <a href="https://t.me/kitob_challange_bot" class="btn btn-primary" target="_blank" rel="noopener">Telegramda boshlash</a>
       </div>
     </div>
   </section>
@@ -400,7 +488,7 @@
   <footer>
     <div class="wrap foot">
       <div><span class="logo" style="font-size:15px"><span class="mark" style="width:28px;height:28px;font-size:15px">📚</span> Kitob Challenge</span></div>
-      <div>© 2026 Kitob Challenge · <a href="https://t.me/kitob_challenge_bot" target="_blank" rel="noopener">@kitob_challenge_bot</a></div>
+      <div>© 2026 Kitob Challenge · <a href="https://t.me/kitob_challange_bot" target="_blank" rel="noopener">@kitob_challange_bot</a></div>
     </div>
   </footer>
 
@@ -431,6 +519,15 @@
     // FAQ accordion
     document.querySelectorAll(".qa button").forEach(btn => {
       btn.addEventListener("click", () => btn.parentElement.classList.toggle("open"));
+    });
+
+    // Leaderboard period tabs
+    document.querySelectorAll(".lb-tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        const p = tab.dataset.period;
+        document.querySelectorAll(".lb-tab").forEach(t => t.classList.toggle("active", t === tab));
+        document.querySelectorAll(".lb-period").forEach(el => el.classList.toggle("active", el.dataset.period === p));
+      });
     });
 
     // Quiz demo — dim the wrong answers on click
