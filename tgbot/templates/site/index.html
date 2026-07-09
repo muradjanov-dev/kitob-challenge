@@ -214,6 +214,28 @@
     .lb-period { display: none; }
     .lb-period.active { display: block; }
 
+    /* Swipe-to-shop hint */
+    .swipe-hint {
+      position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+      z-index: 70; display: flex; align-items: center; gap: 8px;
+      background: linear-gradient(135deg, #103d2b, #1a6044); color: #f6f1e6;
+      padding: 11px 14px 11px 13px; border-radius: 999px 0 0 999px;
+      box-shadow: 0 10px 26px rgba(16,60,42,0.40); cursor: pointer;
+      font-size: 13px; font-weight: 700; white-space: nowrap;
+      animation: swipeWiggle 1.5s ease-in-out infinite;
+      -webkit-tap-highlight-color: transparent; user-select: none;
+    }
+    .swipe-hint .arrow { font-size: 20px; line-height: 1; animation: arrowNudge 1.1s ease-in-out infinite; }
+    @keyframes swipeWiggle {
+      0%, 100% { transform: translateY(-50%) translateX(0); }
+      50%      { transform: translateY(-50%) translateX(-9px); }
+    }
+    @keyframes arrowNudge {
+      0%, 100% { transform: translateX(0); opacity: .65; }
+      50%      { transform: translateX(-5px); opacity: 1; }
+    }
+    @media (max-width: 600px) { .swipe-hint { font-size: 12px; padding: 10px 12px; } }
+
     /* Reveal */
     .reveal { opacity: 0; transform: translateY(20px); transition: opacity .6s ease, transform .6s ease; }
     .reveal.in { opacity: 1; transform: none; }
@@ -249,6 +271,12 @@
       <button class="menu-toggle" id="menuToggle" aria-label="Menyu">☰</button>
     </div>
   </header>
+
+  <!-- Swipe-left → Do'kon hint -->
+  <div class="swipe-hint" id="swipeHint" role="button" aria-label="Do'konni ochish">
+    <span class="arrow">‹</span>
+    <span>🛍 Kitob Challenge Shop</span>
+  </div>
 
   <!-- HERO -->
   <section class="hero">
@@ -522,6 +550,29 @@
         });
       });
     }
+
+    // Swipe-left (or tap the hint) → open the Do'kon. Carry initData so the
+    // shop can authenticate when running inside Telegram.
+    function openShop() {
+      let url = "/shop/";
+      if (tg && tg.initData) url += "#tgWebAppData=" + encodeURIComponent(tg.initData);
+      window.location.href = url;
+    }
+    (function () {
+      let x0 = null, y0 = null;
+      document.addEventListener("touchstart", (e) => {
+        const t = e.changedTouches[0]; x0 = t.clientX; y0 = t.clientY;
+      }, { passive: true });
+      document.addEventListener("touchend", (e) => {
+        if (x0 === null) return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - x0, dy = t.clientY - y0;
+        x0 = null;
+        if (dx < -80 && Math.abs(dx) > Math.abs(dy) * 1.8) openShop();
+      }, { passive: true });
+      const hint = document.getElementById("swipeHint");
+      if (hint) hint.addEventListener("click", openShop);
+    })();
 
     // Mobile nav
     document.getElementById("menuToggle").addEventListener("click", () => {

@@ -383,14 +383,21 @@ def users_unread_book():
     girls_chat = _os.environ.get("GIRLS_GROUP_ID", "").strip()
     general_chat = str(GENERAL_GROUP_ID)
 
-    # group_chat_id -> ordered list of users to check membership against this chat
+    # group_chat_id -> ordered list of users to check membership against this chat.
+    # Dedupe by chat_id: GENERAL_GROUP_ID currently equals GIRLS_GROUP_ID, so
+    # without this the shared group would receive TWO messages (gender + general).
     targets = []
-    if boys_chat:
+    seen = set()
+    if boys_chat and boys_chat not in seen:
         targets.append((boys_chat, [u for u in non_reporters if u.gender == "male"]))
-    if girls_chat:
+        seen.add(boys_chat)
+    if girls_chat and girls_chat not in seen:
         targets.append((girls_chat, [u for u in non_reporters if u.gender == "female"]))
-    # General group: combined of everyone (we'll dedupe by checking general membership)
-    targets.append((general_chat, list(non_reporters)))
+        seen.add(girls_chat)
+    if general_chat and general_chat not in seen:
+        # General group: everyone (membership check below filters to real members).
+        targets.append((general_chat, list(non_reporters)))
+        seen.add(general_chat)
 
     suffix = (
         "\nKuniga 5-10 daqiqa va siz yana safdasiz 🚀 \n\n"
