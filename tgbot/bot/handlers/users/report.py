@@ -1010,7 +1010,7 @@ async def ask_next_book_pages(message, state: FSMContext):
 
 
 MAX_PAGES_PER_DAY = 1000
-MAX_AUDIO_MINUTES_PER_DAY = 1200  # 20 hours/day cap
+MAX_AUDIO_MINUTES_PER_DAY = 360  # 6 hours/day cap
 
 
 @sync_to_async
@@ -1074,7 +1074,7 @@ async def process_loop_pages(message: types.Message, state: FSMContext):
         if used + value > MAX_AUDIO_MINUTES_PER_DAY:
             remaining = max(0, MAX_AUDIO_MINUTES_PER_DAY - used)
             await message.answer(
-                f"❌ Kuniga maksimal eshitish vaqti: <b>{MAX_AUDIO_MINUTES_PER_DAY} daqiqa (20 soat)</b>.\n\n"
+                f"❌ Kuniga maksimal eshitish vaqti: <b>{MAX_AUDIO_MINUTES_PER_DAY} daqiqa (6 soat)</b>.\n\n"
                 f"Bugun jami eshitganingiz: <b>{used} daqiqa</b>.\n"
                 f"Iltimos, <b>{remaining}</b> daqiqadan ko'p bo'lmagan qiymat kiriting.",
                 parse_mode="HTML",
