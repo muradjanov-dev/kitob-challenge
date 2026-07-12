@@ -467,6 +467,13 @@
     // fallback (where some clients put `tgWebAppData=<urlencoded>`).
     function _readInitDataOnce() {
       if (tg && tg.initData) return tg.initData;
+      // Passed from the landing page on in-app navigation. Query string is the
+      // most reliable carrier (Telegram's SDK can strip the hash), so check it
+      // first, then the hash.
+      try {
+        const q = new URLSearchParams(window.location.search).get("tgWebAppData");
+        if (q) return q;
+      } catch (e) {}
       const hash = (window.location.hash || "").replace(/^#/, "");
       if (hash) {
         try {

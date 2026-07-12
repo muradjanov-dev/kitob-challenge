@@ -537,8 +537,8 @@
         a.addEventListener("click", () => {
           const id = tg.initData || "";
           if (id) {
-            const base = a.getAttribute("href").split("#")[0];
-            a.setAttribute("href", base + "#tgWebAppData=" + encodeURIComponent(id));
+            const base = a.getAttribute("href").split("?")[0].split("#")[0];
+            a.setAttribute("href", base + "?tgWebAppData=" + encodeURIComponent(id));
           }
         });
       });
@@ -555,7 +555,8 @@
     // shop can authenticate when running inside Telegram.
     function openShop() {
       let url = "/shop/";
-      if (tg && tg.initData) url += "#tgWebAppData=" + encodeURIComponent(tg.initData);
+      const id = tg && tg.initData ? tg.initData : "";
+      if (id) url += "?tgWebAppData=" + encodeURIComponent(id);
       window.location.href = url;
     }
     (function () {

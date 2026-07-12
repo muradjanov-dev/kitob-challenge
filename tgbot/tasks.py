@@ -368,8 +368,10 @@ def users_unread_book():
     skipped — no point pinging strangers."""
     import os as _os
     import time as _time
+    from django.core.cache import cache
 
     today = timezone.localdate()
+    today_str = today.isoformat()
     non_reporters = list(
         TelegramProfile.objects
         .exclude(confirmationreport__date__date=today)
@@ -427,6 +429,15 @@ def users_unread_book():
             handle = f"@{u.username}" if u.username else f'<a href="tg://user?id={u.telegram_id}">{u.full_name}</a>'
             message += f"-{handle} (<b>{u.full_name}</b>)\n"
         message += suffix
+
+        # Idempotency guard: post the unread list to each group AT MOST once
+        # per day, even if the task somehow runs twice (Celery redelivery on a
+        # long run, a duplicate beat, or a retry). cache.add is atomic, so a
+        # second run for the same chat/day is skipped. This is what actually
+        # fixes the "girls group gets the list twice" report.
+        if not cache.add(f"unread_posted:{chat_id}:{today_str}", 1, 60 * 60 * 20):
+            print(f"users_unread_book: already posted to {chat_id} today, skipping")
+            continue
 
         try:
             send_message(chat_id, message)
