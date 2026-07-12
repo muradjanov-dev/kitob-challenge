@@ -1241,6 +1241,9 @@ def broadcast_congrats_to_others(user_achievement_id: int, points: int):
         "inline_keyboard": [[tabriklash_btn], [reminder_btn]]
     })
 
+    from django.core.cache import cache
+    today_str = timezone.localdate().isoformat()
+
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     qs = (
         TelegramProfile.objects
@@ -1254,6 +1257,12 @@ def broadcast_congrats_to_others(user_achievement_id: int, points: int):
                 continue
             tier = getattr(recipient, "tabriklar_range", "any") or "any"
             if not _achievement_count_matches_range(achiever_total, tier):
+                continue
+            # Cap: at most ONE "please congratulate X" DM per recipient per day,
+            # no matter how many achievements unlock across the platform. Keeps
+            # the bot from spamming users with congrat invitations.
+            cap_key = f"congrats_dm:{recipient.id}:{today_str}"
+            if cache.get(cap_key):
                 continue
             # Nudge: every 10th Tabriklash DM a given recipient receives also
             # surfaces the reminder-config button so users can adjust daily
@@ -1274,6 +1283,7 @@ def broadcast_congrats_to_others(user_achievement_id: int, points: int):
             )
             if resp.ok:
                 sent += 1
+                cache.set(cap_key, 1, 60 * 60 * 26)  # holds for the rest of the day
                 TelegramProfile.objects.filter(id=recipient.id).update(
                     congrats_dm_count=recipient_dm_no
                 )
