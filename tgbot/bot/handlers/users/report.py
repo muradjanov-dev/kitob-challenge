@@ -1009,7 +1009,7 @@ async def ask_next_book_pages(message, state: FSMContext):
     await ReportState.enter_pages_loop.set()
 
 
-MAX_PAGES_PER_DAY = 2000
+MAX_PAGES_PER_DAY = 1000
 MAX_AUDIO_MINUTES_PER_DAY = 1200  # 20 hours/day cap
 
 
