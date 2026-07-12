@@ -197,6 +197,90 @@ MOTIVATIONS = [
 ]
 
 
+# ── Playful praises shown on report confirmation ──────────────────────────────
+# Everyone gets the general pool; girls also get PRAISES_GIRLS (malikam /
+# Qirolicham), boys get PRAISES_BOYS (shahzodam / Qirolim). Picked at random.
+PRAISES_GENERAL = [
+    "Qoyil, qoqindiqginam! Bilim tog'ini yana zabt etding! 🏔",
+    "Shakarim-ey, o'qiganingni ko'rib yuragim yayradi! 🍬",
+    "Bo'talog'im, bugun ham safdasan — ofarin! 🐫",
+    "Aqilligim-a, o'qiysan-u, aqling yana charxlanadi! 🧠",
+    "Voyboo, senga gap yo'q — kitobxonlikda tengsizsan! 🔥",
+    "Qo'zichog'im, hisoboting bilan ko'nglimni ko'tarding! 🐑",
+    "Pahlavonim, bilim gugurtini yana yoqding! 💪",
+    "Bali-bali, o'qiganim! Sen borsan — biz g'ururlanamiz! 🏆",
+    "Jonim, har beting — kelajakka bir qadam! 👣",
+    "Asalim, o'qishing shirin, natijang bundan-da shirin! 🍯",
+    "Oftobim, bilim nuring bilan kunimizni yoritding! ☀️",
+    "Zo'r-ku, qoqindiq! Dangasalikni yana yengding! 😎",
+    "Bulbulginam, kitob sahifalarida sayrayapsan! 🐦",
+    "Tan berdim, aqilligim — mutolaada zabardastsan! 🙌",
+    "Gulim, bog'ingni bilimga to'ldirding! 🌸",
+    "Ofarin, bo'talog'im! Kitob bilan do'stliging bardavom! 🤝",
+    "Qoyilman, jonim! O'qidingmi — yutuq yaqin! 🎯",
+    "Barakalla, shakarim! Bir bet ham bekorga ketmadi! 💎",
+    "Voy, aqllim-ey! Miya sport zalida mashq qilding! 🏋️",
+    "Qoqindiqginam, kitoblar seni sog'inmaydi! 😄",
+    "Zo'rsan, pahlavonim! Bilim toji senga yarashadi! 👑",
+    "Yashavor, jonim! Bir varaq — bir umr boylik! 📈",
+    "Ofarin, gulim! Bugun ham o'zingni yengding! 🌟",
+    "Bali, qo'zichog'im! Reyting cho'qqisi seni kutyapti! ⛰",
+    "Shirinim, o'qishing yuragimga malham bo'ldi! 💗",
+    "Qoyil qoldim, aqilligim — chindan zo'rsan! ✨",
+    "Bo'talog'im-a, bilim karvoniga qo'shilding! 🐫",
+    "Voyboo, gap yo'q — kitobxonlar sultonisan! 🤴",
+    "Barakalla, jonginam! Mutolaa mevasi shirin! 🍎",
+    "Zo'r ish, qoqindiq! Kuning zoye ketmadi! ⏳",
+    "Yashang, asalim! Aqling ham shirin, o'zing ham! 🍯",
+    "Qoyil, qahramonim — bugun ham o'zingni yengding! 🦸",
+    "Bali-bali, jonim! Kitob seni maqtayapti! 📖",
+    "Ofarin, shakarginam! Bilimga oshiq yuraging bor! 💛",
+]
+
+PRAISES_GIRLS = [
+    "Malikam, bilim toji sizga eng yarashgan ziynat! 👑",
+    "Ofarin, malikam! Kitob — eng sodiq hamrohingiz! 💐",
+    "Qoyil, gul malikam! Mutolaada sizga teng yo'q! 🌹",
+    "Malikam, har betingiz — tojingizga bir dur! 💎",
+    "Yashang, malikam! Bilimingiz husningizga husn qo'shadi! ✨",
+    "Barakalla, sohibjamol malikam — aqlingiz ham chiroyingizdek! 💫",
+    "Malikam, o'qishingiz bilan qalblarni zabt etdingiz! 💗",
+    "Bugungi hisobotingiz saltanatingizni boyitdi, malikam! 🏰",
+    "Qirolicham, bilim toji sizga eng yarashadigani! 👑",
+    "Ofarin, Qirolicham! Har betingiz — mulkingizga bir dur! 💎",
+    "Yashang, Qirolicham! Mutolaada sizga teng yo'q! 🌹",
+    "Barakalla, Qirolicham — o'qishingiz saltanatingizni boyitdi! 🏰",
+    "Qirolicham, bilimingiz — eng qimmat toju taxtingiz! ✨",
+]
+
+PRAISES_BOYS = [
+    "Shahzodam, bilim qilichini yana charxlading! ⚔️",
+    "Ofarin, shahzodam! Kitob — kelajak saltanating kaliti! 🗝",
+    "Qoyil, mard shahzodam! Jasorating tengsiz! 🛡",
+    "Shahzodam, har bet — toju taxting sari qadam! 👑",
+    "Yashavor, shahzodam! Bilim bilan cho'qqilarni zabt et! 🏔",
+    "Barakalla, botir shahzodam — aqling ham kuchingdek! 💪",
+    "Shahzodam, nomingni tarixga yozyapsan! 📜",
+    "Tan berdim, shahzodam — kitobxonlik shohsupasi seniki! 🏆",
+    "Qirolim, bilim qilichini yana charxlading! ⚔️",
+    "Ofarin, Qirolim! Mutolaa — saltanating ustuni! 🏛",
+    "Yashavor, Qirolim! Har bet — mulking sari qadam! 👑",
+    "Barakalla, Qirolim — biliming bilan taxtingni mustahkamlading! 🛡",
+    "Qirolim, o'qiganing bilan shohlar shohi bo'lyapsan! 🏆",
+]
+
+
+def _pick_praise(user) -> str:
+    """A warm, playful praise for the report confirmation, gender-aware."""
+    pool = list(PRAISES_GENERAL)
+    gender = (getattr(user, "gender", "") or "").lower()
+    if gender == "female":
+        pool += PRAISES_GIRLS
+    elif gender == "male":
+        pool += PRAISES_BOYS
+    return random.choice(pool)
+
+
 @sync_to_async
 def _today_books_with_type(user, today):
     """Deduplicated [(title, is_audio), ...] across all today's reports' M2M books."""
@@ -1437,6 +1521,9 @@ async def _do_confirm_report(message, user, state: FSMContext):
         )
     else:
         done_text = "Ваш отчёт отправлен." if lang == "ru" else "Hisobotingiz yuborildi."
+    # Warm, playful praise on top of the confirmation (Uzbek only).
+    if lang != "ru":
+        done_text = f"<b>{_pick_praise(user)}</b>\n\n{done_text}"
     if final_group_message_id:
         chat_id_str = str(final_group_chat_id).lstrip("-")
         if chat_id_str.startswith("100"):
