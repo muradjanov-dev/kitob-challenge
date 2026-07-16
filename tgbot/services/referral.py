@@ -49,6 +49,28 @@ class ReferralService:
         return await sync_to_async(UserReferal.objects.filter(referrer=user).count)()
 
     @staticmethod
+    async def get_referral_list(user: TelegramProfile, limit: int = 50):
+        """Names + join dates of the people this user has invited (newest
+        first). Only confirmed referrals appear — UserReferal rows are created
+        once the invitee submits their first report."""
+        @sync_to_async
+        def _fetch():
+            qs = (
+                UserReferal.objects
+                .filter(referrer=user)
+                .select_related("referred_user")
+                .order_by("-created_at")
+            )
+            return [
+                (
+                    (r.referred_user.full_name if r.referred_user else None) or "Foydalanuvchi",
+                    r.created_at,
+                )
+                for r in qs[:limit]
+            ]
+        return await _fetch()
+
+    @staticmethod
     async def process_referral(user: TelegramProfile, referral_code: str):
         """
         Validates and processes a new referral.

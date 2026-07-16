@@ -1230,6 +1230,22 @@ async def referral_link_handler(call: types.CallbackQuery, state: FSMContext):
         f"💎 До следующего Premium: <b>{next_prem}</b> приглашений\n\n"
         f"<i>(Примечание: приглашение засчитывается только после того, как ваш друг отправит свой первый отчёт о книге — одного /start недостаточно.)</i>",
     )
+
+    # Append the list of people this user has invited.
+    from django.utils.html import escape as _esc
+    ref_list = await ReferralService.get_referral_list(user)
+    if ref_list:
+        lines = [f"{i}. {_esc(name)}" for i, (name, _created) in enumerate(ref_list, 1)]
+        header = _t(lang, "\n\n👥 <b>Siz taklif qilganlar:</b>\n",
+                    "\n\n👥 <b>Вы пригласили:</b>\n")
+        text += header + "\n".join(lines)
+        if ref_count > len(ref_list):
+            text += _t(lang, f"\n… va yana <b>{ref_count - len(ref_list)}</b> ta",
+                       f"\n… и ещё <b>{ref_count - len(ref_list)}</b>")
+    else:
+        text += _t(lang, "\n\n👥 <i>Hozircha hech kimni taklif qilmagansiz.</i>",
+                   "\n\n👥 <i>Пока вы никого не пригласили.</i>")
+
     await call.message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
 
 
