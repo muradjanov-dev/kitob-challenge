@@ -79,6 +79,60 @@ async def admin_start_zanjir_cb(call: types.CallbackQuery, state: FSMContext = N
     await _launch_chain_game(call.message)
 
 
+@dp.message_handler(IsPrivate(), commands=["fix_referrals"], state="*")
+async def admin_fix_referrals(message: types.Message, state: FSMContext = None):
+    """Admin-only backfill: process every referral that got stuck 'pending'
+    (invited user registered + already reported, but was never counted due to
+    the old first-report-only bug). Idempotent — process_referral skips anyone
+    already referred."""
+    from asgiref.sync import sync_to_async
+    from tgbot.models import TelegramProfile, ConfirmationReport, UserReferal
+    from tgbot.services.referral import ReferralService
+
+    user = await aget_user(message.from_user.id)
+    if not (user and user.is_admin):
+        await message.answer("Siz admin emassiz!")
+        return
+    await message.answer("🔧 Referal backfill boshlandi…")
+
+    @sync_to_async
+    def _stuck():
+        out = []
+        qs = (
+            TelegramProfile.objects
+            .filter(is_registered=True)
+            .exclude(pending_referral_code__isnull=True)
+            .exclude(pending_referral_code__exact="")
+        )
+        for p in qs:
+            if not ConfirmationReport.objects.filter(user=p).exists():
+                continue  # hasn't read yet — leave pending (fires on next report)
+            if UserReferal.objects.filter(referred_user=p).exists():
+                continue  # already counted
+            out.append((p.id, p.pending_referral_code))
+        return out
+
+    stuck = await _stuck()
+    done = failed = 0
+    for pid, code in stuck:
+        try:
+            p = await sync_to_async(TelegramProfile.objects.get)(id=pid)
+            await sync_to_async(
+                TelegramProfile.objects.filter(id=pid).update
+            )(pending_referral_code=None)
+            if await ReferralService.process_referral(p, code):
+                done += 1
+        except Exception as e:
+            failed += 1
+            print(f"fix_referrals {pid}: {e}")
+
+    await message.answer(
+        f"✅ Backfill tugadi.\nTopilgan (o'qigan, hisoblanmagan): <b>{len(stuck)}</b>\n"
+        f"Hisoblandi: <b>{done}</b>\nXato: <b>{failed}</b>",
+        parse_mode="HTML",
+    )
+
+
 @dp.message_handler(IsPrivate(), commands=["test_weekly_report"], state="*")
 async def test_weekly_report_handler(message: types.Message, state: FSMContext = None):
     """Admin-only: trigger AI-generated weekly report card to self.

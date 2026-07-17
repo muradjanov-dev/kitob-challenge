@@ -1564,27 +1564,19 @@ async def _do_confirm_report(message, user, state: FSMContext):
     except Exception as e:
         print(f"check_user_achievements dispatch failed: {e}")
 
-    # Deferred referral: count the referral only after the invited user's
-    # FIRST ConfirmationReport. Avoids fake referrals that join but never read.
+    # Deferred referral: count the referral once the invited user has actually
+    # read — i.e. on ANY ConfirmationReport, not only the very first. Submitting
+    # a report already proves they read, so this keeps the anti-fake-referral
+    # intent while being robust: the old "first report only" gate silently lost
+    # referrals whenever the first report was a combined audio+text pair (two
+    # rows) or the one-shot processing failed, and never retried. Clearing the
+    # code after processing means it still fires at most once per invitee.
     @sync_to_async
     def _consume_pending_ref():
         from tgbot.models import TelegramProfile as _TP
-        # Re-fetch the user to read latest pending_referral_code (might have
-        # changed since handler entry).
+        # Re-fetch to read the latest pending_referral_code.
         fresh = _TP.objects.filter(id=user.id).first()
         if not fresh or not fresh.pending_referral_code:
-            return None
-        # Only on first ever report — ConfirmationReport.count() == 1 (the row
-        # we just inserted; combined audio adds a second is_audio=True row, so
-        # check by ordering by id ascending and matching our id).
-        is_first_ever = (
-            ConfirmationReport.objects
-            .filter(user=fresh)
-            .order_by("id")
-            .first()
-            .id == report.id
-        )
-        if not is_first_ever:
             return None
         code = fresh.pending_referral_code
         # Clear immediately to prevent double-counting on concurrent triggers.

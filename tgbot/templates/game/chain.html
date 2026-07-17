@@ -44,6 +44,14 @@
     .lk-main{flex:1;min-width:0}
     .lk-name{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .lk-by{font-size:12px;color:var(--muted)}
+    .link.rejected .lk-name{text-decoration:line-through;opacity:.5}
+    .voteb{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:9px;
+      padding:6px 9px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+    .voteb:hover{border-color:var(--bad);color:var(--bad)}
+    .voteb.voted{opacity:.5}
+    .rejtag{font-size:11px;font-weight:800;color:var(--bad);border:1px solid var(--bad);border-radius:8px;padding:3px 7px}
+    .lifetime{text-align:center;color:var(--muted);font-size:12px;margin-top:14px}
+    .me small{display:block;font-size:11px;color:var(--muted);font-weight:600;margin-top:2px}
     .lb{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
     .lb:last-child{border-bottom:0}
     .rank{width:26px;text-align:center;font-weight:900}
@@ -100,6 +108,8 @@
   <!-- SCHEDULED / FINISHED / NONE -->
   <div id="info" class="card big hidden"></div>
 
+  <div id="lifetime" class="lifetime hidden"></div>
+
   <script>
     var tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
     if (tg){ try{ tg.ready(); tg.expand(); }catch(e){} }
@@ -151,14 +161,26 @@
              + '<div class="pts">'+r.points+'</div></div>';
         });
         $('board').innerHTML = b || '<div class="muted" style="padding:6px 0">Hali hech kim ochko olmadi — birinchi bo\'ling!</div>';
-        // chain
+        // chain + community "not a real book" voting
         var c = '';
         (s.recent||[]).forEach(function(k){
-          c += '<div class="link"><div class="badge">'+esc((k.letter||'?').toUpperCase())+'</div>'
+          var right = '';
+          if (k.rejected){
+            right = '<span class="rejtag">bekor</span>';
+          } else if (!k.mine){
+            var vc = k.votes ? (' '+k.votes) : '';
+            right = '<button class="voteb'+(k.voted?' voted':'')+'" data-idx="'+k.idx+'"'
+                  + (k.voted?' disabled':'')+'>❌ yo\'q'+vc+'</button>';
+          }
+          c += '<div class="link'+(k.rejected?' rejected':'')+'"><div class="badge">'
+             + esc((k.letter||'?').toUpperCase())+'</div>'
              + '<div class="lk-main"><div class="lk-name">'+esc(k.display)+'</div>'
-             + '<div class="lk-by">'+esc(k.name)+'</div></div></div>';
+             + '<div class="lk-by">'+esc(k.name)+'</div></div>'+right+'</div>';
         });
         $('chain').innerHTML = c || '<div class="muted" style="padding:6px 0">Zanjir hali bo\'sh.</div>';
+        Array.prototype.forEach.call($('chain').querySelectorAll('.voteb'), function(b){
+          b.addEventListener('click', function(){ challenge(parseInt(b.getAttribute('data-idx'),10)); });
+        });
         localSeconds = s.seconds;
       } else {
         live.classList.add('hidden'); info.classList.remove('hidden');
@@ -190,6 +212,9 @@
           localSeconds = 0;
         }
       }
+      var lt = s.lifetime || {games:0, points:0, links:0};
+      var lel = $('lifetime'); lel.classList.remove('hidden');
+      lel.innerHTML = "📊 Umumiy: <b>"+lt.games+"</b> o'yin · <b>"+lt.points+"</b> ochko · <b>"+lt.links+"</b> zanjir";
       lastStatus = s.status;
       $('timer').textContent = fmt(localSeconds);
     }
@@ -222,17 +247,29 @@
         } else {
           t.className='toast bad';
           t.textContent = ({
-            not_in_dictionary:"Bu nom lug'atda yo'q 🤔 boshqa mashhur kitob/muallif nomini sinang",
             wrong_letter:"«"+((r.required||'').toUpperCase())+"» harfi bilan boshlanishi kerak!",
             already_used:"Bu allaqachon aytilgan 🔁",
             not_live:"O'yin hozir faol emas.",
-            empty:"Nom yozing."
+            empty:"To'liqroq nom yozing."
           })[r.error] || "Qabul qilinmadi, qayta urining.";
           if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.notificationOccurred('error')}catch(e){}}
         }
       }).catch(function(){
         $('toast').className='toast bad'; $('toast').textContent='Tarmoq xatosi.';
       }).then(function(){ busy=false; $('sendBtn').disabled=false; inp.focus(); });
+    }
+
+    function challenge(idx){
+      if (isNaN(idx)) return;
+      api('/zanjir/api/challenge/', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({idx: idx})
+      }).then(function(r){
+        if (r && r.ok && r.rejected){
+          var t=$('toast'); t.className='toast ok'; t.textContent='✅ Javob bekor qilindi (3 ovoz).';
+        }
+        poll();
+      }).catch(function(){});
     }
 
     $('sendBtn').addEventListener('click', send);

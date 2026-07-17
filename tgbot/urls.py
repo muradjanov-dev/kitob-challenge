@@ -3,7 +3,9 @@ from .views import home, telegram
 from src.settings import WEBHOOK_PATH
 from tgbot.views import health_check_celery, health_check_redis
 from tgbot.shop_views import shop_index, api_products, api_me, api_buy
-from tgbot.game_views import chain_index, api_chain_state, api_chain_submit
+from tgbot.game_views import (
+    chain_index, api_chain_state, api_chain_submit, api_chain_challenge,
+)
 
 
 urlpatterns = [
@@ -18,4 +20,5 @@ urlpatterns = [
     path("zanjir/", chain_index, name="chain"),
     path("zanjir/api/state/", api_chain_state, name="chain-api-state"),
     path("zanjir/api/submit/", api_chain_submit, name="chain-api-submit"),
+    path("zanjir/api/challenge/", api_chain_challenge, name="chain-api-challenge"),
 ]
