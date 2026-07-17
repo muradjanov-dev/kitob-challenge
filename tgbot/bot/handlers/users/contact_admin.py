@@ -270,14 +270,21 @@ async def owner_reply_start(call: types.CallbackQuery, state: FSMContext):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return
     target_user_id = call.data.split(":", 1)[1]
-    await state.finish()
-    await state.update_data(reply_target_user_id=target_user_id, is_owner_reply=True)
     await call.answer()
     try:
         await call.message.edit_reply_markup(reply_markup=None)
     except Exception:
         pass
-    await call.message.answer(
+    await begin_owner_reply(call.message, state, target_user_id)
+
+
+async def begin_owner_reply(message: types.Message, state: FSMContext, target_user_id):
+    """Put the admin into 'reply as project owner' mode for `target_user_id`,
+    then prompt for the message. Shared by the inline button and the
+    /start msg_<telegram_id> deep link."""
+    await state.finish()
+    await state.update_data(reply_target_user_id=str(target_user_id), is_owner_reply=True)
+    await message.answer(
         f"✍️ Loyiha asoschisi nomidan yoziladigan xabarni kiriting (foydalanuvchi: <code>{target_user_id}</code>):\n"
         f"<i>Matn, rasm, video, fayl — istalgan format</i>",
         parse_mode="HTML",

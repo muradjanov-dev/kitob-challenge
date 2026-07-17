@@ -319,6 +319,22 @@ def _format_books_section(user) -> str:
     return section
 
 
+_BOT_USERNAME = None
+
+
+async def _ensure_bot_username():
+    """Cache the bot's @username once — needed to build t.me deep links inside
+    the (sync) profile-card text builder."""
+    global _BOT_USERNAME
+    if _BOT_USERNAME is None:
+        try:
+            from tgbot.bot.loader import bot
+            _BOT_USERNAME = (await bot.get_me()).username or ""
+        except Exception:
+            _BOT_USERNAME = ""
+    return _BOT_USERNAME
+
+
 def _build_user_detail(user_id: int) -> str:
     """Returns full HTML detail for a single TelegramProfile (admin view)."""
     from django.db.models import Count, Avg, Sum, F
@@ -400,6 +416,15 @@ def _build_user_detail(user_id: int) -> str:
     # Tapping the name (or the explicit link) opens the user's Telegram profile
     # — works even when they have no @username, since it goes by numeric id.
     name_link = f'<a href="tg://user?id={user.telegram_id}">{_esc(full_name)}</a>'
+    # Prominent one-tap actions right under the name: "Yozish" (opens the owner
+    # message-relay via a deep link — reliable, no @username needed) and
+    # "Profil" (native Telegram profile).
+    _profile_a = f'<a href="tg://user?id={user.telegram_id}">🔗 Profil</a>'
+    if _BOT_USERNAME:
+        _write_a = f'<a href="https://t.me/{_BOT_USERNAME}?start=msg_{user.telegram_id}">✍️ YOZISH</a>'
+        action_line = f"{_write_a}   ·   {_profile_a}\n"
+    else:
+        action_line = f"{_profile_a}\n"
     reg_status = "✅ Ro'yxatdan to'liq o'tgan" if user.is_registered else "🚫 Tugatmagan"
     blocked = "🚫 Bloklangan" if user.is_blocked else ""
     admin_flag = "👑 Admin" if user.is_admin else ""
@@ -417,9 +442,9 @@ def _build_user_detail(user_id: int) -> str:
 
     return (
         f"👤 <b>{name_link}</b>\n"
+        f"{action_line}"
         f"🆔 <code>{user.telegram_id}</code> · DB id: {user.id}\n"
         f"📱 {username_str}\n"
-        f"🔗 <a href=\"tg://user?id={user.telegram_id}\">Telegram profiliga o'tish</a>\n"
         f"🌐 Til: {(user.language or '—').upper()}\n"
         f"🚻 Jins: {gender_label}\n"
         f"🗺 Hudud: {region_name}\n"
@@ -813,6 +838,7 @@ async def open_profile_card_by_tid(message, telegram_id: int):
             return None
         return _build_user_detail(u.id), u, _is_user_premium(u)
 
+    await _ensure_bot_username()
     data = await sync_to_async(_fetch)(telegram_id)
     if not data:
         await message.answer("❌ Bunday foydalanuvchi topilmadi.")
@@ -835,6 +861,7 @@ async def adm_user_detail(call: types.CallbackQuery):
             return
         raw = call.data.split(":", 1)[1]
         target_id = int(raw)
+        await _ensure_bot_username()
         text, target_user, is_premium = await sync_to_async(_detail_text_user_premium)(target_id)
         back_kb = _user_detail_markup(target_user, is_premium)
         try:

@@ -76,6 +76,17 @@ async def do_start(message: types.Message, state: FSMContext):
             await open_profile_card_by_tid(message, int(target_tid))
             return
 
+    # Admin deep link: /start msg_<telegram_id> — start writing a message to
+    # that user (relayed as the project owner). Powers the "✍️ YOZISH" link on
+    # the profile card. Non-admins fall through to the normal start flow.
+    if args and args.startswith("msg_") and user and user.is_admin:
+        target_tid = args[len("msg_"):]
+        if target_tid.isdigit():
+            await state.finish()
+            from tgbot.bot.handlers.users.contact_admin import begin_owner_reply
+            await begin_owner_reply(message, state, target_tid)
+            return
+
     # Handle quiz deep link: /start quiz_<code>
     if args and args.startswith("quiz_"):
         if already_registered:
