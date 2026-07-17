@@ -22,7 +22,7 @@ from tgbot.models import ChainGame, ChainWord, ChainScore
 from tgbot.services.chain_text import normalize, first_letter, last_letter
 
 POINTS_PER_LINK = 10
-DEFAULT_DURATION_MIN = 12
+DEFAULT_DURATION_MIN = 10
 
 # Reward tiers (Kitobcha) by final rank; everyone else in the top 20 with at
 # least one link gets PARTICIPATION.
