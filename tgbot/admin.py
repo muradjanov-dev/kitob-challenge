@@ -510,3 +510,40 @@ class BookQuizAnswerAdmin(admin.ModelAdmin):
 @admin.register(models.BookQuizPromoState)
 class BookQuizPromoStateAdmin(admin.ModelAdmin):
     list_display = ('launched_on', 'last_sent_on')
+
+
+################################################################################
+#                            KITOB ZANJIRI (GAME)                              #
+################################################################################
+
+@admin.register(models.ChainWord)
+class ChainWordAdmin(admin.ModelAdmin):
+    list_display = ('display', 'kind', 'first_letter', 'last_letter', 'is_active')
+    list_filter = ('kind', 'is_active', 'first_letter')
+    list_editable = ('is_active',)
+    search_fields = ('display', 'norm')
+    readonly_fields = ('norm', 'first_letter', 'last_letter', 'created_at', 'updated_at')
+
+    def save_model(self, request, obj, form, change):
+        # Keep the normalized/letter fields consistent with the display value.
+        from tgbot.services.chain_text import normalize, first_letter, last_letter
+        obj.display = (obj.display or "").strip()
+        obj.norm = normalize(obj.display)
+        obj.first_letter = first_letter(obj.display)
+        obj.last_letter = last_letter(obj.display)
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(models.ChainGame)
+class ChainGameAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'status', 'current_letter', 'starts_at', 'ends_at', 'rewarded')
+    list_filter = ('status', 'rewarded')
+    readonly_fields = ('chain', 'used_norms', 'created_at', 'updated_at')
+
+
+@admin.register(models.ChainScore)
+class ChainScoreAdmin(admin.ModelAdmin):
+    list_display = ('id', 'game', 'user', 'points', 'links', 'rewarded')
+    list_filter = ('rewarded',)
+    search_fields = ('user__full_name', 'user__telegram_id')
+    readonly_fields = ('created_at', 'updated_at')

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Kitob Zanjiri</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root{
+      --bg:#0f1115; --card:#171a21; --card2:#1e222b; --text:#eef1f6; --muted:#9aa4b2;
+      --accent:#7c5cff; --accent2:#00c2a8; --ok:#25c26e; --bad:#ff5d6c; --line:#262b36;
+    }
+    @media (prefers-color-scheme: light){
+      :root{ --bg:#f4f6fb; --card:#ffffff; --card2:#f0f2f8; --text:#141821; --muted:#5b6472;
+             --accent:#6a44ff; --accent2:#00a892; --line:#e6e9f2; }
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+      -webkit-font-smoothing:antialiased;padding:14px 12px 28px;max-width:640px;margin:0 auto}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+    .title{font-weight:800;font-size:19px;letter-spacing:.2px}
+    .title small{display:block;font-weight:600;font-size:12px;color:var(--muted)}
+    .timer{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-weight:800;
+      font-variant-numeric:tabular-nums;min-width:74px;text-align:center}
+    .timer .lbl{display:block;font-size:10px;color:var(--muted);font-weight:600}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:12px}
+    .letterwrap{text-align:center;background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;color:#fff}
+    .letterwrap .hint{font-size:13px;opacity:.92;font-weight:600}
+    .letter{font-size:78px;font-weight:900;line-height:1.05;margin:2px 0 4px;text-shadow:0 3px 14px rgba(0,0,0,.25)}
+    .inrow{display:flex;gap:8px;margin-top:10px}
+    input[type=text]{flex:1;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:12px;
+      padding:13px 14px;font-size:16px;outline:none}
+    input[type=text]:focus{border-color:var(--accent)}
+    button.send{background:var(--accent);color:#fff;border:0;border-radius:12px;padding:0 18px;font-size:15px;font-weight:800;cursor:pointer}
+    button.send:disabled{opacity:.5}
+    .toast{min-height:20px;margin-top:9px;font-size:14px;font-weight:700;text-align:center}
+    .toast.ok{color:var(--ok)} .toast.bad{color:var(--bad)}
+    .sect{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:2px 0 10px}
+    .link{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--line)}
+    .link:last-child{border-bottom:0}
+    .badge{background:var(--card2);border:1px solid var(--line);border-radius:8px;min-width:26px;height:26px;
+      display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;text-transform:uppercase}
+    .lk-main{flex:1;min-width:0}
+    .lk-name{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .lk-by{font-size:12px;color:var(--muted)}
+    .lb{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+    .lb:last-child{border-bottom:0}
+    .rank{width:26px;text-align:center;font-weight:900}
+    .rank.g1{color:#ffcc4d}.rank.g2{color:#c9d1dc}.rank.g3{color:#e6a56b}
+    .lb-name{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pts{font-weight:900;color:var(--accent)}
+    .me{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;
+      justify-content:space-between;align-items:center;margin-bottom:12px}
+    .me b{font-size:20px;color:var(--accent)}
+    .big{text-align:center;padding:26px 16px}
+    .big .em{font-size:46px}
+    .big h2{margin:10px 0 6px;font-size:20px}
+    .big p{color:var(--muted);margin:0;font-size:14px;line-height:1.5}
+    .muted{color:var(--muted)}
+    .rules{font-size:13px;color:var(--muted);line-height:1.6;margin-top:8px}
+    .hidden{display:none}
+    .pop{animation:pop .25s ease}
+    @keyframes pop{0%{transform:scale(.96)}60%{transform:scale(1.02)}100%{transform:scale(1)}}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="title">🔗 Kitob Zanjiri <small id="subtitle">Jonli o'yin</small></div>
+    <div class="timer"><span class="lbl" id="timerLbl">QOLDI</span><span id="timer">--:--</span></div>
+  </div>
+
+  <!-- LIVE -->
+  <div id="live" class="hidden">
+    <div class="card letterwrap">
+      <div class="hint" id="letterHint">Shu harf bilan boshlanadigan kitob yoki muallif</div>
+      <div class="letter" id="letter">–</div>
+    </div>
+    <div class="card" style="margin-top:-2px">
+      <div class="inrow">
+        <input id="answer" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+               placeholder="Kitob yoki muallif nomi…" enterkeyhint="send">
+        <button class="send" id="sendBtn">Yuborish</button>
+      </div>
+      <div class="toast" id="toast"></div>
+    </div>
+    <div class="me">
+      <span>Sizning ballaringiz</span><b id="myPts">0</b>
+    </div>
+    <div class="card">
+      <div class="sect">🏆 Reyting</div>
+      <div id="board"></div>
+    </div>
+    <div class="card">
+      <div class="sect">⛓ Oxirgi zanjir</div>
+      <div id="chain"></div>
+    </div>
+  </div>
+
+  <!-- SCHEDULED / FINISHED / NONE -->
+  <div id="info" class="card big hidden"></div>
+
+  <script>
+    var tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+    if (tg){ try{ tg.ready(); tg.expand(); }catch(e){} }
+
+    function readInit(){
+      if (tg && tg.initData) return tg.initData;
+      try{ var q=new URLSearchParams(location.search).get('tgWebAppData'); if(q) return q; }catch(e){}
+      var h=(location.hash||'').replace(/^#/,'');
+      if(h){ try{ var d=new URLSearchParams(h).get('tgWebAppData'); if(d) return d; }catch(e){} }
+      return '';
+    }
+    var INIT = readInit();
+
+    var $ = function(id){ return document.getElementById(id); };
+    var localSeconds = 0, lastStatus = '', busy = false;
+
+    function fmt(s){
+      s = Math.max(0, s|0);
+      var m = Math.floor(s/60), r = s%60;
+      return (m<10?'0':'')+m+':'+(r<10?'0':'')+r;
+    }
+    function esc(t){ return (t||'').replace(/[&<>"]/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+    function api(path, opts){
+      opts = opts || {};
+      opts.headers = Object.assign({'X-Telegram-Init-Data': INIT}, opts.headers||{});
+      return fetch(path, opts).then(function(r){ return r.json(); });
+    }
+
+    function render(s){
+      var live = $('live'), info = $('info');
+      if (s.status === 'live'){
+        live.classList.remove('hidden'); info.classList.add('hidden');
+        $('subtitle').textContent = 'Jonli o\'yin · ' + s.chain_len + ' zanjir';
+        $('timerLbl').textContent = 'QOLDI';
+        var letterEl = $('letter');
+        if (letterEl.textContent !== (s.current_letter||'–')){
+          letterEl.textContent = s.current_letter || '–';
+          letterEl.classList.remove('pop'); void letterEl.offsetWidth; letterEl.classList.add('pop');
+        }
+        $('myPts').textContent = s.your_points || 0;
+        // leaderboard
+        var b = '';
+        (s.leaderboard||[]).forEach(function(r,i){
+          var cls = i===0?'g1':i===1?'g2':i===2?'g3':'';
+          b += '<div class="lb"><div class="rank '+cls+'">'+(i+1)+'</div>'
+             + '<div class="lb-name">'+esc(r.name)+'</div>'
+             + '<div class="pts">'+r.points+'</div></div>';
+        });
+        $('board').innerHTML = b || '<div class="muted" style="padding:6px 0">Hali hech kim ochko olmadi — birinchi bo\'ling!</div>';
+        // chain
+        var c = '';
+        (s.recent||[]).forEach(function(k){
+          c += '<div class="link"><div class="badge">'+esc((k.letter||'?').toUpperCase())+'</div>'
+             + '<div class="lk-main"><div class="lk-name">'+esc(k.display)+'</div>'
+             + '<div class="lk-by">'+esc(k.name)+'</div></div></div>';
+        });
+        $('chain').innerHTML = c || '<div class="muted" style="padding:6px 0">Zanjir hali bo\'sh.</div>';
+        localSeconds = s.seconds;
+      } else {
+        live.classList.add('hidden'); info.classList.remove('hidden');
+        if (s.status === 'scheduled'){
+          $('timerLbl').textContent = 'BOSHLANISH';
+          $('subtitle').textContent = 'Tez orada';
+          info.innerHTML = '<div class="em">⏳</div><h2>O\'yin boshlanmoqda</h2>'
+            + '<p>Kitob Zanjiri boshlanishini kuting. Tayyor turing!</p>'
+            + '<div class="rules">Berilgan <b>harf</b> bilan boshlanadigan kitob yoki muallif nomini eng tez yozgan ochko oladi. Zanjir davom etadi. Eng ko\'p ochko yig\'gan — Kitobcha yutadi! 🪙</div>';
+          localSeconds = s.seconds;
+        } else if (s.status === 'finished'){
+          $('timerLbl').textContent = 'TUGADI'; $('timer').textContent = '00:00';
+          $('subtitle').textContent = 'Tugadi';
+          var w = '';
+          (s.leaderboard||[]).forEach(function(r,i){
+            var medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
+            w += '<div class="lb"><div class="rank">'+medal+'</div><div class="lb-name">'+esc(r.name)+'</div><div class="pts">'+r.points+'</div></div>';
+          });
+          info.innerHTML = '<div class="em">🏁</div><h2>O\'yin tugadi!</h2>'
+            + '<p>Keyingi Kitob Zanjiri tez orada — kuzatib boring!</p>'
+            + (w ? '<div style="text-align:left;margin-top:14px">'+w+'</div>'
+                 : '<p class="muted" style="margin-top:12px">Bu safar hech kim qatnashmadi.</p>');
+          localSeconds = 0;
+        } else {
+          $('timerLbl').textContent = '—'; $('timer').textContent = '--:--';
+          $('subtitle').textContent = 'Kutilmoqda';
+          info.innerHTML = '<div class="em">🔗</div><h2>Hozircha jonli o\'yin yo\'q</h2>'
+            + '<p>Kitob Zanjiri haftada 2 marta bo\'ladi. Keyingi o\'yin e\'lon qilinadi — guruhni kuzating!</p>';
+          localSeconds = 0;
+        }
+      }
+      lastStatus = s.status;
+      $('timer').textContent = fmt(localSeconds);
+    }
+
+    function poll(){
+      api('/zanjir/api/state/').then(function(s){
+        if (!s || s.ok === false){
+          $('info').classList.remove('hidden'); $('live').classList.add('hidden');
+          $('info').innerHTML = '<div class="em">🔒</div><h2>Kirish xatosi</h2><p>Iltimos, saytni ✨ Sayt tugmasi orqali qayta oching.</p>';
+          return;
+        }
+        render(s);
+      }).catch(function(){});
+    }
+
+    function send(){
+      if (busy) return;
+      var inp = $('answer'); var text = (inp.value||'').trim();
+      if (!text) return;
+      busy = true; $('sendBtn').disabled = true;
+      api('/zanjir/api/submit/', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({text: text})
+      }).then(function(r){
+        var t = $('toast');
+        if (r.ok){
+          t.className='toast ok'; t.textContent='✅ +'+r.gained+' — '+r.display+'!';
+          inp.value=''; if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.notificationOccurred('success')}catch(e){}}
+          poll();
+        } else {
+          t.className='toast bad';
+          t.textContent = ({
+            not_in_dictionary:"Bu nom lug'atda yo'q 🤔 boshqa mashhur kitob/muallif nomini sinang",
+            wrong_letter:"«"+((r.required||'').toUpperCase())+"» harfi bilan boshlanishi kerak!",
+            already_used:"Bu allaqachon aytilgan 🔁",
+            not_live:"O'yin hozir faol emas.",
+            empty:"Nom yozing."
+          })[r.error] || "Qabul qilinmadi, qayta urining.";
+          if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.notificationOccurred('error')}catch(e){}}
+        }
+      }).catch(function(){
+        $('toast').className='toast bad'; $('toast').textContent='Tarmoq xatosi.';
+      }).then(function(){ busy=false; $('sendBtn').disabled=false; inp.focus(); });
+    }
+
+    $('sendBtn').addEventListener('click', send);
+    $('answer').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); send(); }});
+
+    // local 1s countdown between polls
+    setInterval(function(){
+      if (localSeconds > 0){ localSeconds--; $('timer').textContent = fmt(localSeconds); }
+    }, 1000);
+    // server sync
+    poll();
+    setInterval(poll, 1500);
+  </script>
+</body>
+</html>

@@ -111,6 +111,28 @@ async def do_start(message: types.Message, state: FSMContext):
         await send_daily_report_handler(message, state)
         return
 
+    # Kitob Zanjiri deep link: /start zanjir — from the group announcement
+    # button. Opens the live game Mini App (web_app buttons are only allowed in
+    # private chats, so we hand it off here in the DM).
+    if args == "zanjir" and already_registered:
+        if user and not user.is_registered:
+            user.is_registered = True
+            await sync_to_async(user.save)(update_fields=["is_registered"])
+        await state.finish()
+        from aiogram.types import (
+            InlineKeyboardMarkup as _IKM, InlineKeyboardButton as _IKB, WebAppInfo as _WAI,
+        )
+        from src.settings import WEB_DOMAIN
+        kb = _IKM().add(_IKB(
+            "🔗 Kitob Zanjirini ochish", web_app=_WAI(url=f"{WEB_DOMAIN}/zanjir/"),
+        ))
+        await message.answer(
+            "🔗 <b>Kitob Zanjiri</b> — jonli o'yin boshlandi!\n"
+            "Pastdagi tugmani bosing va qatnashing 👇",
+            reply_markup=kb, parse_mode="HTML",
+        )
+        return
+
     if already_registered:
         if user and not user.is_registered:
             user.is_registered = True

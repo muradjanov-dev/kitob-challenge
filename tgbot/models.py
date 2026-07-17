@@ -1100,3 +1100,93 @@ class ReferralBoomParticipant(BaseModel):
 
     def __str__(self):
         return f"{self.user.full_name} — {self.boom.title} ({self.referrals_count} taklif)"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Kitob Zanjiri — a live, twice-a-week "book chain" race on the website Mini
+# App. A session shows a required starting letter; everyone races to submit a
+# book title / author name starting with it (from the ChainWord dictionary, not
+# already used). The first valid submission wins the link, scores a point, and
+# the chain advances to a new letter. Top scorers earn Kitobcha at the end.
+# ─────────────────────────────────────────────────────────────────────────────
+class ChainWord(BaseModel):
+    KIND_BOOK = "book"
+    KIND_AUTHOR = "author"
+    KIND_CHOICES = [(KIND_BOOK, "Kitob"), (KIND_AUTHOR, "Muallif")]
+
+    display = models.CharField(max_length=200, help_text="Shown to players.")
+    norm = models.CharField(
+        max_length=200, unique=True, db_index=True,
+        help_text="Normalized lookup/dedupe key (lowercase, unified apostrophes).",
+    )
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default=KIND_BOOK)
+    first_letter = models.CharField(max_length=1, db_index=True, default="")
+    last_letter = models.CharField(max_length=1, db_index=True, default="")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "chain_words"
+        verbose_name = "Kitob Zanjiri — So'z"
+        verbose_name_plural = "Kitob Zanjiri — Lug'at"
+        ordering = ("norm",)
+
+    def __str__(self):
+        return f"{self.display} ({self.first_letter}…{self.last_letter})"
+
+
+class ChainGame(BaseModel):
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_LIVE = "live"
+    STATUS_FINISHED = "finished"
+    STATUS_CHOICES = [
+        (STATUS_SCHEDULED, "Rejalashtirilgan"),
+        (STATUS_LIVE, "Jonli"),
+        (STATUS_FINISHED, "Tugagan"),
+    ]
+
+    title = models.CharField(max_length=120, default="Kitob Zanjiri")
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    current_letter = models.CharField(max_length=1, default="")
+    chain = models.JSONField(
+        default=list,
+        help_text='Won links: [{"norm","display","user_id","name","letter","at"}].',
+    )
+    used_norms = models.JSONField(
+        default=list, help_text="Normalized words already played (no repeats).",
+    )
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "chain_games"
+        verbose_name = "Kitob Zanjiri — O'yin"
+        verbose_name_plural = "Kitob Zanjiri — O'yinlar"
+        ordering = ("-starts_at",)
+
+    def __str__(self):
+        return f"{self.title} #{self.id} — {self.status} ({self.starts_at:%d.%m %H:%M})"
+
+    def is_live(self) -> bool:
+        now = timezone.now()
+        return self.status == self.STATUS_LIVE and self.starts_at <= now <= self.ends_at
+
+
+class ChainScore(BaseModel):
+    game = models.ForeignKey(ChainGame, on_delete=models.CASCADE, related_name="scores")
+    user = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="chain_scores",
+    )
+    points = models.PositiveIntegerField(default=0)
+    links = models.PositiveIntegerField(default=0, help_text="Links this user won.")
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "chain_scores"
+        verbose_name = "Kitob Zanjiri — Ball"
+        verbose_name_plural = "Kitob Zanjiri — Ballar"
+        unique_together = ("game", "user")
+        ordering = ("-points", "created_at")
+
+    def __str__(self):
+        return f"{self.user_id} → game {self.game_id}: {self.points}"

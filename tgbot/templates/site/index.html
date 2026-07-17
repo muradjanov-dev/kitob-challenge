@@ -287,6 +287,7 @@
         <p class="lead">Kitob Challenge — kitobxonlar uchun Telegram platformasi. Kunlik hisobot yuboring, mukofot tangalar (Kitobcha) ishlang, viktorinada qatnashing va reytingda peshqadam bo'ling.</p>
         <div class="cta-row">
           <a href="https://t.me/kitob_challange_bot" class="btn btn-primary" target="_blank" rel="noopener">📚 Bepul boshlash</a>
+          <a href="#" id="zanjirBtn" class="btn btn-ghost">🔗 Kitob Zanjiri</a>
           <a href="#premium" class="btn btn-ghost">💎 Premium haqida</a>
         </div>
         <div class="stats">
@@ -559,6 +560,13 @@
       if (id) url += "?tgWebAppData=" + encodeURIComponent(id);
       window.location.href = url;
     }
+    // Open the live Kitob Zanjiri game, carrying initData for auth.
+    function openGame() {
+      let url = "/zanjir/";
+      const id = tg && tg.initData ? tg.initData : "";
+      if (id) url += "?tgWebAppData=" + encodeURIComponent(id);
+      window.location.href = url;
+    }
     (function () {
       let x0 = null, y0 = null;
       document.addEventListener("touchstart", (e) => {
@@ -573,6 +581,8 @@
       }, { passive: true });
       const hint = document.getElementById("swipeHint");
       if (hint) hint.addEventListener("click", openShop);
+      const zbtn = document.getElementById("zanjirBtn");
+      if (zbtn) zbtn.addEventListener("click", function (e) { e.preventDefault(); openGame(); });
     })();
 
     // Mobile nav

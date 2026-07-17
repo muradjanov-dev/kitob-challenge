@@ -209,6 +209,9 @@ admin_keyboard.row(
     InlineKeyboardButton(text="🧩 Viktorina yuborish", callback_data="admin:book_quiz"),
 )
 admin_keyboard.row(
+    InlineKeyboardButton(text="🔗 Kitob Zanjiri boshlash", callback_data="admin:start_zanjir"),
+)
+admin_keyboard.row(
     InlineKeyboardButton(text="🛒 Do'kon boshqaruvi", callback_data="admin:shop"),
 )
 

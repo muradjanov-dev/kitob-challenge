@@ -30,6 +30,55 @@ async def admin_commands(message: types.Message, state: FSMContext = None):
         await message.answer("Siz admin emassiz!")
 
 
+async def _launch_chain_game(target_message):
+    """Start a live Kitob Zanjiri now (inline, so it works even if the
+    celery_worker image is stale) and reply with a button to open the game."""
+    from asgiref.sync import sync_to_async
+    from aiogram.types import WebAppInfo
+    from src.settings import WEB_DOMAIN
+
+    await target_message.answer("🔗 Kitob Zanjiri boshlanmoqda…")
+    try:
+        from tgbot.tasks import start_chain_game
+        await sync_to_async(start_chain_game)()
+    except Exception as e:
+        import traceback
+        print(f"[admin start_zanjir] {e}\n{traceback.format_exc()}")
+        await target_message.answer(f"❌ Xatolik: <code>{e}</code>", parse_mode="HTML")
+        return
+    kb = InlineKeyboardMarkup().add(InlineKeyboardButton(
+        "🔗 O'yinni ochish", web_app=WebAppInfo(url=f"{WEB_DOMAIN}/zanjir/"),
+    ))
+    await target_message.answer(
+        "✅ <b>Kitob Zanjiri boshlandi!</b> Guruhlarga e'lon yuborildi.",
+        parse_mode="HTML", reply_markup=kb,
+    )
+
+
+@dp.message_handler(IsPrivate(), commands=["zanjir"], state="*")
+async def admin_zanjir_command(message: types.Message, state: FSMContext = None):
+    user = await aget_user(message.from_user.id)
+    if not (user and user.is_admin):
+        await message.answer("Siz admin emassiz!")
+        return
+    if state is not None:
+        try:
+            await state.finish()
+        except Exception:
+            pass
+    await _launch_chain_game(message)
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data == "admin:start_zanjir", state="*")
+async def admin_start_zanjir_cb(call: types.CallbackQuery, state: FSMContext = None):
+    user = await aget_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    await call.answer("Boshlanmoqda…")
+    await _launch_chain_game(call.message)
+
+
 @dp.message_handler(IsPrivate(), commands=["test_weekly_report"], state="*")
 async def test_weekly_report_handler(message: types.Message, state: FSMContext = None):
     """Admin-only: trigger AI-generated weekly report card to self.

@@ -4121,3 +4121,100 @@ def send_admin_daily_report():
             print(f"[admin_daily_report] failed to send to {admin_id}: {e}")
 
     print(f"[admin_daily_report] sent to {len(admin_ids)} admins")
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Kitob Zanjiri — live twice-a-week "book chain" game on the website.
+# ────────────────────────────────────────────────────────────────────────
+@shared_task
+def start_chain_game():
+    """Create a fresh live Kitob Zanjiri and announce it to the reading groups
+    with a button that opens the game Mini App (via /start zanjir)."""
+    from tgbot.services.chain_game import (
+        create_live_game, finalize_due_games, DEFAULT_DURATION_MIN,
+    )
+
+    # Close out any previous game that never got finalized, then open a new one.
+    finalize_due_games()
+    game = create_live_game()
+
+    username = _get_bot_username()
+    rows = []
+    if username:
+        rows.append([{"text": "🎮 O'yinga kirish", "url": f"https://t.me/{username}?start=zanjir"}])
+    keyboard = json.dumps({"inline_keyboard": rows}) if rows else None
+
+    text = (
+        "🔗 <b>KITOB ZANJIRI BOSHLANDI!</b>\n\n"
+        f"⏱ {DEFAULT_DURATION_MIN} daqiqa jonli o'yin.\n"
+        "Berilgan <b>harf</b> bilan boshlanadigan kitob yoki muallif nomini eng "
+        "tez yozgan ochko oladi — zanjir davom etadi!\n\n"
+        "🏆 Eng ko'p ochko yig'ganlar <b>Kitobcha</b> yutadi.\n"
+        "👇 Hoziroq qatnashing:"
+    )
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    for group_id in _group_chat_ids():
+        data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                "disable_web_page_preview": "true"}
+        if keyboard:
+            data["reply_markup"] = keyboard
+        try:
+            requests.post(url, data=data, timeout=10)
+        except Exception as e:
+            print(f"start_chain_game group {group_id}: {e}")
+    print(f"start_chain_game: game #{game.id} live until {game.ends_at}")
+
+
+@shared_task
+def chain_game_tick():
+    """Finish + reward any Kitob Zanjiri whose time is up; announce results to
+    groups and DM the winners who earned Kitobcha. Runs every minute (cheap;
+    does nothing when there's no expired live game)."""
+    from tgbot.services.chain_game import finalize_due_games
+
+    results = finalize_due_games()
+    if not results:
+        return
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    medals = ["🥇", "🥈", "🥉"]
+    for game, summary in results:
+        winners = summary.get("winners", [])
+        lines = [
+            "🏁 <b>Kitob Zanjiri yakunlandi!</b>\n",
+            f"⛓ Zanjir: <b>{summary.get('links', 0)}</b> · "
+            f"Qatnashchilar: <b>{summary.get('players', 0)}</b>\n",
+        ]
+        if winners:
+            for i, w in enumerate(winners[:5]):
+                m = medals[i] if i < 3 else f"{i + 1}."
+                rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
+                lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{rew}")
+        else:
+            lines.append("Bu safar hech kim qatnashmadi 😔")
+        text = "\n".join(lines)
+        for group_id in _group_chat_ids():
+            try:
+                requests.post(url, data={
+                    "chat_id": group_id, "text": text, "parse_mode": "HTML",
+                    "disable_web_page_preview": "true",
+                }, timeout=10)
+            except Exception as e:
+                print(f"chain_game_tick group {group_id}: {e}")
+
+        for w in winners:
+            if not w.get("reward"):
+                continue
+            try:
+                requests.post(url, data={
+                    "chat_id": w["telegram_id"],
+                    "text": (
+                        f"🎉 Kitob Zanjirida <b>{w['rank']}-o'rin</b>!\n"
+                        f"🪙 <b>+{w['reward']} Kitobcha</b> qo'shildi.\n"
+                        f"Ballaringiz: {w['points']} · Zanjirlar: {w['links']}"
+                    ),
+                    "parse_mode": "HTML",
+                }, timeout=8)
+            except Exception:
+                pass
+        print(f"chain_game_tick: finalized game #{game.id}, {len(winners)} scorers")
