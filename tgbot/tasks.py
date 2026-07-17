@@ -4131,12 +4131,13 @@ def start_chain_game():
     """Create a fresh live Kitob Zanjiri and announce it to the reading groups
     with a button that opens the game Mini App (via /start zanjir)."""
     from tgbot.services.chain_game import (
-        create_live_game, finalize_due_games, DEFAULT_DURATION_MIN,
+        create_scheduled_game, finalize_due_games, DEFAULT_DURATION_MIN, LEAD_SECONDS,
     )
 
-    # Close out any previous game that never got finalized, then open a new one.
+    # Close out any previous game that never got finalized, then open a new one
+    # with a short lobby so players who just saw this post can get ready.
     finalize_due_games()
-    game = create_live_game()
+    game = create_scheduled_game()
 
     username = _get_bot_username()
     rows = []
@@ -4145,12 +4146,14 @@ def start_chain_game():
     keyboard = json.dumps({"inline_keyboard": rows}) if rows else None
 
     text = (
-        "🔗 <b>KITOB ZANJIRI BOSHLANDI!</b>\n\n"
-        f"⏱ {DEFAULT_DURATION_MIN} daqiqa jonli o'yin.\n"
+        "🔗 <b>KITOB ZANJIRI!</b>\n\n"
+        f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring va "
+        "tayyor turing!\n"
+        f"⏱ O'yin {DEFAULT_DURATION_MIN} daqiqa davom etadi.\n\n"
         "Berilgan <b>harf</b> bilan boshlanadigan kitob yoki muallif nomini eng "
         "tez yozgan ochko oladi — zanjir davom etadi!\n\n"
-        "🏆 Eng ko'p ochko yig'ganlar <b>Kitobcha</b> yutadi.\n"
-        "👇 Hoziroq qatnashing:"
+        "🏆 G'oliblar ko'p <b>Kitobcha</b>, qatnashgan hamma <b>+30 🪙</b> oladi.\n"
+        "👇 Hoziroq kiring:"
     )
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     for group_id in _group_chat_ids():

@@ -25,6 +25,7 @@ from tgbot.services.chain_text import normalize, first_letter, last_letter
 
 POINTS_PER_LINK = 10
 DEFAULT_DURATION_MIN = 10
+LEAD_SECONDS = 30  # lobby countdown after the announcement, so everyone can join
 REJECT_VOTES = 3  # community votes that invalidate a link
 
 # Letters that comfortably start Uzbek book/author names — used for the opening
@@ -54,14 +55,19 @@ def _next_letter(word_last: str) -> str:
 
 
 # ── Game lifecycle ───────────────────────────────────────────────────────────
-def create_live_game(duration_minutes: int = DEFAULT_DURATION_MIN,
-                     title: str = "Kitob Zanjiri") -> ChainGame:
+def create_scheduled_game(lead_seconds: int = LEAD_SECONDS,
+                          duration_minutes: int = DEFAULT_DURATION_MIN,
+                          title: str = "Kitob Zanjiri") -> ChainGame:
+    """Create a game that opens after a short lobby (default 30s) so players who
+    just saw the announcement can get ready. It auto-flips to live at starts_at
+    (see get_or_activate_live_game)."""
     now = timezone.now()
+    starts = now + timedelta(seconds=lead_seconds)
     return ChainGame.objects.create(
         title=title,
-        status=ChainGame.STATUS_LIVE,
-        starts_at=now,
-        ends_at=now + timedelta(minutes=duration_minutes),
+        status=ChainGame.STATUS_SCHEDULED,
+        starts_at=starts,
+        ends_at=starts + timedelta(minutes=duration_minutes),
         current_letter=_initial_letter(),
         chain=[],
         used_norms=[],

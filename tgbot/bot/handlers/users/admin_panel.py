@@ -50,7 +50,8 @@ async def _launch_chain_game(target_message):
         "🔗 O'yinni ochish", web_app=WebAppInfo(url=f"{WEB_DOMAIN}/zanjir/"),
     ))
     await target_message.answer(
-        "✅ <b>Kitob Zanjiri boshlandi!</b> Guruhlarga e'lon yuborildi.",
+        "✅ <b>Kitob Zanjiri e'lon qilindi!</b> 30 soniyadan keyin boshlanadi. "
+        "Guruhlarga e'lon yuborildi.",
         parse_mode="HTML", reply_markup=kb,
     )
 
