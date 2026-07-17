@@ -1179,6 +1179,7 @@ class ChainScore(BaseModel):
     )
     points = models.PositiveIntegerField(default=0)
     links = models.PositiveIntegerField(default=0, help_text="Links this user won.")
+    reward = models.PositiveIntegerField(default=0, help_text="Kitobcha paid at finish.")
     rewarded = models.BooleanField(default=False)
 
     class Meta:

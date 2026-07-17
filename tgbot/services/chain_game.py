@@ -32,8 +32,17 @@ REJECT_VOTES = 3  # community votes that invalidate a link
 START_LETTERS = list("abdegijklmnopqrstuvyfh")
 
 REWARD_TIERS = {0: 300, 1: 200, 2: 100}
-PARTICIPATION = 25
-PARTICIPATION_MAX_RANK = 20
+PARTICIPATION = 30  # guest Kitobcha for EVERY participant who didn't place
+
+
+def _add_ball_flat(user, amount: int) -> int:
+    """Add Kitobcha WITHOUT the premium 2× multiplier — competition prizes are
+    strictly by rank (otherwise a Premium 2nd place could out-earn a 1st)."""
+    with transaction.atomic():
+        user.refresh_from_db(fields=["ball"])
+        user.ball = (user.ball or 0) + amount
+        user.save(update_fields=["ball"])
+    return amount
 
 
 def _initial_letter() -> str:
@@ -103,6 +112,11 @@ def submit(game_id: int, profile, text: str) -> dict:
         now = timezone.now()
         if not (g.status == ChainGame.STATUS_LIVE and g.starts_at <= now <= g.ends_at):
             return {"ok": False, "error": "not_live"}
+
+        # Register participation on any genuine attempt (even a wrong one), so
+        # everyone who actually played gets the guest Kitobcha at the end —
+        # including those who tried but never found a valid answer.
+        ChainScore.objects.get_or_create(game=g, user=profile)
 
         required = g.current_letter
         if required and fl != required:
@@ -192,21 +206,26 @@ def finalize(game_id: int) -> dict | None:
     if already:
         return None
 
+    # Everyone who participated is included (points may be 0). Top-3 scorers get
+    # the tiered reward; every other participant is a "guest" and gets 30.
     scores = list(
-        ChainScore.objects.filter(game=g, points__gt=0)
+        ChainScore.objects.filter(game=g)
         .select_related("user")
         .order_by("-points", "created_at")
     )
     winners = []
     for i, s in enumerate(scores):
-        reward = REWARD_TIERS.get(i, PARTICIPATION) if i < PARTICIPATION_MAX_RANK else 0
-        applied = 0
-        if reward and not s.rewarded:
-            applied = s.user.update_ball(True, reward)
+        if s.points > 0 and i < 3:
+            reward = REWARD_TIERS[i]
+        else:
+            reward = PARTICIPATION
+        if not s.rewarded:
+            applied = _add_ball_flat(s.user, reward)
             s.rewarded = True
-            s.save(update_fields=["rewarded", "updated_at"])
-        elif reward:
-            applied = reward
+            s.reward = applied
+            s.save(update_fields=["rewarded", "reward", "updated_at"])
+        else:
+            applied = s.reward or reward
         winners.append({
             "rank": i + 1,
             "user_id": s.user_id,
@@ -234,14 +253,18 @@ def finalize_due_games() -> list:
 
 
 # ── State for the Mini App ───────────────────────────────────────────────────
-def _leaderboard(game, limit: int = 10):
-    rows = (
-        ChainScore.objects.filter(game=game, points__gt=0)
-        .select_related("user")
-        .order_by("-points", "created_at")[:limit]
-    )
+def _leaderboard(game, limit: int = 10, include_all: bool = False):
+    qs = ChainScore.objects.filter(game=game).select_related("user")
+    if not include_all:
+        qs = qs.filter(points__gt=0)  # live board: only those who've scored
+    rows = qs.order_by("-points", "created_at")[:limit]
     return [
-        {"name": r.user.full_name or "Kitobxon", "points": r.points, "links": r.links}
+        {
+            "name": r.user.full_name or "Kitobxon",
+            "points": r.points,
+            "links": r.links,
+            "reward": r.reward or 0,
+        }
         for r in rows
     ]
 
@@ -294,6 +317,7 @@ def state_payload(profile) -> dict:
         seconds = 0
 
     valid_links = sum(1 for c in chain if not c.get("rejected"))
+    finished = status == "finished"
     return {
         "ok": True,
         "status": status,
@@ -303,9 +327,11 @@ def state_payload(profile) -> dict:
         "seconds": seconds,
         "chain_len": valid_links,
         "recent": recent,
-        "leaderboard": _leaderboard(g),
+        # Finished: show EVERY participant with the Kitobcha they won.
+        "leaderboard": _leaderboard(g, limit=(40 if finished else 10), include_all=finished),
         "your_points": (my.points if my else 0),
         "your_links": (my.links if my else 0),
+        "your_reward": (my.reward if my else 0),
         "lifetime": _lifetime_stats(profile),
         "reject_votes": REJECT_VOTES,
     }

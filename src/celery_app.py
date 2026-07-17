@@ -97,17 +97,10 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=3, minute=0, day_of_week=0),
     },
 
-    # ── Kitob Zanjiri — live "book chain" game, twice a week (group posts) ────
-    # Starts Wednesday & Sunday at 20:00; the tick finalizes + rewards a game
+    # ── Kitob Zanjiri — live "book chain" game ───────────────────────────────
+    # Games are started MANUALLY by an admin (/zanjir or the admin-panel button);
+    # there is no auto-schedule. The tick just finalizes + rewards a running game
     # once its time is up (cheap no-op when nothing is due).
-    'chain-game-start-wed': {
-        'task': 'tgbot.tasks.start_chain_game',
-        'schedule': crontab(hour=20, minute=0, day_of_week=3),
-    },
-    'chain-game-start-sun': {
-        'task': 'tgbot.tasks.start_chain_game',
-        'schedule': crontab(hour=20, minute=0, day_of_week=0),
-    },
     'chain-game-tick': {
         'task': 'tgbot.tasks.chain_game_tick',
         'schedule': crontab(minute='*/1'),

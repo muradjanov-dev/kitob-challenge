@@ -197,10 +197,15 @@
           var w = '';
           (s.leaderboard||[]).forEach(function(r,i){
             var medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
-            w += '<div class="lb"><div class="rank">'+medal+'</div><div class="lb-name">'+esc(r.name)+'</div><div class="pts">'+r.points+'</div></div>';
+            var rew = r.reward ? '<span style="color:var(--accent2);font-weight:800">🪙 +'+r.reward+'</span>' : '';
+            w += '<div class="lb"><div class="rank">'+medal+'</div>'
+               + '<div class="lb-name">'+esc(r.name)+' <span class="muted" style="font-weight:600">'+r.points+' ochko</span></div>'
+               + '<div class="pts">'+rew+'</div></div>';
           });
+          var mine = (s.your_reward ? ('<div class="me" style="margin-top:12px"><span>Sizning mukofotingiz</span><b>🪙 +'+s.your_reward+'</b></div>') : '');
           info.innerHTML = '<div class="em">🏁</div><h2>O\'yin tugadi!</h2>'
-            + '<p>Keyingi Kitob Zanjiri tez orada — kuzatib boring!</p>'
+            + '<p>Qatnashgan har bir kishi Kitobcha oladi 🎁 — o\'rin olmaganlar ham 30 🪙.</p>'
+            + mine
             + (w ? '<div style="text-align:left;margin-top:14px">'+w+'</div>'
                  : '<p class="muted" style="margin-top:12px">Bu safar hech kim qatnashmadi.</p>');
           localSeconds = 0;

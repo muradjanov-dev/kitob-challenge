@@ -4190,6 +4190,7 @@ def chain_game_tick():
                 m = medals[i] if i < 3 else f"{i + 1}."
                 rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
                 lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{rew}")
+            lines.append("\n🎁 Qatnashgan barcha do'stlarга — hatto o'rin olmaganlarga ham — <b>+30 🪙</b>!")
         else:
             lines.append("Bu safar hech kim qatnashmadi 😔")
         text = "\n".join(lines)
