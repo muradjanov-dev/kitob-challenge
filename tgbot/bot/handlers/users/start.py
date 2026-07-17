@@ -65,6 +65,17 @@ async def do_start(message: types.Message, state: FSMContext):
         user and (user.is_registered or (user.full_name and user.gender))
     )
 
+    # Admin deep link: /start prof_<telegram_id> — open that user's profile
+    # card (with the message-relay button). Only admins get the card; for
+    # everyone else it falls through to the normal start flow.
+    if args and args.startswith("prof_") and user and user.is_admin:
+        target_tid = args[len("prof_"):]
+        if target_tid.isdigit():
+            await state.finish()
+            from tgbot.bot.handlers.users.admin_panel import open_profile_card_by_tid
+            await open_profile_card_by_tid(message, int(target_tid))
+            return
+
     # Handle quiz deep link: /start quiz_<code>
     if args and args.startswith("quiz_"):
         if already_registered:

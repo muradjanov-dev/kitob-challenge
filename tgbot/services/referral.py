@@ -64,6 +64,7 @@ class ReferralService:
             return [
                 (
                     (r.referred_user.full_name if r.referred_user else None) or "Foydalanuvchi",
+                    r.referred_user.telegram_id if r.referred_user else None,
                     r.created_at,
                 )
                 for r in qs[:limit]

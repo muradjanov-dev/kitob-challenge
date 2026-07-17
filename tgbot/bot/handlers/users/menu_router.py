@@ -1235,7 +1235,12 @@ async def referral_link_handler(call: types.CallbackQuery, state: FSMContext):
     from django.utils.html import escape as _esc
     ref_list = await ReferralService.get_referral_list(user)
     if ref_list:
-        lines = [f"{i}. {_esc(name)}" for i, (name, _created) in enumerate(ref_list, 1)]
+        lines = []
+        for i, (name, tid, _created) in enumerate(ref_list, 1):
+            safe = _esc(name)
+            # Tap the name to open the invited user's Telegram profile (works
+            # without a @username — it goes by numeric id).
+            lines.append(f'{i}. <a href="tg://user?id={tid}">{safe}</a>' if tid else f"{i}. {safe}")
         header = _t(lang, "\n\n👥 <b>Siz taklif qilganlar:</b>\n",
                     "\n\n👥 <b>Вы пригласили:</b>\n")
         text += header + "\n".join(lines)

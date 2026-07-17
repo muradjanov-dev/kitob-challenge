@@ -394,8 +394,12 @@ def _build_user_detail(user_id: int) -> str:
         if prem_payment else "💎 <b>Premium:</b> yo'q"
     )
 
+    from django.utils.html import escape as _esc
     username_str = f"@{user.username}" if user.username else "—"
     full_name = user.full_name or "—"
+    # Tapping the name (or the explicit link) opens the user's Telegram profile
+    # — works even when they have no @username, since it goes by numeric id.
+    name_link = f'<a href="tg://user?id={user.telegram_id}">{_esc(full_name)}</a>'
     reg_status = "✅ Ro'yxatdan to'liq o'tgan" if user.is_registered else "🚫 Tugatmagan"
     blocked = "🚫 Bloklangan" if user.is_blocked else ""
     admin_flag = "👑 Admin" if user.is_admin else ""
@@ -412,9 +416,10 @@ def _build_user_detail(user_id: int) -> str:
         ach_text = "\n\n🏆 <b>Yutuqlar (" + str(ach_count) + "):</b>\n" + "\n".join(items)
 
     return (
-        f"👤 <b>{full_name}</b>\n"
+        f"👤 <b>{name_link}</b>\n"
         f"🆔 <code>{user.telegram_id}</code> · DB id: {user.id}\n"
         f"📱 {username_str}\n"
+        f"🔗 <a href=\"tg://user?id={user.telegram_id}\">Telegram profiliga o'tish</a>\n"
         f"🌐 Til: {(user.language or '—').upper()}\n"
         f"🚻 Jins: {gender_label}\n"
         f"🗺 Hudud: {region_name}\n"
@@ -796,6 +801,28 @@ def _detail_text_user_premium(target_id: int):
     target_user = TelegramProfile.objects.filter(id=target_id).first()
     is_premium = _is_user_premium(target_user) if target_user else False
     return text, target_user, is_premium
+
+
+async def open_profile_card_by_tid(message, telegram_id: int):
+    """Render the admin profile card for a user by telegram_id and send it.
+    Used by the /start prof_<telegram_id> deep link so any name that links to
+    this profile opens the full card (with the message-relay button)."""
+    def _fetch(tid):
+        u = TelegramProfile.objects.filter(telegram_id=tid).first()
+        if not u:
+            return None
+        return _build_user_detail(u.id), u, _is_user_premium(u)
+
+    data = await sync_to_async(_fetch)(telegram_id)
+    if not data:
+        await message.answer("❌ Bunday foydalanuvchi topilmadi.")
+        return
+    text, target_user, is_premium = data
+    await message.answer(
+        text, parse_mode="HTML",
+        reply_markup=_user_detail_markup(target_user, is_premium),
+        disable_web_page_preview=True,
+    )
 
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("adm_userd:"), state="*")
