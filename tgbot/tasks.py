@@ -4276,6 +4276,20 @@ def start_castle_game():
 
 
 @shared_task
+def start_random_game():
+    """Pick one of the live games at random and start it. Wired to the daily
+    10:00 & 22:00 slots so the community gets variety."""
+    choice = random.choice(["chain", "feud", "castle"])
+    if choice == "chain":
+        start_chain_game()
+    elif choice == "feud":
+        start_feud_game()
+    else:
+        start_castle_game()
+    print(f"start_random_game: picked {choice}")
+
+
+@shared_task
 def games_finalize_tick():
     """Finish + reward any Ko'pchilik / Qal'a game whose time is up; announce
     results to groups and DM winners. Runs every minute (cheap no-op)."""
