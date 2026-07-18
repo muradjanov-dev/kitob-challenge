@@ -13,7 +13,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 from tgbot.shop_views import _require_authed
-from tgbot.services import chain_game
+from tgbot.services import chain_game, feud_game, castle_game
 
 
 def chain_index(request: HttpRequest) -> HttpResponse:
@@ -65,3 +65,67 @@ def api_chain_challenge(request: HttpRequest) -> JsonResponse:
     if not g:
         return JsonResponse({"ok": False, "error": "not_live"})
     return JsonResponse(chain_game.challenge(g.id, request.tg_profile, idx))
+
+
+# ── Ko'pchilik nima dedi? (Feud) ─────────────────────────────────────────────
+def feud_index(request: HttpRequest) -> HttpResponse:
+    resp = render(request, "game/feud.html", {})
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp["Pragma"] = "no-cache"
+    return resp
+
+
+@csrf_exempt
+@require_GET
+@_require_authed
+def api_feud_state(request: HttpRequest) -> JsonResponse:
+    return JsonResponse(feud_game.state_payload(request.tg_profile))
+
+
+@csrf_exempt
+@require_POST
+@_require_authed
+def api_feud_submit(request: HttpRequest) -> JsonResponse:
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
+    text = (body.get("text") or "").strip()
+    if not text:
+        return JsonResponse({"ok": False, "error": "empty"})
+    g = feud_game.latest_game()
+    if not g:
+        return JsonResponse({"ok": False, "error": "not_live"})
+    return JsonResponse(feud_game.submit_answer(g.id, request.tg_profile, text))
+
+
+# ── Bilim Qal'asi (Castle) ───────────────────────────────────────────────────
+def castle_index(request: HttpRequest) -> HttpResponse:
+    resp = render(request, "game/castle.html", {})
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp["Pragma"] = "no-cache"
+    return resp
+
+
+@csrf_exempt
+@require_GET
+@_require_authed
+def api_castle_state(request: HttpRequest) -> JsonResponse:
+    return JsonResponse(castle_game.state_payload(request.tg_profile))
+
+
+@csrf_exempt
+@require_POST
+@_require_authed
+def api_castle_submit(request: HttpRequest) -> JsonResponse:
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
+    choice = body.get("choice")
+    if not isinstance(choice, int):
+        return JsonResponse({"ok": False, "error": "bad_choice"}, status=400)
+    g = castle_game.latest_game()
+    if not g:
+        return JsonResponse({"ok": False, "error": "not_live"})
+    return JsonResponse(castle_game.submit_answer(g.id, request.tg_profile, choice))

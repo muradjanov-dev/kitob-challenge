@@ -212,6 +212,10 @@ admin_keyboard.row(
     InlineKeyboardButton(text="🔗 Kitob Zanjiri boshlash", callback_data="admin:start_zanjir"),
 )
 admin_keyboard.row(
+    InlineKeyboardButton(text="🗣 Ko'pchilik nima dedi", callback_data="admin:start_feud"),
+    InlineKeyboardButton(text="🏰 Bilim Qal'asi", callback_data="admin:start_castle"),
+)
+admin_keyboard.row(
     InlineKeyboardButton(text="🛒 Do'kon boshqaruvi", callback_data="admin:shop"),
 )
 

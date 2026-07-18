@@ -133,6 +133,27 @@ async def do_start(message: types.Message, state: FSMContext):
         )
         return
 
+    # Ko'pchilik / Qal'a deep links — open the respective game Mini App.
+    if args in ("kopchilik", "qala") and already_registered:
+        if user and not user.is_registered:
+            user.is_registered = True
+            await sync_to_async(user.save)(update_fields=["is_registered"])
+        await state.finish()
+        from aiogram.types import (
+            InlineKeyboardMarkup as _IKM2, InlineKeyboardButton as _IKB2, WebAppInfo as _WAI2,
+        )
+        from src.settings import WEB_DOMAIN
+        if args == "kopchilik":
+            path, label, title = "/kopchilik/", "🗣 O'yinni ochish", "Ko'pchilik nima dedi?"
+        else:
+            path, label, title = "/qala/", "🏰 O'yinni ochish", "Bilim Qal'asi"
+        kb = _IKM2().add(_IKB2(label, web_app=_WAI2(url=f"{WEB_DOMAIN}{path}")))
+        await message.answer(
+            f"<b>{title}</b> — jonli o'yin boshlandi!\nPastdagi tugmani bosing 👇",
+            reply_markup=kb, parse_mode="HTML",
+        )
+        return
+
     if already_registered:
         if user and not user.is_registered:
             user.is_registered = True

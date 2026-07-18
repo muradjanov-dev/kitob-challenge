@@ -4222,3 +4222,120 @@ def chain_game_tick():
             except Exception:
                 pass
         print(f"chain_game_tick: finalized game #{game.id}, {len(winners)} scorers")
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Ko'pchilik nima dedi? (Feud) + Bilim Qal'asi (Castle) — start & finalize.
+# ────────────────────────────────────────────────────────────────────────
+def _announce_game(text, start_param):
+    username = _get_bot_username()
+    rows = []
+    if username:
+        rows.append([{"text": "🎮 O'yinga kirish", "url": f"https://t.me/{username}?start={start_param}"}])
+    keyboard = json.dumps({"inline_keyboard": rows}) if rows else None
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    for group_id in _group_chat_ids():
+        data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                "disable_web_page_preview": "true"}
+        if keyboard:
+            data["reply_markup"] = keyboard
+        try:
+            requests.post(url, data=data, timeout=10)
+        except Exception as e:
+            print(f"_announce_game {group_id}: {e}")
+
+
+@shared_task
+def start_feud_game():
+    from tgbot.services.feud_game import create_scheduled_feud, finalize_due_games, LEAD_SECONDS
+    finalize_due_games()
+    game = create_scheduled_feud()
+    text = (
+        "🗣 <b>KO'PCHILIK NIMA DEDI?</b>\n\n"
+        f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+        "Har savolga javob bering — <b>ko'pchilik bilan mos</b> javob ko'p ochko beradi!\n\n"
+        "🏆 G'oliblar ko'p Kitobcha, qatnashgan hamma <b>+30 🪙</b>.\n👇 Kiring:"
+    )
+    _announce_game(text, "kopchilik")
+    print(f"start_feud_game: game #{game.id}")
+
+
+@shared_task
+def start_castle_game():
+    from tgbot.services.castle_game import create_scheduled_castle, finalize_due_games, LEAD_SECONDS
+    finalize_due_games()
+    game = create_scheduled_castle()
+    text = (
+        "🏰 <b>BILIM QAL'ASI</b> — jamoaviy jang!\n\n"
+        f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+        "Birgalikda savollarga javob bering, har to'g'ri javob <b>bossni uradi</b>. "
+        "Uni yenging — hammamiz Kitobcha yutamiz!\n👇 Kiring:"
+    )
+    _announce_game(text, "qala")
+    print(f"start_castle_game: game #{game.id}")
+
+
+@shared_task
+def games_finalize_tick():
+    """Finish + reward any Ko'pchilik / Qal'a game whose time is up; announce
+    results to groups and DM winners. Runs every minute (cheap no-op)."""
+    from tgbot.services import feud_game, castle_game
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    medals = ["🥇", "🥈", "🥉"]
+
+    for game, summary in feud_game.finalize_due_games():
+        winners = summary.get("winners", [])
+        lines = ["🗣 <b>Ko'pchilik nima dedi? — yakun!</b>\n"]
+        if winners:
+            for i, w in enumerate(winners[:5]):
+                m = medals[i] if i < 3 else f"{i + 1}."
+                rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
+                lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{rew}")
+            lines.append("\n🎁 Qatnashgan hammaga <b>+30 🪙</b>!")
+        else:
+            lines.append("Bu safar hech kim qatnashmadi 😔")
+        text = "\n".join(lines)
+        for gid in _group_chat_ids():
+            try:
+                requests.post(url, data={"chat_id": gid, "text": text, "parse_mode": "HTML",
+                                         "disable_web_page_preview": "true"}, timeout=10)
+            except Exception:
+                pass
+        for w in winners:
+            if not w.get("reward"):
+                continue
+            try:
+                requests.post(url, data={"chat_id": w["telegram_id"],
+                    "text": f"🗣 Ko'pchilik nima dedi? — <b>{w['rank']}-o'rin</b>!\n"
+                            f"🪙 <b>+{w['reward']} Kitobcha</b> · Ball: {w['points']}",
+                    "parse_mode": "HTML"}, timeout=8)
+            except Exception:
+                pass
+
+    for game, summary in castle_game.finalize_due_games():
+        victory = summary.get("victory")
+        winners = summary.get("winners", [])
+        head = ("🎉 <b>Bilim Qal'asi — G'ALABA!</b>" if victory
+                else "🛡 <b>Bilim Qal'asi — boss omon qoldi</b>")
+        lines = [head,
+                 f"\n⚔️ Qatnashchilar: <b>{summary.get('players', 0)}</b> · "
+                 f"Hissa qo'shganlar: <b>{summary.get('contributors', 0)}</b>"]
+        for i, w in enumerate(winners[:5]):
+            lines.append(f"{i + 1}. {escape(w['name'])} — {w['correct']} ✓ (+{w['reward']} 🪙)")
+        text = "\n".join(lines)
+        for gid in _group_chat_ids():
+            try:
+                requests.post(url, data={"chat_id": gid, "text": text, "parse_mode": "HTML",
+                                         "disable_web_page_preview": "true"}, timeout=10)
+            except Exception:
+                pass
+        for w in winners:
+            if not w.get("reward"):
+                continue
+            try:
+                requests.post(url, data={"chat_id": w["telegram_id"],
+                    "text": f"🏰 Bilim Qal'asi: <b>+{w['reward']} Kitobcha</b>! "
+                            f"To'g'ri javoblar: {w['correct']}",
+                    "parse_mode": "HTML"}, timeout=8)
+            except Exception:
+                pass

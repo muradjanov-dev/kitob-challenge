@@ -1191,3 +1191,113 @@ class ChainScore(BaseModel):
 
     def __str__(self):
         return f"{self.user_id} → game {self.game_id}: {self.points}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Ko'pchilik nima dedi? — a live "Family Feud" style game. Each round asks an
+# open question; everyone types one answer within a window. Answers are grouped;
+# the more people who gave the same answer, the more points each of them earns
+# (matching the crowd wins). Top scorers earn Kitobcha; every player gets a
+# guest reward.
+# ─────────────────────────────────────────────────────────────────────────────
+class FeudGame(BaseModel):
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_LIVE = "live"
+    STATUS_FINISHED = "finished"
+    STATUS_CHOICES = [
+        (STATUS_SCHEDULED, "Rejalashtirilgan"), (STATUS_LIVE, "Jonli"),
+        (STATUS_FINISHED, "Tugagan"),
+    ]
+    title = models.CharField(max_length=120, default="Ko'pchilik nima dedi?")
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    questions = models.JSONField(default=list, help_text="List of question strings.")
+    answer_seconds = models.PositiveIntegerField(default=25)
+    reveal_seconds = models.PositiveIntegerField(default=8)
+    scored_indices = models.JSONField(default=list, help_text="Questions already scored.")
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "feud_games"
+        verbose_name = "Ko'pchilik — O'yin"
+        verbose_name_plural = "Ko'pchilik — O'yinlar"
+        ordering = ("-starts_at",)
+
+    def __str__(self):
+        return f"Ko'pchilik #{self.id} — {self.status}"
+
+
+class FeudAnswer(BaseModel):
+    game = models.ForeignKey(FeudGame, on_delete=models.CASCADE, related_name="answers")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="feud_answers")
+    q_index = models.PositiveSmallIntegerField()
+    text = models.CharField(max_length=120)
+    norm = models.CharField(max_length=120, db_index=True)
+
+    class Meta:
+        db_table = "feud_answers"
+        unique_together = ("game", "user", "q_index")
+        ordering = ("created_at",)
+
+
+class FeudScore(BaseModel):
+    game = models.ForeignKey(FeudGame, on_delete=models.CASCADE, related_name="scores")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="feud_scores")
+    points = models.PositiveIntegerField(default=0)
+    reward = models.PositiveIntegerField(default=0)
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "feud_scores"
+        unique_together = ("game", "user")
+        ordering = ("-points", "created_at")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bilim Qal'asi — a cooperative live quiz. Everyone answers multiple-choice
+# literary questions; each correct answer damages a shared "boss". If the whole
+# community drops the boss's HP to zero before time runs out, every contributor
+# wins Kitobcha. Inclusive: even one correct answer counts.
+# ─────────────────────────────────────────────────────────────────────────────
+class CastleGame(BaseModel):
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_LIVE = "live"
+    STATUS_FINISHED = "finished"
+    STATUS_CHOICES = [
+        (STATUS_SCHEDULED, "Rejalashtirilgan"), (STATUS_LIVE, "Jonli"),
+        (STATUS_FINISHED, "Tugagan"),
+    ]
+    title = models.CharField(max_length=120, default="Bilim Qal'asi")
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    boss_name = models.CharField(max_length=60, default="Bilim Ajdari")
+    boss_hp_max = models.PositiveIntegerField(default=300)
+    boss_hp = models.PositiveIntegerField(default=300)
+    damage_per_hit = models.PositiveIntegerField(default=10)
+    questions = models.JSONField(default=list, help_text='[{"q","options":[4],"correct":idx}]')
+    question_seconds = models.PositiveIntegerField(default=20)
+    victory = models.BooleanField(default=False)
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "castle_games"
+        verbose_name = "Bilim Qal'asi — O'yin"
+        verbose_name_plural = "Bilim Qal'asi — O'yinlar"
+        ordering = ("-starts_at",)
+
+    def __str__(self):
+        return f"Qal'a #{self.id} — {self.status} (HP {self.boss_hp}/{self.boss_hp_max})"
+
+
+class CastleHit(BaseModel):
+    game = models.ForeignKey(CastleGame, on_delete=models.CASCADE, related_name="hits")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="castle_hits")
+    q_index = models.PositiveSmallIntegerField()
+    is_correct = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "castle_hits"
+        unique_together = ("game", "user", "q_index")
+        ordering = ("created_at",)

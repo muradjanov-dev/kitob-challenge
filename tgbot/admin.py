@@ -547,3 +547,31 @@ class ChainScoreAdmin(admin.ModelAdmin):
     list_filter = ('rewarded',)
     search_fields = ('user__full_name', 'user__telegram_id')
     readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(models.FeudGame)
+class FeudGameAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'status', 'starts_at', 'ends_at', 'rewarded')
+    list_filter = ('status', 'rewarded')
+    readonly_fields = ('questions', 'scored_indices', 'created_at', 'updated_at')
+
+
+@admin.register(models.FeudScore)
+class FeudScoreAdmin(admin.ModelAdmin):
+    list_display = ('id', 'game', 'user', 'points', 'reward', 'rewarded')
+    list_filter = ('rewarded',)
+    search_fields = ('user__full_name', 'user__telegram_id')
+
+
+@admin.register(models.CastleGame)
+class CastleGameAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'status', 'boss_hp', 'boss_hp_max', 'victory', 'rewarded')
+    list_filter = ('status', 'victory', 'rewarded')
+    readonly_fields = ('questions', 'created_at', 'updated_at')
+
+
+@admin.register(models.CastleHit)
+class CastleHitAdmin(admin.ModelAdmin):
+    list_display = ('id', 'game', 'user', 'q_index', 'is_correct')
+    list_filter = ('is_correct',)
+    search_fields = ('user__full_name', 'user__telegram_id')

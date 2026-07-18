@@ -1,0 +1,225 @@
+"""Ko'pchilik nima dedi? — live "Family Feud" style game.
+
+Each question runs for an answer window then a reveal window (all time-based, so
+clients just poll). After a question's answer window closes, answers are grouped
+and everyone who gave a given answer scores count×10 — matching the crowd wins.
+Top scorers earn Kitobcha at the end; every player who answered gets a guest 30.
+"""
+
+import random
+from collections import Counter
+from datetime import timedelta
+
+from django.db import transaction
+from django.db.models import Sum, Count
+from django.utils import timezone
+
+from tgbot.models import FeudGame, FeudAnswer, FeudScore
+from tgbot.services.chain_text import normalize
+from tgbot.services.chain_game import _add_ball_flat, REWARD_TIERS, PARTICIPATION
+from tgbot.services.game_questions import FEUD_QUESTIONS
+
+LEAD_SECONDS = 30
+NUM_QUESTIONS = 8
+MATCH_POINTS = 10  # per person who gave the same answer
+
+
+def create_scheduled_feud(lead_seconds: int = LEAD_SECONDS,
+                          num_questions: int = NUM_QUESTIONS) -> FeudGame:
+    qs = random.sample(FEUD_QUESTIONS, min(num_questions, len(FEUD_QUESTIONS)))
+    now = timezone.now()
+    starts = now + timedelta(seconds=lead_seconds)
+    answer_s, reveal_s = 25, 8
+    total = len(qs) * (answer_s + reveal_s)
+    return FeudGame.objects.create(
+        status=FeudGame.STATUS_SCHEDULED,
+        starts_at=starts,
+        ends_at=starts + timedelta(seconds=total),
+        questions=qs,
+        answer_seconds=answer_s,
+        reveal_seconds=reveal_s,
+        scored_indices=[],
+    )
+
+
+def latest_game():
+    return FeudGame.objects.order_by("-starts_at").first()
+
+
+def _phase(game, now):
+    """Return (status, q_index, phase, seconds_left_in_phase)."""
+    span = game.answer_seconds + game.reveal_seconds
+    total = span * len(game.questions or [])
+    elapsed = (now - game.starts_at).total_seconds()
+    if elapsed < 0:
+        return "scheduled", -1, "lobby", int(-elapsed)
+    if elapsed >= total:
+        return "finished", len(game.questions or []), "done", 0
+    qi = int(elapsed // span)
+    within = elapsed - qi * span
+    if within < game.answer_seconds:
+        return "live", qi, "answer", int(game.answer_seconds - within) + 1
+    return "live", qi, "reveal", int(span - within) + 1
+
+
+def _closed_count(status, qi, phase, nq):
+    if status == "scheduled":
+        return 0
+    if status == "finished":
+        return nq
+    return qi + 1 if phase == "reveal" else qi
+
+
+def _score_question(g, q_index):
+    answers = list(FeudAnswer.objects.filter(game=g, q_index=q_index))
+    counts = Counter(a.norm for a in answers)
+    for a in answers:
+        pts = counts[a.norm] * MATCH_POINTS
+        score, _ = FeudScore.objects.get_or_create(game=g, user_id=a.user_id)
+        score.points = (score.points or 0) + pts
+        score.save(update_fields=["points", "updated_at"])
+
+
+def _ensure_scored(game, closed_count):
+    """Score every question whose answer window has closed (idempotent)."""
+    if closed_count <= len(game.scored_indices or []):
+        return  # nothing new — cheap fast path, no lock
+    with transaction.atomic():
+        g = FeudGame.objects.select_for_update().get(id=game.id)
+        done = set(g.scored_indices or [])
+        changed = False
+        for qi in range(0, min(closed_count, len(g.questions or []))):
+            if qi in done:
+                continue
+            _score_question(g, qi)
+            done.add(qi)
+            changed = True
+        if changed:
+            g.scored_indices = sorted(done)
+            g.save(update_fields=["scored_indices", "updated_at"])
+
+
+def submit_answer(game_id: int, profile, text: str) -> dict:
+    norm = normalize(text)
+    if not norm or len(norm) < 1:
+        return {"ok": False, "error": "empty"}
+    g = FeudGame.objects.filter(id=game_id).first()
+    if not g:
+        return {"ok": False, "error": "not_live"}
+    now = timezone.now()
+    status, qi, phase, _ = _phase(g, now)
+    if status != "live" or phase != "answer":
+        return {"ok": False, "error": "not_answering"}
+    FeudAnswer.objects.update_or_create(
+        game_id=g.id, user=profile, q_index=qi,
+        defaults={"text": text.strip()[:120], "norm": norm},
+    )
+    return {"ok": True, "q_index": qi}
+
+
+def finalize(game_id: int) -> dict | None:
+    with transaction.atomic():
+        g = FeudGame.objects.select_for_update().get(id=game_id)
+        already = g.rewarded
+        if g.status != FeudGame.STATUS_FINISHED:
+            g.status = FeudGame.STATUS_FINISHED
+            g.save(update_fields=["status", "updated_at"])
+    if already:
+        return None
+    _ensure_scored(g, len(g.questions or []))  # score any remaining questions
+
+    scores = list(
+        FeudScore.objects.filter(game=g).select_related("user").order_by("-points", "created_at")
+    )
+    winners = []
+    for i, s in enumerate(scores):
+        reward = REWARD_TIERS[i] if (s.points > 0 and i < 3) else PARTICIPATION
+        if not s.rewarded:
+            applied = _add_ball_flat(s.user, reward)
+            s.rewarded = True
+            s.reward = applied
+            s.save(update_fields=["rewarded", "reward", "updated_at"])
+        else:
+            applied = s.reward or reward
+        winners.append({
+            "rank": i + 1, "user_id": s.user_id, "telegram_id": s.user.telegram_id,
+            "name": s.user.full_name or "Kitobxon", "points": s.points, "reward": applied,
+        })
+    g.rewarded = True
+    g.save(update_fields=["rewarded", "updated_at"])
+    return {"winners": winners, "players": len(scores)}
+
+
+def finalize_due_games() -> list:
+    now = timezone.now()
+    out = []
+    for g in FeudGame.objects.exclude(status=FeudGame.STATUS_FINISHED).filter(ends_at__lt=now):
+        summary = finalize(g.id)
+        if summary is not None:
+            out.append((g, summary))
+    return out
+
+
+def _reveal(game, q_index, limit=6):
+    rows = FeudAnswer.objects.filter(game=game, q_index=q_index).values_list("text", "norm")
+    counts, display = Counter(), {}
+    for text, norm in rows:
+        counts[norm] += 1
+        display.setdefault(norm, text)
+    return [{"text": display[n], "count": c} for n, c in counts.most_common(limit)]
+
+
+def _leaderboard(game, limit=10, include_all=False):
+    rows = (
+        FeudScore.objects.filter(game=game).select_related("user")
+        .order_by("-points", "created_at")[:limit]
+    )
+    return [
+        {"name": r.user.full_name or "Kitobxon", "points": r.points, "reward": r.reward or 0}
+        for r in rows
+    ]
+
+
+def _lifetime(profile):
+    agg = FeudScore.objects.filter(user=profile).aggregate(games=Count("id"), points=Sum("points"))
+    return {"games": agg["games"] or 0, "points": int(agg["points"] or 0)}
+
+
+def state_payload(profile) -> dict:
+    now = timezone.now()
+    g = latest_game()
+    if not g:
+        return {"ok": True, "status": "none", "lifetime": _lifetime(profile)}
+
+    status, qi, phase, secs = _phase(g, now)
+    nq = len(g.questions or [])
+    _ensure_scored(g, _closed_count(status, qi, phase, nq))
+
+    finished = status == "finished"
+    payload = {
+        "ok": True,
+        "status": status,
+        "phase": phase,
+        "game_id": g.id,
+        "q_index": qi,
+        "q_total": nq,
+        "seconds": secs,
+        "leaderboard": _leaderboard(g, limit=(40 if finished else 10), include_all=finished),
+        "your_points": 0,
+        "lifetime": _lifetime(profile),
+    }
+    my = FeudScore.objects.filter(game=g, user=profile).first()
+    payload["your_points"] = my.points if my else 0
+    payload["your_reward"] = my.reward if my else 0
+
+    if status == "live" and 0 <= qi < nq:
+        payload["question"] = g.questions[qi]
+        payload["q_number"] = qi + 1
+        if phase == "answer":
+            ans = FeudAnswer.objects.filter(game=g, user=profile, q_index=qi).first()
+            payload["your_answer"] = ans.text if ans else ""
+        else:  # reveal
+            payload["reveal"] = _reveal(g, qi)
+            ans = FeudAnswer.objects.filter(game=g, user=profile, q_index=qi).first()
+            payload["your_answer"] = ans.text if ans else ""
+    return payload

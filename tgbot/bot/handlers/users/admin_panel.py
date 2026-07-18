@@ -80,6 +80,82 @@ async def admin_start_zanjir_cb(call: types.CallbackQuery, state: FSMContext = N
     await _launch_chain_game(call.message)
 
 
+async def _launch_game(target_message, start_task, web_path, title):
+    """Generic: run a game's start task inline and reply with an open button."""
+    from asgiref.sync import sync_to_async
+    from aiogram.types import WebAppInfo
+    from src.settings import WEB_DOMAIN
+
+    await target_message.answer(f"{title} boshlanmoqda…")
+    try:
+        await sync_to_async(start_task)()
+    except Exception as e:
+        import traceback
+        print(f"[admin start {title}] {e}\n{traceback.format_exc()}")
+        await target_message.answer(f"❌ Xatolik: <code>{e}</code>", parse_mode="HTML")
+        return
+    kb = InlineKeyboardMarkup().add(InlineKeyboardButton(
+        "🎮 O'yinni ochish", web_app=WebAppInfo(url=f"{WEB_DOMAIN}{web_path}"),
+    ))
+    await target_message.answer(
+        f"✅ <b>{title}</b> e'lon qilindi! 30 soniyadan keyin boshlanadi. "
+        "Guruhlarga e'lon yuborildi.",
+        parse_mode="HTML", reply_markup=kb,
+    )
+
+
+@dp.message_handler(IsPrivate(), commands=["kopchilik"], state="*")
+async def admin_kopchilik_command(message: types.Message, state: FSMContext = None):
+    user = await aget_user(message.from_user.id)
+    if not (user and user.is_admin):
+        await message.answer("Siz admin emassiz!")
+        return
+    if state is not None:
+        try:
+            await state.finish()
+        except Exception:
+            pass
+    from tgbot.tasks import start_feud_game
+    await _launch_game(message, start_feud_game, "/kopchilik/", "Ko'pchilik nima dedi?")
+
+
+@dp.message_handler(IsPrivate(), commands=["qala"], state="*")
+async def admin_qala_command(message: types.Message, state: FSMContext = None):
+    user = await aget_user(message.from_user.id)
+    if not (user and user.is_admin):
+        await message.answer("Siz admin emassiz!")
+        return
+    if state is not None:
+        try:
+            await state.finish()
+        except Exception:
+            pass
+    from tgbot.tasks import start_castle_game
+    await _launch_game(message, start_castle_game, "/qala/", "Bilim Qal'asi")
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data == "admin:start_feud", state="*")
+async def admin_start_feud_cb(call: types.CallbackQuery, state: FSMContext = None):
+    user = await aget_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    await call.answer("Boshlanmoqda…")
+    from tgbot.tasks import start_feud_game
+    await _launch_game(call.message, start_feud_game, "/kopchilik/", "Ko'pchilik nima dedi?")
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data == "admin:start_castle", state="*")
+async def admin_start_castle_cb(call: types.CallbackQuery, state: FSMContext = None):
+    user = await aget_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    await call.answer("Boshlanmoqda…")
+    from tgbot.tasks import start_castle_game
+    await _launch_game(call.message, start_castle_game, "/qala/", "Bilim Qal'asi")
+
+
 @dp.message_handler(IsPrivate(), commands=["fix_referrals"], state="*")
 async def admin_fix_referrals(message: types.Message, state: FSMContext = None):
     """Admin-only backfill: process every referral that got stuck 'pending'

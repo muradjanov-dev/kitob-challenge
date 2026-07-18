@@ -114,6 +114,13 @@ app.conf.beat_schedule = {
         'schedule': crontab(minute='*/1'),
     },
 
+    # Ko'pchilik nima dedi? + Bilim Qal'asi — admin-started; this tick just
+    # finalizes + rewards them once their time is up.
+    'games-finalize-tick': {
+        'task': 'tgbot.tasks.games_finalize_tick',
+        'schedule': crontab(minute='*/1'),
+    },
+
     # ── User DMs — hard cap of 3 per day ─────────────────────────────────────
     #
     # Slot 1 — 08:30  Kitob Viktorina (GROUP post only — never a DM)
