@@ -51,6 +51,14 @@
     .voteb.voted{opacity:.5}
     .rejtag{font-size:11px;font-weight:800;color:var(--bad);border:1px solid var(--bad);border-radius:8px;padding:3px 7px}
     .lifetime{text-align:center;color:var(--muted);font-size:12px;margin-top:14px}
+    .statsgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+    .sbox{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 4px;text-align:center}
+    .sbox b{display:block;font-size:18px;color:var(--accent)}
+    .sbox span{font-size:10px;color:var(--muted)}
+    .hrow{text-align:left;padding:9px 2px;border-bottom:1px solid var(--line)}
+    .hrow:last-child{border-bottom:0}
+    .hrow .hd{font-size:11px;color:var(--muted)}
+    .hrow .hw{font-weight:700}
     .me small{display:block;font-size:11px;color:var(--muted);font-weight:600;margin-top:2px}
     .lb{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
     .lb:last-child{border-bottom:0}
@@ -70,9 +78,16 @@
     .hidden{display:none}
     .pop{animation:pop .25s ease}
     @keyframes pop{0%{transform:scale(.96)}60%{transform:scale(1.02)}100%{transform:scale(1)}}
+    /* Final-2-minutes tension */
+    @keyframes redpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,77,109,0);transform:scale(1)}50%{box-shadow:0 0 16px 3px rgba(255,77,109,.85);transform:scale(1.06)}}
+    .timer.warn{border-color:var(--bad)!important;color:var(--bad);animation:redpulse 1s infinite}
+    @keyframes vignette{0%,100%{box-shadow:inset 0 0 0 0 rgba(255,77,109,0)}50%{box-shadow:inset 0 0 70px 6px rgba(255,77,109,.4)}}
+    #tensionOverlay{position:fixed;inset:0;pointer-events:none;z-index:9}
+    #tensionOverlay.on{animation:vignette 1.15s infinite}
   </style>
 </head>
 <body>
+  <div id="tensionOverlay"></div>
   <div class="top">
     <div class="title">🔗 Kitob Zanjiri <small id="subtitle">Jonli o'yin</small></div>
     <div class="timer"><span class="lbl" id="timerLbl">QOLDI</span><span id="timer">--:--</span></div>
@@ -138,6 +153,24 @@
       opts = opts || {};
       opts.headers = Object.assign({'X-Telegram-Init-Data': INIT}, opts.headers||{});
       return fetch(path, opts).then(function(r){ return r.json(); });
+    }
+
+    function statsHistoryHtml(s){
+      var lt = s.lifetime || {};
+      var h = '<div class="statsgrid">'
+        + '<div class="sbox"><b>'+(lt.games||0)+'</b><span>O\'yin</span></div>'
+        + '<div class="sbox"><b>'+(lt.points||0)+'</b><span>Jami ochko</span></div>'
+        + '<div class="sbox"><b>'+(lt.links||0)+'</b><span>Zanjir</span></div>'
+        + '<div class="sbox"><b>'+(lt.best||0)+'</b><span>Rekord</span></div></div>';
+      if (s.history && s.history.length){
+        h += '<div class="sect" style="margin-top:16px;text-align:left">🕘 O\'tgan o\'yinlar</div>';
+        s.history.forEach(function(g){
+          h += '<div class="hrow"><div class="hd">'+esc(g.date)+'</div>'
+             + '<div class="hw">🥇 '+esc(g.winner)+' <span class="muted">('+g.winner_points+' ochko)</span></div>'
+             + '<div class="muted" style="font-size:12px">'+g.players+' 👤 · '+g.links+' ⛓</div></div>';
+        });
+      }
+      return h;
     }
 
     function render(s){
@@ -207,13 +240,15 @@
             + '<p>Qatnashgan har bir kishi Kitobcha oladi 🎁 — o\'rin olmaganlar ham 30 🪙.</p>'
             + mine
             + (w ? '<div style="text-align:left;margin-top:14px">'+w+'</div>'
-                 : '<p class="muted" style="margin-top:12px">Bu safar hech kim qatnashmadi.</p>');
+                 : '<p class="muted" style="margin-top:12px">Bu safar hech kim qatnashmadi.</p>')
+            + statsHistoryHtml(s);
           localSeconds = 0;
         } else {
           $('timerLbl').textContent = '—'; $('timer').textContent = '--:--';
           $('subtitle').textContent = 'Kutilmoqda';
           info.innerHTML = '<div class="em">🔗</div><h2>Hozircha jonli o\'yin yo\'q</h2>'
-            + '<p>Kitob Zanjiri haftada 2 marta bo\'ladi. Keyingi o\'yin e\'lon qilinadi — guruhni kuzating!</p>';
+            + '<p>Kitob Zanjiri har kuni 10:00 va 22:00 da boshlanadi — guruhni kuzating!</p>'
+            + statsHistoryHtml(s);
           localSeconds = 0;
         }
       }
@@ -222,6 +257,7 @@
       lel.innerHTML = "📊 Umumiy: <b>"+lt.games+"</b> o'yin · <b>"+lt.points+"</b> ochko · <b>"+lt.links+"</b> zanjir";
       lastStatus = s.status;
       $('timer').textContent = fmt(localSeconds);
+      applyTension();
     }
 
     function poll(){
@@ -280,9 +316,17 @@
     $('sendBtn').addEventListener('click', send);
     $('answer').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); send(); }});
 
+    // Final-2-minutes red tension animation.
+    function applyTension(){
+      var on = (lastStatus === 'live' && localSeconds > 0 && localSeconds <= 120);
+      $('timer').classList.toggle('warn', on);
+      $('tensionOverlay').classList.toggle('on', on);
+    }
+
     // local 1s countdown between polls
     setInterval(function(){
       if (localSeconds > 0){ localSeconds--; $('timer').textContent = fmt(localSeconds); }
+      applyTension();
     }, 1000);
     // server sync
     poll();

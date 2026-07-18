@@ -291,14 +291,34 @@ def _leaderboard(game, limit: int = 10, include_all: bool = False):
 
 def _lifetime_stats(profile) -> dict:
     """Cumulative Kitob Zanjiri stats for one user across every game played."""
+    from django.db.models import Max
     agg = ChainScore.objects.filter(user=profile).aggregate(
-        games=Count("id"), points=Sum("points"), links=Sum("links"),
+        games=Count("id"), points=Sum("points"), links=Sum("links"), best=Max("points"),
     )
     return {
         "games": agg["games"] or 0,
         "points": int(agg["points"] or 0),
         "links": int(agg["links"] or 0),
+        "best": int(agg["best"] or 0),
     }
+
+
+def _history(limit: int = 6) -> list:
+    """Recent finished games with their winner, for the history screen."""
+    out = []
+    for g in ChainGame.objects.filter(status=ChainGame.STATUS_FINISHED).order_by("-starts_at")[:limit]:
+        top = (
+            ChainScore.objects.filter(game=g, points__gt=0)
+            .select_related("user").order_by("-points").first()
+        )
+        out.append({
+            "date": timezone.localtime(g.starts_at).strftime("%d.%m %H:%M"),
+            "winner": (top.user.full_name if top else "—") or "—",
+            "winner_points": (top.points if top else 0),
+            "players": ChainScore.objects.filter(game=g).count(),
+            "links": sum(1 for c in (g.chain or []) if not c.get("rejected")),
+        })
+    return out
 
 
 def state_payload(profile) -> dict:
@@ -308,7 +328,8 @@ def state_payload(profile) -> dict:
     if not g:
         g = latest_game()
     if not g:
-        return {"ok": True, "status": "none", "lifetime": _lifetime_stats(profile)}
+        return {"ok": True, "status": "none", "lifetime": _lifetime_stats(profile),
+                "history": _history()}
 
     chain = g.chain or []
     recent = []
@@ -353,5 +374,6 @@ def state_payload(profile) -> dict:
         "your_links": (my.links if my else 0),
         "your_reward": (my.reward if my else 0),
         "lifetime": _lifetime_stats(profile),
+        "history": _history() if status != "live" else [],
         "reject_votes": REJECT_VOTES,
     }
