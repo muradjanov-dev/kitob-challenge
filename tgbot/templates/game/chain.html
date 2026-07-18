@@ -37,7 +37,7 @@
     .toast{min-height:20px;margin-top:9px;font-size:14px;font-weight:700;text-align:center}
     .toast.ok{color:var(--ok)} .toast.bad{color:var(--bad)}
     .sect{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:2px 0 10px}
-    .link{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--line)}
+    .link{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
     .link:last-child{border-bottom:0}
     .badge{background:var(--card2);border:1px solid var(--line);border-radius:8px;min-width:26px;height:26px;
       display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;text-transform:uppercase}
@@ -168,9 +168,9 @@
           if (k.rejected){
             right = '<span class="rejtag">bekor</span>';
           } else if (!k.mine){
-            var vc = k.votes ? (' '+k.votes) : '';
+            var vc = k.votes ? (' ('+k.votes+')') : '';
             right = '<button class="voteb'+(k.voted?' voted':'')+'" data-idx="'+k.idx+'"'
-                  + (k.voted?' disabled':'')+'>❌ yo\'q'+vc+'</button>';
+                  + (k.voted?' disabled':'')+'>❌ bunday kitob yo\'q'+vc+'</button>';
           }
           c += '<div class="link'+(k.rejected?' rejected':'')+'"><div class="badge">'
              + esc((k.letter||'?').toUpperCase())+'</div>'

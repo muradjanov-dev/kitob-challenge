@@ -87,9 +87,10 @@ case "$SERVICE_TYPE" in
     echo "=== Starting gunicorn on port ${PORT:-8000} ==="
     exec gunicorn src.wsgi \
       --bind "0.0.0.0:${PORT:-8000}" \
-      --workers 2 \
-      --threads 4 \
+      --workers 3 \
+      --threads 8 \
       --timeout 120 \
+      --graceful-timeout 30 \
       --log-level info \
       --access-logfile - \
       --error-logfile -

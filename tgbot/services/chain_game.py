@@ -113,16 +113,30 @@ def submit(game_id: int, profile, text: str) -> dict:
     if not norm or not fl or len(norm) < 2:
         return {"ok": False, "error": "empty"}
 
+    # Optimistic, LOCK-FREE pre-check: sheds the vast majority of racing / late /
+    # wrong submissions without contending on the game row lock, keeping the web
+    # responsive during a big live game (only real winner-candidates take the
+    # lock below).
+    g0 = ChainGame.objects.filter(id=game_id).first()
+    now = timezone.now()
+    if not g0 or not (g0.status == ChainGame.STATUS_LIVE and g0.starts_at <= now <= g0.ends_at):
+        return {"ok": False, "error": "not_live"}
+
+    # Register participation for any genuine attempt (own row — no game lock) so
+    # everyone who played gets the guest Kitobcha, even if they never found a
+    # valid answer.
+    ChainScore.objects.get_or_create(game_id=g0.id, user=profile)
+
+    if g0.current_letter and fl != g0.current_letter:
+        return {"ok": False, "error": "wrong_letter", "required": g0.current_letter}
+    if norm in (g0.used_norms or []):
+        return {"ok": False, "error": "already_used"}
+
     with transaction.atomic():
         g = ChainGame.objects.select_for_update().get(id=game_id)
         now = timezone.now()
         if not (g.status == ChainGame.STATUS_LIVE and g.starts_at <= now <= g.ends_at):
             return {"ok": False, "error": "not_live"}
-
-        # Register participation on any genuine attempt (even a wrong one), so
-        # everyone who actually played gets the guest Kitobcha at the end —
-        # including those who tried but never found a valid answer.
-        ChainScore.objects.get_or_create(game=g, user=profile)
 
         required = g.current_letter
         if required and fl != required:

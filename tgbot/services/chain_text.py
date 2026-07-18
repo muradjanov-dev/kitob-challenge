@@ -14,11 +14,28 @@ _APOS = str.maketrans({
     "ʻ": "'", "ʼ": "'", "´": "'",
 })
 
+# Uzbek Cyrillic → Latin, so a book typed in either script chains by the same
+# letters (many users type in Cyrillic — "Ўтган кунлар" must match letter "o").
+_CYR = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "yo",
+    "ж": "j", "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m",
+    "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
+    "ф": "f", "х": "x", "ц": "s", "ч": "ch", "ш": "sh", "щ": "sh", "ъ": "'",
+    "ы": "i", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+    "ў": "o'", "қ": "q", "ғ": "g'", "ҳ": "h", "ҷ": "j", "ъ".upper(): "'",
+}
+
+
+def _translit(t: str) -> str:
+    return "".join(_CYR.get(c, c) for c in t)
+
 
 def normalize(text: str) -> str:
-    """Lowercase, unify apostrophes, collapse whitespace. Used as the dedupe /
-    lookup key so 'O‘tkan Kunlar' and \"o'tkan  kunlar\" match."""
+    """Lowercase, unify apostrophes, transliterate Uzbek Cyrillic to Latin, and
+    collapse whitespace. Used as the dedupe / lookup key so 'O‘tkan Kunlar',
+    \"o'tkan  kunlar\" and 'Ўткан кунлар' all line up."""
     t = (text or "").strip().lower().translate(_APOS)
+    t = _translit(t)
     t = re.sub(r"\s+", " ", t)
     return t
 
