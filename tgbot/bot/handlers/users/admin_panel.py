@@ -134,6 +134,59 @@ async def admin_qala_command(message: types.Message, state: FSMContext = None):
     await _launch_game(message, start_castle_game, "/qala/", "Bilim Qal'asi")
 
 
+@dp.message_handler(IsPrivate(), commands=["jami"], state="*")
+async def admin_total_pages(message: types.Message, state: FSMContext = None):
+    """One command: announce the platform-wide total pages read (and a few more
+    milestones) to every reading group."""
+    from asgiref.sync import sync_to_async
+    user = await aget_user(message.from_user.id)
+    if not (user and user.is_admin):
+        await message.answer("Siz admin emassiz!")
+        return
+
+    @sync_to_async
+    def _stats():
+        from django.db.models import Sum, Count, F
+        from tgbot.models import TelegramProfile, ConfirmationReport, BooksToRead
+        pages = ConfirmationReport.objects.filter(is_audio=False).aggregate(
+            s=Sum("pages_read"))["s"] or 0
+        audio = ConfirmationReport.objects.filter(is_audio=True).aggregate(
+            s=Sum("pages_read"))["s"] or 0
+        readers = TelegramProfile.objects.filter(is_registered=True).count()
+        finished = BooksToRead.objects.filter(
+            total_pages__gt=0, current_page__gte=F("total_pages")).count()
+        reports = ConfirmationReport.objects.count()
+        return pages, audio, readers, finished, reports
+
+    pages, audio, readers, finished, reports = await _stats()
+
+    def fmt(n):
+        return f"{int(n or 0):,}".replace(",", " ")
+
+    text = (
+        "📚 <b>KITOB CHALLENGE — UMUMIY NATIJA</b>\n\n"
+        "Bugungi kunga qadar hamjamiyatimiz birgalikda:\n"
+        f"📖 <b>{fmt(pages)} bet</b> o'qidi!\n"
+        f"🎧 <b>{fmt(audio)} daqiqa</b> audiokitob tingladi!\n\n"
+        f"👥 {fmt(readers)} kitobxon\n"
+        f"✅ {fmt(finished)} kitob tugatildi\n"
+        f"📝 {fmt(reports)} ta hisobot yuborildi\n\n"
+        "Bu — BIZNING umumiy natijamiz! 🔥 O'qishda davom etamiz 📚"
+    )
+
+    from tgbot.tasks import _group_chat_ids
+    from tgbot.bot.loader import bot as _bot
+    sent = 0
+    for gid in _group_chat_ids():
+        try:
+            await _bot.send_message(gid, text, parse_mode="HTML",
+                                    disable_web_page_preview=True)
+            sent += 1
+        except Exception as e:
+            print(f"admin /jami group {gid}: {e}")
+    await message.answer(f"✅ {sent} guruhga e'lon yuborildi.\n\n{text}", parse_mode="HTML")
+
+
 @dp.callback_query_handler(IsPrivate(), lambda c: c.data == "admin:start_feud", state="*")
 async def admin_start_feud_cb(call: types.CallbackQuery, state: FSMContext = None):
     user = await aget_user(call.from_user.id)

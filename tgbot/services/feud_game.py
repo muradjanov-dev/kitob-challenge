@@ -24,9 +24,28 @@ NUM_QUESTIONS = 8
 MATCH_POINTS = 10  # per person who gave the same answer
 
 
+def _pick_fresh(pool, used, count):
+    """Prefer questions not used in recent games; top up if not enough."""
+    fresh = [x for x in pool if x not in used]
+    random.shuffle(fresh)
+    if len(fresh) >= count:
+        return fresh[:count]
+    rest = [x for x in pool if x in used]
+    random.shuffle(rest)
+    return (fresh + rest)[:count]
+
+
+def _recent_used(games_back=6):
+    used = set()
+    for g in FeudGame.objects.order_by("-starts_at")[:games_back]:
+        for q in (g.questions or []):
+            used.add(q)
+    return used
+
+
 def create_scheduled_feud(lead_seconds: int = LEAD_SECONDS,
                           num_questions: int = NUM_QUESTIONS) -> FeudGame:
-    qs = random.sample(FEUD_QUESTIONS, min(num_questions, len(FEUD_QUESTIONS)))
+    qs = _pick_fresh(FEUD_QUESTIONS, _recent_used(), min(num_questions, len(FEUD_QUESTIONS)))
     now = timezone.now()
     starts = now + timedelta(seconds=lead_seconds)
     answer_s, reveal_s = 25, 8
@@ -181,15 +200,33 @@ def _leaderboard(game, limit=10, include_all=False):
 
 
 def _lifetime(profile):
-    agg = FeudScore.objects.filter(user=profile).aggregate(games=Count("id"), points=Sum("points"))
-    return {"games": agg["games"] or 0, "points": int(agg["points"] or 0)}
+    from django.db.models import Max
+    agg = FeudScore.objects.filter(user=profile).aggregate(
+        games=Count("id"), points=Sum("points"), best=Max("points"))
+    return {"games": agg["games"] or 0, "points": int(agg["points"] or 0),
+            "best": int(agg["best"] or 0)}
+
+
+def _history(limit=6):
+    out = []
+    for g in FeudGame.objects.filter(status=FeudGame.STATUS_FINISHED).order_by("-starts_at")[:limit]:
+        top = (FeudScore.objects.filter(game=g, points__gt=0)
+               .select_related("user").order_by("-points").first())
+        out.append({
+            "date": timezone.localtime(g.starts_at).strftime("%d.%m %H:%M"),
+            "winner": (top.user.full_name if top else "—") or "—",
+            "winner_points": (top.points if top else 0),
+            "players": FeudScore.objects.filter(game=g).count(),
+        })
+    return out
 
 
 def state_payload(profile) -> dict:
     now = timezone.now()
     g = latest_game()
     if not g:
-        return {"ok": True, "status": "none", "lifetime": _lifetime(profile)}
+        return {"ok": True, "status": "none", "lifetime": _lifetime(profile),
+                "history": _history()}
 
     status, qi, phase, secs = _phase(g, now)
     nq = len(g.questions or [])
@@ -207,6 +244,7 @@ def state_payload(profile) -> dict:
         "leaderboard": _leaderboard(g, limit=(40 if finished else 10), include_all=finished),
         "your_points": 0,
         "lifetime": _lifetime(profile),
+        "history": _history() if status != "live" else [],
     }
     my = FeudScore.objects.filter(game=g, user=profile).first()
     payload["your_points"] = my.points if my else 0

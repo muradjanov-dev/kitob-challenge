@@ -40,6 +40,11 @@
     .big{text-align:center;padding:26px 16px}.big .em{font-size:52px}.big h2{margin:10px 0 6px;font-size:22px}.big p{color:var(--muted);margin:0;font-size:14px;line-height:1.5}
     .victory h2{color:var(--ok)}.defeat h2{color:var(--bad)}
     .lifetime{text-align:center;color:var(--muted);font-size:12px;margin-top:14px}
+    .statsgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:14px}
+    .sbox{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 4px;text-align:center}
+    .sbox b{display:block;font-size:18px;color:var(--accent)}.sbox span{font-size:10px;color:var(--muted)}
+    .hrow{text-align:left;padding:9px 2px;border-bottom:1px solid var(--line)}.hrow:last-child{border-bottom:0}
+    .hrow .hd{font-size:11px;color:var(--muted)}.hrow .hw{font-weight:700}
     .muted{color:var(--muted)}.hidden{display:none}
     .banner{background:rgba(37,194,110,.15);border:1px solid var(--ok);color:var(--ok);border-radius:12px;padding:10px;text-align:center;font-weight:800;margin-bottom:12px}
   </style>
@@ -98,6 +103,16 @@
       });
     }
 
+    function statsHistoryHtml(s){
+      var lt=s.lifetime||{};
+      var h='<div class="statsgrid"><div class="sbox"><b>'+(lt.games||0)+'</b><span>O\'yin</span></div><div class="sbox"><b>'+(lt.correct||0)+'</b><span>To\'g\'ri javob</span></div></div>';
+      if(s.history&&s.history.length){
+        h+='<div class="sect" style="margin-top:16px;text-align:left">🕘 O\'tgan janglar</div>';
+        s.history.forEach(function(g){h+='<div class="hrow"><div class="hd">'+esc(g.date)+'</div><div class="hw">'+(g.victory?'🎉 G\'alaba':'🛡 Boss omon qoldi')+'</div><div class="muted" style="font-size:12px">'+g.players+' 👤</div></div>';});
+      }
+      return h;
+    }
+
     function render(s){
       var live=$('live'),info=$('info');
       if(s.status==='live'){
@@ -132,16 +147,16 @@
           var rew=s.your_reward?('<div class="banner" style="margin-top:12px">🪙 Sizning mukofotingiz: +'+s.your_reward+' Kitobcha</div>'):'';
           if(s.victory){
             info.className='card big victory';
-            info.innerHTML='<div class="em">🎉</div><h2>G\'alaba!</h2><p>Jamoa bossni yengdi! Hissa qo\'shgan har bir kishi Kitobcha oldi.</p>'+rew;
+            info.innerHTML='<div class="em">🎉</div><h2>G\'alaba!</h2><p>Jamoa bossni yengdi! Hissa qo\'shgan har bir kishi Kitobcha oldi.</p>'+rew+statsHistoryHtml(s);
           }else{
             info.className='card big defeat';
-            info.innerHTML='<div class="em">🛡</div><h2>Boss omon qoldi</h2><p>Bu safar yenga olmadik — keyingi safar birga urinamiz! Qatnashganlar Kitobcha oldi.</p>'+rew;
+            info.innerHTML='<div class="em">🛡</div><h2>Boss omon qoldi</h2><p>Bu safar yenga olmadik — keyingi safar birga urinamiz! Qatnashganlar Kitobcha oldi.</p>'+rew+statsHistoryHtml(s);
           }
           localSeconds=0;
         }else{
           $('timerLbl').textContent='—';$('timer').textContent='--:--';$('subtitle').textContent='Kutilmoqda';
           info.className='card big';
-          info.innerHTML='<div class="em">🏰</div><h2>Hozircha o\'yin yo\'q</h2><p>Bilim Qal\'asi tez orada boshlanadi — guruhni kuzating!</p>';
+          info.innerHTML='<div class="em">🏰</div><h2>Hozircha o\'yin yo\'q</h2><p>Bilim Qal\'asi tez orada boshlanadi — guruhni kuzating!</p>'+statsHistoryHtml(s);
           localSeconds=0;
         }
       }

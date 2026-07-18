@@ -44,6 +44,11 @@
     .me b{font-size:20px;color:var(--accent)}
     .big{text-align:center;padding:26px 16px}.big .em{font-size:46px}.big h2{margin:10px 0 6px;font-size:20px}.big p{color:var(--muted);margin:0;font-size:14px;line-height:1.5}
     .lifetime{text-align:center;color:var(--muted);font-size:12px;margin-top:14px}
+    .statsgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+    .sbox{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 4px;text-align:center}
+    .sbox b{display:block;font-size:18px;color:var(--accent)}.sbox span{font-size:10px;color:var(--muted)}
+    .hrow{text-align:left;padding:9px 2px;border-bottom:1px solid var(--line)}.hrow:last-child{border-bottom:0}
+    .hrow .hd{font-size:11px;color:var(--muted)}.hrow .hw{font-weight:700}
     .muted{color:var(--muted)}.hidden{display:none}
   </style>
 </head>
@@ -89,6 +94,16 @@
     function esc(t){return(t||'').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     function api(path,opts){opts=opts||{};opts.headers=Object.assign({'X-Telegram-Init-Data':INIT},opts.headers||{});return fetch(path,opts).then(function(r){return r.json();});}
 
+    function statsHistoryHtml(s){
+      var lt=s.lifetime||{};
+      var h='<div class="statsgrid"><div class="sbox"><b>'+(lt.games||0)+'</b><span>O\'yin</span></div><div class="sbox"><b>'+(lt.points||0)+'</b><span>Jami ochko</span></div><div class="sbox"><b>'+(lt.best||0)+'</b><span>Rekord</span></div></div>';
+      if(s.history&&s.history.length){
+        h+='<div class="sect" style="margin-top:16px;text-align:left">🕘 O\'tgan o\'yinlar</div>';
+        s.history.forEach(function(g){h+='<div class="hrow"><div class="hd">'+esc(g.date)+'</div><div class="hw">🥇 '+esc(g.winner)+' <span class="muted">('+g.winner_points+' ochko)</span></div><div class="muted" style="font-size:12px">'+g.players+' 👤</div></div>';});
+      }
+      return h;
+    }
+
     function render(s){
       var live=$('live'),info=$('info');
       if(s.status==='live'){
@@ -128,11 +143,11 @@
           $('timerLbl').textContent='TUGADI';$('timer').textContent='00:00';$('subtitle').textContent='Tugadi';
           var w='';(s.leaderboard||[]).forEach(function(r,i){var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';var rew=r.reward?'<span style="color:var(--accent2);font-weight:800">🪙 +'+r.reward+'</span>':'';w+='<div class="lb"><div class="rank">'+medal+'</div><div class="lb-name">'+esc(r.name)+' <span class="muted">'+r.points+'</span></div><div class="pts">'+rew+'</div></div>';});
           var mine=s.your_reward?('<div class="me" style="margin-top:12px"><span>Sizning mukofotingiz</span><b>🪙 +'+s.your_reward+'</b></div>'):'';
-          info.innerHTML='<div class="em">🏁</div><h2>O\'yin tugadi!</h2><p>Qatnashgan hamma Kitobcha oladi 🎁</p>'+mine+(w?'<div style="text-align:left;margin-top:14px">'+w+'</div>':'');
+          info.innerHTML='<div class="em">🏁</div><h2>O\'yin tugadi!</h2><p>Qatnashgan hamma Kitobcha oladi 🎁</p>'+mine+(w?'<div style="text-align:left;margin-top:14px">'+w+'</div>':'')+statsHistoryHtml(s);
           localSeconds=0;
         }else{
           $('timerLbl').textContent='—';$('timer').textContent='--:--';$('subtitle').textContent='Kutilmoqda';
-          info.innerHTML='<div class="em">🗣</div><h2>Hozircha o\'yin yo\'q</h2><p>Ko\'pchilik nima dedi? o\'yini tez orada boshlanadi — guruhni kuzating!</p>';
+          info.innerHTML='<div class="em">🗣</div><h2>Hozircha o\'yin yo\'q</h2><p>Ko\'pchilik nima dedi? o\'yini tez orada boshlanadi — guruhni kuzating!</p>'+statsHistoryHtml(s);
           localSeconds=0;
         }
       }

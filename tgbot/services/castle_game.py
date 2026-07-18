@@ -38,10 +38,27 @@ def _prep_questions(raw):
     return out
 
 
+def _recent_used(games_back=3):
+    used = set()
+    for g in CastleGame.objects.order_by("-starts_at")[:games_back]:
+        for item in (g.questions or []):
+            used.add(item.get("q"))
+    return used
+
+
 def create_scheduled_castle(lead_seconds: int = LEAD_SECONDS,
                             num_questions: int = NUM_QUESTIONS,
                             boss_hp: int = BOSS_HP) -> CastleGame:
-    raw = random.sample(CASTLE_QUESTIONS, min(num_questions, len(CASTLE_QUESTIONS)))
+    num_questions = min(num_questions, len(CASTLE_QUESTIONS))
+    used = _recent_used()
+    fresh = [it for it in CASTLE_QUESTIONS if it["q"] not in used]
+    random.shuffle(fresh)
+    if len(fresh) < num_questions:
+        rest = [it for it in CASTLE_QUESTIONS if it["q"] in used]
+        random.shuffle(rest)
+        raw = (fresh + rest)[:num_questions]
+    else:
+        raw = fresh[:num_questions]
     qs = _prep_questions(raw)
     now = timezone.now()
     starts = now + timedelta(seconds=lead_seconds)
@@ -176,11 +193,24 @@ def _lifetime(profile):
     return {"games": games, "correct": correct}
 
 
+def _history(limit=6):
+    out = []
+    for g in CastleGame.objects.filter(status=CastleGame.STATUS_FINISHED).order_by("-starts_at")[:limit]:
+        players = CastleHit.objects.filter(game=g).values("user").distinct().count()
+        out.append({
+            "date": timezone.localtime(g.starts_at).strftime("%d.%m %H:%M"),
+            "victory": g.victory or g.boss_hp == 0,
+            "players": players,
+        })
+    return out
+
+
 def state_payload(profile) -> dict:
     now = timezone.now()
     g = latest_game()
     if not g:
-        return {"ok": True, "status": "none", "lifetime": _lifetime(profile)}
+        return {"ok": True, "status": "none", "lifetime": _lifetime(profile),
+                "history": _history()}
 
     status, qi, left = _phase(g, now)
     nq = len(g.questions or [])
@@ -194,6 +224,7 @@ def state_payload(profile) -> dict:
         "my_correct": my_correct,
         "leaderboard": _leaderboard(g),
         "lifetime": _lifetime(profile),
+        "history": _history() if status != "live" else [],
     }
     if status == "live" and 0 <= qi < nq:
         q = g.questions[qi]
