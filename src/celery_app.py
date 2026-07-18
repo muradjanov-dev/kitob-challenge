@@ -98,9 +98,17 @@ app.conf.beat_schedule = {
     },
 
     # ── Kitob Zanjiri — live "book chain" game ───────────────────────────────
-    # Games are started MANUALLY by an admin (/zanjir or the admin-panel button);
-    # there is no auto-schedule. The tick just finalizes + rewards a running game
-    # once its time is up (cheap no-op when nothing is due).
+    # Auto-starts twice a day (10:00 & 22:00 Tashkent); an admin can also start
+    # one anytime via /zanjir. The tick finalizes + rewards a running game once
+    # its time is up (cheap no-op when nothing is due).
+    'chain-game-morning': {
+        'task': 'tgbot.tasks.start_chain_game',
+        'schedule': crontab(hour=10, minute=0),
+    },
+    'chain-game-evening': {
+        'task': 'tgbot.tasks.start_chain_game',
+        'schedule': crontab(hour=22, minute=0),
+    },
     'chain-game-tick': {
         'task': 'tgbot.tasks.chain_game_tick',
         'schedule': crontab(minute='*/1'),

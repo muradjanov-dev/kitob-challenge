@@ -4150,7 +4150,7 @@ def start_chain_game():
         f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring va "
         "tayyor turing!\n"
         f"⏱ O'yin {DEFAULT_DURATION_MIN} daqiqa davom etadi.\n\n"
-        "Berilgan <b>harf</b> bilan boshlanadigan kitob yoki muallif nomini eng "
+        "Berilgan <b>harf</b> bilan boshlanadigan <b>kitob nomini</b> eng "
         "tez yozgan ochko oladi — zanjir davom etadi!\n\n"
         "🏆 G'oliblar ko'p <b>Kitobcha</b>, qatnashgan hamma <b>+30 🪙</b> oladi.\n"
         "👇 Hoziroq kiring:"

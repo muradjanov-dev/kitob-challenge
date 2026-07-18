@@ -81,13 +81,13 @@
   <!-- LIVE -->
   <div id="live" class="hidden">
     <div class="card letterwrap">
-      <div class="hint" id="letterHint">Shu harf bilan boshlanadigan kitob yoki muallif</div>
+      <div class="hint" id="letterHint">Shu harf bilan boshlanadigan <b>kitob nomini</b> yozing</div>
       <div class="letter" id="letter">–</div>
     </div>
     <div class="card" style="margin-top:-2px">
       <div class="inrow">
         <input id="answer" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
-               placeholder="Kitob yoki muallif nomi…" enterkeyhint="send">
+               placeholder="Kitob nomi…" enterkeyhint="send">
         <button class="send" id="sendBtn">Yuborish</button>
       </div>
       <div class="toast" id="toast"></div>
@@ -189,7 +189,7 @@
           $('subtitle').textContent = 'Tez orada';
           info.innerHTML = '<div class="em">⏳</div><h2>O\'yin boshlanmoqda</h2>'
             + '<p>Kitob Zanjiri boshlanishini kuting. Tayyor turing!</p>'
-            + '<div class="rules">Berilgan <b>harf</b> bilan boshlanadigan kitob yoki muallif nomini eng tez yozgan ochko oladi. Zanjir davom etadi. Eng ko\'p ochko yig\'gan — Kitobcha yutadi! 🪙</div>';
+            + '<div class="rules">Berilgan <b>harf</b> bilan boshlanadigan <b>kitob nomini</b> eng tez yozgan ochko oladi. Zanjir davom etadi. Eng ko\'p ochko yig\'gan — Kitobcha yutadi! 🪙</div>';
           localSeconds = s.seconds;
         } else if (s.status === 'finished'){
           $('timerLbl').textContent = 'TUGADI'; $('timer').textContent = '00:00';
