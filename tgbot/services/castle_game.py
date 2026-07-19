@@ -132,19 +132,21 @@ def finalize(game_id: int) -> dict | None:
     if already:
         return None
 
-    rows = (
+    rows = list(
         CastleHit.objects.filter(game=g)
         .values("user_id")
-        .annotate(correct=Count("id", filter=Q(is_correct=True)), total=Count("id"))
+        .annotate(correct=Count("id", filter=Q(is_correct=True)))
     )
     from tgbot.models import TelegramProfile
+    users = {u.id: u for u in TelegramProfile.objects.filter(
+        id__in=[r["user_id"] for r in rows])}
     contributors = 0
     rewarded = []
     for row in rows:
         uid = row["user_id"]
         correct = row["correct"]
         reward = VICTORY_REWARD if (victory and correct > 0) else CONTRIB_CONSOLATION
-        user = TelegramProfile.objects.filter(id=uid).first()
+        user = users.get(uid)
         if not user:
             continue
         applied = _add_ball_flat(user, reward)
@@ -172,19 +174,15 @@ def finalize_due_games() -> list:
 
 
 def _leaderboard(game, limit=10):
+    # Single query — pull the name via the FK join instead of a per-row lookup
+    # (this runs on every poll during a live game).
     rows = (
         CastleHit.objects.filter(game=game, is_correct=True)
-        .values("user_id")
+        .values("user_id", "user__full_name")
         .annotate(correct=Count("id"))
         .order_by("-correct")[:limit]
     )
-    from tgbot.models import TelegramProfile
-    out = []
-    for r in rows:
-        u = TelegramProfile.objects.filter(id=r["user_id"]).first()
-        if u:
-            out.append({"name": u.full_name or "Kitobxon", "correct": r["correct"]})
-    return out
+    return [{"name": r["user__full_name"] or "Kitobxon", "correct": r["correct"]} for r in rows]
 
 
 def _lifetime(profile):

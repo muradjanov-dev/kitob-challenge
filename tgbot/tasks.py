@@ -876,6 +876,7 @@ def send_random_inspiration():
       count=0 → never; count=1 → only 21:00;
       count=2 → 07:00 + 21:00; count=3 → all three slots.
     """
+    import time as _t
     hour = timezone.localtime().hour
     if hour < 10:
         threshold = 2  # 07:00 slot
@@ -907,8 +908,12 @@ def send_random_inspiration():
                 sent += 1
             else:
                 failed += 1
+                # Respect Telegram's flood limit so the rest of the batch lands.
+                if resp.status_code == 429:
+                    _t.sleep(resp.json().get("parameters", {}).get("retry_after", 3))
         except Exception:
             failed += 1
+        _t.sleep(0.035)  # ~28 msg/s, under Telegram's ~30/s global cap
     print(f"send_random_inspiration: sent={sent} failed={failed}")
 
 
@@ -939,6 +944,7 @@ def send_personalized_inspiration():
     if not qs.exists():
         return
 
+    import time as _t
     text = random.choice(INSPIRATION_POOL)
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     reply_markup = _cta_reply_markup()
@@ -960,8 +966,11 @@ def send_personalized_inspiration():
                 sent += 1
             else:
                 failed += 1
+                if resp.status_code == 429:
+                    _t.sleep(resp.json().get("parameters", {}).get("retry_after", 3))
         except Exception:
             failed += 1
+        _t.sleep(0.035)
 
     print(f"send_personalized_inspiration [hour={current_hour}]: sent={sent} failed={failed}")
 
