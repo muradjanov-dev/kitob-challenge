@@ -224,3 +224,39 @@ CASTLE_QUESTIONS = [
     {"q": "Said Ahmadning mashhur komediyasi qaysi?",
      "options": ["Kelinlar qo'zg'oloni", "Toshkentnoma", "Sarob", "Ufq"], "correct": 0},
 ]
+
+
+# Emoji Kitob — guess the book from emojis (multiple choice; options shuffled at
+# runtime, `correct` is the seed position).
+EMOJI_QUESTIONS = [
+    {"emoji": "👴 🌊 🐟", "options": ["Chol va dengiz", "Robinzon Kruzo", "Oq kema", "Moby Dik"], "correct": 0},
+    {"emoji": "🤴 🌹 🦊 🪐", "options": ["Kichkina shahzoda", "Pinokkio", "Piter Pen", "Alisa"], "correct": 0},
+    {"emoji": "🏝️ 👣 ⛵", "options": ["Robinzon Kruzo", "Gulliver sayohatlari", "Sindbad", "Kapitan qizi"], "correct": 0},
+    {"emoji": "🐺 ❄️ 🐕", "options": ["Oq So'yloq", "Bemor", "Momo", "Oq kema"], "correct": 0},
+    {"emoji": "🔪 ⚖️ 😰", "options": ["Jinoyat va jazo", "Anna Karenina", "Idiot", "Telba"], "correct": 0},
+    {"emoji": "🚂 💔 👩", "options": ["Anna Karenina", "Urush va tinchlik", "Ona", "Sarob"], "correct": 0},
+    {"emoji": "⚔️ 🕊️ 🇷🇺", "options": ["Urush va tinchlik", "Tinch Don", "Ona", "Idiot"], "correct": 0},
+    {"emoji": "🗡️ 🤺 4️⃣", "options": ["Uch mushketyor", "Robin Gud", "Don Kixot", "Ayvengo"], "correct": 0},
+    {"emoji": "🏰 💰 🗝️ 🌊", "options": ["Graf Monte-Kristo", "Ali Baba", "Oltin kalit", "Xazina oroli"], "correct": 0},
+    {"emoji": "🕌 🦂", "options": ["Mehrobdan chayon", "Sha'ytanat", "Diyonat", "Kabus"], "correct": 0},
+    {"emoji": "👦 😜 🎭", "options": ["Shum bola", "Tom Soyer", "Chipollino", "Buratino"], "correct": 0},
+    {"emoji": "⭐ 🌙 🌃", "options": ["Yulduzli tunlar", "Kecha va kunduz", "Sarob", "Ufq"], "correct": 0},
+    {"emoji": "🧪 ⚗️ 🐫 🏜️", "options": ["Alkimyogar", "Sindbad", "Robinzon", "Sahroyi kabir"], "correct": 0},
+    {"emoji": "🐷 🐴 🚩 🏛️", "options": ["Hayvonlar fermasi", "Robinzon", "Momo", "Idiot"], "correct": 0},
+    {"emoji": "👁️ 🏙️ 1️⃣9️⃣8️⃣4️⃣", "options": ["1984", "Biz", "451 daraja", "O'yin"], "correct": 0},
+    {"emoji": "🐛 ➡️ 🧑 😱", "options": ["Metamorfoza", "Jinoyat va jazo", "Telba", "Bemor"], "correct": 0},
+    {"emoji": "🎭 💀 🇩🇰", "options": ["Hamlet", "Otello", "Qirol Lir", "Makbet"], "correct": 0},
+    {"emoji": "❤️ 🗡️ 👫 ⚰️", "options": ["Romeo va Julyetta", "Layli va Majnun", "Farhod va Shirin", "Tohir va Zuhra"], "correct": 0},
+    {"emoji": "🗿 ⛏️ 🏔️ 👑", "options": ["Ulug'bek xazinasi", "Boburnoma", "Navoiy", "Yulduzli tunlar"], "correct": 0},
+    {"emoji": "🕵️ 🔍 🚬 🎻", "options": ["Sherlok Xolms", "Erkul Puaro", "Miss Marpl", "Fandorin"], "correct": 0},
+    {"emoji": "🐋 ⛵ 🎣 😡", "options": ["Moby Dik", "Chol va dengiz", "Robinzon", "20 ming liga"], "correct": 0},
+    {"emoji": "🌊 🚢 🐙 2️⃣0️⃣0️⃣0️⃣0️⃣", "options": ["Dengiz ostida 20 ming liga", "Titanik", "Robinzon", "Sindbad"], "correct": 0},
+    {"emoji": "🎈 🌍 8️⃣0️⃣ 📅", "options": ["80 kunda dunyo bo'ylab", "Vaqt mashinasi", "Oy sayohati", "Sindbad"], "correct": 0},
+    {"emoji": "🧞 🪔 🏜️", "options": ["Alouddin", "Ali Baba", "Sindbad", "Kichkina shahzoda"], "correct": 0},
+    {"emoji": "🍎 ❄️ 7️⃣ 👸", "options": ["Qorqiz va yetti gnom", "Zolushka", "Rapunzel", "Qizil shapkacha"], "correct": 0},
+    {"emoji": "🐺 👵 🔴 🧺", "options": ["Qizil shapkacha", "Uch cho'chqa", "Qorqiz", "Bo'ri va yetti uloq"], "correct": 0},
+    {"emoji": "🎃 👞 🐭 🕛", "options": ["Zolushka", "Qorqiz", "Uxlab qolgan malika", "Rapunzel"], "correct": 0},
+    {"emoji": "📖 🌌 ✍️ 🇺🇿", "options": ["O'tkan kunlar", "Kecha va kunduz", "Sarob", "Ufq"], "correct": 0},
+    {"emoji": "🧔 👑 📜 🇮🇳", "options": ["Boburnoma", "Navoiy", "Yulduzli tunlar", "Ulug'bek xazinasi"], "correct": 0},
+    {"emoji": "🌹 🎶 📚 ✒️", "options": ["Xamsa", "Devon", "Boburnoma", "Qutadg'u bilig"], "correct": 0},
+]

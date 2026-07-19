@@ -1305,3 +1305,62 @@ class CastleHit(BaseModel):
         db_table = "castle_hits"
         unique_together = ("game", "user", "q_index")
         ordering = ("created_at",)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Emoji Kitob — live "guess the book from emojis" multiple-choice game. Each
+# question shows emojis; players pick the book from 4 options. Correct answers
+# score; top scorers earn Kitobcha.
+# ─────────────────────────────────────────────────────────────────────────────
+class EmojiGame(BaseModel):
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_LIVE = "live"
+    STATUS_FINISHED = "finished"
+    STATUS_CHOICES = [
+        (STATUS_SCHEDULED, "Rejalashtirilgan"), (STATUS_LIVE, "Jonli"),
+        (STATUS_FINISHED, "Tugagan"),
+    ]
+    title = models.CharField(max_length=120, default="Emoji Kitob")
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    questions = models.JSONField(default=list, help_text='[{"emoji","options":[4],"correct":idx}]')
+    answer_seconds = models.PositiveIntegerField(default=15)
+    reveal_seconds = models.PositiveIntegerField(default=5)
+    scored_indices = models.JSONField(default=list)
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "emoji_games"
+        verbose_name = "Emoji Kitob — O'yin"
+        verbose_name_plural = "Emoji Kitob — O'yinlar"
+        ordering = ("-starts_at",)
+
+    def __str__(self):
+        return f"Emoji #{self.id} — {self.status}"
+
+
+class EmojiAnswer(BaseModel):
+    game = models.ForeignKey(EmojiGame, on_delete=models.CASCADE, related_name="answers")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="emoji_answers")
+    q_index = models.PositiveSmallIntegerField()
+    choice = models.PositiveSmallIntegerField()
+    is_correct = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "emoji_answers"
+        unique_together = ("game", "user", "q_index")
+        ordering = ("created_at",)
+
+
+class EmojiScore(BaseModel):
+    game = models.ForeignKey(EmojiGame, on_delete=models.CASCADE, related_name="scores")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="emoji_scores")
+    points = models.PositiveIntegerField(default=0)
+    reward = models.PositiveIntegerField(default=0)
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "emoji_scores"
+        unique_together = ("game", "user")
+        ordering = ("-points", "created_at")

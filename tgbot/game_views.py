@@ -13,7 +13,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 from tgbot.shop_views import _require_authed
-from tgbot.services import chain_game, feud_game, castle_game
+from tgbot.services import chain_game, feud_game, castle_game, emoji_game
 
 
 def chain_index(request: HttpRequest) -> HttpResponse:
@@ -129,3 +129,35 @@ def api_castle_submit(request: HttpRequest) -> JsonResponse:
     if not g:
         return JsonResponse({"ok": False, "error": "not_live"})
     return JsonResponse(castle_game.submit_answer(g.id, request.tg_profile, choice))
+
+
+# ── Emoji Kitob ──────────────────────────────────────────────────────────────
+def emoji_index(request: HttpRequest) -> HttpResponse:
+    resp = render(request, "game/emoji.html", {})
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp["Pragma"] = "no-cache"
+    return resp
+
+
+@csrf_exempt
+@require_GET
+@_require_authed
+def api_emoji_state(request: HttpRequest) -> JsonResponse:
+    return JsonResponse(emoji_game.state_payload(request.tg_profile))
+
+
+@csrf_exempt
+@require_POST
+@_require_authed
+def api_emoji_submit(request: HttpRequest) -> JsonResponse:
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
+    choice = body.get("choice")
+    if not isinstance(choice, int):
+        return JsonResponse({"ok": False, "error": "bad_choice"}, status=400)
+    g = emoji_game.latest_game()
+    if not g:
+        return JsonResponse({"ok": False, "error": "not_live"})
+    return JsonResponse(emoji_game.submit_answer(g.id, request.tg_profile, choice))

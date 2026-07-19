@@ -7,6 +7,7 @@ from tgbot.game_views import (
     chain_index, api_chain_state, api_chain_submit, api_chain_challenge,
     feud_index, api_feud_state, api_feud_submit,
     castle_index, api_castle_state, api_castle_submit,
+    emoji_index, api_emoji_state, api_emoji_submit,
 )
 
 
@@ -29,4 +30,7 @@ urlpatterns = [
     path("qala/", castle_index, name="castle"),
     path("qala/api/state/", api_castle_state, name="castle-api-state"),
     path("qala/api/submit/", api_castle_submit, name="castle-api-submit"),
+    path("emoji/", emoji_index, name="emoji"),
+    path("emoji/api/state/", api_emoji_state, name="emoji-api-state"),
+    path("emoji/api/submit/", api_emoji_submit, name="emoji-api-submit"),
 ]

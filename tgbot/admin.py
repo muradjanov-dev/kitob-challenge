@@ -575,3 +575,17 @@ class CastleHitAdmin(admin.ModelAdmin):
     list_display = ('id', 'game', 'user', 'q_index', 'is_correct')
     list_filter = ('is_correct',)
     search_fields = ('user__full_name', 'user__telegram_id')
+
+
+@admin.register(models.EmojiGame)
+class EmojiGameAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'status', 'starts_at', 'ends_at', 'rewarded')
+    list_filter = ('status', 'rewarded')
+    readonly_fields = ('questions', 'scored_indices', 'created_at', 'updated_at')
+
+
+@admin.register(models.EmojiScore)
+class EmojiScoreAdmin(admin.ModelAdmin):
+    list_display = ('id', 'game', 'user', 'points', 'reward', 'rewarded')
+    list_filter = ('rewarded',)
+    search_fields = ('user__full_name', 'user__telegram_id')

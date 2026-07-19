@@ -219,6 +219,9 @@ admin_keyboard.row(
     InlineKeyboardButton(text="🏰 Bilim Qal'asi", callback_data="admin:start_castle"),
 )
 admin_keyboard.row(
+    InlineKeyboardButton(text="🎬 Emoji Kitob", callback_data="admin:start_emoji"),
+)
+admin_keyboard.row(
     InlineKeyboardButton(text="🛒 Do'kon boshqaruvi", callback_data="admin:shop"),
 )
 

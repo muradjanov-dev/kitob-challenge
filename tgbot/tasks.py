@@ -4296,16 +4296,34 @@ def start_castle_game():
 
 
 @shared_task
+def start_emoji_game():
+    from tgbot.services.emoji_game import create_scheduled_emoji, finalize_due_games, LEAD_SECONDS
+    finalize_due_games()
+    game = create_scheduled_emoji()
+    text = (
+        "🎬 <b>EMOJI KITOB</b> — emojidan kitobni top!\n\n"
+        f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+        "Emojilarga qarab, 4 variantdan to'g'ri kitobni eng tez tanlang. "
+        "To'g'ri javob — ochko!\n"
+        "🏆 G'oliblar ko'p Kitobcha oladi.\n👇 Kiring:"
+    )
+    _announce_game(text, "emoji")
+    print(f"start_emoji_game: game #{game.id}")
+
+
+@shared_task
 def start_random_game():
     """Pick one of the live games at random and start it. Wired to the daily
     10:00 & 22:00 slots so the community gets variety."""
-    choice = random.choice(["chain", "feud", "castle"])
+    choice = random.choice(["chain", "feud", "castle", "emoji"])
     if choice == "chain":
         start_chain_game()
     elif choice == "feud":
         start_feud_game()
-    else:
+    elif choice == "castle":
         start_castle_game()
+    else:
+        start_emoji_game()
     print(f"start_random_game: picked {choice}")
 
 
@@ -4370,6 +4388,35 @@ def games_finalize_tick():
                 requests.post(url, data={"chat_id": w["telegram_id"],
                     "text": f"🏰 Bilim Qal'asi: <b>+{w['reward']} Kitobcha</b>! "
                             f"To'g'ri javoblar: {w['correct']}",
+                    "parse_mode": "HTML"}, timeout=8)
+            except Exception:
+                pass
+
+    from tgbot.services import emoji_game
+    for game, summary in emoji_game.finalize_due_games():
+        winners = summary.get("winners", [])
+        lines = ["🎬 <b>Emoji Kitob — yakun!</b>\n"]
+        if winners:
+            for i, w in enumerate(winners[:5]):
+                m = medals[i] if i < 3 else f"{i + 1}."
+                rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
+                lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{rew}")
+        else:
+            lines.append("Bu safar hech kim ochko olmadi 😔")
+        text = "\n".join(lines)
+        for gid in _group_chat_ids():
+            try:
+                requests.post(url, data={"chat_id": gid, "text": text, "parse_mode": "HTML",
+                                         "disable_web_page_preview": "true"}, timeout=10)
+            except Exception:
+                pass
+        for w in winners:
+            if not w.get("reward"):
+                continue
+            try:
+                requests.post(url, data={"chat_id": w["telegram_id"],
+                    "text": f"🎬 Emoji Kitob — <b>{w['rank']}-o'rin</b>!\n"
+                            f"🪙 <b>+{w['reward']} Kitobcha</b> · Ball: {w['points']}",
                     "parse_mode": "HTML"}, timeout=8)
             except Exception:
                 pass

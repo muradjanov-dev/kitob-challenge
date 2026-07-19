@@ -209,6 +209,32 @@ async def admin_start_castle_cb(call: types.CallbackQuery, state: FSMContext = N
     await _launch_game(call.message, start_castle_game, "/qala/", "Bilim Qal'asi")
 
 
+@dp.message_handler(IsPrivate(), commands=["emoji"], state="*")
+async def admin_emoji_command(message: types.Message, state: FSMContext = None):
+    user = await aget_user(message.from_user.id)
+    if not (user and user.is_admin):
+        await message.answer("Siz admin emassiz!")
+        return
+    if state is not None:
+        try:
+            await state.finish()
+        except Exception:
+            pass
+    from tgbot.tasks import start_emoji_game
+    await _launch_game(message, start_emoji_game, "/emoji/", "Emoji Kitob")
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data == "admin:start_emoji", state="*")
+async def admin_start_emoji_cb(call: types.CallbackQuery, state: FSMContext = None):
+    user = await aget_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    await call.answer("Boshlanmoqda…")
+    from tgbot.tasks import start_emoji_game
+    await _launch_game(call.message, start_emoji_game, "/emoji/", "Emoji Kitob")
+
+
 @dp.message_handler(IsPrivate(), commands=["fix_referrals"], state="*")
 async def admin_fix_referrals(message: types.Message, state: FSMContext = None):
     """Admin-only backfill: process every referral that got stuck 'pending'
