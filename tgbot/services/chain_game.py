@@ -74,13 +74,13 @@ def _openlibrary_has(text: str) -> bool:
         needle = normalize(text)
         if not needle:
             return True
+        # EXACT normalized match only — substring matching let short common words
+        # ("va", "men", "noma") pass as substrings of real titles.
         for d in docs:
-            title = normalize(d.get("title", "") or "")
-            if needle in title or title in needle:
+            if normalize(d.get("title", "") or "") == needle:
                 return True
             for a in (d.get("author_name") or []):
-                an = normalize(a)
-                if an and (needle in an or an in needle):
+                if normalize(a) == needle:
                     return True
         return False
     except Exception:
@@ -103,8 +103,14 @@ def _is_valid_name(norm: str, text: str) -> bool:
     if nt and GlobalBook.objects.filter(normalized_title=nt).exists():
         return True
 
+    # A short single word that isn't in our curated dictionary/catalog is almost
+    # certainly not a real book title — don't let Open Library's global index
+    # (which has obscure 1-word entries in many languages) validate it.
+    if " " not in norm and len(norm) < 5:
+        return False
+
     from django.core.cache import cache
-    key = f"chain:valid:{norm}"
+    key = f"chain:valid2:{norm}"  # v2 — invalidates stale substring-era cache
     try:
         v = cache.get(key)
         if v is not None:
