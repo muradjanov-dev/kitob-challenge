@@ -355,6 +355,13 @@ async def age_pick(call: types.CallbackQuery, state: FSMContext):
     except Exception as e:
         print(f"welcome message failed for {call.from_user.id}: {e}")
 
+    # Auto-send the full, detailed "how it works" guide to every new user.
+    try:
+        from tgbot.bot.handlers.users.menu_router import _show_how_it_works
+        await _show_how_it_works(call.message, user)
+    except Exception as e:
+        print(f"how-it-works auto-send failed for {call.from_user.id}: {e}")
+
     # Notify admins (best-effort, doesn't block the user). Always Uzbek for admin.
     try:
         admins_raw = os.environ.get("ADMINS", "")

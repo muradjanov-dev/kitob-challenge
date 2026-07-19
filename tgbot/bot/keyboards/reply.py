@@ -52,6 +52,7 @@ def main_markup(language="uz", is_admin=False):
             "settings": "⚙️ Настройки",
             "quiz": "📝 Книжный Квиз",
             "admin": "👑 Админ панель",
+            "how": "❓ Как это работает?",
         }
     else:
         labels = {
@@ -63,10 +64,12 @@ def main_markup(language="uz", is_admin=False):
             "settings": "⚙️ Sozlamalar",
             "quiz": "📝 Kitob Quiz",
             "admin": "👑 Admin panel",
+            "how": "❓ Qanday ishlaydi?",
         }
 
     kb = InlineKeyboardMarkup(row_width=2)
     kb.row(InlineKeyboardButton(text=labels["report_big"], callback_data="menu:report"))
+    kb.row(InlineKeyboardButton(text=labels["how"], callback_data="menu:how"))
     # Shop entry lives on the native chat menu button now (see
     # set_shop_menu_button management command), so it's removed from the
     # inline menu entirely.

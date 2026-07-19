@@ -737,21 +737,46 @@ async def _menu_achievements(call, user, state: FSMContext):
 # How it works — bot features explanation.
 # ──────────────────────────────────────────────────────────────────────────
 _HOW_IT_WORKS_UZ = (
-    "❓ <b>Bot qanday ishlaydi?</b>\n\n"
-    "📚 <b>1. Har kuni o'qing va hisobot yuboring</b>\n"
-    "   «Kitob hisoboti» tugmasi → o'qigan sahifalar soni → kitob → xulosa\n\n"
-    "📊 <b>2. Reytingda kurashing</b>\n"
-    "   Kunlik, haftalik, oylik va yillik top kitobxonlar e'lon qilinadi\n\n"
-    "🏆 <b>3. Yutuqlar yuting</b>\n"
-    "   30+ yutuq: hisobotlar, betlar, streak, referrallar va boshqalar\n\n"
-    "🪙 <b>4. Kitobcha to'plang</b>\n"
-    "   Har yutuq va top o'rin uchun Kitobcha beriladi\n\n"
-    "📈 <b>5. Darajangizni oshiring</b>\n"
-    "   100 → 500 → 1000 → ... bet bosib o'tganda yangi daraja va mukofot!\n\n"
-    "👥 <b>6. Do'stlarni taklif qiling</b>\n"
-    "   Referral kod orqali do'stingizni qo'shing va bonus oling\n\n"
-    "⚙️ <b>7. Sozlamalar</b>\n"
-    "   Eslatmalar, til, tabriqlash filtrlari — hammasini sozlang"
+    "❓ <b>Bot qanday ishlaydi? (Qo'rqmang — juda oson!)</b>\n\n"
+    "Salom, bo'lajak super-kitobxon! 🦸 Bu yerda kitob o'qish — qiziqarli "
+    "o'yinga aylanadi. Mana sirlar:\n\n"
+
+    "📚 <b>1. Har kuni o'qing va hisobot bering</b>\n"
+    "   «📚 Kitob hisoboti» → nechta bet o'qidingiz → qaysi kitob → bitta xulosa.\n"
+    "   Hatto <b>1 bet</b> ham hisoblanadi 😉 (lekin botni aldash yaramaydi — "
+    "biz kuzatib turibmiz 👀).\n\n"
+
+    "🪙 <b>2. Kitobcha to'plang</b>\n"
+    "   O'qigan va yutuq olgan sayin hamyoningizga 🪙 <b>Kitobcha</b> tushadi.\n"
+    "   Ular haqiqiy — <b>Do'kondan</b> sovrinlarga almashtiriladi! 😌\n\n"
+
+    "📊 <b>3. Reytingda jang qiling</b>\n"
+    "   Kunlik, haftalik, oylik, yillik top. Qo'shningizni ortda qoldiring — "
+    "u ham sizni quvib yetmoqchi 🏃💨\n\n"
+
+    "🏆 <b>4. 30+ yutuq yig'ing</b>\n"
+    "   «Yigirma bet», «Kunlik marafon», «Birinchi kitob»... Kolleksioner bo'ling!\n\n"
+
+    "🎮 <b>5. JONLI O'YINLAR — eng qizig'i!</b>\n"
+    "   Har kuni <b>10:00</b> va <b>22:00</b> da saytda tasodifiy o'yin:\n"
+    "   🔗 <b>Kitob Zanjiri</b> — harf bo'yicha kitob nomini ayting (poyga!)\n"
+    "   🗣 <b>Ko'pchilik nima dedi?</b> — ko'pchilik bilan bir xil javob bering\n"
+    "   🏰 <b>Bilim Qal'asi</b> — jamoa bo'lib «boss»ni yenging ⚔️\n"
+    "   🧩 <b>Kitob Viktorina</b> — 08:30, 14:00, 21:00 (guruhda)\n"
+    "   G'oliblarga Kitobcha, qatnashganga sovg'a. Yutqazsangiz ham... baribir sovg'a 🎁\n\n"
+
+    "📈 <b>6. Darajangizni oshiring</b>\n"
+    "   100 → 500 → 1000 → ... bet. Har bosqichda yangi daraja + mukofot. Level up! 🆙\n\n"
+
+    "👥 <b>7. Do'st taklif qiling</b>\n"
+    "   Havolangizni yuboring → do'st qo'shilib o'qiy boshlasa → sizga bonus 🪙.\n"
+    "   Yolg'iz o'qigandan birga qiziqroq-da! 😄\n\n"
+
+    "⚙️ <b>8. Sozlamalar</b>\n"
+    "   Eslatmalar, til, tabrik filtrlari — hammasini o'zingizga moslang.\n\n"
+
+    "Xullas: <b>O'qing → Yozing → O'ynang → Yuting!</b> 📚🎮🏆\n"
+    "Qani, bugungi birinchi hisobotni yuboramizmi? 👇"
 )
 
 _HOW_IT_WORKS_RU = (
