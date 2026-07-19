@@ -201,9 +201,10 @@ def _leaderboard(game, limit=10, include_all=False):
 
 def _lifetime(profile):
     from django.db.models import Max
+    # Alias must not shadow the field name (else Max("points") → FieldError).
     agg = FeudScore.objects.filter(user=profile).aggregate(
-        games=Count("id"), points=Sum("points"), best=Max("points"))
-    return {"games": agg["games"] or 0, "points": int(agg["points"] or 0),
+        games=Count("id"), pts=Sum("points"), best=Max("points"))
+    return {"games": agg["games"] or 0, "points": int(agg["pts"] or 0),
             "best": int(agg["best"] or 0)}
 
 

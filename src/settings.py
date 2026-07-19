@@ -17,6 +17,21 @@ DEBUG = env.bool('DEBUG')
 ADMINS = env.list('ADMINS')
 CHANNELS = env.list('CHANNELS')
 
+# NOTE: this project reuses Django's ADMINS name for Telegram admin IDs (plain
+# strings), not the (name, email) 2-tuples Django's error-email reporter wants.
+# Django's default `mail_admins` handler therefore crashes on every 500 and
+# masks the real traceback. Route request errors to the console instead so real
+# exceptions are always visible in the logs.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+    },
+}
+
 WEBHOOK_PATH = 'tgbot/' + hashlib.md5(API_TOKEN.encode()).hexdigest()
 WEBHOOK_URL = f"{WEB_DOMAIN}/{WEBHOOK_PATH}"
 

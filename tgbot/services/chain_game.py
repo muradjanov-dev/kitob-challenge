@@ -292,13 +292,15 @@ def _leaderboard(game, limit: int = 10, include_all: bool = False):
 def _lifetime_stats(profile) -> dict:
     """Cumulative Kitob Zanjiri stats for one user across every game played."""
     from django.db.models import Max
+    # NB: alias names must NOT shadow the field name — an alias `points` makes
+    # Max("points") resolve to the aggregate instead of the column (FieldError).
     agg = ChainScore.objects.filter(user=profile).aggregate(
-        games=Count("id"), points=Sum("points"), links=Sum("links"), best=Max("points"),
+        games=Count("id"), pts=Sum("points"), lnk=Sum("links"), best=Max("points"),
     )
     return {
         "games": agg["games"] or 0,
-        "points": int(agg["points"] or 0),
-        "links": int(agg["links"] or 0),
+        "points": int(agg["pts"] or 0),
+        "links": int(agg["lnk"] or 0),
         "best": int(agg["best"] or 0),
     }
 
