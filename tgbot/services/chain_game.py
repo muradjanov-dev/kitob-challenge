@@ -399,8 +399,8 @@ def state_payload(profile) -> dict:
         "seconds": seconds,
         "chain_len": valid_links,
         "recent": recent,
-        # Finished: show EVERY participant with the Kitobcha they won.
-        "leaderboard": _cached_leaderboard(g, (40 if finished else 10), finished),
+        # Top 50; finished also includes every participant with their Kitobcha.
+        "leaderboard": _cached_leaderboard(g, 50, finished),
         "your_points": (my.points if my else 0),
         "your_links": (my.links if my else 0),
         "your_reward": (my.reward if my else 0),

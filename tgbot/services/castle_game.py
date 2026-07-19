@@ -238,7 +238,7 @@ def state_payload(profile) -> dict:
         "victory": g.victory or g.boss_hp == 0,
         "seconds": left, "q_number": qi + 1, "q_total": nq,
         "my_correct": my_correct,
-        "leaderboard": _cached_leaderboard(g),
+        "leaderboard": _cached_leaderboard(g, 50),
         "lifetime": _lifetime(profile),
         "history": _history() if status != "live" else [],
     }

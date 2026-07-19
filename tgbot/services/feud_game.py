@@ -260,7 +260,7 @@ def state_payload(profile) -> dict:
         "q_index": qi,
         "q_total": nq,
         "seconds": secs,
-        "leaderboard": _cached_leaderboard(g, (40 if finished else 10), finished),
+        "leaderboard": _cached_leaderboard(g, 50, finished),
         "your_points": 0,
         "lifetime": _lifetime(profile),
         "history": _history() if status != "live" else [],
