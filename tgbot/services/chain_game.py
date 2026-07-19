@@ -20,9 +20,10 @@ from django.db import transaction
 from django.db.models import Sum, Count
 from django.utils import timezone
 
-from tgbot.models import ChainGame, ChainScore, ChainWord
+from tgbot.models import ChainGame, ChainScore, ChainWord, TelegramProfile
 from tgbot.services.chain_text import normalize, first_letter, last_letter
 
+ENTRY_FEE = 20  # Kitobcha to join a game (charged once, on first attempt)
 POINTS_PER_LINK = 10
 DEFAULT_DURATION_MIN = 10
 LEAD_SECONDS = 30  # lobby countdown after the announcement, so everyone can join
@@ -193,10 +194,17 @@ def submit(game_id: int, profile, text: str) -> dict:
     if not g0 or not (g0.status == ChainGame.STATUS_LIVE and g0.starts_at <= now <= g0.ends_at):
         return {"ok": False, "error": "not_live"}
 
-    # Register participation for any genuine attempt (own row — no game lock) so
-    # everyone who played gets the guest Kitobcha, even if they never found a
-    # valid answer.
-    ChainScore.objects.get_or_create(game_id=g0.id, user=profile)
+    # Entry fee: joining this competition costs ENTRY_FEE Kitobcha, charged once
+    # on the first attempt. Makes it fair — a cheater who gets kicked forfeits it.
+    score0, created0 = ChainScore.objects.get_or_create(game_id=g0.id, user=profile)
+    if created0:
+        with transaction.atomic():
+            p = TelegramProfile.objects.select_for_update().get(id=profile.id)
+            if int(p.ball or 0) < ENTRY_FEE:
+                ChainScore.objects.filter(id=score0.id).delete()  # undo the join
+                return {"ok": False, "error": "insufficient_balance", "need": ENTRY_FEE}
+            p.ball = p.ball - ENTRY_FEE
+            p.save(update_fields=["ball"])
 
     if g0.current_letter and fl != g0.current_letter:
         return {"ok": False, "error": "wrong_letter", "required": g0.current_letter}
@@ -318,8 +326,9 @@ def finalize(game_id: int) -> dict | None:
 
     # Everyone who participated is included (points may be 0). Top-3 scorers get
     # the tiered reward; every other participant is a "guest" and gets 30.
+    # Kicked cheaters get no reward — they forfeit their entry fee.
     scores = list(
-        ChainScore.objects.filter(game=g)
+        ChainScore.objects.filter(game=g).exclude(kicked=True)
         .select_related("user")
         .order_by("-points", "created_at")
     )

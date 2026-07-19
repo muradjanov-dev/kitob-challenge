@@ -4167,9 +4167,10 @@ def start_chain_game():
         f"⏱ O'yin {DEFAULT_DURATION_MIN} daqiqa davom etadi.\n\n"
         "Berilgan <b>harf</b> bilan boshlanadigan <b>kitob yoki muallif</b> nomini "
         "eng tez yozgan ochko oladi — zanjir davom etadi!\n\n"
+        "💰 <b>Kirish: 20 Kitobcha</b> (birinchi javobда yechiladi).\n"
         "🏆 G'oliblar ko'p <b>Kitobcha</b>, qatnashgan hamma <b>+30 🪙</b> oladi.\n"
         "🤝 <b>Halol o'ynang</b> — faqat haqiqiy nom yozing. 3 marta «kitob yo'q» "
-        "olgan chetlatiladi. Vijdonan javob bering, barakangizni yo'qotmang 🤲\n"
+        "olgan chetlatiladi va kirish haqini yo'qotadi 🤲\n"
         "👇 Hoziroq kiring:"
     )
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
