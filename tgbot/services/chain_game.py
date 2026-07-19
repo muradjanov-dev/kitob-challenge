@@ -20,7 +20,7 @@ from django.db import transaction
 from django.db.models import Sum, Count
 from django.utils import timezone
 
-from tgbot.models import ChainGame, ChainScore
+from tgbot.models import ChainGame, ChainScore, ChainWord
 from tgbot.services.chain_text import normalize, first_letter, last_letter
 
 POINTS_PER_LINK = 10
@@ -52,6 +52,71 @@ def _initial_letter() -> str:
 
 def _next_letter(word_last: str) -> str:
     return word_last or random.choice(START_LETTERS)
+
+
+# ── Real-book validation (hybrid) ────────────────────────────────────────────
+def _openlibrary_has(text: str) -> bool:
+    """True if Open Library knows a book/author matching `text`. Returns False on
+    a clean 'not found' (garbage is rejected), but FAIL-OPEN (True) on any
+    network/API error so the game never stalls — community voting + the 3-strike
+    rule are the final backstop. Keyless & generous (unlike Google Books)."""
+    import requests
+    try:
+        r = requests.get(
+            "https://openlibrary.org/search.json",
+            params={"q": text, "limit": 5, "fields": "title,author_name"},
+            headers={"User-Agent": "KitobChallenge/1.0"},
+            timeout=4,
+        )
+        if not r.ok:
+            return True
+        docs = (r.json() or {}).get("docs") or []
+        needle = normalize(text)
+        if not needle:
+            return True
+        for d in docs:
+            title = normalize(d.get("title", "") or "")
+            if needle in title or title in needle:
+                return True
+            for a in (d.get("author_name") or []):
+                an = normalize(a)
+                if an and (needle in an or an in needle):
+                    return True
+        return False
+    except Exception:
+        return True
+
+
+def _is_valid_name(norm: str, text: str) -> bool:
+    """Hybrid gate, cheapest → broadest:
+      1) our curated ChainWord dictionary (instant, best for Uzbek classics),
+      2) the Kitob Challenge catalog — GlobalBook, real books users log (fast,
+         indexed normalized_title),
+      3) Open Library online, cached in Redis 14d, for the world long tail.
+    Fast so the race keeps its intrigue — only brand-new titles hit the network,
+    and never the same one twice."""
+    if ChainWord.objects.filter(norm=norm, is_active=True).exists():
+        return True
+
+    from tgbot.models import GlobalBook, normalize_uzbek_text
+    nt = normalize_uzbek_text(text)
+    if nt and GlobalBook.objects.filter(normalized_title=nt).exists():
+        return True
+
+    from django.core.cache import cache
+    key = f"chain:valid:{norm}"
+    try:
+        v = cache.get(key)
+        if v is not None:
+            return v
+    except Exception:
+        pass
+    ok = _openlibrary_has(text)
+    try:
+        cache.set(key, ok, 60 * 60 * 24 * 14)
+    except Exception:
+        pass
+    return ok
 
 
 # ── Game lifecycle ───────────────────────────────────────────────────────────
@@ -131,6 +196,15 @@ def submit(game_id: int, profile, text: str) -> dict:
         return {"ok": False, "error": "wrong_letter", "required": g0.current_letter}
     if norm in (g0.used_norms or []):
         return {"ok": False, "error": "already_used"}
+
+    # Kicked players can't play — skip the (network) validation for them.
+    mine0 = ChainScore.objects.filter(game_id=g0.id, user=profile).first()
+    if mine0 and mine0.kicked:
+        return {"ok": False, "error": "kicked"}
+
+    # Hybrid real-book check, OUTSIDE the game lock so the race stays snappy.
+    if not _is_valid_name(norm, text):
+        return {"ok": False, "error": "not_a_book"}
 
     with transaction.atomic():
         g = ChainGame.objects.select_for_update().get(id=game_id)
