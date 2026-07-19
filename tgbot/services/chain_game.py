@@ -323,6 +323,25 @@ def _history(limit: int = 6) -> list:
     return out
 
 
+def _cached_leaderboard(game, limit, include_all):
+    """Leaderboard is identical for every poller — compute it at most once every
+    2s and share it across all clients (via Redis) to cut per-poll DB load."""
+    from django.core.cache import cache
+    key = f"chain:lb:{game.id}:{limit}:{int(include_all)}"
+    try:
+        v = cache.get(key)
+        if v is not None:
+            return v
+    except Exception:
+        pass
+    v = _leaderboard(game, limit=limit, include_all=include_all)
+    try:
+        cache.set(key, v, 2)
+    except Exception:
+        pass
+    return v
+
+
 def state_payload(profile) -> dict:
     """Everything the game page needs in one poll."""
     now = timezone.now()
@@ -371,7 +390,7 @@ def state_payload(profile) -> dict:
         "chain_len": valid_links,
         "recent": recent,
         # Finished: show EVERY participant with the Kitobcha they won.
-        "leaderboard": _leaderboard(g, limit=(40 if finished else 10), include_all=finished),
+        "leaderboard": _cached_leaderboard(g, (40 if finished else 10), finished),
         "your_points": (my.points if my else 0),
         "your_links": (my.links if my else 0),
         "your_reward": (my.reward if my else 0),

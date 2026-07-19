@@ -203,6 +203,24 @@ def _history(limit=6):
     return out
 
 
+def _cached_leaderboard(game, limit=10):
+    """Shared across all pollers — computed at most once every 2s (Redis)."""
+    from django.core.cache import cache
+    key = f"castle:lb:{game.id}:{limit}"
+    try:
+        v = cache.get(key)
+        if v is not None:
+            return v
+    except Exception:
+        pass
+    v = _leaderboard(game, limit=limit)
+    try:
+        cache.set(key, v, 2)
+    except Exception:
+        pass
+    return v
+
+
 def state_payload(profile) -> dict:
     now = timezone.now()
     g = latest_game()
@@ -220,7 +238,7 @@ def state_payload(profile) -> dict:
         "victory": g.victory or g.boss_hp == 0,
         "seconds": left, "q_number": qi + 1, "q_total": nq,
         "my_correct": my_correct,
-        "leaderboard": _leaderboard(g),
+        "leaderboard": _cached_leaderboard(g),
         "lifetime": _lifetime(profile),
         "history": _history() if status != "live" else [],
     }

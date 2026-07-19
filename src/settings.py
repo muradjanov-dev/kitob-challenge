@@ -210,6 +210,19 @@ CELERY_BROKER_URL = env.str("CELERY_BROKER_URL", "redis://redis:6379/0")
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
+# Shared Redis cache (across all gunicorn workers) — used for the landing stats
+# and, most importantly, the live-game state which is polled every ~1.5s by many
+# clients at once. Sharing one cached read across concurrent pollers massively
+# cuts DB load. Reuses the Celery Redis; KEY_PREFIX keeps namespaces separate.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": CELERY_BROKER_URL,
+        "KEY_PREFIX": "kc",
+        "TIMEOUT": 300,
+    }
+}
+
 # CSRF settings
 CORS_ALLOW_METHODS = [
     "GET",

@@ -1,1 +1,1 @@
-web: python manage.py migrate && python manage.py collectstatic --noinput && python manage.py send_deploy_notif && python manage.py announce_first_challenge && gunicorn src.wsgi
+web: python manage.py migrate && python manage.py collectstatic --noinput && python manage.py send_deploy_notif && python manage.py announce_first_challenge && gunicorn src.wsgi --workers 2 --threads 4 --worker-class gthread --timeout 60 --graceful-timeout 30 --keep-alive 5 --max-requests 2000 --max-requests-jitter 200
