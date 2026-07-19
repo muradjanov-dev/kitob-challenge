@@ -87,6 +87,18 @@
     .pledge{background:rgba(255,204,77,.12);border:1px solid var(--accent2);border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.5;margin-bottom:12px}
     .strikewarn{color:var(--bad);font-weight:700;font-size:12px;text-align:center;margin-top:8px}
     .kicked-box{background:rgba(255,93,108,.14);border:1px solid var(--bad);color:var(--bad);border-radius:12px;padding:14px;text-align:center;font-weight:700;margin-bottom:12px;line-height:1.5}
+    /* Reyting + Zanjir side by side */
+    .twocol{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+    .twocol .card{padding:12px 10px;margin-bottom:0;min-width:0}
+    .twocol .sect{margin-bottom:8px}
+    .twocol .lb,.twocol .link{padding:7px 0;gap:7px}
+    .twocol .lb-name,.twocol .lk-name{font-size:13px}
+    .twocol .lk-by{font-size:10px}
+    .twocol .pts{font-size:14px}
+    .twocol .rank{width:20px;font-size:13px}
+    .twocol .badge{min-width:22px;height:22px;font-size:11px}
+    .twocol .voteb{padding:4px 6px;font-size:10px}
+    .twocol .rejtag{font-size:10px;padding:2px 5px}
   </style>
 </head>
 <body>
@@ -116,13 +128,15 @@
     <div class="me">
       <span>Sizning ballaringiz</span><b id="myPts">0</b>
     </div>
-    <div class="card">
-      <div class="sect">🏆 Reyting</div>
-      <div id="board"></div>
-    </div>
-    <div class="card">
-      <div class="sect">⛓ Oxirgi zanjir</div>
-      <div id="chain"></div>
+    <div class="twocol">
+      <div class="card">
+        <div class="sect">🏆 Reyting</div>
+        <div id="board"></div>
+      </div>
+      <div class="card">
+        <div class="sect">⛓ Zanjir</div>
+        <div id="chain"></div>
+      </div>
     </div>
   </div>
 
