@@ -1181,6 +1181,10 @@ class ChainScore(BaseModel):
     links = models.PositiveIntegerField(default=0, help_text="Links this user won.")
     reward = models.PositiveIntegerField(default=0, help_text="Kitobcha paid at finish.")
     rewarded = models.BooleanField(default=False)
+    strikes = models.PositiveIntegerField(
+        default=0, help_text="How many of this user's links the crowd rejected.")
+    kicked = models.BooleanField(
+        default=False, help_text="Removed from the game after 3 rejected links.")
 
     class Meta:
         db_table = "chain_scores"

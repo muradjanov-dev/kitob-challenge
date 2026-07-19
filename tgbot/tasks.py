@@ -4168,6 +4168,8 @@ def start_chain_game():
         "Berilgan <b>harf</b> bilan boshlanadigan <b>kitob yoki muallif</b> nomini "
         "eng tez yozgan ochko oladi — zanjir davom etadi!\n\n"
         "🏆 G'oliblar ko'p <b>Kitobcha</b>, qatnashgan hamma <b>+30 🪙</b> oladi.\n"
+        "🤝 <b>Halol o'ynang</b> — faqat haqiqiy nom yozing. 3 marta «kitob yo'q» "
+        "olgan chetlatiladi. Vijdonan javob bering, barakangizni yo'qotmang 🤲\n"
         "👇 Hoziroq kiring:"
     )
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"

@@ -138,6 +138,11 @@ def submit(game_id: int, profile, text: str) -> dict:
         if not (g.status == ChainGame.STATUS_LIVE and g.starts_at <= now <= g.ends_at):
             return {"ok": False, "error": "not_live"}
 
+        # Fair-play: a player whose answers were rejected 3× is out of the game.
+        mine = ChainScore.objects.filter(game=g, user=profile).first()
+        if mine and mine.kicked:
+            return {"ok": False, "error": "kicked"}
+
         required = g.current_letter
         if required and fl != required:
             return {"ok": False, "error": "wrong_letter", "required": required}
@@ -206,13 +211,18 @@ def challenge(game_id: int, profile, idx: int) -> dict:
         g.chain = chain
         g.save(update_fields=["chain", "updated_at"])
 
+        kicked_user = False
         if rejected:
             s = ChainScore.objects.filter(game=g, user_id=link.get("user_id")).first()
             if s:
                 s.points = max(0, (s.points or 0) - POINTS_PER_LINK)
                 s.links = max(0, (s.links or 0) - 1)
-                s.save(update_fields=["points", "links", "updated_at"])
-        return {"ok": True, "count": len(votes), "rejected": rejected}
+                s.strikes = (s.strikes or 0) + 1
+                if s.strikes >= 3 and not s.kicked:
+                    s.kicked = True
+                    kicked_user = True
+                s.save(update_fields=["points", "links", "strikes", "kicked", "updated_at"])
+        return {"ok": True, "count": len(votes), "rejected": rejected, "kicked_user": kicked_user}
 
 
 def finalize(game_id: int) -> dict | None:
@@ -394,6 +404,8 @@ def state_payload(profile) -> dict:
         "your_points": (my.points if my else 0),
         "your_links": (my.links if my else 0),
         "your_reward": (my.reward if my else 0),
+        "your_strikes": (my.strikes if my else 0),
+        "kicked": (my.kicked if my else False),
         "lifetime": _lifetime_stats(profile),
         "history": _history() if status != "live" else [],
         "reject_votes": REJECT_VOTES,
