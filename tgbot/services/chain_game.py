@@ -20,9 +20,10 @@ from django.db import transaction
 from django.db.models import Sum, Count
 from django.utils import timezone
 
-from tgbot.models import ChainGame, ChainScore, ChainWord
+from tgbot.models import ChainGame, ChainScore, TelegramProfile
 from tgbot.services.chain_text import normalize, first_letter, last_letter
 
+ENTRY_FEE = 20  # Kitobcha to join a game (charged once, on first attempt)
 POINTS_PER_LINK = 10
 DEFAULT_DURATION_MIN = 10
 LEAD_SECONDS = 30  # lobby countdown after the announcement, so everyone can join
@@ -52,77 +53,6 @@ def _initial_letter() -> str:
 
 def _next_letter(word_last: str) -> str:
     return word_last or random.choice(START_LETTERS)
-
-
-# ── Real-book validation (hybrid) ────────────────────────────────────────────
-def _openlibrary_has(text: str) -> bool:
-    """True if Open Library knows a book/author matching `text`. Returns False on
-    a clean 'not found' (garbage is rejected), but FAIL-OPEN (True) on any
-    network/API error so the game never stalls — community voting + the 3-strike
-    rule are the final backstop. Keyless & generous (unlike Google Books)."""
-    import requests
-    try:
-        r = requests.get(
-            "https://openlibrary.org/search.json",
-            params={"q": text, "limit": 5, "fields": "title,author_name"},
-            headers={"User-Agent": "KitobChallenge/1.0"},
-            timeout=4,
-        )
-        if not r.ok:
-            return True
-        docs = (r.json() or {}).get("docs") or []
-        needle = normalize(text)
-        if not needle:
-            return True
-        # EXACT normalized match only — substring matching let short common words
-        # ("va", "men", "noma") pass as substrings of real titles.
-        for d in docs:
-            if normalize(d.get("title", "") or "") == needle:
-                return True
-            for a in (d.get("author_name") or []):
-                if normalize(a) == needle:
-                    return True
-        return False
-    except Exception:
-        return True
-
-
-def _is_valid_name(norm: str, text: str) -> bool:
-    """Hybrid gate, cheapest → broadest:
-      1) our curated ChainWord dictionary (instant, best for Uzbek classics),
-      2) the Kitob Challenge catalog — GlobalBook, real books users log (fast,
-         indexed normalized_title),
-      3) Open Library online, cached in Redis 14d, for the world long tail.
-    Fast so the race keeps its intrigue — only brand-new titles hit the network,
-    and never the same one twice."""
-    if ChainWord.objects.filter(norm=norm, is_active=True).exists():
-        return True
-
-    from tgbot.models import GlobalBook, normalize_uzbek_text
-    nt = normalize_uzbek_text(text)
-    if nt and GlobalBook.objects.filter(normalized_title=nt).exists():
-        return True
-
-    # A short single word that isn't in our curated dictionary/catalog is almost
-    # certainly not a real book title — don't let Open Library's global index
-    # (which has obscure 1-word entries in many languages) validate it.
-    if " " not in norm and len(norm) < 5:
-        return False
-
-    from django.core.cache import cache
-    key = f"chain:valid2:{norm}"  # v2 — invalidates stale substring-era cache
-    try:
-        v = cache.get(key)
-        if v is not None:
-            return v
-    except Exception:
-        pass
-    ok = _openlibrary_has(text)
-    try:
-        cache.set(key, ok, 60 * 60 * 24 * 14)
-    except Exception:
-        pass
-    return ok
 
 
 # ── Game lifecycle ───────────────────────────────────────────────────────────
@@ -193,24 +123,26 @@ def submit(game_id: int, profile, text: str) -> dict:
     if not g0 or not (g0.status == ChainGame.STATUS_LIVE and g0.starts_at <= now <= g0.ends_at):
         return {"ok": False, "error": "not_live"}
 
-    # Register participation for any genuine attempt (own row — no game lock) so
-    # everyone who played gets the guest Kitobcha, even if they never found a
-    # valid answer.
-    ChainScore.objects.get_or_create(game_id=g0.id, user=profile)
+    # Entry fee: joining this competition costs ENTRY_FEE Kitobcha, charged once
+    # on the first attempt. Any answer is accepted (no book validation) — the
+    # crowd moderates via the "not a real book" vote, and a 3× rejected player is
+    # kicked and forfeits both reward and entry fee.
+    score0, created0 = ChainScore.objects.get_or_create(game_id=g0.id, user=profile)
+    if created0:
+        with transaction.atomic():
+            p = TelegramProfile.objects.select_for_update().get(id=profile.id)
+            if int(p.ball or 0) < ENTRY_FEE:
+                ChainScore.objects.filter(id=score0.id).delete()  # undo the join
+                return {"ok": False, "error": "insufficient_balance", "need": ENTRY_FEE}
+            p.ball = p.ball - ENTRY_FEE
+            p.save(update_fields=["ball"])
 
+    if score0.kicked:
+        return {"ok": False, "error": "kicked"}
     if g0.current_letter and fl != g0.current_letter:
         return {"ok": False, "error": "wrong_letter", "required": g0.current_letter}
     if norm in (g0.used_norms or []):
         return {"ok": False, "error": "already_used"}
-
-    # Kicked players can't play — skip the (network) validation for them.
-    mine0 = ChainScore.objects.filter(game_id=g0.id, user=profile).first()
-    if mine0 and mine0.kicked:
-        return {"ok": False, "error": "kicked"}
-
-    # Hybrid real-book check, OUTSIDE the game lock so the race stays snappy.
-    if not _is_valid_name(norm, text):
-        return {"ok": False, "error": "not_a_book"}
 
     with transaction.atomic():
         g = ChainGame.objects.select_for_update().get(id=game_id)
@@ -316,26 +248,31 @@ def finalize(game_id: int) -> dict | None:
     if already:
         return None
 
-    # Everyone who participated is included (points may be 0). Top-3 scorers get
-    # the tiered reward; every other participant is a "guest" and gets 30.
+    # Option A — only players who actually SCORED are rewarded. Freeloaders
+    # (0 points) and kicked cheaters get nothing and forfeit their entry fee.
+    # Top-3 scorers get the tiered prize; every other scorer gets PARTICIPATION.
     scores = list(
-        ChainScore.objects.filter(game=g)
+        ChainScore.objects.filter(game=g).exclude(kicked=True)
         .select_related("user")
         .order_by("-points", "created_at")
     )
     winners = []
     for i, s in enumerate(scores):
-        if s.points > 0 and i < 3:
+        if s.points <= 0:
+            reward = 0
+        elif i < 3:
             reward = REWARD_TIERS[i]
         else:
             reward = PARTICIPATION
-        if not s.rewarded:
+        if reward and not s.rewarded:
             applied = _add_ball_flat(s.user, reward)
             s.rewarded = True
             s.reward = applied
             s.save(update_fields=["rewarded", "reward", "updated_at"])
-        else:
+        elif reward:
             applied = s.reward or reward
+        else:
+            applied = 0
         winners.append({
             "rank": i + 1,
             "user_id": s.user_id,

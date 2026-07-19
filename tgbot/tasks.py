@@ -4167,9 +4167,11 @@ def start_chain_game():
         f"⏱ O'yin {DEFAULT_DURATION_MIN} daqiqa davom etadi.\n\n"
         "Berilgan <b>harf</b> bilan boshlanadigan <b>kitob yoki muallif</b> nomini "
         "eng tez yozgan ochko oladi — zanjir davom etadi!\n\n"
-        "🏆 G'oliblar ko'p <b>Kitobcha</b>, qatnashgan hamma <b>+30 🪙</b> oladi.\n"
-        "🤝 <b>Halol o'ynang</b> — faqat haqiqiy nom yozing. 3 marta «kitob yo'q» "
-        "olgan chetlatiladi. Vijdonan javob bering, barakangizni yo'qotmang 🤲\n"
+        "💰 <b>Kirish: 20 Kitobcha.</b>\n"
+        "🏆 Ochko olganlar mukofot oladi (1/2/3-o'rin: <b>300/200/100 🪙</b>); "
+        "bekorchi va firibgar kirish haqini yo'qotadi.\n"
+        "🤝 <b>Halol o'ynang</b> — faqat haqiqiy nom yozing, aks holda ovoz bilan "
+        "chetlatilasiz. Barakangizni yo'qotmang 🤲\n"
         "👇 Hoziroq kiring:"
     )
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -4205,14 +4207,15 @@ def chain_game_tick():
             f"⛓ Zanjir: <b>{summary.get('links', 0)}</b> · "
             f"Qatnashchilar: <b>{summary.get('players', 0)}</b>\n",
         ]
-        if winners:
-            for i, w in enumerate(winners[:5]):
+        scorers = [w for w in winners if (w.get("points") or 0) > 0]
+        if scorers:
+            for i, w in enumerate(scorers[:5]):
                 m = medals[i] if i < 3 else f"{i + 1}."
                 rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
                 lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{rew}")
-            lines.append("\n🎁 Qatnashgan barcha kitobxonlarga — hatto o'rin olmaganlarga ham — <b>+30 🪙</b>!")
+            lines.append("\n💰 Kirish 20 🪙 · faqat ochko olganlar mukofot oldi. Halol o'yin uchun rahmat! 🤲")
         else:
-            lines.append("Bu safar hech kim qatnashmadi 😔")
+            lines.append("Bu safar hech kim ochko olmadi 😔")
         text = "\n".join(lines)
         for group_id in _group_chat_ids():
             try:

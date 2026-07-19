@@ -111,7 +111,7 @@
   <!-- LIVE -->
   <div id="live" class="hidden">
     <div class="kicked-box hidden" id="kickedBox">🚫 Siz bu o'yindan chetlashtirildingiz.<br>Javoblaringiz 3 marta «kitob yo'q» deb belgilandi. Iltimos, halol o'ynang — barakangizni yo'qotmang 🤲</div>
-    <div class="pledge">🤝 <b>Halol o'ynang!</b> Faqat haqiqiy kitob yoki muallif nomini yozing. Vijdonan javob bering — 3 marta «kitob yo'q» olsangiz o'yindan chetlatilasiz. Barakangizni yo'qotmang 🤲</div>
+    <div class="pledge">💰 <b>Kirish: 20 Kitobcha</b> (birinchi javobда). 🏆 Faqat ochko olganlar mukofot oladi. 🤝 <b>Halol o'ynang</b> — faqat haqiqiy nom yozing, 3 marta «kitob yo'q» olsangiz chetlatilasiz va kirish haqini yo'qotasiz. Barakangizni yo'qotmang 🤲</div>
     <div class="card letterwrap">
       <div class="hint" id="letterHint">Shu harf bilan boshlanadigan <b>kitob yoki muallif</b> nomini yozing</div>
       <div class="letter" id="letter">–</div>
@@ -265,7 +265,7 @@
           });
           var mine = (s.your_reward ? ('<div class="me" style="margin-top:12px"><span>Sizning mukofotingiz</span><b>🪙 +'+s.your_reward+'</b></div>') : '');
           info.innerHTML = '<div class="em">🏁</div><h2>O\'yin tugadi!</h2>'
-            + '<p>Qatnashgan har bir kishi Kitobcha oladi 🎁 — o\'rin olmaganlar ham 30 🪙.</p>'
+            + '<p>🏆 Ochko olganlar mukofot oldi (1/2/3: 300/200/100, qolganlar +30). Bekorchi va firibgar kirish haqini yo\'qotdi.</p>'
             + mine
             + (w ? '<div style="text-align:left;margin-top:14px">'+w+'</div>'
                  : '<p class="muted" style="margin-top:12px">Bu safar hech kim qatnashmadi.</p>')
@@ -318,7 +318,7 @@
           t.textContent = ({
             wrong_letter:"«"+((r.required||'').toUpperCase())+"» harfi bilan boshlanishi kerak!",
             already_used:"Bu allaqachon aytilgan 🔁",
-            not_a_book:"Bunday kitob topilmadi 🤔 Haqiqiy kitob yoki muallif nomini yozing!",
+            insufficient_balance:"🪙 Kirish uchun 20 Kitobcha kerak — balansingiz yetarli emas.",
             not_live:"O'yin hozir faol emas.",
             kicked:"🚫 Siz o'yindan chetlashtirildingiz (3 marta «kitob yo'q»). Halol o'ynang!",
             empty:"To'liqroq nom yozing."
