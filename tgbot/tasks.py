@@ -848,6 +848,12 @@ INSPIRATION_POOL = [
     "🪄 Sehr yo'q, mehnat bor. Bugungi mehnat — bir bet va bir tugma.",
     "🌅 Yangi kun — yangi imkoniyat. Hisobot bilan boshla, faxr bilan tugat!",
     "📮 Hisobot tugmasi seni kutmoqda. Bosishga tayyormisan? 👇",
+    # ── Referral → Premium reminders ──────────────────────────────────────
+    "💎 Premiumni PULSIZ oling! Do'stlarni taklif qiling: <b>har 3 ta taklif = 1 kun Premium</b> + Kitobcha. Havolangiz: «📊 Reyting → 🌟 Referal».",
+    "🎁 Yolg'iz o'qima — do'st taklif qil! Har taklif uchun Kitobcha, <b>har 3-tasiga 1 kun Premium</b> 💎. «📊 Reyting → 🌟 Referal».",
+    "👥 Do'stingiz ham kitobxon bo'lsin! Referal havolangizni ulashing — sizga 🪙 Kitobcha va <b>Premium kunlari</b> sovg'a!",
+    "🚀 Premium olishning eng oson yo'li — do'st taklif qilish! Har 3 do'st = 1 kun Premium. Havola «📊 Reyting → 🌟 Referal»da.",
+    "💌 Kitobxon do'stingizni chaqiring — u o'qiy boshlasa, sizga bonus 🪙 + <b>har 3 taklifga 1 kun Premium</b> 💎!",
 ]
 
 
