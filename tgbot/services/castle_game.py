@@ -15,7 +15,7 @@ from django.db.models.functions import Greatest
 from django.utils import timezone
 
 from tgbot.models import CastleGame, CastleHit
-from tgbot.services.chain_game import _add_ball_flat
+from tgbot.services.chain_game import _add_ball_flat, charge_entry_fee, ENTRY_FEE
 from tgbot.services.game_questions import CASTLE_QUESTIONS
 
 LEAD_SECONDS = 30
@@ -38,7 +38,7 @@ def _prep_questions(raw):
     return out
 
 
-def _recent_used(games_back=3):
+def _recent_used(games_back=33):
     used = set()
     for g in CastleGame.objects.order_by("-starts_at")[:games_back]:
         for item in (g.questions or []):
@@ -98,6 +98,13 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
     status, qi, _ = _phase(g, now)
     if status != "live" or qi < 0 or qi >= len(g.questions or []):
         return {"ok": False, "error": "not_live"}
+
+    # Entry fee: joining this competition costs ENTRY_FEE Kitobcha, charged once
+    # on the user's first answer of the game.
+    is_first = not CastleHit.objects.filter(game_id=g.id, user=profile).exists()
+    if is_first and not charge_entry_fee(profile):
+        return {"ok": False, "error": "insufficient_balance", "need": ENTRY_FEE}
+
     q = g.questions[qi]
     correct = (choice == q.get("correct"))
 

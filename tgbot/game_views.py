@@ -51,20 +51,17 @@ def api_chain_submit(request: HttpRequest) -> JsonResponse:
 @csrf_exempt
 @require_POST
 @_require_authed
-def api_chain_challenge(request: HttpRequest) -> JsonResponse:
-    """Vote a chain link as 'not a real book'. At the vote threshold the link is
-    invalidated and its point revoked."""
+def api_chain_vote(request: HttpRequest) -> JsonResponse:
+    """Vote the pending candidate 'to'g'ri' (accept) or 'noto'g'ri' (reject)."""
     try:
         body = json.loads(request.body.decode("utf-8") or "{}")
     except json.JSONDecodeError:
         return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
-    idx = body.get("idx")
-    if not isinstance(idx, int):
-        return JsonResponse({"ok": False, "error": "bad_index"}, status=400)
+    accept = bool(body.get("accept"))
     g = chain_game.get_or_activate_live_game()
     if not g:
         return JsonResponse({"ok": False, "error": "not_live"})
-    return JsonResponse(chain_game.challenge(g.id, request.tg_profile, idx))
+    return JsonResponse(chain_game.vote_pending(g.id, request.tg_profile, accept))
 
 
 # ── Ko'pchilik nima dedi? (Feud) ─────────────────────────────────────────────

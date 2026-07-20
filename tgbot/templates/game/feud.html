@@ -59,6 +59,7 @@
   </div>
 
   <div id="live" class="hidden">
+    <div class="card" style="background:rgba(255,204,77,.12);border:1px solid var(--accent2);font-size:12.5px;line-height:1.5;padding:10px 12px">💰 <b>Kirish: 25 Kitobcha</b> (birinchi javobda). 🎁 Qatnashgan hamma <b>+30 🪙</b>, g'oliblar ko'proq oladi.</div>
     <div class="card qcard">
       <div class="qnum" id="qnum">Savol</div>
       <div class="qtext" id="qtext">—</div>
@@ -163,7 +164,7 @@
       api('/kopchilik/api/submit/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})}).then(function(r){
         var t=$('toast');
         if(r.ok){t.className='toast ok';t.textContent='✅ Javobingiz qabul qilindi!';if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.notificationOccurred('success')}catch(e){}}poll();}
-        else{t.className='toast bad';t.textContent=({not_answering:"Hozir javob vaqti emas.",not_live:"O'yin faol emas.",empty:"Javob yozing."})[r.error]||"Qabul qilinmadi.";}
+        else{t.className='toast bad';t.textContent=({not_answering:"Hozir javob vaqti emas.",not_live:"O'yin faol emas.",empty:"Javob yozing.",insufficient_balance:"🪙 Kirish uchun 25 Kitobcha kerak — balansingiz yetarli emas."})[r.error]||"Qabul qilinmadi.";}
       }).catch(function(){$('toast').className='toast bad';$('toast').textContent='Tarmoq xatosi.';}).then(function(){busy=false;$('sendBtn').disabled=false;});
     }
     $('sendBtn').addEventListener('click',send);

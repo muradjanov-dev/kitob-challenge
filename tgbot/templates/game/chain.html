@@ -110,8 +110,8 @@
 
   <!-- LIVE -->
   <div id="live" class="hidden">
-    <div class="kicked-box hidden" id="kickedBox">🚫 Siz bu o'yindan chetlashtirildingiz.<br>Javoblaringiz 3 marta «kitob yo'q» deb belgilandi. Iltimos, halol o'ynang — barakangizni yo'qotmang 🤲</div>
-    <div class="pledge">💰 <b>Kirish: 20 Kitobcha</b> (birinchi javobда). 🏆 Faqat ochko olganlar mukofot oladi. 🤝 <b>Halol o'ynang</b> — faqat haqiqiy nom yozing, 3 marta «kitob yo'q» olsangiz chetlatilasiz va kirish haqini yo'qotasiz. Barakangizni yo'qotmang 🤲</div>
+    <div class="kicked-box hidden" id="kickedBox">🚫 Siz bu o'yindan chetlashtirildingiz.<br>Javoblaringiz 3 marta ovoz bilan rad etildi. Iltimos, halol o'ynang — barakangizni yo'qotmang 🤲</div>
+    <div class="pledge">💰 <b>Kirish: 25 Kitobcha</b> (birinchi javobda). ✅ Har javob avval <b>ovozga qo'yiladi</b> — ko'pchilik «to'g'ri» desa qabul qilinadi va zanjir davom etadi. 🏆 Faqat ochko olganlar mukofot oladi. 🤝 <b>Halol o'ynang</b> — 3 marta rad etilsangiz chetlatilasiz va kirish haqini yo'qotasiz. Barakangizni yo'qotmang 🤲</div>
     <div class="card letterwrap">
       <div class="hint" id="letterHint">Shu harf bilan boshlanadigan <b>kitob yoki muallif</b> nomini yozing</div>
       <div class="letter" id="letter">–</div>
@@ -124,6 +124,19 @@
       </div>
       <div class="toast" id="toast"></div>
       <div class="strikewarn hidden" id="strikeWarn"></div>
+    </div>
+    <div class="card hidden" style="margin-top:-2px" id="pendingCard">
+      <div class="sect">🗳 Ovozga qo'yildi — to'g'rimi?</div>
+      <div style="text-align:center;margin-bottom:10px">
+        <div style="font-size:22px;font-weight:800" id="pendingWord">–</div>
+        <div class="muted" style="font-size:12px" id="pendingBy"></div>
+      </div>
+      <div class="inrow" style="justify-content:center">
+        <button class="send" id="voteYes" style="background:var(--ok);flex:1">✅ To'g'ri</button>
+        <button class="send" id="voteNo" style="background:var(--bad);flex:1">❌ Noto'g'ri</button>
+      </div>
+      <div class="toast ok" id="pendingTally"></div>
+      <div class="muted" style="text-align:center;font-size:12px" id="pendingSeconds"></div>
     </div>
     <div class="me">
       <span>Sizning ballaringiz</span><b id="myPts">0</b>
@@ -200,7 +213,9 @@
         $('subtitle').textContent = 'Jonli o\'yin · ' + s.chain_len + ' zanjir';
         // Fair-play: removed players lose the input; warn those with strikes.
         $('kickedBox').classList.toggle('hidden', !s.kicked);
-        $('answerCard').classList.toggle('hidden', !!s.kicked);
+        var pend = s.pending;
+        $('answerCard').classList.toggle('hidden', !!s.kicked || !!pend);
+        $('pendingCard').classList.toggle('hidden', !pend);
         var sw = $('strikeWarn');
         if (!s.kicked && s.your_strikes > 0){
           sw.classList.remove('hidden');
@@ -213,6 +228,18 @@
           letterEl.classList.remove('pop'); void letterEl.offsetWidth; letterEl.classList.add('pop');
         }
         $('myPts').textContent = s.your_points || 0;
+        // pending vote (candidate awaiting crowd verdict)
+        if (pend){
+          $('pendingWord').textContent = pend.display;
+          $('pendingBy').textContent = pend.mine ? 'Bu sizning javobingiz' : ('Yozdi: ' + pend.name);
+          var locked = !!pend.mine || !!pend.your_vote;
+          $('voteYes').disabled = locked; $('voteNo').disabled = locked;
+          $('voteYes').style.opacity = locked ? .5 : 1; $('voteNo').style.opacity = locked ? .5 : 1;
+          var mine_vote = pend.your_vote === 'yes' ? ' · siz ✅ dedingiz' : (pend.your_vote === 'no' ? ' · siz ❌ dedingiz' : '');
+          $('pendingTally').textContent = '✅ ' + pend.yes + '  ❌ ' + pend.no + mine_vote;
+          pendingSeconds = pend.seconds_left;
+          $('pendingSeconds').textContent = pendingSeconds + ' soniya qoldi';
+        }
         // leaderboard
         var b = '';
         (s.leaderboard||[]).forEach(function(r,i){
@@ -222,26 +249,15 @@
              + '<div class="pts">'+r.points+'</div></div>';
         });
         $('board').innerHTML = b || '<div class="muted" style="padding:6px 0">Hali hech kim ochko olmadi — birinchi bo\'ling!</div>';
-        // chain + community "not a real book" voting
+        // chain — accepted links are final, just a history list now
         var c = '';
         (s.recent||[]).forEach(function(k){
-          var right = '';
-          if (k.rejected){
-            right = '<span class="rejtag">bekor</span>';
-          } else if (!k.mine){
-            var vc = k.votes ? (' ('+k.votes+')') : '';
-            right = '<button class="voteb'+(k.voted?' voted':'')+'" data-idx="'+k.idx+'"'
-                  + (k.voted?' disabled':'')+'>❌ bunday kitob yo\'q'+vc+'</button>';
-          }
-          c += '<div class="link'+(k.rejected?' rejected':'')+'"><div class="badge">'
+          c += '<div class="link"><div class="badge">'
              + esc((k.letter||'?').toUpperCase())+'</div>'
              + '<div class="lk-main"><div class="lk-name">'+esc(k.display)+'</div>'
-             + '<div class="lk-by">'+esc(k.name)+'</div></div>'+right+'</div>';
+             + '<div class="lk-by">'+esc(k.name)+'</div></div></div>';
         });
         $('chain').innerHTML = c || '<div class="muted" style="padding:6px 0">Zanjir hali bo\'sh.</div>';
-        Array.prototype.forEach.call($('chain').querySelectorAll('.voteb'), function(b){
-          b.addEventListener('click', function(){ challenge(parseInt(b.getAttribute('data-idx'),10)); });
-        });
         localSeconds = s.seconds;
       } else {
         live.classList.add('hidden'); info.classList.remove('hidden');
@@ -250,7 +266,7 @@
           $('subtitle').textContent = 'Tez orada';
           info.innerHTML = '<div class="em">⏳</div><h2>O\'yin boshlanmoqda</h2>'
             + '<p>Kitob Zanjiri boshlanishini kuting. Tayyor turing!</p>'
-            + '<div class="rules">Berilgan <b>harf</b> bilan boshlanadigan <b>kitob yoki muallif</b> nomini eng tez yozgan ochko oladi. Zanjir davom etadi. Eng ko\'p ochko yig\'gan — Kitobcha yutadi! 🪙</div>';
+            + '<div class="rules">Berilgan <b>harf</b> bilan boshlanadigan <b>kitob yoki muallif</b> nomini birinchi yozgan ovozga qo\'yiladi — ko\'pchilik «to\'g\'ri» desa qabul qilinadi va zanjir davom etadi. Eng ko\'p ochko yig\'gan — Kitobcha yutadi! 🪙</div>';
           localSeconds = s.seconds;
         } else if (s.status === 'finished'){
           $('timerLbl').textContent = 'TUGADI'; $('timer').textContent = '00:00';
@@ -310,7 +326,7 @@
       }).then(function(r){
         var t = $('toast');
         if (r.ok){
-          t.className='toast ok'; t.textContent='✅ +'+r.gained+' — '+r.display+'!';
+          t.className='toast ok'; t.textContent='🗳 «'+r.display+'» ovozga qo\'yildi!';
           inp.value=''; if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.notificationOccurred('success')}catch(e){}}
           poll();
         } else {
@@ -318,9 +334,11 @@
           t.textContent = ({
             wrong_letter:"«"+((r.required||'').toUpperCase())+"» harfi bilan boshlanishi kerak!",
             already_used:"Bu allaqachon aytilgan 🔁",
-            insufficient_balance:"🪙 Kirish uchun 20 Kitobcha kerak — balansingiz yetarli emas.",
+            already_rejected:"Bu so'z endigina rad etildi, boshqa nom yozing.",
+            vote_in_progress:"Hozir boshqa javob ovoz olmoqda — biroz kuting.",
+            insufficient_balance:"🪙 Kirish uchun 25 Kitobcha kerak — balansingiz yetarli emas.",
             not_live:"O'yin hozir faol emas.",
-            kicked:"🚫 Siz o'yindan chetlashtirildingiz (3 marta «kitob yo'q»). Halol o'ynang!",
+            kicked:"🚫 Siz o'yindan chetlashtirildingiz (3 marta rad etildi). Halol o'ynang!",
             empty:"To'liqroq nom yozing."
           })[r.error] || "Qabul qilinmadi, qayta urining.";
           if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.notificationOccurred('error')}catch(e){}}
@@ -330,21 +348,17 @@
       }).then(function(){ busy=false; $('sendBtn').disabled=false; inp.focus(); });
     }
 
-    function challenge(idx){
-      if (isNaN(idx)) return;
-      api('/zanjir/api/challenge/', {
+    function vote(accept){
+      api('/zanjir/api/vote/', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({idx: idx})
-      }).then(function(r){
-        if (r && r.ok && r.rejected){
-          var t=$('toast'); t.className='toast ok'; t.textContent='✅ Javob bekor qilindi (3 ovoz).';
-        }
-        poll();
-      }).catch(function(){});
+        body: JSON.stringify({accept: accept})
+      }).then(function(){ poll(); }).catch(function(){});
     }
 
     $('sendBtn').addEventListener('click', send);
     $('answer').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); send(); }});
+    $('voteYes').addEventListener('click', function(){ vote(true); });
+    $('voteNo').addEventListener('click', function(){ vote(false); });
 
     // Final-2-minutes red tension animation.
     function applyTension(){
@@ -354,8 +368,15 @@
     }
 
     // local 1s countdown between polls
+    var pendingSeconds = 0;
     setInterval(function(){
       if (localSeconds > 0){ localSeconds--; $('timer').textContent = fmt(localSeconds); }
+      if (pendingSeconds > 0){
+        pendingSeconds--;
+        if (!$('pendingCard').classList.contains('hidden')){
+          $('pendingSeconds').textContent = pendingSeconds + ' soniya qoldi';
+        }
+      }
       applyTension();
     }, 1000);
     // server sync

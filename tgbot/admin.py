@@ -70,7 +70,8 @@ class TelegramProfileAdmin(admin.ModelAdmin):
             "fields": ("language", "gender", "region", "group")
         }),
         ("System Status", {
-            "fields": ("referral_code", "ball", "is_registered", "is_blocked", "is_admin")
+            "fields": ("referral_code", "ball", "is_registered", "is_blocked", "is_admin",
+                       "trial_premium_until")
         }),
         ("Timestamps", {
             "fields": ("created_at", "updated_at"),
@@ -589,3 +590,11 @@ class EmojiScoreAdmin(admin.ModelAdmin):
     list_display = ('id', 'game', 'user', 'points', 'reward', 'rewarded')
     list_filter = ('rewarded',)
     search_fields = ('user__full_name', 'user__telegram_id')
+
+
+@admin.register(models.GameSequence)
+class GameSequenceAdmin(admin.ModelAdmin):
+    list_display = ('id', 'date', 'slot', 'game_types', 'current_index',
+                     'current_game_type', 'current_game_id', 'completed')
+    list_filter = ('slot', 'completed')
+    readonly_fields = ('created_at', 'updated_at')

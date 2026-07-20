@@ -307,10 +307,8 @@ async def show_user_cabinet(message: types.Message, state=None):
 
     # Viktorina — correct-guess count is a Premium-only stat. Free users see a
     # teaser; answering itself is free, only the statistics are gated.
-    from tgbot.models import BookQuizAnswer, Payment
-    is_premium = Payment.objects.filter(
-        user=user, status="paid", end_date__gte=timezone.localdate()
-    ).exists()
+    from tgbot.models import BookQuizAnswer
+    is_premium = user.has_active_premium()
     if is_premium:
         quiz_correct_count = BookQuizAnswer.objects.filter(
             user=user, is_correct=True

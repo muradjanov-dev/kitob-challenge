@@ -4035,6 +4035,119 @@ def send_premium_upsell():
     print(f"[premium_upsell] done. sent={sent} skipped={skipped} failed={failed}")
 
 
+# ── Daily trial Premium giveaway — 10 random users get 3 free hours ──────────
+TRIAL_PREMIUM_HOURS = 3
+TRIAL_PREMIUM_DAILY_COUNT = 10
+
+
+def _trial_premium_intro_text() -> str:
+    return (
+        f"🎉 <b>Tabriklaymiz! Sizga {TRIAL_PREMIUM_HOURS} soatlik BEPUL Premium sovg'a qilindi!</b>\n\n"
+        f"⏳ Amal qilish muddati: <b>{TRIAL_PREMIUM_HOURS} soat</b>\n\n"
+        "Shu vaqt ichida sizga quyidagi imkoniyatlar ochiq:\n\n"
+        "🪙 <b>×2 (ikki barobar) Kitobcha!</b> 🔥 — har bir hisobot, yutuq va referal mukofoti ikki barobar!\n"
+        "♾️ <b>Cheksiz kunlik hisobotlar</b> — bir necha marotaba hisobot yuboring, barchasi avtomatik jamlanadi!\n"
+        "💎 <b>Premium belgisi</b> — guruhdagi hisobotingizda 💎 belgisi bilan ajralib turasiz\n\n"
+        "Yoqdimi? Muddat tugagach buni doimiy saqlab qolishning 2 ta yo'li bo'ladi — kuting! 🚀"
+    )
+
+
+def _trial_premium_expiry_markup() -> str:
+    keyboard = {
+        "inline_keyboard": [[
+            {"text": "💎 Premium xarid qilish", "callback_data": "buy_plan:premium"},
+            {"text": "🎁 Referal havolamni olish", "callback_data": "referral:link"},
+        ]]
+    }
+    return json.dumps(keyboard)
+
+
+@shared_task
+def grant_daily_trial_premium():
+    """Daily (12:00 Tashkent): randomly grant TRIAL_PREMIUM_DAILY_COUNT users a
+    TRIAL_PREMIUM_HOURS-long trial Premium — see TelegramProfile.trial_premium_until
+    / has_active_premium(). Introduces them to Premium's features, then schedules
+    expire_trial_premium to DM the buy/referral upsell once it ends.
+
+    Skips users who already have real Premium or are already mid-trial.
+    """
+    import datetime as _dt
+
+    now = timezone.now()
+    today = timezone.localdate()
+    eligible_ids = list(
+        TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+        .exclude(payments__status="paid", payments__end_date__gte=today)
+        .exclude(trial_premium_until__gte=now)
+        .values_list("id", flat=True)
+        .distinct()
+    )
+    if not eligible_ids:
+        print("grant_daily_trial_premium: no eligible users")
+        return
+
+    chosen = random.sample(eligible_ids, min(TRIAL_PREMIUM_DAILY_COUNT, len(eligible_ids)))
+    until = now + _dt.timedelta(hours=TRIAL_PREMIUM_HOURS)
+    text = _trial_premium_intro_text()
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    sent = 0
+    for uid in chosen:
+        try:
+            profile = TelegramProfile.objects.filter(id=uid).only("telegram_id").first()
+            if not profile:
+                continue
+            TelegramProfile.objects.filter(id=uid).update(trial_premium_until=until)
+            requests.post(
+                url,
+                data={"chat_id": profile.telegram_id, "text": text, "parse_mode": "HTML"},
+                timeout=5,
+            )
+            expire_trial_premium.apply_async(args=[uid], countdown=TRIAL_PREMIUM_HOURS * 3600)
+            sent += 1
+        except Exception as e:
+            print(f"grant_daily_trial_premium user {uid}: {e}")
+    print(f"grant_daily_trial_premium: granted to {sent}/{len(chosen)} users")
+
+
+@shared_task
+def expire_trial_premium(user_id):
+    """Fires TRIAL_PREMIUM_HOURS after grant_daily_trial_premium for one user.
+    If they haven't bought real Premium in the meantime, DM the upsell: buy
+    1-month Premium, or get their referral link (3 invites = 1 free day)."""
+    from tgbot.models import Payment as _Pay
+
+    profile = TelegramProfile.objects.filter(id=user_id).first()
+    if not profile:
+        return
+
+    is_real_premium = _Pay.objects.filter(
+        user=profile, status="paid", end_date__gte=timezone.localdate()
+    ).exists()
+    if not is_real_premium:
+        text = (
+            f"⌛ <b>{TRIAL_PREMIUM_HOURS} soatlik BEPUL Premium tajribangiz tugadi.</b>\n\n"
+            "Yoqdimi? 🪙 ×2 Kitobcha, ♾️ cheksiz hisobot va 💎 belgisini "
+            "doimiy saqlab qolishning 2 ta yo'li bor:\n\n"
+            "💳 1 oylik Premium sotib oling, yoki\n"
+            "🎁 Har 3 ta taklif qilingan do'stingiz uchun — 1 kun BEPUL Premium!"
+        )
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                data={
+                    "chat_id": profile.telegram_id, "text": text, "parse_mode": "HTML",
+                    "reply_markup": _trial_premium_expiry_markup(),
+                },
+                timeout=5,
+            )
+        except Exception as e:
+            print(f"expire_trial_premium DM failed for {user_id}: {e}")
+
+    # Clear the flag either way (tidy state; has_active_premium() already
+    # treats a past timestamp as inactive so this isn't strictly required).
+    TelegramProfile.objects.filter(id=user_id).update(trial_premium_until=None)
+
+
 @shared_task
 def send_admin_daily_report():
     """
@@ -4166,8 +4279,9 @@ def start_chain_game():
         "tayyor turing!\n"
         f"⏱ O'yin {DEFAULT_DURATION_MIN} daqiqa davom etadi.\n\n"
         "Berilgan <b>harf</b> bilan boshlanadigan <b>kitob yoki muallif</b> nomini "
-        "eng tez yozgan ochko oladi — zanjir davom etadi!\n\n"
-        "💰 <b>Kirish: 20 Kitobcha.</b>\n"
+        "birinchi yozgan ovozga qo'yiladi — ko'pchilik «to'g'ri» desa qabul "
+        "qilinadi va zanjir davom etadi!\n\n"
+        "💰 <b>Kirish: 25 Kitobcha.</b>\n"
         "🏆 Ochko olganlar mukofot oladi (1/2/3-o'rin: <b>300/200/100 🪙</b>); "
         "bekorchi va firibgar kirish haqini yo'qotadi.\n"
         "🤝 <b>Halol o'ynang</b> — faqat haqiqiy nom yozing, aks holda ovoz bilan "
@@ -4185,6 +4299,7 @@ def start_chain_game():
         except Exception as e:
             print(f"start_chain_game group {group_id}: {e}")
     print(f"start_chain_game: game #{game.id} live until {game.ends_at}")
+    return game
 
 
 @shared_task
@@ -4213,7 +4328,7 @@ def chain_game_tick():
                 m = medals[i] if i < 3 else f"{i + 1}."
                 rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
                 lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{rew}")
-            lines.append("\n💰 Kirish 20 🪙 · faqat ochko olganlar mukofot oldi. Halol o'yin uchun rahmat! 🤲")
+            lines.append("\n💰 Kirish 25 🪙 · faqat ochko olganlar mukofot oldi. Halol o'yin uchun rahmat! 🤲")
         else:
             lines.append("Bu safar hech kim ochko olmadi 😔")
         text = "\n".join(lines)
@@ -4242,6 +4357,7 @@ def chain_game_tick():
             except Exception:
                 pass
         print(f"chain_game_tick: finalized game #{game.id}, {len(winners)} scorers")
+        _advance_game_sequence("chain", game.id)
 
 
 # ────────────────────────────────────────────────────────────────────────
@@ -4274,10 +4390,12 @@ def start_feud_game():
         "🗣 <b>KO'PCHILIK NIMA DEDI?</b>\n\n"
         f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
         "Har savolga javob bering — <b>ko'pchilik bilan mos</b> javob ko'p ochko beradi!\n\n"
+        "💰 <b>Kirish: 25 Kitobcha.</b>\n"
         "🏆 G'oliblar ko'p Kitobcha, qatnashgan hamma <b>+30 🪙</b>.\n👇 Kiring:"
     )
     _announce_game(text, "kopchilik")
     print(f"start_feud_game: game #{game.id}")
+    return game
 
 
 @shared_task
@@ -4289,10 +4407,12 @@ def start_castle_game():
         "🏰 <b>BILIM QAL'ASI</b> — jamoaviy jang!\n\n"
         f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
         "Birgalikda savollarga javob bering, har to'g'ri javob <b>bossni uradi</b>. "
-        "Uni yenging — hammamiz Kitobcha yutamiz!\n👇 Kiring:"
+        "Uni yenging — hammamiz Kitobcha yutamiz!\n\n"
+        "💰 <b>Kirish: 25 Kitobcha.</b>\n👇 Kiring:"
     )
     _announce_game(text, "qala")
     print(f"start_castle_game: game #{game.id}")
+    return game
 
 
 @shared_task
@@ -4304,27 +4424,80 @@ def start_emoji_game():
         "🎬 <b>EMOJI KITOB</b> — emojidan kitobni top!\n\n"
         f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
         "Emojilarga qarab, 4 variantdan to'g'ri kitobni eng tez tanlang. "
-        "To'g'ri javob — ochko!\n"
+        "To'g'ri javob — ochko!\n\n"
+        "💰 <b>Kirish: 25 Kitobcha.</b>\n"
         "🏆 G'oliblar ko'p Kitobcha oladi.\n👇 Kiring:"
     )
     _announce_game(text, "emoji")
     print(f"start_emoji_game: game #{game.id}")
+    return game
+
+
+# Maps a game-type slug to the task that starts it (each returns the created
+# game instance). Shared by start_game_sequence and _advance_game_sequence to
+# run the daily 10:00/22:00 slot: 3 different types, back to back, no repeats.
+_GAME_STARTERS = {
+    "chain": start_chain_game,
+    "feud": start_feud_game,
+    "castle": start_castle_game,
+    "emoji": start_emoji_game,
+}
 
 
 @shared_task
-def start_random_game():
-    """Pick one of the live games at random and start it. Wired to the daily
-    10:00 & 22:00 slots so the community gets variety."""
-    choice = random.choice(["chain", "feud", "castle", "emoji"])
-    if choice == "chain":
-        start_chain_game()
-    elif choice == "feud":
-        start_feud_game()
-    elif choice == "castle":
-        start_castle_game()
-    else:
-        start_emoji_game()
-    print(f"start_random_game: picked {choice}")
+def start_game_sequence(slot):
+    """Kick off today's `slot` ('morning' 10:00 or 'evening' 22:00) sequence:
+    pick 3 of the 4 live games at random (no repeats) and start the first one.
+    The rest are chained on as each prior game finishes — see
+    `_advance_game_sequence`, called from chain_game_tick/games_finalize_tick."""
+    from tgbot.models import GameSequence
+
+    today = timezone.localdate()
+    seq, created = GameSequence.objects.get_or_create(
+        slot=slot, date=today,
+        defaults={"game_types": random.sample(GameSequence.GAME_TYPES, 3)},
+    )
+    if not created:
+        print(f"start_game_sequence: {slot}/{today} already started, skipping")
+        return
+
+    first_type = seq.game_types[0]
+    game = _GAME_STARTERS[first_type]()
+    seq.current_game_type = first_type
+    seq.current_game_id = game.id
+    seq.save(update_fields=["current_game_type", "current_game_id", "updated_at"])
+    print(f"start_game_sequence: {slot} sequence {seq.game_types}, starting {first_type} #{game.id}")
+
+
+def _advance_game_sequence(game_type, game_id):
+    """If `game_id` (of `game_type`) was the current step of a live daily
+    sequence, start the next game type in line — or mark the sequence
+    completed once all 3 have run."""
+    from tgbot.models import GameSequence
+
+    seq = GameSequence.objects.filter(
+        completed=False, current_game_type=game_type, current_game_id=game_id,
+    ).first()
+    if not seq:
+        return
+
+    next_index = seq.current_index + 1
+    if next_index >= len(seq.game_types):
+        seq.completed = True
+        seq.current_index = next_index
+        seq.save(update_fields=["completed", "current_index", "updated_at"])
+        print(f"_advance_game_sequence: {seq.slot}/{seq.date} sequence complete")
+        return
+
+    next_type = seq.game_types[next_index]
+    game = _GAME_STARTERS[next_type]()
+    seq.current_index = next_index
+    seq.current_game_type = next_type
+    seq.current_game_id = game.id
+    seq.save(update_fields=[
+        "current_index", "current_game_type", "current_game_id", "updated_at",
+    ])
+    print(f"_advance_game_sequence: {seq.slot}/{seq.date} advancing to {next_type} #{game.id}")
 
 
 @shared_task
@@ -4363,6 +4536,7 @@ def games_finalize_tick():
                     "parse_mode": "HTML"}, timeout=8)
             except Exception:
                 pass
+        _advance_game_sequence("feud", game.id)
 
     for game, summary in castle_game.finalize_due_games():
         victory = summary.get("victory")
@@ -4391,6 +4565,7 @@ def games_finalize_tick():
                     "parse_mode": "HTML"}, timeout=8)
             except Exception:
                 pass
+        _advance_game_sequence("castle", game.id)
 
     from tgbot.services import emoji_game
     for game, summary in emoji_game.finalize_due_games():
@@ -4420,3 +4595,4 @@ def games_finalize_tick():
                     "parse_mode": "HTML"}, timeout=8)
             except Exception:
                 pass
+        _advance_game_sequence("emoji", game.id)

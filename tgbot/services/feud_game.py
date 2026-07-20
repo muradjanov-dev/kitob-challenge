@@ -16,7 +16,9 @@ from django.utils import timezone
 
 from tgbot.models import FeudGame, FeudAnswer, FeudScore
 from tgbot.services.chain_text import normalize
-from tgbot.services.chain_game import _add_ball_flat, REWARD_TIERS, PARTICIPATION
+from tgbot.services.chain_game import (
+    _add_ball_flat, charge_entry_fee, ENTRY_FEE, REWARD_TIERS, PARTICIPATION,
+)
 from tgbot.services.game_questions import FEUD_QUESTIONS
 
 LEAD_SECONDS = 30
@@ -35,7 +37,7 @@ def _pick_fresh(pool, used, count):
     return (fresh + rest)[:count]
 
 
-def _recent_used(games_back=6):
+def _recent_used(games_back=33):
     used = set()
     for g in FeudGame.objects.order_by("-starts_at")[:games_back]:
         for q in (g.questions or []):
@@ -129,6 +131,13 @@ def submit_answer(game_id: int, profile, text: str) -> dict:
     status, qi, phase, _ = _phase(g, now)
     if status != "live" or phase != "answer":
         return {"ok": False, "error": "not_answering"}
+
+    # Entry fee: joining this competition costs ENTRY_FEE Kitobcha, charged once
+    # on the user's first answer of the game.
+    is_first = not FeudAnswer.objects.filter(game_id=g.id, user=profile).exists()
+    if is_first and not charge_entry_fee(profile):
+        return {"ok": False, "error": "insufficient_balance", "need": ENTRY_FEE}
+
     FeudAnswer.objects.update_or_create(
         game_id=g.id, user=profile, q_index=qi,
         defaults={"text": text.strip()[:120], "norm": norm},

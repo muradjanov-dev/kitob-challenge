@@ -43,6 +43,8 @@
     .hrow{text-align:left;padding:9px 2px;border-bottom:1px solid var(--line)}.hrow:last-child{border-bottom:0}
     .hrow .hd{font-size:11px;color:var(--muted)}.hrow .hw{font-weight:700}
     .muted{color:var(--muted)}.hidden{display:none}
+    .toast{min-height:20px;margin-top:9px;font-size:14px;font-weight:700;text-align:center}
+    .toast.ok{color:var(--ok)}.toast.bad{color:var(--bad)}
   </style>
 </head>
 <body>
@@ -52,11 +54,12 @@
   </div>
 
   <div id="live" class="hidden">
+    <div class="card" style="background:rgba(255,204,77,.12);border:1px solid var(--accent2);font-size:12.5px;line-height:1.5;padding:10px 12px">💰 <b>Kirish: 25 Kitobcha</b> (birinchi javobda). 🏆 G'oliblar ko'p Kitobcha oladi.</div>
     <div class="card emojicard">
       <div class="qn" id="qn">SAVOL</div>
       <div class="em" id="emoji">—</div>
     </div>
-    <div class="card" id="optsCard"><div id="opts"></div></div>
+    <div class="card" id="optsCard"><div id="opts"></div><div class="toast" id="toast"></div></div>
     <div class="stat">
       <div class="box"><b id="myPts">0</b><span>Sizning ballaringiz</span></div>
       <div class="box"><b id="qnum">1/1</b><span>Savol</span></div>
@@ -149,9 +152,13 @@
       if(busy||curAnswered)return;busy=true;
       api('/emoji/api/submit/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({choice:choice})}).then(function(r){
         if(r.ok||r.error==='already_answered'){
+          $('toast').textContent='';
           curAnswered=true;curChoice=choice;curCorrectIdx=(r.correct_index!==undefined?r.correct_index:-1);renderOpts();
           if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.notificationOccurred(r.correct?'success':'error')}catch(e){}}
           poll();
+        } else {
+          var t=$('toast');t.className='toast bad';
+          t.textContent=({insufficient_balance:"🪙 Kirish uchun 25 Kitobcha kerak — balansingiz yetarli emas.",not_answering:"Hozir javob vaqti emas."})[r.error]||"Qabul qilinmadi.";
         }
       }).catch(function(){}).then(function(){busy=false;});
     }

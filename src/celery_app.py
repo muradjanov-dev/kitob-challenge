@@ -97,24 +97,32 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=3, minute=0, day_of_week=0),
     },
 
-    # ── Live games — a RANDOM one auto-starts twice a day (10:00 & 22:00) ─────
-    # Picks among Kitob Zanjiri / Ko'pchilik nima dedi / Bilim Qal'asi for
-    # variety; admins can still start any specific game anytime.
+    # ── Live games — 3 auto-chained per slot, twice a day (10:00 & 22:00) ────
+    # Each slot randomly picks 3 of the 4 live games (Kitob Zanjiri / Ko'pchilik
+    # nima dedi / Bilim Qal'asi / Emoji Kitob), no repeats, and runs them back
+    # to back: game #2 starts only once #1 finishes, then #3 (see
+    # start_game_sequence + _advance_game_sequence in tasks.py, hooked into the
+    # chain-game-tick / games-finalize-tick below). Entry fee is a flat 25
+    # Kitobcha regardless of which game is live. Admins can still start any
+    # specific game anytime via the management commands.
     'games-random-morning': {
-        'task': 'tgbot.tasks.start_random_game',
+        'task': 'tgbot.tasks.start_game_sequence',
         'schedule': crontab(hour=10, minute=0),
+        'args': ('morning',),
     },
     'games-random-evening': {
-        'task': 'tgbot.tasks.start_random_game',
+        'task': 'tgbot.tasks.start_game_sequence',
         'schedule': crontab(hour=22, minute=0),
+        'args': ('evening',),
     },
     'chain-game-tick': {
         'task': 'tgbot.tasks.chain_game_tick',
         'schedule': crontab(minute='*/1'),
     },
 
-    # Ko'pchilik nima dedi? + Bilim Qal'asi — admin-started; this tick just
-    # finalizes + rewards them once their time is up.
+    # Ko'pchilik nima dedi? + Bilim Qal'asi + Emoji Kitob — finalizes + rewards
+    # each once its time is up, and (like chain-game-tick above) advances the
+    # daily sequence to its next game if this one was part of it.
     'games-finalize-tick': {
         'task': 'tgbot.tasks.games_finalize_tick',
         'schedule': crontab(minute='*/1'),
@@ -207,6 +215,15 @@ app.conf.beat_schedule = {
     'send-premium-upsell': {
         'task': 'tgbot.tasks.send_premium_upsell',
         'schedule': crontab(hour=20, minute=0, day_of_week=3),  # Wednesday
+    },
+
+    # Daily trial Premium giveaway — 12:00 Tashkent. Randomly grants 10 users a
+    # free 3-hour Premium trial (introduces them to the features); 3 hours
+    # later expire_trial_premium (scheduled via apply_async countdown, not a
+    # beat entry) DMs them the buy/referral upsell if they didn't convert.
+    'grant-daily-trial-premium': {
+        'task': 'tgbot.tasks.grant_daily_trial_premium',
+        'schedule': crontab(hour=12, minute=0),
     },
 
     # Admin daily summary — 23:55 every day, 2 minutes before the personal

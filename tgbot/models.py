@@ -216,6 +216,12 @@ class TelegramProfile(BaseModel):
         help_text="Number of Tabriklash DMs this user has received; used to "
                   "surface the reminder-config button on every 10th one.",
     )
+    trial_premium_until = models.DateTimeField(
+        null=True, blank=True,
+        help_text="If set and in the future, the user has temporary trial Premium "
+                  "(e.g. from the daily random giveaway) — see has_active_premium() "
+                  "and tasks.grant_daily_trial_premium.",
+    )
     optimal_send_hour = models.PositiveSmallIntegerField(
         null=True,
         blank=True,
@@ -226,15 +232,22 @@ class TelegramProfile(BaseModel):
         ),
     )
 
+    def has_active_premium(self) -> bool:
+        """True if the user has a paid Payment active today, OR is inside a
+        temporary trial Premium window (see `trial_premium_until`)."""
+        if self.trial_premium_until and self.trial_premium_until >= timezone.now():
+            return True
+        # Payment is defined later in this module.
+        return Payment.objects.filter(
+            user=self, status="paid", end_date__gte=timezone.localdate()
+        ).exists()
+
     def update_ball(self, is_completed: bool, ball: int) -> int:
         """Add or subtract Kitobcha. Premium users earn 2× on every add.
         Returns the effective amount actually applied."""
         ball_decimal = Decimal(str(ball))
         if is_completed:
-            # Check active premium subscription; Payment is defined later in this module.
-            if Payment.objects.filter(
-                user=self, status="paid", end_date__gte=timezone.localdate()
-            ).exists():
+            if self.has_active_premium():
                 ball_decimal = ball_decimal * 2
         with transaction.atomic():
             self.refresh_from_db()
@@ -1156,6 +1169,16 @@ class ChainGame(BaseModel):
     used_norms = models.JSONField(
         default=list, help_text="Normalized words already played (no repeats).",
     )
+    pending = models.JSONField(
+        null=True, blank=True, default=None,
+        help_text='Candidate awaiting a crowd vote: {"norm","display","user_id","name",'
+                  '"letter","last_letter","started_at","yes":[ids],"no":[ids]}.',
+    )
+    rejected_norms = models.JSONField(
+        default=list,
+        help_text="Norms voted down for the CURRENT letter — blocked from resubmission "
+                  "until the letter advances.",
+    )
     rewarded = models.BooleanField(default=False)
 
     class Meta:
@@ -1364,3 +1387,37 @@ class EmojiScore(BaseModel):
         db_table = "emoji_scores"
         unique_together = ("game", "user")
         ordering = ("-points", "created_at")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Daily 10:00 / 22:00 slot — 3 different live games auto-chained back to back
+# (random pick of 3 out of Kitob Zanjiri / Ko'pchilik / Bilim Qal'asi / Emoji,
+# no repeats). One row tracks a day's slot; `current_game_type`/`current_game_id`
+# point at whichever game is live right now, and get advanced by the per-minute
+# finalize ticks once that game finishes.
+# ─────────────────────────────────────────────────────────────────────────────
+class GameSequence(BaseModel):
+    SLOT_MORNING = "morning"
+    SLOT_EVENING = "evening"
+    SLOT_CHOICES = [(SLOT_MORNING, "10:00"), (SLOT_EVENING, "22:00")]
+    GAME_TYPES = ["chain", "feud", "castle", "emoji"]
+
+    slot = models.CharField(max_length=10, choices=SLOT_CHOICES)
+    date = models.DateField()
+    game_types = models.JSONField(
+        default=list, help_text="3 randomly chosen, non-repeating game types for this slot.",
+    )
+    current_index = models.PositiveSmallIntegerField(default=0)
+    current_game_type = models.CharField(max_length=10, blank=True, default="")
+    current_game_id = models.PositiveIntegerField(null=True, blank=True)
+    completed = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "game_sequences"
+        verbose_name = "Kunlik O'yin Ketma-ketligi"
+        verbose_name_plural = "Kunlik O'yin Ketma-ketliklari"
+        unique_together = ("slot", "date")
+        ordering = ("-date", "slot")
+
+    def __str__(self):
+        return f"{self.date} {self.slot} — {self.game_types} (#{self.current_index})"

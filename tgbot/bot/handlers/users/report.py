@@ -85,10 +85,7 @@ def get_confirmation_report_exists(user, date):
 
 @sync_to_async
 def _is_premium_user(user):
-    from tgbot.models import Payment
-    return Payment.objects.filter(
-        user=user, status="paid", end_date__gte=timezone.localdate()
-    ).exists()
+    return user.has_active_premium()
 
 
 @sync_to_async
@@ -195,6 +192,19 @@ MOTIVATIONS = [
     "Bilim — hayot chirog'idir. 💡",
     "Mutolaa bilan har kuningiz mazmunli bo'lsin! ✨"
 ]
+
+
+# ── Premium CTA, occasionally shown to free users after their Kitobcha award ──
+# Not every report — see PREMIUM_CTA_CHANCE where it's used — so it reads as a
+# friendly nudge, not spam. Never shown to users who already have Premium.
+PREMIUM_CTAS = [
+    "💎 <b>Premium</b> bilan bugungidek har bir hisobot <b>2 barobar ko'p Kitobcha</b> berardi!",
+    "✨ Premium a'zolar har kuni <b>2x Kitobcha</b> yig'adi. Menyudan 💎 Premium tugmasini bosib ko'ring!",
+    "🚀 Imkoniyatlaringizni 2 barobar oshiring — 💎 Premium bilan Kitobcha ham, kunlik tahlil ham 2x!",
+    "💎 Bir zumda Premium oling — shu daqiqadan Kitobchangiz 2 barobar tezroq yig'iladi!",
+    "🔥 Doimiy o'qiysiz — Premium bilan har hisobotdan 2 barobar ko'p Kitobcha oling!",
+]
+PREMIUM_CTA_CHANCE = 0.3  # ~30% of eligible (non-Premium, first report of the day) messages
 
 
 # ── Playful praises shown on report confirmation ──────────────────────────────
@@ -1550,8 +1560,14 @@ async def _do_confirm_report(message, user, state: FSMContext):
         try:
             awarded = await sync_to_async(user.update_ball)(True, 25)
             premium_note = " 💎 ×2 premium!" if awarded > 25 else ""
+            # Only nudge users who don't already have Premium (awarded == 25
+            # means the 2x multiplier in update_ball did NOT apply), and only
+            # sometimes — a CTA on every single report would be spammy.
+            cta = ""
+            if awarded == 25 and random.random() < PREMIUM_CTA_CHANCE:
+                cta = "\n\n" + random.choice(PREMIUM_CTAS)
             await message.answer(
-                f"🪙 +{awarded} Kitobcha qo'shildi!{premium_note} Joriy balans: <b>{int(user.ball)}</b>",
+                f"🪙 +{awarded} Kitobcha qo'shildi!{premium_note} Joriy balans: <b>{int(user.ball)}</b>{cta}",
                 parse_mode="HTML",
             )
         except Exception as e:

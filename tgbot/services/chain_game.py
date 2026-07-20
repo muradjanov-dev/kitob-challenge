@@ -1,16 +1,17 @@
 """Kitob Zanjiri — live "book chain" game logic.
 
 A session shows a required starting letter; players race to submit a book title
-or author name starting with that letter and not already used. The first valid
-submission wins the link (+10) and the chain advances to that word's last letter.
-
-No fixed dictionary: ANY answer is accepted (only the starting letter + no
-repeats are enforced). Bad answers are moderated by the crowd — any player can
-tap "❌ Bunday kitob yo'q" on a link; once it collects REJECT_VOTES votes the
-link is invalidated and its point is revoked.
+or author name starting with that letter and not already used. The FIRST valid
+submission for that letter becomes a "pending" candidate that goes to a crowd
+vote (see `submit`/`vote_pending`): if it collects more than ACCEPT_VOTES_THRESHOLD-1
+"to'g'ri" votes, or is ahead when the VOTE_WINDOW_SECONDS window closes, it's
+accepted and the chain advances (+10, next letter). Otherwise it's rejected —
+the letter stays open and the next person to submit for it becomes the new
+candidate. No fixed dictionary: any text is accepted as a candidate, the crowd
+vets it.
 
 Concurrency: every write locks the ChainGame row (select_for_update), so under
-simultaneous answers exactly one wins the current letter.
+simultaneous answers exactly one becomes the pending candidate.
 """
 
 import random
@@ -19,15 +20,17 @@ from datetime import timedelta
 from django.db import transaction
 from django.db.models import Sum, Count
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from tgbot.models import ChainGame, ChainScore, TelegramProfile
 from tgbot.services.chain_text import normalize, first_letter, last_letter
 
-ENTRY_FEE = 20  # Kitobcha to join a game (charged once, on first attempt)
+ENTRY_FEE = 25  # Kitobcha to join a game (charged once, on first attempt)
 POINTS_PER_LINK = 10
 DEFAULT_DURATION_MIN = 10
 LEAD_SECONDS = 30  # lobby countdown after the announcement, so everyone can join
-REJECT_VOTES = 3  # community votes that invalidate a link
+VOTE_WINDOW_SECONDS = 10  # how long a pending candidate stays open to votes
+ACCEPT_VOTES_THRESHOLD = 6  # more than 5 "to'g'ri" votes accepts immediately
 
 # Letters that comfortably start Uzbek book/author names — used for the opening
 # letter and as a fallback when a word ends in a hard/rare letter.
@@ -45,6 +48,19 @@ def _add_ball_flat(user, amount: int) -> int:
         user.ball = (user.ball or 0) + amount
         user.save(update_fields=["ball"])
     return amount
+
+
+def charge_entry_fee(profile) -> bool:
+    """Deduct ENTRY_FEE from profile.ball if affordable. Shared by every live
+    game (Zanjiri/Ko'pchilik/Qal'a/Emoji) so the 25-Kitobcha join cost is
+    consistent across all of them."""
+    with transaction.atomic():
+        p = TelegramProfile.objects.select_for_update().get(id=profile.id)
+        if int(p.ball or 0) < ENTRY_FEE:
+            return False
+        p.ball = p.ball - ENTRY_FEE
+        p.save(update_fields=["ball"])
+    return True
 
 
 def _initial_letter() -> str:
@@ -104,10 +120,105 @@ def latest_game():
     return ChainGame.objects.order_by("-starts_at").first()
 
 
+def _mk_pending(profile, text: str, norm: str, ll: str, letter: str) -> dict:
+    display = " ".join((text or "").strip().split())[:60]
+    return {
+        "norm": norm,
+        "display": display,
+        "user_id": profile.id,
+        "name": (profile.full_name or "Kitobxon")[:40],
+        "letter": letter,
+        "last_letter": ll,
+        "started_at": timezone.now().isoformat(),
+        "yes": [],
+        "no": [],
+    }
+
+
+def _pending_elapsed(pending: dict) -> float:
+    started = parse_datetime(pending["started_at"])
+    if started and timezone.is_naive(started):
+        started = timezone.make_aware(started)
+    return (timezone.now() - started).total_seconds()
+
+
+def _accept_pending(g: ChainGame) -> dict:
+    """Commit the pending candidate as a won link and advance the letter.
+    Caller must hold the row lock (select_for_update) on `g`."""
+    p = g.pending
+    chain = g.chain or []
+    chain.append({
+        "idx": len(chain),
+        "norm": p["norm"],
+        "display": p["display"],
+        "user_id": p["user_id"],
+        "name": p["name"],
+        "letter": p["letter"],
+        "at": timezone.now().isoformat(),
+    })
+    used = list(g.used_norms or [])
+    used.append(p["norm"])
+    g.chain = chain
+    g.used_norms = used
+    g.current_letter = _next_letter(p.get("last_letter"))
+    g.pending = None
+    g.rejected_norms = []
+    g.save(update_fields=[
+        "chain", "used_norms", "current_letter", "pending", "rejected_norms", "updated_at",
+    ])
+
+    score, _ = ChainScore.objects.get_or_create(game=g, user_id=p["user_id"])
+    score.points = (score.points or 0) + POINTS_PER_LINK
+    score.links = (score.links or 0) + 1
+    score.save(update_fields=["points", "links", "updated_at"])
+    return {
+        "accepted": True, "display": p["display"], "gained": POINTS_PER_LINK,
+        "next_letter": g.current_letter, "user_id": p["user_id"],
+    }
+
+
+def _reject_pending(g: ChainGame) -> dict:
+    """Drop the pending candidate — the letter stays open for the next
+    submitter. Strikes the submitter; 3 strikes kicks them from the game."""
+    p = g.pending
+    rejected = list(g.rejected_norms or [])
+    rejected.append(p["norm"])
+    g.pending = None
+    g.rejected_norms = rejected
+    g.save(update_fields=["pending", "rejected_norms", "updated_at"])
+
+    kicked_user = False
+    score = ChainScore.objects.filter(game=g, user_id=p["user_id"]).first()
+    if score:
+        score.strikes = (score.strikes or 0) + 1
+        if score.strikes >= 3 and not score.kicked:
+            score.kicked = True
+            kicked_user = True
+        score.save(update_fields=["strikes", "kicked", "updated_at"])
+    return {"accepted": False, "display": p["display"], "user_id": p["user_id"], "kicked_user": kicked_user}
+
+
+def _resolve_if_expired(g: ChainGame) -> dict | None:
+    """If the pending candidate's vote window has elapsed, resolve it now:
+    accepted if it has more "to'g'ri" than "noto'g'ri" votes, else rejected.
+    Caller must hold the row lock. Returns the resolution, or None if there's
+    nothing to resolve yet."""
+    if not g.pending:
+        return None
+    if _pending_elapsed(g.pending) < VOTE_WINDOW_SECONDS:
+        return None
+    yes = len(g.pending.get("yes") or [])
+    no = len(g.pending.get("no") or [])
+    if yes > no:
+        return _accept_pending(g)
+    return _reject_pending(g)
+
+
 def submit(game_id: int, profile, text: str) -> dict:
-    """Validate a submission and, if it wins the current letter, record the link
-    and advance the chain. No dictionary — any answer with the right starting
-    letter that hasn't been used is accepted."""
+    """Submit a candidate answer for the current letter. The FIRST valid
+    submission becomes the pending candidate and goes to a crowd vote (see
+    `vote_pending`) — it does not score immediately. Any later submission while
+    a vote is in progress is rejected with `vote_in_progress`."""
     norm = normalize(text)
     fl = first_letter(text)
     ll = last_letter(text)
@@ -116,26 +227,20 @@ def submit(game_id: int, profile, text: str) -> dict:
 
     # Optimistic, LOCK-FREE pre-check: sheds the vast majority of racing / late /
     # wrong submissions without contending on the game row lock, keeping the web
-    # responsive during a big live game (only real winner-candidates take the
-    # lock below).
+    # responsive during a big live game (only real candidates take the lock below).
     g0 = ChainGame.objects.filter(id=game_id).first()
     now = timezone.now()
     if not g0 or not (g0.status == ChainGame.STATUS_LIVE and g0.starts_at <= now <= g0.ends_at):
         return {"ok": False, "error": "not_live"}
 
     # Entry fee: joining this competition costs ENTRY_FEE Kitobcha, charged once
-    # on the first attempt. Any answer is accepted (no book validation) — the
-    # crowd moderates via the "not a real book" vote, and a 3× rejected player is
-    # kicked and forfeits both reward and entry fee.
+    # on the first attempt. The crowd vets every candidate via a vote before it
+    # scores; a 3× rejected player is kicked and forfeits reward + entry fee.
     score0, created0 = ChainScore.objects.get_or_create(game_id=g0.id, user=profile)
     if created0:
-        with transaction.atomic():
-            p = TelegramProfile.objects.select_for_update().get(id=profile.id)
-            if int(p.ball or 0) < ENTRY_FEE:
-                ChainScore.objects.filter(id=score0.id).delete()  # undo the join
-                return {"ok": False, "error": "insufficient_balance", "need": ENTRY_FEE}
-            p.ball = p.ball - ENTRY_FEE
-            p.save(update_fields=["ball"])
+        if not charge_entry_fee(profile):
+            ChainScore.objects.filter(id=score0.id).delete()  # undo the join
+            return {"ok": False, "error": "insufficient_balance", "need": ENTRY_FEE}
 
     if score0.kicked:
         return {"ok": False, "error": "kicked"}
@@ -150,91 +255,69 @@ def submit(game_id: int, profile, text: str) -> dict:
         if not (g.status == ChainGame.STATUS_LIVE and g.starts_at <= now <= g.ends_at):
             return {"ok": False, "error": "not_live"}
 
-        # Fair-play: a player whose answers were rejected 3× is out of the game.
+        # Fair-play: a player whose candidates were rejected 3× is out of the game.
         mine = ChainScore.objects.filter(game=g, user=profile).first()
         if mine and mine.kicked:
             return {"ok": False, "error": "kicked"}
 
+        # A vote may have just expired — resolve it before deciding what this
+        # submission means (acceptance/rejection may change the current letter).
+        _resolve_if_expired(g)
+
+        if g.pending:
+            return {"ok": False, "error": "vote_in_progress"}
+
         required = g.current_letter
         if required and fl != required:
             return {"ok": False, "error": "wrong_letter", "required": required}
-
-        used = list(g.used_norms or [])
-        if norm in used:
+        if norm in (g.used_norms or []):
             return {"ok": False, "error": "already_used"}
+        if norm in (g.rejected_norms or []):
+            return {"ok": False, "error": "already_rejected"}
 
-        chain = g.chain or []
-        display = " ".join((text or "").strip().split())[:60]
-        link = {
-            "idx": len(chain),
-            "norm": norm,
-            "display": display,
-            "user_id": profile.id,
-            "name": (profile.full_name or "Kitobxon")[:40],
-            "letter": required,
-            "at": now.isoformat(),
-            "votes": [],
-            "rejected": False,
-        }
-        chain.append(link)
-        used.append(norm)
-        g.chain = chain
-        g.used_norms = used
-        g.current_letter = _next_letter(ll)
-        g.save(update_fields=["chain", "used_norms", "current_letter", "updated_at"])
-
-        score, _ = ChainScore.objects.get_or_create(game=g, user=profile)
-        score.points = (score.points or 0) + POINTS_PER_LINK
-        score.links = (score.links or 0) + 1
-        score.save(update_fields=["points", "links", "updated_at"])
-
+        g.pending = _mk_pending(profile, text, norm, ll, required)
+        g.save(update_fields=["pending", "updated_at"])
         return {
-            "ok": True,
-            "gained": POINTS_PER_LINK,
-            "display": display,
-            "next_letter": g.current_letter,
-            "your_points": score.points,
+            "ok": True, "pending": True, "display": g.pending["display"],
+            "seconds": VOTE_WINDOW_SECONDS,
         }
 
 
-def challenge(game_id: int, profile, idx: int) -> dict:
-    """Vote a chain link as "not a real book". At REJECT_VOTES the link is
-    invalidated and the submitter's point is revoked. You can't vote your own
-    link, nor vote twice."""
+def vote_pending(game_id: int, profile, accept: bool) -> dict:
+    """Vote the pending candidate 'to'g'ri' (accept) or 'noto'g'ri' (reject).
+    Immediately accepts once ACCEPT_VOTES_THRESHOLD 'to'g'ri' votes are in;
+    otherwise waits for the window to close (see `_resolve_if_expired`). You
+    can't vote your own candidate, nor vote twice."""
     with transaction.atomic():
         g = ChainGame.objects.select_for_update().get(id=game_id)
-        chain = g.chain or []
-        if idx is None or idx < 0 or idx >= len(chain):
-            return {"ok": False, "error": "bad_index"}
-        link = chain[idx]
-        if link.get("rejected"):
-            return {"ok": True, "count": len(link.get("votes") or []), "rejected": True}
-        if link.get("user_id") == profile.id:
-            return {"ok": False, "error": "own_link"}
 
-        votes = list(link.get("votes") or [])
-        if profile.id in votes:
-            return {"ok": True, "count": len(votes), "rejected": False, "already": True}
-        votes.append(profile.id)
-        link["votes"] = votes
-        rejected = len(votes) >= REJECT_VOTES
-        link["rejected"] = rejected
-        chain[idx] = link
-        g.chain = chain
-        g.save(update_fields=["chain", "updated_at"])
+        resolved = _resolve_if_expired(g)
+        if resolved is not None:
+            return {"ok": True, "resolved": True, **resolved}
 
-        kicked_user = False
-        if rejected:
-            s = ChainScore.objects.filter(game=g, user_id=link.get("user_id")).first()
-            if s:
-                s.points = max(0, (s.points or 0) - POINTS_PER_LINK)
-                s.links = max(0, (s.links or 0) - 1)
-                s.strikes = (s.strikes or 0) + 1
-                if s.strikes >= 3 and not s.kicked:
-                    s.kicked = True
-                    kicked_user = True
-                s.save(update_fields=["points", "links", "strikes", "kicked", "updated_at"])
-        return {"ok": True, "count": len(votes), "rejected": rejected, "kicked_user": kicked_user}
+        if not g.pending:
+            return {"ok": False, "error": "no_pending"}
+        if g.pending.get("user_id") == profile.id:
+            return {"ok": False, "error": "own_pending"}
+
+        yes = list(g.pending.get("yes") or [])
+        no = list(g.pending.get("no") or [])
+        if profile.id in yes or profile.id in no:
+            return {"ok": True, "already": True, "yes": len(yes), "no": len(no)}
+
+        if accept:
+            yes.append(profile.id)
+        else:
+            no.append(profile.id)
+        g.pending["yes"] = yes
+        g.pending["no"] = no
+
+        if len(yes) >= ACCEPT_VOTES_THRESHOLD:
+            resolved = _accept_pending(g)
+            return {"ok": True, "resolved": True, **resolved}
+
+        g.save(update_fields=["pending", "updated_at"])
+        return {"ok": True, "resolved": False, "yes": len(yes), "no": len(no)}
 
 
 def finalize(game_id: int) -> dict | None:
@@ -242,6 +325,11 @@ def finalize(game_id: int) -> dict | None:
     with transaction.atomic():
         g = ChainGame.objects.select_for_update().get(id=game_id)
         already = g.rewarded
+        # A candidate still awaiting votes when time runs out never scored —
+        # just drop it, no strike (the game ending isn't the crowd's fault).
+        if g.pending:
+            g.pending = None
+            g.save(update_fields=["pending", "updated_at"])
         if g.status != ChainGame.STATUS_FINISHED:
             g.status = ChainGame.STATUS_FINISHED
             g.save(update_fields=["status", "updated_at"])
@@ -379,20 +467,24 @@ def state_payload(profile) -> dict:
         return {"ok": True, "status": "none", "lifetime": _lifetime_stats(profile),
                 "history": _history()}
 
+    # Lazily resolve an expired vote so polling clients see the outcome quickly,
+    # even if nobody has submitted/voted since the window closed.
+    if g.status == ChainGame.STATUS_LIVE and g.pending:
+        with transaction.atomic():
+            g = ChainGame.objects.select_for_update().get(id=g.id)
+            _resolve_if_expired(g)
+
     chain = g.chain or []
-    recent = []
-    for c in reversed(chain[-14:]):
-        votes = c.get("votes") or []
-        recent.append({
+    recent = [
+        {
             "idx": c.get("idx"),
             "display": c.get("display", ""),
             "name": c.get("name", ""),
             "letter": c.get("letter", ""),
-            "votes": len(votes),
-            "rejected": bool(c.get("rejected")),
             "mine": c.get("user_id") == profile.id,
-            "voted": profile.id in votes,
-        })
+        }
+        for c in reversed(chain[-14:])
+    ]
     my = ChainScore.objects.filter(game=g, user=profile).first()
 
     if g.status == ChainGame.STATUS_LIVE and g.starts_at <= now <= g.ends_at:
@@ -405,6 +497,20 @@ def state_payload(profile) -> dict:
         status = "finished"
         seconds = 0
 
+    pending_payload = None
+    if status == "live" and g.pending:
+        p = g.pending
+        yes, no = p.get("yes") or [], p.get("no") or []
+        pending_payload = {
+            "display": p["display"],
+            "name": p["name"],
+            "mine": p["user_id"] == profile.id,
+            "yes": len(yes),
+            "no": len(no),
+            "your_vote": "yes" if profile.id in yes else ("no" if profile.id in no else None),
+            "seconds_left": max(0, int(VOTE_WINDOW_SECONDS - _pending_elapsed(p))),
+        }
+
     valid_links = sum(1 for c in chain if not c.get("rejected"))
     finished = status == "finished"
     return {
@@ -416,6 +522,9 @@ def state_payload(profile) -> dict:
         "seconds": seconds,
         "chain_len": valid_links,
         "recent": recent,
+        "pending": pending_payload,
+        "vote_threshold": ACCEPT_VOTES_THRESHOLD,
+        "vote_seconds": VOTE_WINDOW_SECONDS,
         # Top 50; finished also includes every participant with their Kitobcha.
         "leaderboard": _cached_leaderboard(g, 50, finished),
         "your_points": (my.points if my else 0),
@@ -425,5 +534,4 @@ def state_payload(profile) -> dict:
         "kicked": (my.kicked if my else False),
         "lifetime": _lifetime_stats(profile),
         "history": _history() if status != "live" else [],
-        "reject_votes": REJECT_VOTES,
     }
