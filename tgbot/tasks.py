@@ -1530,13 +1530,22 @@ def _send_and_pin_progress(user) -> int:
     )
     _award_level_rewards(user, pages)
 
+    from django.conf import settings as _settings
+
     text = _progress_bar_text(pages)
+    site_button = json.dumps({
+        "inline_keyboard": [[{
+            "text": "✨ Sayt",
+            "web_app": {"url": f"{_settings.WEB_DOMAIN}/"},
+        }]]
+    })
     resp = requests.post(
         url,
         data={
             "chat_id": user.telegram_id,
             "text": text,
             "parse_mode": "HTML",
+            "reply_markup": site_button,
         },
         timeout=5,
     )
