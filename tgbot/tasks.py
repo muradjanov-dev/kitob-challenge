@@ -4159,16 +4159,27 @@ def expire_trial_premium(user_id):
 
 @shared_task
 def announce_top_game_players():
-    """23:00 every day — announce the 5 users who joined the most live games
-    today (Zanjiri/Ko'pchilik/Qal'a/Emoji/Hikmat/Detektiv/Omon qolish/Bilim
-    O'yini, all 4 flavors), counted as one participation per distinct game."""
+    """Celebratory announcement of the 5 users who joined the most live games
+    today, across every game type. Fires the moment the evening GameSequence
+    completes (see _advance_game_sequence) so it lands right after tonight's
+    games actually finish; also runs as a 23:00 fallback (beat schedule) in
+    case that event-driven trigger doesn't fire for any reason — guarded by a
+    same-day cache flag so it only ever posts once."""
     from collections import Counter
+    from django.core.cache import cache
     from tgbot.models import (
         ChainScore, FeudScore, CastleHit, EmojiScore,
         WisdomScore, DetectiveScore, SurvivalPlayer, QuizScore, TelegramProfile,
     )
 
     today = timezone.localdate()
+    cache_key = f"top_game_players_announced:{today}"
+    try:
+        if cache.get(cache_key):
+            print("announce_top_game_players: already announced today, skipping")
+            return
+    except Exception:
+        pass
     counts = Counter()
 
     def _tally(qs):
@@ -4194,18 +4205,21 @@ def announce_top_game_players():
 
     top = counts.most_common(5)
     users = {u.id: u for u in TelegramProfile.objects.filter(id__in=[uid for uid, _ in top])}
-    medals = ["🥇", "🥈", "🥉", "4.", "5."]
-    lines = ["🎮 <b>Bugungi eng faol o'yinchilar!</b>\n"]
+    medals = ["🥇", "🥈", "🥉", "🏅", "🎖"]
+    lines = [
+        "🎉🏆 <b>TANTANALI E'LON — BUGUNGI O'YINLAR YAKUNI!</b> 🏆🎉\n",
+        "Bugungi barcha jonli o'yinlarda eng faol bo'lgan <b>5 ta Kitobxon</b>:\n",
+    ]
     shown = 0
     for i, (uid, cnt) in enumerate(top):
         u = users.get(uid)
         if not u:
             continue
-        lines.append(f"{medals[i]} {escape(u.full_name or 'Kitobxon')} — <b>{cnt}</b> ta o'yin")
+        lines.append(f"{medals[i]} <b>{escape(u.full_name or 'Kitobxon')}</b> — {cnt} ta o'yinda qatnashdi!")
         shown += 1
     if not shown:
         return
-    lines.append("\n🔥 Ertaga ham 10:00 va 22:00 dagi o'yinlarda faol bo'ling!")
+    lines.append("\n👏 Barchangizni tabriklaymiz! Ertaga ham 10:00 va 22:00 dagi o'yinlarda faol bo'ling — navbatdagi tantanali e'londa sizning ismingiz bo'lsin! 🔥📚")
     text = "\n".join(lines)
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -4216,6 +4230,10 @@ def announce_top_game_players():
         except Exception as e:
             print(f"announce_top_game_players group {group_id}: {e}")
     print(f"announce_top_game_players: top5={top}")
+    try:
+        cache.set(cache_key, True, 60 * 60 * 6)
+    except Exception:
+        pass
 
 
 @shared_task
@@ -4757,6 +4775,10 @@ def _advance_game_sequence(game_type, game_id):
         seq.current_index = next_index
         seq.save(update_fields=["completed", "current_index", "updated_at"])
         print(f"_advance_game_sequence: {seq.slot}/{seq.date} sequence complete")
+        if seq.slot == GameSequence.SLOT_EVENING:
+            # Celebratory top-5 announcement right after tonight's games wrap
+            # up, instead of only waiting for the fixed 23:00 fallback slot.
+            announce_top_game_players()
         return
 
     next_type = seq.game_types[next_index]
