@@ -22,10 +22,23 @@ class Command(BaseCommand):
                              help="Post an apology + compensation announcement to the groups.")
         parser.add_argument("--dry-run", action="store_true",
                              help="Show what would change without applying it.")
+        parser.add_argument("--list", type=int, default=0, metavar="N",
+                             help="Just list the last N finished games' top-3 scorers and exit "
+                                  "(no fixing) — use this to find the right --game-id.")
 
     def handle(self, *args, **options):
         from tgbot.models import ChainGame, ChainScore
         from tgbot.services.chain_game import _add_ball_flat, REWARD_TIERS, PARTICIPATION
+
+        if options["list"]:
+            games = ChainGame.objects.filter(status="finished").order_by("-starts_at")[:options["list"]]
+            for g in games:
+                top = list(
+                    ChainScore.objects.filter(game=g).order_by("-points", "created_at")[:3]
+                    .values_list("user__full_name", "points", "reward")
+                )
+                self.stdout.write(f"#{g.id} starts_at={g.starts_at} players={ChainScore.objects.filter(game=g).count()} top3={top}")
+            return
 
         game_id = options["game_id"]
         g = (ChainGame.objects.filter(id=game_id).first() if game_id
