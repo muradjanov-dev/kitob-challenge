@@ -30,3 +30,25 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f"Admin access {action} {user.full_name or user.username or tid} (telegram_id={tid})."
         ))
+
+        if not options["revoke"]:
+            import requests
+            from tgbot.tasks import BOT_TOKEN
+            try:
+                requests.post(
+                    f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                    data={
+                        "chat_id": tid,
+                        "text": (
+                            "🎉 <b>Tabriklaymiz! Siz endi adminsiz!</b>\n\n"
+                            "Endi sizga admin panel ochiq — /admin buyrug'ini yuboring yoki "
+                            "\"👑 Admin panel\" tugmasini bosing. U yerda barcha 14 ta jonli "
+                            "o'yinni istalgan payt boshlashingiz (guruhga e'lon qilinadi) yoki "
+                            "jimgina sinab ko'rishingiz (guruhga e'lon qilinmaydi) mumkin. 🎮"
+                        ),
+                        "parse_mode": "HTML",
+                    },
+                    timeout=8,
+                )
+            except Exception as e:
+                self.stdout.write(self.style.WARNING(f"Welcome DM failed: {e}"))

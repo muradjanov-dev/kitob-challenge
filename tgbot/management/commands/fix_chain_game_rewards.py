@@ -52,15 +52,19 @@ class Command(BaseCommand):
             f"starts_at={g.starts_at} ends_at={g.ends_at}"
         )
 
+        # NOTE: kicked users are INCLUDED here on purpose. The 3-strikes kick
+        # mechanic (which forfeited the whole reward, even for top scorers)
+        # has been removed per feedback — this recompute retroactively forgives
+        # any kick and rewards purely by point rank, same as everyone else.
         scores = list(
-            ChainScore.objects.filter(game=g).exclude(kicked=True)
+            ChainScore.objects.filter(game=g)
             .select_related("user").order_by("-points", "created_at")
         )
         self.stdout.write(f"{len(scores)} scores:")
         for i, s in enumerate(scores):
             self.stdout.write(
                 f"  [{i}] {s.user.full_name} points={s.points} stored_reward={s.reward} "
-                f"rewarded={s.rewarded} created={s.created_at} updated={s.updated_at}"
+                f"rewarded={s.rewarded} kicked={s.kicked} created={s.created_at} updated={s.updated_at}"
             )
 
         fixes = []
