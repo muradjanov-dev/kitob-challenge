@@ -561,3 +561,98 @@ QUIZ_CONNECTION_QUESTIONS = [
      "options": ["Barchasi rus mumtoz nasri", "Barchasi frantsuz romani", "Barchasi bolalar kitobi", "Barchasi she'riy doston"],
      "correct": 0},
 ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Vaqt Mashinasi (QuizGame flavor "timeline") — guess which era/century a
+# book or thinker belongs to. Same {"q","options","correct"} shape.
+# ─────────────────────────────────────────────────────────────────────────────
+QUIZ_TIMELINE_QUESTIONS = [
+    {"q": "“O'tkan kunlar” qaysi asrda yozilgan?",
+     "options": ["XX asr boshi", "XIX asr", "XVIII asr", "XXI asr"], "correct": 0},
+    {"q": "Imom Buxoriy qaysi asrda yashagan?",
+     "options": ["IX asr", "XV asr", "XX asr", "VI asr"], "correct": 0},
+    {"q": "Ibn Sino qaysi asrda yashagan?",
+     "options": ["X-XI asr", "XVIII asr", "XX asr", "VII asr"], "correct": 0},
+    {"q": "Alisher Navoiy qaysi asrda ijod qilgan?",
+     "options": ["XV asr", "XX asr", "X asr", "XVIII asr"], "correct": 0},
+    {"q": "Mirzo Ulug'bek observatoriyasi qaysi asrda qurilgan?",
+     "options": ["XV asr", "XIX asr", "XX asr", "XI asr"], "correct": 0},
+    {"q": "“Qutadg'u bilig” qaysi asrda yozilgan?",
+     "options": ["XI asr", "XIX asr", "XVI asr", "XX asr"], "correct": 0},
+    {"q": "“Urush va tinchlik” qaysi asrda yozilgan?",
+     "options": ["XIX asr", "XVII asr", "XX asr", "XV asr"], "correct": 0},
+    {"q": "“Hamlet” qaysi asrda yozilgan?",
+     "options": ["XVI-XVII asr", "XIX asr", "XX asr", "XII asr"], "correct": 0},
+    {"q": "Abu Rayhon Beruniy qaysi asrda yashagan?",
+     "options": ["X-XI asr", "XVIII asr", "XX asr", "VII asr"], "correct": 0},
+    {"q": "Boburiylar sulolasi (Boburnoma muallifi) qaysi asrda hukmronlik boshlagan?",
+     "options": ["XVI asr", "XIX asr", "XX asr", "XII asr"], "correct": 0},
+]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Muallif-Asar Moslashtirish (QuizGame flavor "matchbook") — given an author,
+# pick their real book from 4 options (bibliography-matching speed round).
+# ─────────────────────────────────────────────────────────────────────────────
+QUIZ_MATCHBOOK_QUESTIONS = [
+    {"q": "Abdulla Qodiriyga qaysi asar tegishli?",
+     "options": ["O'tkan kunlar", "Sarob", "Kecha va kunduz", "Shum bola"], "correct": 0},
+    {"q": "Abdulla Qahhorga qaysi asar tegishli?",
+     "options": ["Sarob", "O'tkan kunlar", "Boburnoma", "Xamsa"], "correct": 0},
+    {"q": "Cho'lponga qaysi asar tegishli?",
+     "options": ["Kecha va kunduz", "Shum bola", "Sarob", "Mehrobdan chayon"], "correct": 0},
+    {"q": "G'afur G'ulomga qaysi asar tegishli?",
+     "options": ["Shum bola", "O'tkan kunlar", "Kecha va kunduz", "Boburnoma"], "correct": 0},
+    {"q": "Alisher Navoiyga qaysi asar tegishli?",
+     "options": ["Xamsa", "Qutadg'u bilig", "Boburnoma", "Devon"], "correct": 0},
+    {"q": "Zahiriddin Muhammad Boburga qaysi asar tegishli?",
+     "options": ["Boburnoma", "Xamsa", "O'tkan kunlar", "Qutadg'u bilig"], "correct": 0},
+    {"q": "Yusuf Xos Hojibga qaysi asar tegishli?",
+     "options": ["Qutadg'u bilig", "Xamsa", "Boburnoma", "Hidoyat"], "correct": 0},
+    {"q": "Ibn Sinoga qaysi asar tegishli?",
+     "options": ["Al-Qonun fit-tib", "Qonun al-Mas'udiy", "Hidoyat", "At-Tafhim"], "correct": 0},
+    {"q": "Abu Rayhon Beruniyga qaysi asar tegishli?",
+     "options": ["Qonun al-Mas'udiy", "Al-Qonun fit-tib", "Xamsa", "Sahih al-Buxoriy"], "correct": 0},
+    {"q": "Lev Tolstoyga qaysi asar tegishli?",
+     "options": ["Urush va tinchlik", "Jinoyat va jazo", "Hamlet", "Don Kixot"], "correct": 0},
+    {"q": "Fyodor Dostoyevskiyga qaysi asar tegishli?",
+     "options": ["Jinoyat va jazo", "Urush va tinchlik", "Anna Karenina", "Hamlet"], "correct": 0},
+    {"q": "Uilyam Shekspirga qaysi asar tegishli?",
+     "options": ["Hamlet", "Don Kixot", "Kichkina shahzoda", "Robinzon Kruzo"], "correct": 0},
+]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Teskari Viktorina (QuizGame flavor "reverse") — the ANSWER is shown first;
+# pick which of the 4 questions/clues it actually matches (Jeopardy-style).
+# ─────────────────────────────────────────────────────────────────────────────
+QUIZ_REVERSE_QUESTIONS = [
+    {"q": "Javob: «O'tkan kunlar». Bu qaysi savolga to'g'ri javob?",
+     "options": ["Birinchi o'zbek romani qaysi?", "Eng qadimgi turkiy hikmatnoma qaysi?",
+                 "Ikki barobar Kitobcha kim beradi?", "Qaysi asar 20 ta dostondan iborat?"], "correct": 0},
+    {"q": "Javob: «Ibn Sino». Bu qaysi savolga to'g'ri javob?",
+     "options": ["“Al-Qonun fit-tib” kim tomonidan yozilgan?", "“Sahih al-Buxoriy” muallifi kim?",
+                 "Samarqandda observatoriya kim qurdirgan?", "“Xamsa” muallifi kim?"], "correct": 0},
+    {"q": "Javob: «Imom Buxoriy». Bu qaysi savolga to'g'ri javob?",
+     "options": ["“Sahih al-Buxoriy” muallifi kim?", "“Al-Qonun fit-tib” muallifi kim?",
+                 "“Boburnoma” muallifi kim?", "Naqshbandiya piri kim?"], "correct": 0},
+    {"q": "Javob: «Mirzo Ulug'bek». Bu qaysi savolga to'g'ri javob?",
+     "options": ["Samarqandda observatoriya kim qurdirgan?", "“Hidoyat” muallifi kim?",
+                 "“Xamsa” muallifi kim?", "Naqshbandiya piri kim?"], "correct": 0},
+    {"q": "Javob: «Alisher Navoiy». Bu qaysi savolga to'g'ri javob?",
+     "options": ["“Xamsa” muallifi kim?", "“Boburnoma” muallifi kim?",
+                 "“Al-Qonun fit-tib” muallifi kim?", "“Qutadg'u bilig” muallifi kim?"], "correct": 0},
+    {"q": "Javob: «Lev Tolstoy». Bu qaysi savolga to'g'ri javob?",
+     "options": ["“Urush va tinchlik” muallifi kim?", "“Jinoyat va jazo” muallifi kim?",
+                 "“Hamlet” muallifi kim?", "“Don Kixot” muallifi kim?"], "correct": 0},
+    {"q": "Javob: «Abu Rayhon Beruniy». Bu qaysi savolga to'g'ri javob?",
+     "options": ["“Qonun al-Mas'udiy” muallifi kim?", "“Al-Qonun fit-tib” muallifi kim?",
+                 "“Sahih Muslim” muallifi kim?", "“Xamsa” muallifi kim?"], "correct": 0},
+    {"q": "Javob: «Bahouddin Naqshband». Bu qaysi savolga to'g'ri javob?",
+     "options": ["Naqshbandiya tariqatining piri kim?", "Yassaviya tariqatining piri kim?",
+                 "Kubraviya tariqatining piri kim?", "“Hidoyat” muallifi kim?"], "correct": 0},
+    {"q": "Javob: «Yusuf Xos Hojib». Bu qaysi savolga to'g'ri javob?",
+     "options": ["“Qutadg'u bilig” muallifi kim?", "“Xamsa” muallifi kim?",
+                 "“Boburnoma” muallifi kim?", "“Devon” muallifi kim?"], "correct": 0},
+]

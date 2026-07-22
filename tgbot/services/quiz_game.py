@@ -1,4 +1,4 @@
-"""Bilim O'yini — one shared MC-quiz engine for 4 content flavors:
+"""Bilim O'yini — one shared MC-quiz engine for 7 content flavors:
 
   twofacts   — Ikki haqiqat, bir yolg'on: 3 statements, spot the fake one.
   impostor   — Kim yolg'onchi?: 3 real book/author pairings + 1 fabricated one.
@@ -7,8 +7,14 @@
                they join (alternating A/B); a TEAM's cumulative correct
                answers (not individuals) decide the winning side, which then
                splits a jackpot.
+  timeline   — Vaqt Mashinasi: guess which era/century a book or thinker
+               belongs to.
+  matchbook  — Muallif-Asar Moslashtirish: given an author, pick their real
+               book from 4 options.
+  reverse    — Teskari Viktorina: the answer is shown first, pick which of 4
+               questions it actually matches (Jeopardy-style).
 
-All four share the same live answer/reveal-phase timing as Ko'pchilik/Emoji;
+All seven share the same live answer/reveal-phase timing as Ko'pchilik/Emoji;
 only content prep and (for "teams") scoring differ.
 """
 
@@ -23,6 +29,7 @@ from tgbot.models import QuizGame, QuizAnswer, QuizScore
 from tgbot.services.chain_game import _add_ball_flat, charge_entry_fee, REWARD_TIERS, PARTICIPATION
 from tgbot.services.game_questions import (
     QUIZ_TWOFACTS_QUESTIONS, QUIZ_IMPOSTOR_QUESTIONS, QUIZ_CONNECTION_QUESTIONS,
+    QUIZ_TIMELINE_QUESTIONS, QUIZ_MATCHBOOK_QUESTIONS, QUIZ_REVERSE_QUESTIONS,
     SURVIVAL_QUESTIONS,
 )
 
@@ -37,9 +44,18 @@ TITLES = {
     "impostor": "Kim yolg'onchi?",
     "connection": "Yashirin bog'lanish",
     "teams": "Jamoa Jangi",
+    "timeline": "Vaqt Mashinasi",
+    "matchbook": "Muallif-Asar Moslashtirish",
+    "reverse": "Teskari Viktorina",
 }
-ENTRY_FEES = {"twofacts": 25, "impostor": 25, "connection": 25, "teams": 30}
-NUM_QUESTIONS = {"twofacts": 6, "impostor": 6, "connection": 6, "teams": 10}
+ENTRY_FEES = {
+    "twofacts": 25, "impostor": 25, "connection": 25, "teams": 30,
+    "timeline": 25, "matchbook": 25, "reverse": 25,
+}
+NUM_QUESTIONS = {
+    "twofacts": 6, "impostor": 6, "connection": 6, "teams": 10,
+    "timeline": 8, "matchbook": 8, "reverse": 8,
+}
 
 
 def _raw_pool(flavor):
@@ -51,6 +67,12 @@ def _raw_pool(flavor):
         return SURVIVAL_QUESTIONS
     if flavor == "impostor":
         return QUIZ_IMPOSTOR_QUESTIONS
+    if flavor == "timeline":
+        return QUIZ_TIMELINE_QUESTIONS
+    if flavor == "matchbook":
+        return QUIZ_MATCHBOOK_QUESTIONS
+    if flavor == "reverse":
+        return QUIZ_REVERSE_QUESTIONS
     raise ValueError(f"unknown flavor {flavor}")
 
 

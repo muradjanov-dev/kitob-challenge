@@ -1125,7 +1125,7 @@ def check_user_achievements(user_id: int):
         prem_note = " 💎 ×2!" if awarded_points > points else ""
         points_line = f"\n🪙 <b>+{awarded_points} Kitobcha</b>{prem_note}" if awarded_points else ""
 
-        # 1) Group congrats — auto-delete after 12 hours.
+        # 1) Group congrats — auto-delete after 2 minutes (see countdown=120 below).
         group_text = (
             "🎉 <b>Tabriklaymiz!</b>\n\n"
             f"<a href='tg://user?id={tg_id}'>{plain_name}</a> yangi yutuqni qo'lga kiritdi:\n\n"
@@ -4586,10 +4586,30 @@ def _start_quiz_flavor(flavor):
             "to'g'ri javob bersa — jamoa jackpotni bo'lishadi!\n\n"
             f"💰 <b>Kirish: {ENTRY_FEES['teams']} Kitobcha.</b>\n👇 Kiring:"
         ),
+        "timeline": (
+            "🕰️ <b>VAQT MASHINASI</b>\n\n"
+            f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+            "Kitob yoki mutafakkir qaysi asrga tegishli ekanini toping!\n\n"
+            f"💰 <b>Kirish: {ENTRY_FEES['timeline']} Kitobcha.</b>\n👇 Kiring:"
+        ),
+        "matchbook": (
+            "🎯 <b>MUALLIF-ASAR MOSLASHTIRISH</b>\n\n"
+            f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+            "Muallifga tegishli haqiqiy asarni 4 variantdan tez toping!\n\n"
+            f"💰 <b>Kirish: {ENTRY_FEES['matchbook']} Kitobcha.</b>\n👇 Kiring:"
+        ),
+        "reverse": (
+            "🔄 <b>TESKARI VIKTORINA</b>\n\n"
+            f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+            "Javob avval ko'rsatiladi — qaysi savolga mos kelishini toping!\n\n"
+            f"💰 <b>Kirish: {ENTRY_FEES['reverse']} Kitobcha.</b>\n👇 Kiring:"
+        ),
     }
     deep_link_params = {
         "twofacts": "ikki-haqiqat", "impostor": "kim-yolgonchi",
         "connection": "bog-lanish", "teams": "jamoa-jangi",
+        "timeline": "vaqt-mashinasi", "matchbook": "muallif-asar",
+        "reverse": "teskari-viktorina",
     }
     _announce_game(texts[flavor], deep_link_params[flavor])
     print(f"start_quiz_{flavor}: game #{game.id}")
@@ -4616,6 +4636,21 @@ def start_quiz_teams_game():
     return _start_quiz_flavor("teams")
 
 
+@shared_task
+def start_quiz_timeline_game():
+    return _start_quiz_flavor("timeline")
+
+
+@shared_task
+def start_quiz_matchbook_game():
+    return _start_quiz_flavor("matchbook")
+
+
+@shared_task
+def start_quiz_reverse_game():
+    return _start_quiz_flavor("reverse")
+
+
 # Maps a game-type slug to the task that starts it (each returns the created
 # game instance). Shared by start_game_sequence and _advance_game_sequence to
 # run the daily 10:00/22:00 slot: 3 different types, back to back, no repeats.
@@ -4631,12 +4666,18 @@ _GAME_STARTERS = {
     "impostor": start_quiz_impostor_game,
     "connection": start_quiz_connection_game,
     "teams": start_quiz_teams_game,
+    "timeline": start_quiz_timeline_game,
+    "matchbook": start_quiz_matchbook_game,
+    "reverse": start_quiz_reverse_game,
 }
 
 
-# The 7 games built today (2026-07-22) — used to source tonight's special
+# The 10 games built today (2026-07-22) — used to source tonight's special
 # 5-game bonus lineup so it showcases only the new content.
-NEW_GAME_TYPES = ["wisdom", "detective", "survival", "twofacts", "impostor", "connection", "teams"]
+NEW_GAME_TYPES = [
+    "wisdom", "detective", "survival", "twofacts", "impostor", "connection", "teams",
+    "timeline", "matchbook", "reverse",
+]
 
 
 @shared_task
@@ -4829,7 +4870,8 @@ def games_finalize_tick():
     _finalize_wisdom()
     _finalize_detective()
     _finalize_survival()
-    for flavor in ("twofacts", "impostor", "connection", "teams"):
+    for flavor in ("twofacts", "impostor", "connection", "teams",
+                   "timeline", "matchbook", "reverse"):
         _finalize_quiz_flavor(flavor)
 
 
@@ -4917,8 +4959,11 @@ def _finalize_quiz_flavor(flavor):
     from tgbot.services import quiz_game
     medals = ["🥇", "🥈", "🥉"]
     titles = {"twofacts": "Ikki haqiqat, bir yolg'on", "impostor": "Kim yolg'onchi?",
-              "connection": "Yashirin bog'lanish", "teams": "Jamoa Jangi"}
-    emojis = {"twofacts": "🎭", "impostor": "🃏", "connection": "🧩", "teams": "👥"}
+              "connection": "Yashirin bog'lanish", "teams": "Jamoa Jangi",
+              "timeline": "Vaqt Mashinasi", "matchbook": "Muallif-Asar Moslashtirish",
+              "reverse": "Teskari Viktorina"}
+    emojis = {"twofacts": "🎭", "impostor": "🃏", "connection": "🧩", "teams": "👥",
+              "timeline": "🕰️", "matchbook": "🎯", "reverse": "🔄"}
     for game, summary in quiz_game.finalize_due_games(flavor):
         winners = summary.get("winners", [])
         emoji_, title = emojis[flavor], titles[flavor]

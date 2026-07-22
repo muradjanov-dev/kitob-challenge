@@ -1602,6 +1602,9 @@ class QuizGame(BaseModel):
         ("impostor", "Kim yolg'onchi?"),
         ("connection", "Yashirin bog'lanish"),
         ("teams", "Jamoa Jangi"),
+        ("timeline", "Vaqt Mashinasi"),
+        ("matchbook", "Muallif-Asar Moslashtirish"),
+        ("reverse", "Teskari Viktorina"),
     ]
     flavor = models.CharField(max_length=12, choices=FLAVOR_CHOICES)
     title = models.CharField(max_length=120, default="Bilim O'yini")
@@ -1667,6 +1670,7 @@ class GameSequence(BaseModel):
         "chain", "feud", "castle", "emoji",
         "wisdom", "detective", "survival",
         "twofacts", "impostor", "connection", "teams",
+        "timeline", "matchbook", "reverse",
     ]
 
     slot = models.CharField(max_length=10, choices=SLOT_CHOICES)

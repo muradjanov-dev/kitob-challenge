@@ -260,7 +260,8 @@ def api_survival_submit(request: HttpRequest) -> JsonResponse:
 
 
 # ── Bilim O'yini — shared engine + shared template for 4 flavors ────────────
-_QUIZ_FLAVORS = ("twofacts", "impostor", "connection", "teams")
+_QUIZ_FLAVORS = ("twofacts", "impostor", "connection", "teams",
+                 "timeline", "matchbook", "reverse")
 
 
 def quiz_index(request: HttpRequest, flavor: str) -> HttpResponse:

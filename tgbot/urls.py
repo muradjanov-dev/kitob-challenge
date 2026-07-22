@@ -66,4 +66,16 @@ urlpatterns = [
     path("jamoa-jangi/", quiz_index, {"flavor": "teams"}, name="quiz-teams"),
     path("jamoa-jangi/api/state/", api_quiz_state, {"flavor": "teams"}, name="quiz-teams-api-state"),
     path("jamoa-jangi/api/submit/", api_quiz_submit, {"flavor": "teams"}, name="quiz-teams-api-submit"),
+
+    path("vaqt-mashinasi/", quiz_index, {"flavor": "timeline"}, name="quiz-timeline"),
+    path("vaqt-mashinasi/api/state/", api_quiz_state, {"flavor": "timeline"}, name="quiz-timeline-api-state"),
+    path("vaqt-mashinasi/api/submit/", api_quiz_submit, {"flavor": "timeline"}, name="quiz-timeline-api-submit"),
+
+    path("muallif-asar/", quiz_index, {"flavor": "matchbook"}, name="quiz-matchbook"),
+    path("muallif-asar/api/state/", api_quiz_state, {"flavor": "matchbook"}, name="quiz-matchbook-api-state"),
+    path("muallif-asar/api/submit/", api_quiz_submit, {"flavor": "matchbook"}, name="quiz-matchbook-api-submit"),
+
+    path("teskari-viktorina/", quiz_index, {"flavor": "reverse"}, name="quiz-reverse"),
+    path("teskari-viktorina/api/state/", api_quiz_state, {"flavor": "reverse"}, name="quiz-reverse-api-state"),
+    path("teskari-viktorina/api/submit/", api_quiz_submit, {"flavor": "reverse"}, name="quiz-reverse-api-submit"),
 ]
