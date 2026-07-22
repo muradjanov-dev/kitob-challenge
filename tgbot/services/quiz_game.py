@@ -55,10 +55,15 @@ def _raw_pool(flavor):
 
 
 def _identity(flavor, item):
-    """A stable string identifying a raw content item, for no-repeat tracking."""
+    """A stable string identifying a raw content item, for no-repeat tracking.
+    "connection" items reuse the same handful of generic question texts
+    ("Bu 4 asarni nima bog'laydi?" etc.) across distinct puzzles — the actual
+    `items` list is what varies, so it's the identity there, not `q`."""
     if flavor == "impostor":
         return item["fake"]
-    return item.get("q") or str(item.get("items"))
+    if flavor == "connection":
+        return str(item.get("items"))
+    return item.get("q")
 
 
 def _prep_one(flavor, item):
@@ -82,12 +87,15 @@ def _recent_used(flavor, games_back=33):
     """Identity of each question actually used in recent games. `options[correct]`
     is the reliable identity for "impostor" since its display text is a fixed
     string ("Qaysi biri SOXTA...") — the fake statement's own text (which ends
-    up at the `correct` index post-shuffle) is what actually varies."""
+    up at the `correct` index post-shuffle) is what actually varies. "connection"
+    uses `items` for the same reason its `q` text repeats across puzzles."""
     used = set()
     for g in QuizGame.objects.filter(flavor=flavor).order_by("-starts_at")[:games_back]:
         for q in (g.questions or []):
             if flavor == "impostor":
                 used.add(q["options"][q["correct"]])
+            elif flavor == "connection":
+                used.add(str(q.get("items")))
             else:
                 used.add(q.get("q"))
     return used
