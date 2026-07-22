@@ -34,8 +34,8 @@ from tgbot.services.game_questions import (
 )
 
 LEAD_SECONDS = 30
-ANSWER_SECONDS = 15
-REVEAL_SECONDS = 5
+ANSWER_SECONDS = 20
+REVEAL_SECONDS = 8
 POINTS = 10
 TEAM_JACKPOT = 300
 
@@ -53,8 +53,8 @@ ENTRY_FEES = {
     "timeline": 25, "matchbook": 25, "reverse": 25,
 }
 NUM_QUESTIONS = {
-    "twofacts": 6, "impostor": 6, "connection": 6, "teams": 10,
-    "timeline": 8, "matchbook": 8, "reverse": 8,
+    "twofacts": 11, "impostor": 11, "connection": 11, "teams": 11,
+    "timeline": 11, "matchbook": 11, "reverse": 11,
 }
 
 

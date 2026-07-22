@@ -528,6 +528,12 @@ QUIZ_IMPOSTOR_QUESTIONS = [
      "fake": "Lev Tolstoy — “Don Kixot”"},
     {"real": ["Bahouddin Naqshband — Naqshbandiya piri", "Najmiddin Kubro — Kubraviya asoschisi", "Ahmad Yassaviy — Yassaviya asoschisi"],
      "fake": "Imom Buxoriy — bir tariqat piri"},
+    {"real": ["Yusuf Xos Hojib — “Qutadg'u bilig”", "Alisher Navoiy — “Xamsa”", "Zahiriddin Bobur — “Boburnoma”"],
+     "fake": "Ahmad Yassaviy — “Qutadg'u bilig”"},
+    {"real": ["Uilyam Shekspir — “Otello”", "Migel de Servantes — “Don Kixot”", "Lev Tolstoy — “Anna Karenina”"],
+     "fake": "Fyodor Dostoyevskiy — “Anna Karenina”"},
+    {"real": ["Abdulla Qodiriy — “Mehrobdan chayon”", "Cho'lpon — “Kecha va kunduz”", "G'afur G'ulom — “Shum bola”"],
+     "fake": "Abdulla Qahhor — “Mehrobdan chayon”"},
 ]
 
 # connection — "Yashirin bog'lanish": 4 items share a hidden theme; pick it.
@@ -560,6 +566,22 @@ QUIZ_CONNECTION_QUESTIONS = [
      "q": "Bu 4 asarni nima bog'laydi?",
      "options": ["Barchasi rus mumtoz nasri", "Barchasi frantsuz romani", "Barchasi bolalar kitobi", "Barchasi she'riy doston"],
      "correct": 0},
+    {"items": ["Alisher Navoiy", "Abdulla Qodiriy", "Cho'lpon", "G'afur G'ulom"],
+     "q": "Bu 4 ijodkorni nima bog'laydi?",
+     "options": ["Barchasi o'zbek adabiyoti vakili", "Barchasi rus yozuvchisi", "Barchasi olim", "Barchasi bastakor"],
+     "correct": 0},
+    {"items": ["Sahih al-Buxoriy", "Sunan at-Termiziy", "Sahih Muslim", "Kitob at-Tavhid"],
+     "q": "Bu 4 asarni nima bog'laydi?",
+     "options": ["Barchasi islomiy ilmiy manba", "Barchasi she'riy to'plam", "Barchasi roman", "Barchasi zamonaviy asar"],
+     "correct": 0},
+    {"items": ["Boburnoma", "Al-Qonun fit-tib", "Qonun al-Mas'udiy", "Hidoyat"],
+     "q": "Bu 4 asarni nima bog'laydi?",
+     "options": ["Barchasi Markaziy Osiyolik olim/hukmdor qalamiga mansub", "Barchasi bolalar kitobi", "Barchasi tarjima asar", "Barchasi rus adabiyoti"],
+     "correct": 0},
+    {"items": ["Don Kixot", "Hamlet", "Urush va tinchlik", "Kichkina shahzoda"],
+     "q": "Bu 4 asarni nima bog'laydi?",
+     "options": ["Barchasi jahon adabiyoti durdonasi", "Barchasi o'zbek adabiyoti", "Barchasi islomiy manba", "Barchasi zamonaviy detektiv"],
+     "correct": 0},
 ]
 
 
@@ -588,6 +610,8 @@ QUIZ_TIMELINE_QUESTIONS = [
      "options": ["X-XI asr", "XVIII asr", "XX asr", "VII asr"], "correct": 0},
     {"q": "Boburiylar sulolasi (Boburnoma muallifi) qaysi asrda hukmronlik boshlagan?",
      "options": ["XVI asr", "XIX asr", "XX asr", "XII asr"], "correct": 0},
+    {"q": "Imom Termiziy qaysi asrda yashagan?",
+     "options": ["IX asr", "XV asr", "XX asr", "VI asr"], "correct": 0},
 ]
 
 
@@ -655,4 +679,10 @@ QUIZ_REVERSE_QUESTIONS = [
     {"q": "Javob: «Yusuf Xos Hojib». Bu qaysi savolga to'g'ri javob?",
      "options": ["“Qutadg'u bilig” muallifi kim?", "“Xamsa” muallifi kim?",
                  "“Boburnoma” muallifi kim?", "“Devon” muallifi kim?"], "correct": 0},
+    {"q": "Javob: «Abdulla Qodiriy». Bu qaysi savolga to'g'ri javob?",
+     "options": ["“O'tkan kunlar” muallifi kim?", "“Sarob” muallifi kim?",
+                 "“Kecha va kunduz” muallifi kim?", "“Shum bola” muallifi kim?"], "correct": 0},
+    {"q": "Javob: «Imom Termiziy». Bu qaysi savolga to'g'ri javob?",
+     "options": ["“Sunan at-Termiziy” muallifi kim?", "“Sahih al-Buxoriy” muallifi kim?",
+                 "“Sahih Muslim” muallifi kim?", "“Kitob at-Tavhid” muallifi kim?"], "correct": 0},
 ]
