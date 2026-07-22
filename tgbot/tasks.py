@@ -4634,18 +4634,29 @@ _GAME_STARTERS = {
 }
 
 
+# The 7 games built today (2026-07-22) — used to source tonight's special
+# 5-game bonus lineup so it showcases only the new content.
+NEW_GAME_TYPES = ["wisdom", "detective", "survival", "twofacts", "impostor", "connection", "teams"]
+
+
 @shared_task
-def start_game_sequence(slot):
+def start_game_sequence(slot, count=3, pool=None):
     """Kick off today's `slot` ('morning' 10:00 or 'evening' 22:00) sequence:
-    pick 3 of the 4 live games at random (no repeats) and start the first one.
-    The rest are chained on as each prior game finishes — see
-    `_advance_game_sequence`, called from chain_game_tick/games_finalize_tick."""
+    pick `count` of the live games at random from `pool` (no repeats) and
+    start the first one. The rest are chained on as each prior game finishes
+    — see `_advance_game_sequence`, called from chain_game_tick/games_finalize_tick.
+
+    `count` defaults to 3 and `pool` defaults to every live game type (the
+    regular daily rotation); a bigger one-off event (see
+    start_special_evening_event) can request more from a narrower pool."""
     from tgbot.models import GameSequence
 
+    pool = pool or GameSequence.GAME_TYPES
     today = timezone.localdate()
+    count = min(count, len(pool))
     seq, created = GameSequence.objects.get_or_create(
         slot=slot, date=today,
-        defaults={"game_types": random.sample(GameSequence.GAME_TYPES, 3)},
+        defaults={"game_types": random.sample(pool, count)},
     )
     if not created:
         print(f"start_game_sequence: {slot}/{today} already started, skipping")
@@ -4657,6 +4668,34 @@ def start_game_sequence(slot):
     seq.current_game_id = game.id
     seq.save(update_fields=["current_game_type", "current_game_id", "updated_at"])
     print(f"start_game_sequence: {slot} sequence {seq.game_types}, starting {first_type} #{game.id}")
+
+
+@shared_task
+def start_special_evening_event(count=5, bonus_count=2):
+    """One-off bonus night: announce it to the groups, then immediately kick
+    off the evening GameSequence with `count` games (all drawn from
+    NEW_GAME_TYPES, today's new content) instead of the usual 3 from the full
+    pool. The first `count - bonus_count` are the "standard" slots, the last
+    `bonus_count` are announced as bonus.
+
+    Scheduled via apply_async(eta=...) a few seconds before 22:00 so it wins
+    the GameSequence.get_or_create race against the regular beat-triggered
+    start_game_sequence('evening') call at 22:00:00 sharp (whichever creates
+    the row first "wins"; the other becomes a harmless no-op)."""
+    text = (
+        f"🎉 <b>BUGUN KECHQURUN MAXSUS O'YIN TUNI!</b>\n\n"
+        f"Bugun 22:00 da odatdagi 3 ta o'rniga <b>{count} ta YANGI o'yin</b> ketma-ket "
+        f"o'tkaziladi — oxirgi <b>{bonus_count} tasi BONUS o'yin</b>! 🎁\n\n"
+        "Barchasida qatnashib, ko'proq Kitobcha va sovg'alar yutib oling! 👇"
+    )
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    for group_id in _group_chat_ids():
+        try:
+            requests.post(url, data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                                     "disable_web_page_preview": "true"}, timeout=10)
+        except Exception as e:
+            print(f"start_special_evening_event announce {group_id}: {e}")
+    start_game_sequence("evening", count=count, pool=NEW_GAME_TYPES)
 
 
 def _advance_game_sequence(game_type, game_id):
