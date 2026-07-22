@@ -179,7 +179,8 @@ def _accept_pending(g: ChainGame) -> dict:
 
 def _reject_pending(g: ChainGame) -> dict:
     """Drop the pending candidate — the letter stays open for the next
-    submitter. Strikes the submitter; 3 strikes kicks them from the game."""
+    submitter. Strikes the submitter (shown as a warning), but no one is ever
+    removed from the game for it."""
     p = g.pending
     rejected = list(g.rejected_norms or [])
     rejected.append(p["norm"])
@@ -187,15 +188,11 @@ def _reject_pending(g: ChainGame) -> dict:
     g.rejected_norms = rejected
     g.save(update_fields=["pending", "rejected_norms", "updated_at"])
 
-    kicked_user = False
     score = ChainScore.objects.filter(game=g, user_id=p["user_id"]).first()
     if score:
         score.strikes = (score.strikes or 0) + 1
-        if score.strikes >= 3 and not score.kicked:
-            score.kicked = True
-            kicked_user = True
-        score.save(update_fields=["strikes", "kicked", "updated_at"])
-    return {"accepted": False, "display": p["display"], "user_id": p["user_id"], "kicked_user": kicked_user}
+        score.save(update_fields=["strikes", "updated_at"])
+    return {"accepted": False, "display": p["display"], "user_id": p["user_id"], "kicked_user": False}
 
 
 def _resolve_if_expired(g: ChainGame) -> dict | None:
@@ -235,15 +232,14 @@ def submit(game_id: int, profile, text: str) -> dict:
 
     # Entry fee: joining this competition costs ENTRY_FEE Kitobcha, charged once
     # on the first attempt. The crowd vets every candidate via a vote before it
-    # scores; a 3× rejected player is kicked and forfeits reward + entry fee.
+    # scores. Rejected candidates strike the submitter (shown as a warning) but
+    # no one is ever removed from the game for it.
     score0, created0 = ChainScore.objects.get_or_create(game_id=g0.id, user=profile)
     if created0:
         if not charge_entry_fee(profile):
             ChainScore.objects.filter(id=score0.id).delete()  # undo the join
             return {"ok": False, "error": "insufficient_balance", "need": ENTRY_FEE}
 
-    if score0.kicked:
-        return {"ok": False, "error": "kicked"}
     if g0.current_letter and fl != g0.current_letter:
         return {"ok": False, "error": "wrong_letter", "required": g0.current_letter}
     if norm in (g0.used_norms or []):
@@ -254,11 +250,6 @@ def submit(game_id: int, profile, text: str) -> dict:
         now = timezone.now()
         if not (g.status == ChainGame.STATUS_LIVE and g.starts_at <= now <= g.ends_at):
             return {"ok": False, "error": "not_live"}
-
-        # Fair-play: a player whose candidates were rejected 3× is out of the game.
-        mine = ChainScore.objects.filter(game=g, user=profile).first()
-        if mine and mine.kicked:
-            return {"ok": False, "error": "kicked"}
 
         # A vote may have just expired — resolve it before deciding what this
         # submission means (acceptance/rejection may change the current letter).

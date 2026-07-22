@@ -222,6 +222,12 @@ admin_keyboard.row(
     InlineKeyboardButton(text="🎬 Emoji Kitob", callback_data="admin:start_emoji"),
 )
 admin_keyboard.row(
+    InlineKeyboardButton(text="🎮 Barcha o'yinlar (14 ta)", callback_data="admin:games_menu"),
+)
+admin_keyboard.row(
+    InlineKeyboardButton(text="🧪 O'yinlarni jimgina sinash", callback_data="admin:games_test_menu"),
+)
+admin_keyboard.row(
     InlineKeyboardButton(text="🛒 Do'kon boshqaruvi", callback_data="admin:shop"),
 )
 

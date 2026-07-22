@@ -235,6 +235,169 @@ async def admin_start_emoji_cb(call: types.CallbackQuery, state: FSMContext = No
     await _launch_game(call.message, start_emoji_game, "/emoji/", "Emoji Kitob")
 
 
+# ── All 14 games — one submenu, manual start for any of them ────────────────
+# (key, title, web_path, tasks.py function name). Covers the original 4 (which
+# also still have their own direct top-level buttons above) plus all 10 games
+# built 2026-07-22, so every live game has a manual-start button in one place.
+_GAMES_MENU = [
+    ("chain", "🔗 Kitob Zanjiri", "/zanjir/", "start_chain_game"),
+    ("feud", "🗣 Ko'pchilik nima dedi?", "/kopchilik/", "start_feud_game"),
+    ("castle", "🏰 Bilim Qal'asi", "/qala/", "start_castle_game"),
+    ("emoji", "🎬 Emoji Kitob", "/emoji/", "start_emoji_game"),
+    ("wisdom", "☪️ Hikmat Xazinasi", "/hikmat/", "start_wisdom_game"),
+    ("detective", "📖 Kitob Detektivi", "/detektiv/", "start_detective_game"),
+    ("survival", "💀 Omon qolish", "/omon-qolish/", "start_survival_game"),
+    ("twofacts", "🎭 Ikki haqiqat, bir yolg'on", "/ikki-haqiqat/", "start_quiz_twofacts_game"),
+    ("impostor", "🃏 Kim yolg'onchi?", "/kim-yolgonchi/", "start_quiz_impostor_game"),
+    ("connection", "🧩 Yashirin bog'lanish", "/bog-lanish/", "start_quiz_connection_game"),
+    ("teams", "👥 Jamoa Jangi", "/jamoa-jangi/", "start_quiz_teams_game"),
+    ("timeline", "🕰️ Vaqt Mashinasi", "/vaqt-mashinasi/", "start_quiz_timeline_game"),
+    ("matchbook", "🎯 Muallif-Asar Moslashtirish", "/muallif-asar/", "start_quiz_matchbook_game"),
+    ("reverse", "🔄 Teskari Viktorina", "/teskari-viktorina/", "start_quiz_reverse_game"),
+]
+_GAMES_MENU_BY_KEY = {key: (title, path, task_name) for key, title, path, task_name in _GAMES_MENU}
+
+
+def _games_admin_menu_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardMarkup(row_width=2)
+    for key, title, _path, _task_name in _GAMES_MENU:
+        kb.insert(InlineKeyboardButton(title, callback_data=f"adm_game:{key}"))
+    kb.row(InlineKeyboardButton("🔙 Admin panelga qaytish", callback_data="menu:admin"))
+    return kb
+
+
+def _create_game_silent(key):
+    """Create a live game instance for `key` WITHOUT any group announcement —
+    used by the admin's silent test-play button. Mirrors what each start_*_game
+    task does internally, minus the `_announce_game()` broadcast."""
+    if key == "chain":
+        from tgbot.services.chain_game import create_scheduled_game, finalize_due_games
+        finalize_due_games()
+        return create_scheduled_game()
+    if key == "feud":
+        from tgbot.services.feud_game import create_scheduled_feud, finalize_due_games
+        finalize_due_games()
+        return create_scheduled_feud()
+    if key == "castle":
+        from tgbot.services.castle_game import create_scheduled_castle, finalize_due_games
+        finalize_due_games()
+        return create_scheduled_castle()
+    if key == "emoji":
+        from tgbot.services.emoji_game import create_scheduled_emoji, finalize_due_games
+        finalize_due_games()
+        return create_scheduled_emoji()
+    if key == "wisdom":
+        from tgbot.services.wisdom_game import create_scheduled_wisdom, finalize_due_games
+        finalize_due_games()
+        return create_scheduled_wisdom()
+    if key == "detective":
+        from tgbot.services.detective_game import create_scheduled_detective, finalize_due_games
+        finalize_due_games()
+        return create_scheduled_detective()
+    if key == "survival":
+        from tgbot.services.survival_game import create_scheduled_survival, finalize_due_games
+        finalize_due_games()
+        return create_scheduled_survival()
+    # The 7 Bilim O'yini flavors all share one engine.
+    from tgbot.services.quiz_game import create_scheduled_quiz, finalize_due_games
+    finalize_due_games(key)
+    return create_scheduled_quiz(key)
+
+
+async def _launch_game_silent(target_message, key, web_path, title):
+    """Create a live game for admin-only testing — no group announcement, no
+    public deep link. Only the admin who tapped the button gets an open
+    button in their own DM."""
+    await target_message.answer(f"🧪 {title} sinov rejimida yaratilmoqda… (guruhga e'lon qilinmaydi)")
+    try:
+        await sync_to_async(_create_game_silent)(key)
+    except Exception as e:
+        import traceback
+        print(f"[admin test {title}] {e}\n{traceback.format_exc()}")
+        await target_message.answer(f"❌ Xatolik: <code>{e}</code>", parse_mode="HTML")
+        return
+    from aiogram.types import WebAppInfo
+    from src.settings import WEB_DOMAIN
+    kb = InlineKeyboardMarkup().add(InlineKeyboardButton(
+        "🧪 O'yinni sinab ko'rish", web_app=WebAppInfo(url=f"{WEB_DOMAIN}{web_path}"),
+    ))
+    await target_message.answer(
+        f"✅ <b>{title}</b> sinov o'yini tayyor — bu faqat sizga ko'rinadi, guruhga hech narsa "
+        "yuborilmadi. 30 soniyadan keyin boshlanadi.",
+        parse_mode="HTML", reply_markup=kb,
+    )
+
+
+def _games_test_menu_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardMarkup(row_width=2)
+    for key, title, _path, _task_name in _GAMES_MENU:
+        kb.insert(InlineKeyboardButton(title, callback_data=f"adm_test:{key}"))
+    kb.row(InlineKeyboardButton("🔙 Admin panelga qaytish", callback_data="menu:admin"))
+    return kb
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data == "admin:games_test_menu", state="*")
+async def admin_games_test_menu_cb(call: types.CallbackQuery, state: FSMContext = None):
+    user = await aget_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    await call.answer()
+    await call.message.answer(
+        "🧪 <b>Qaysi o'yinni jimgina sinab ko'ramiz?</b>\n\n"
+        "Bu yerda tanlangan o'yin FAQAT sizga ochiladi — guruhga hech qanday e'lon yuborilmaydi.",
+        parse_mode="HTML", reply_markup=_games_test_menu_kb(),
+    )
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("adm_test:"), state="*")
+async def admin_test_any_game_cb(call: types.CallbackQuery, state: FSMContext = None):
+    user = await aget_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    key = call.data.split(":", 1)[1]
+    entry = _GAMES_MENU_BY_KEY.get(key)
+    if not entry:
+        await call.answer("Noma'lum o'yin.", show_alert=True)
+        return
+    title, web_path, _task_name = entry
+    await call.answer("Sinov rejimida yaratilmoqda…")
+    await _launch_game_silent(call.message, key, web_path, title)
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data == "admin:games_menu", state="*")
+async def admin_games_menu_cb(call: types.CallbackQuery, state: FSMContext = None):
+    user = await aget_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    await call.answer()
+    await call.message.answer(
+        "🎮 <b>Qaysi o'yinni hozir boshlaymiz?</b>\n\n"
+        "Bosilgan o'yin darhol e'lon qilinadi va 30 soniyadan keyin boshlanadi.",
+        parse_mode="HTML", reply_markup=_games_admin_menu_kb(),
+    )
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("adm_game:"), state="*")
+async def admin_start_any_game_cb(call: types.CallbackQuery, state: FSMContext = None):
+    user = await aget_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    key = call.data.split(":", 1)[1]
+    entry = _GAMES_MENU_BY_KEY.get(key)
+    if not entry:
+        await call.answer("Noma'lum o'yin.", show_alert=True)
+        return
+    title, web_path, task_name = entry
+    await call.answer("Boshlanmoqda…")
+    import tgbot.tasks as _tasks
+    start_task = getattr(_tasks, task_name)
+    await _launch_game(call.message, start_task, web_path, title)
+
+
 @dp.message_handler(IsPrivate(), commands=["fix_referrals"], state="*")
 async def admin_fix_referrals(message: types.Message, state: FSMContext = None):
     """Admin-only backfill: process every referral that got stuck 'pending'
