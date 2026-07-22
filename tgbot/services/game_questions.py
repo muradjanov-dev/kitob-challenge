@@ -260,3 +260,304 @@ EMOJI_QUESTIONS = [
     {"emoji": "🧔 👑 📜 🇮🇳", "options": ["Boburnoma", "Navoiy", "Yulduzli tunlar", "Ulug'bek xazinasi"], "correct": 0},
     {"emoji": "🌹 🎶 📚 ✒️", "options": ["Xamsa", "Devon", "Boburnoma", "Qutadg'u bilig"], "correct": 0},
 ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Hikmat Xazinasi — a widely-known hikmat (wisdom saying) is shown; guess which
+# thinker/scholar/ulamo it's commonly attributed to (multiple choice; options
+# shuffled at runtime, `correct` is the seed position). Sayings here are the
+# commonly-repeated paraphrased forms used in Uzbek educational contexts, not
+# claimed as precise verbatim primary-source quotations. Figures are all
+# broadly and uncontroversially respected across the Sunni/Central Asian
+# tradition, with an emphasis on Uzbekistan's own religious heritage.
+# ─────────────────────────────────────────────────────────────────────────────
+WISDOM_QUESTIONS = [
+    {"quote": "“Ilm — Xitoyda bo'lsa ham boring, uni izlang” hadisini rivoyat qilgan buyuk muhaddis kim?",
+     "options": ["Imom Buxoriy", "Imom Termiziy", "Imom Muslim", "Imom A'zam"], "correct": 0},
+    {"quote": "“Sahih al-Buxoriy” hadis to'plamining muallifi kim?",
+     "options": ["Imom Buxoriy", "Imom Naqshband", "Ahmad Yassaviy", "Imom G'azzoliy"], "correct": 0},
+    {"quote": "“Sunan at-Termiziy” asari kimga tegishli?",
+     "options": ["Imom Termiziy", "Imom Muslim", "Imom Moturidiy", "Farobiy"], "correct": 0},
+    {"quote": "Hanafiy mazhabining asoschisi — “Imom A'zam” nomi bilan mashhur bo'lgan olim kim?",
+     "options": ["Abu Hanifa", "Imom Shofi'iy", "Imom Buxoriy", "Beruniy"], "correct": 0},
+    {"quote": "“Ihyo ulum ad-din” (Din ilmlarini tiriltirish) asarining muallifi kim?",
+     "options": ["Imom G'azzoliy", "Imom Termiziy", "Ahmad Yassaviy", "Ibn Sino"], "correct": 0},
+    {"quote": "“Hikmatlar devoni” asari va sufizmdagi “hikmat” yo'nalishi kimga bog'liq?",
+     "options": ["Ahmad Yassaviy", "Bahouddin Naqshband", "Najmiddin Kubro", "Alisher Navoiy"], "correct": 0},
+    {"quote": "“Dil ba yoru, dast ba kor” (Qalb Haq bilan, qo'l ish bilan) hikmatli qoidasi kimga nisbat beriladi?",
+     "options": ["Bahouddin Naqshband", "Ahmad Yassaviy", "Najmiddin Kubro", "Imom Moturidiy"], "correct": 0},
+    {"quote": "Naqshbandiya tariqatining piri, Buxoroda dafn etilgan buyuk shayx kim?",
+     "options": ["Bahouddin Naqshband", "Ahmad Yassaviy", "Xoja Ahror Vali", "Abdulxoliq G'ijduvoniy"], "correct": 0},
+    {"quote": "“Kubraviya” tariqatiga asos solgan, Xorazmda yetishib chiqqan mutasavvif olim kim?",
+     "options": ["Najmiddin Kubro", "Bahouddin Naqshband", "Ahmad Yassaviy", "Imom G'azzoliy"], "correct": 0},
+    {"quote": "“Kitob at-Tavhid” asari va “Moturidiya” aqidaviy maktabining asoschisi kim?",
+     "options": ["Imom Moturidiy", "Imom Buxoriy", "Imom A'zam", "Imom Shofi'iy"], "correct": 0},
+    {"quote": "“At-Tafhim” va “Qonun al-Mas'udiy” kabi ilmiy asarlar muallifi, buyuk qomusiy olim kim?",
+     "options": ["Abu Rayhon Beruniy", "Ibn Sino", "Farobiy", "Ulug'bek"], "correct": 0},
+    {"quote": "“Tib qonunlari” (Al-Qonun fit-tib) asari bilan jahonga mashhur bo'lgan tabib-faylasuf kim?",
+     "options": ["Ibn Sino", "Beruniy", "Farobiy", "Xorazmiy"], "correct": 0},
+    {"quote": "“Muallimi soniy” (Ikkinchi muallim — Arastudan keyingi) laqabi bilan tanilgan faylasuf kim?",
+     "options": ["Abu Nasr Farobiy", "Ibn Sino", "Beruniy", "Imom G'azzoliy"], "correct": 0},
+    {"quote": "Algebra faniga asos solgan, “al-jabr” atamasini ilmga kiritgan olim kim?",
+     "options": ["Muhammad al-Xorazmiy", "Ibn Sino", "Beruniy", "Ulug'bek"], "correct": 0},
+    {"quote": "Samarqandda observatoriya qurdirgan, buyuk astronom va hukmdor kim edi?",
+     "options": ["Mirzo Ulug'bek", "Amir Temur", "Zahiriddin Bobur", "Shohruh Mirzo"], "correct": 0},
+    {"quote": "“Sahih Muslim” hadis to'plamining muallifi kim?",
+     "options": ["Imom Muslim", "Imom Buxoriy", "Imom Termiziy", "Imom Nasoiy"], "correct": 0},
+    {"quote": "“Ilmni beshikdan qabrgacha izlang” degan mashhur hikmatli da'vat kimning ta'limotiga xos?",
+     "options": ["Payg'ambarimiz (s.a.v.) hadisi", "Imom G'azzoliy", "Ibn Sino", "Farobiy"], "correct": 0},
+    {"quote": "“Kimki bir yo'lni ilm izlab bossa, Alloh unga jannat yo'lini osonlashtiradi” hadisini kim rivoyat qilgan?",
+     "options": ["Imom Muslim", "Imom Termiziy", "Imom Buxoriy", "Imom A'zam"], "correct": 0},
+    {"quote": "Toshkentda “Hazrati Imom” majmuasida qadimiy Qur'on (Usmon mushafi) saqlanadigan bo'lib, u qaysi imom nomi bilan bog'liq?",
+     "options": ["Imom Buxoriy", "Imom Termiziy", "Imom Moturidiy", "Imom A'zam"], "correct": 0},
+    {"quote": "“Qutadg'u bilig” (Baxt keltiruvchi bilim) hikmatnomasining muallifi kim?",
+     "options": ["Yusuf Xos Hojib", "Ahmad Yassaviy", "Alisher Navoiy", "Mahmud Qoshg'ariy"], "correct": 0},
+]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Kitob Detektivi — a mystery book revealed through 3 progressively less vague
+# clues (vague → medium → specific). `norms` lists every accepted normalized
+# answer form (title and/or author, matched via chain_text.normalize).
+# ─────────────────────────────────────────────────────────────────────────────
+DETECTIVE_BOOKS = [
+    {"display": "O'tkan kunlar", "norms": ["otkan kunlar", "abdulla qodiriy"],
+     "clues": ["Bu — birinchi o'zbek romani.", "Bosh qahramoni Otabek va Kumush.",
+               "Muallifi Abdulla Qodiriy, XIX asr oxiri voqealari haqida."]},
+    {"display": "Mehrobdan chayon", "norms": ["mehrobdan chayon", "abdulla qodiriy"],
+     "clues": ["Bu ham Abdulla Qodiriy qalamiga mansub.", "Bosh qahramon — munofiq domla Anvar.",
+               "Nomida diniy joy va zaharli jonivor bor: mehrob va chayon."]},
+    {"display": "Sarob", "norms": ["sarob", "abdulla qahhor"],
+     "clues": ["Bu roman ikkiyuzlamachilik mavzusiga bag'ishlangan.", "Muallifi Abdulla Qahhor.",
+               "Nomi — cho'lda ko'rinadigan yolg'on suv tasviri (illyuziya)ni bildiradi."]},
+    {"display": "Kecha va kunduz", "norms": ["kecha va kunduz", "cholpon", "abdulhamid sulaymon"],
+     "clues": ["Muallifi taxallusi — tabiat hodisasi nomi bilan bog'liq.", "Roman ikki qismdan iborat rejalashtirilgan edi.",
+               "Muallifi Cho'lpon, asar nomi sutkaning ikki qarama-qarshi qismini ifodalaydi."]},
+    {"display": "Shum bola", "norms": ["shum bola", "g'afur g'ulom"],
+     "clues": ["Bu — hazil-mutoyibaga boy qissa.", "Bosh qahramon yetim, ammo hazilkash bola.",
+               "Muallifi G'afur G'ulom."]},
+    {"display": "Boburnoma", "norms": ["boburnoma", "zahiriddin muhammad bobur", "bobur"],
+     "clues": ["Bu — memuar (xotira) janridagi asar.", "Muallifi Hindistonda Boburiylar sulolasiga asos solgan.",
+               "Asar Zahiriddin Muhammad Boburning o'z hayoti haqidagi yozuvlari."]},
+    {"display": "Xamsa", "norms": ["xamsa", "alisher navoiy"],
+     "clues": ["Bu — besh dostondan iborat to'plam.", "Muallifi o'zbek adabiyotining buyuk mutafakkiri.",
+               "Alisher Navoiy qalamiga mansub, “beshlik” ma'nosini beradi."]},
+    {"display": "Qutadg'u bilig", "norms": ["qutadgu bilig", "yusuf xos hojib"],
+     "clues": ["Bu — turkiy tildagi eng qadimgi hikmatnomalardan biri.", "Nomi “baxt keltiruvchi bilim” degan ma'noni beradi.",
+               "Muallifi Yusuf Xos Hojib, XI asrda yozilgan."]},
+    {"display": "Hidoyat", "norms": ["hidoyat", "burhoniddin marg'inoniy"],
+     "clues": ["Bu — islom huquqshunosligi (fiqh)ga oid klassik asar.", "Muallifi Marg'ilondan yetishib chiqqan buyuk faqih.",
+               "“Al-Hidoya” nomi bilan butun dunyoda tanilgan, Burhoniddin Marg'inoniy qalamiga mansub."]},
+    {"display": "Al-Qonun fit-tib", "norms": ["al qonun fit tib", "tib qonunlari", "ibn sino"],
+     "clues": ["Bu — tibbiyotga oid qomusiy asar.", "Asrlar davomida Yevropa universitetlarida darslik bo'lgan.",
+               "Muallifi Ibn Sino, nomi “Tib qonunlari” deb tarjima qilinadi."]},
+    {"display": "Urush va tinchlik", "norms": ["urush va tinchlik", "lev tolstoy"],
+     "clues": ["Bu — rus mumtoz adabiyotining eng yirik romanlaridan biri.", "Voqealar Napoleon urushlari davrida kechadi.",
+               "Muallifi Lev Tolstoy."]},
+    {"display": "Jinoyat va jazo", "norms": ["jinoyat va jazo", "fyodor dostoyevskiy"],
+     "clues": ["Bosh qahramon qari sudxo'r ayolni o'ldiradi.", "Roman vijdon azobi mavzusiga bag'ishlangan.",
+               "Muallifi Fyodor Dostoyevskiy."]},
+    {"display": "Hamlet", "norms": ["hamlet", "shekspir", "uilyam shekspir"],
+     "clues": ["Bu — Daniya shahzodasi haqidagi tragediya.", "Mashhur “Bo'lish yoki bo'lmaslik” monologi shu asarda.",
+               "Muallifi Uilyam Shekspir."]},
+    {"display": "Don Kixot", "norms": ["don kixot", "servantes", "migel servantes"],
+     "clues": ["Bosh qahramon o'zini ritsar deb hisoblaydi.", "U shamol tegirmonlariga hujum qiladi.",
+               "Muallifi ispan yozuvchisi Migel de Servantes."]},
+    {"display": "Kichkina shahzoda", "norms": ["kichkina shahzoda", "sent ekzyuperi", "antuan sent ekzyuperi"],
+     "clues": ["Bosh qahramon boshqa sayyoradan kelgan.", "U bitta atirgul bilan do'stlashadi.",
+               "Muallifi frantsuz yozuvchisi va uchuvchi Antuan de Sent-Ekzyuperi."]},
+]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Omon qolish (Survival) — general book/literature trivia, wrong or missed
+# answer costs a life. Same {"q","options","correct"} shape as CASTLE_QUESTIONS
+# (options shuffled at runtime); shared by the "teams" QuizGame flavor too.
+# ─────────────────────────────────────────────────────────────────────────────
+SURVIVAL_QUESTIONS = [
+    {"q": "“O'tkan kunlar” romanining muallifi kim?",
+     "options": ["Abdulla Qodiriy", "Abdulla Qahhor", "Cho'lpon", "G'afur G'ulom"], "correct": 0},
+    {"q": "“Boburnoma” qaysi janrga mansub?", "options": ["Memuar", "Doston", "Fantastika", "Detektiv"], "correct": 0},
+    {"q": "“Urush va tinchlik” romani muallifi kim?",
+     "options": ["Lev Tolstoy", "Fyodor Dostoyevskiy", "Anton Chexov", "Maksim Gorkiy"], "correct": 0},
+    {"q": "“Hamlet” asari qaysi mamlakat qahramoni haqida?",
+     "options": ["Daniya", "Angliya", "Fransiya", "Ispaniya"], "correct": 0},
+    {"q": "“Xamsa” nechta dostondan iborat?", "options": ["5 ta", "3 ta", "7 ta", "4 ta"], "correct": 0},
+    {"q": "“Al-Qonun fit-tib” asari qaysi sohaga oid?",
+     "options": ["Tibbiyot", "Astronomiya", "Matematika", "Geografiya"], "correct": 0},
+    {"q": "Mirzo Ulug'bek qaysi shaharda observatoriya qurdirgan?",
+     "options": ["Samarqand", "Buxoro", "Xiva", "Toshkent"], "correct": 0},
+    {"q": "“Jinoyat va jazo” romanida bosh qahramon kimni o'ldiradi?",
+     "options": ["Qari sudxo'r ayolni", "O'z otasini", "Do'stini", "Sevgilisini"], "correct": 0},
+    {"q": "“Qutadg'u bilig” asari qaysi asrda yozilgan?",
+     "options": ["XI asr", "XV asr", "XIX asr", "VIII asr"], "correct": 0},
+    {"q": "“Don Kixot” bosh qahramoni o'zini kim deb hisoblaydi?",
+     "options": ["Ritsar", "Qirol", "Sarkarda", "Rohib"], "correct": 0},
+    {"q": "Algebra atamasini fanga kim kiritgan?",
+     "options": ["Muhammad al-Xorazmiy", "Ibn Sino", "Beruniy", "Farobiy"], "correct": 0},
+    {"q": "“Muallimi soniy” laqabi kimga tegishli?",
+     "options": ["Abu Nasr Farobiy", "Ibn Sino", "Beruniy", "Ulug'bek"], "correct": 0},
+    {"q": "“Sahih al-Buxoriy” qaysi ilm sohasiga oid?",
+     "options": ["Hadis", "Tib", "Falsafa", "Adabiyot"], "correct": 0},
+    {"q": "Ahmad Yassaviy qaysi tariqat ta'limotining asoschisi?",
+     "options": ["Yassaviya", "Naqshbandiya", "Qodiriya", "Kubraviya"], "correct": 0},
+    {"q": "“Kichkina shahzoda”da bosh qahramon nima bilan do'stlashadi?",
+     "options": ["Atirgul", "Tulki", "Ilon", "Yulduz"], "correct": 0},
+    {"q": "“Shum bola” qissasining muallifi kim?",
+     "options": ["G'afur G'ulom", "Abdulla Qodiriy", "Said Ahmad", "Oybek"], "correct": 0},
+    {"q": "Naqshbandiya tariqatining piri qayerda dafn etilgan?",
+     "options": ["Buxoro", "Samarqand", "Yassi (Turkiston)", "Xiva"], "correct": 0},
+    {"q": "“Hidoyat” (Al-Hidoya) asari qaysi sohaga oid klassik manba?",
+     "options": ["Fiqh (islom huquqi)", "Tib", "Astronomiya", "Adabiyot"], "correct": 0},
+    {"q": "“Sarob” romanining muallifi kim?",
+     "options": ["Abdulla Qahhor", "Abdulla Qodiriy", "Oybek", "Said Ahmad"], "correct": 0},
+    {"q": "Imom Termiziy qaysi hadis to'plamining muallifi?",
+     "options": ["Sunan at-Termiziy", "Sahih al-Buxoriy", "Sahih Muslim", "Sunan an-Nasoiy"], "correct": 0},
+    {"q": "“Kecha va kunduz” romani muallifining taxallusi nima?",
+     "options": ["Cho'lpon", "Oybek", "Hamid Olimjon", "Usmon Nosir"], "correct": 0},
+    {"q": "Marg'ilondan yetishib chiqqan, “Hidoyat” muallifi buyuk faqih kim?",
+     "options": ["Burhoniddin Marg'inoniy", "Imom Buxoriy", "Imom Moturidiy", "Imom A'zam"], "correct": 0},
+    {"q": "“Qonun al-Mas'udiy” asarining muallifi kim?",
+     "options": ["Abu Rayhon Beruniy", "Ibn Sino", "Farobiy", "Xorazmiy"], "correct": 0},
+    {"q": "Servantesning mashhur romani qaysi?",
+     "options": ["Don Kixot", "Uch mushketyor", "Graf Monte-Kristo", "Robinzon Kruzo"], "correct": 0},
+    {"q": "“Qutadg'u bilig” nomi qanday ma'noni anglatadi?",
+     "options": ["Baxt keltiruvchi bilim", "Hikmatlar devoni", "Yaxshi so'zlar kitobi", "Ulug' bilim"], "correct": 0},
+]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bilim O'yini (QuizGame) content — 4 flavors sharing the {"q","options","correct"}
+# MC shape, so the same engine/template runs all of them.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# twofacts — "Ikki haqiqat, bir yolg'on": 3 statements about a book/author,
+# find the FAKE one. `correct` = index of the fake statement.
+QUIZ_TWOFACTS_QUESTIONS = [
+    {"q": "“O'tkan kunlar” haqida qaysi gap YOLG'ON?",
+     "options": [
+         "Bu birinchi o'zbek romani hisoblanadi",
+         "Bosh qahramonlari Otabek va Kumush",
+         "Muallifi Abdulla Qodiriy uni frantsuz tilida yozgan",
+     ], "correct": 2},
+    {"q": "“Boburnoma” haqida qaysi gap YOLG'ON?",
+     "options": [
+         "Uni Zahiriddin Muhammad Bobur yozgan",
+         "Bu — memuar (xotira) janridagi asar",
+         "Asar to'liq she'riy vaznda yozilgan",
+     ], "correct": 2},
+    {"q": "Ibn Sino haqida qaysi gap YOLG'ON?",
+     "options": [
+         "U “Al-Qonun fit-tib” asarining muallifi",
+         "Uning asari asrlar davomida Yevropada darslik bo'lgan",
+         "U faqat shoir bo'lgan, tibbiyot bilan shug'ullanmagan",
+     ], "correct": 2},
+    {"q": "Mirzo Ulug'bek haqida qaysi gap YOLG'ON?",
+     "options": [
+         "U Samarqandda observatoriya qurdirgan",
+         "U buyuk astronom bo'lgan",
+         "U hech qachon yulduzlar jadvalini tuzmagan",
+     ], "correct": 2},
+    {"q": "“Xamsa” haqida qaysi gap YOLG'ON?",
+     "options": [
+         "Muallifi Alisher Navoiy",
+         "U besh dostondan iborat",
+         "U roman janrida yozilgan, dostonlardan iborat emas",
+     ], "correct": 2},
+    {"q": "Imom Buxoriy haqida qaysi gap YOLG'ON?",
+     "options": [
+         "U “Sahih al-Buxoriy” hadis to'plamining muallifi",
+         "U buyuk muhaddis (hadis olimi) bo'lgan",
+         "U faqat shifokor bo'lib, hadis bilan shug'ullanmagan",
+     ], "correct": 2},
+    {"q": "“Urush va tinchlik” haqida qaysi gap YOLG'ON?",
+     "options": [
+         "Muallifi Lev Tolstoy",
+         "Voqealar Napoleon urushlari davrida kechadi",
+         "Roman atigi 50 betdan iborat qisqa qissa",
+     ], "correct": 2},
+    {"q": "Ahmad Yassaviy haqida qaysi gap YOLG'ON?",
+     "options": [
+         "U “Hikmatlar devoni” muallifi",
+         "U Yassaviya tariqatiga asos solgan",
+         "U hech qachon hikmatli she'r yozmagan",
+     ], "correct": 2},
+    {"q": "“Hamlet” haqida qaysi gap YOLG'ON?",
+     "options": [
+         "Muallifi Uilyam Shekspir",
+         "Bosh qahramon Daniya shahzodasi",
+         "Asar baxtli sevgi haqidagi komediya",
+     ], "correct": 2},
+    {"q": "Abu Rayhon Beruniy haqida qaysi gap YOLG'ON?",
+     "options": [
+         "U qomusiy olim bo'lgan",
+         "U “Qonun al-Mas'udiy” asarini yozgan",
+         "U faqat musiqachi bo'lib, ilm bilan shug'ullanmagan",
+     ], "correct": 2},
+    {"q": "“Don Kixot” haqida qaysi gap YOLG'ON?",
+     "options": [
+         "Muallifi Migel de Servantes",
+         "Bosh qahramon o'zini ritsar deb biladi",
+         "Asar haqiqiy voqealar - tarixiy hujjat sifatida yozilgan",
+     ], "correct": 2},
+    {"q": "“Hidoyat” (Al-Hidoya) haqida qaysi gap YOLG'ON?",
+     "options": [
+         "Muallifi Burhoniddin Marg'inoniy",
+         "Bu fiqh (islom huquqi)ga oid klassik manba",
+         "Bu asar zamonaviy fantastik roman",
+     ], "correct": 2},
+]
+
+# impostor — "Kim yolg'onchi?": 3 real, correctly-matched book/author snippets
+# and 1 fabricated (fake pairing). `options` = the 3 real ones, `fake` = the
+# fake one; options+fake are shuffled together at runtime by the service.
+QUIZ_IMPOSTOR_QUESTIONS = [
+    {"real": ["Abdulla Qodiriy — “O'tkan kunlar”", "Abdulla Qahhor — “Sarob”", "Cho'lpon — “Kecha va kunduz”"],
+     "fake": "G'afur G'ulom — “Jinoyat va jazo”"},
+    {"real": ["Lev Tolstoy — “Urush va tinchlik”", "Fyodor Dostoyevskiy — “Jinoyat va jazo”", "Uilyam Shekspir — “Hamlet”"],
+     "fake": "Migel de Servantes — “Robinzon Kruzo”"},
+    {"real": ["Ibn Sino — “Al-Qonun fit-tib”", "Abu Rayhon Beruniy — “Qonun al-Mas'udiy”", "Farobiy — falsafiy risolalar"],
+     "fake": "Ahmad Yassaviy — “Al-Qonun fit-tib”"},
+    {"real": ["Imom Buxoriy — “Sahih al-Buxoriy”", "Imom Muslim — “Sahih Muslim”", "Imom Termiziy — “Sunan at-Termiziy”"],
+     "fake": "Imom G'azzoliy — “Sahih al-Buxoriy”"},
+    {"real": ["Alisher Navoiy — “Xamsa”", "Yusuf Xos Hojib — “Qutadg'u bilig”", "Zahiriddin Bobur — “Boburnoma”"],
+     "fake": "Ahmad Yassaviy — “Xamsa”"},
+    {"real": ["Burhoniddin Marg'inoniy — “Hidoyat”", "Imom Moturidiy — “Kitob at-Tavhid”", "Imom A'zam — hanafiy mazhabi asoschisi"],
+     "fake": "Beruniy — “Hidoyat”"},
+    {"real": ["Migel de Servantes — “Don Kixot”", "Antuan de Sent-Ekzyuperi — “Kichkina shahzoda”", "Uilyam Shekspir — “Hamlet”"],
+     "fake": "Lev Tolstoy — “Don Kixot”"},
+    {"real": ["Bahouddin Naqshband — Naqshbandiya piri", "Najmiddin Kubro — Kubraviya asoschisi", "Ahmad Yassaviy — Yassaviya asoschisi"],
+     "fake": "Imom Buxoriy — bir tariqat piri"},
+]
+
+# connection — "Yashirin bog'lanish": 4 items share a hidden theme; pick it.
+QUIZ_CONNECTION_QUESTIONS = [
+    {"items": ["O'tkan kunlar", "Mehrobdan chayon", "Sarob", "Kecha va kunduz"],
+     "q": "Bu 4 asarni nima bog'laydi?",
+     "options": ["Barchasi o'zbek mumtoz nasri", "Barchasi she'riy to'plam", "Barchasi tarjima asar", "Barchasi bolalar kitobi"],
+     "correct": 0},
+    {"items": ["Imom Buxoriy", "Imom Muslim", "Imom Termiziy", "Imom Nasoiy"],
+     "q": "Bu 4 olimni nima bog'laydi?",
+     "options": ["Barchasi mashhur hadis to'plamlari muallifi", "Barchasi shifokor", "Barchasi shoir", "Barchasi hukmdor"],
+     "correct": 0},
+    {"items": ["Ibn Sino", "Beruniy", "Farobiy", "Xorazmiy"],
+     "q": "Bu 4 mutafakkirni nima bog'laydi?",
+     "options": ["Barchasi Islom oltin davri olimlari", "Barchasi zamonaviy yozuvchi", "Barchasi rassom", "Barchasi harbiy sarkarda"],
+     "correct": 0},
+    {"items": ["Ahmad Yassaviy", "Bahouddin Naqshband", "Najmiddin Kubro", "Xoja Ahror Vali"],
+     "q": "Bu 4 shaxsni nima bog'laydi?",
+     "options": ["Barchasi tasavvuf (sufizm) yo'nalishi piri", "Barchasi tarixchi", "Barchasi tabib", "Barchasi me'mor"],
+     "correct": 0},
+    {"items": ["Hamlet", "Otello", "Qirol Lir", "Makbet"],
+     "q": "Bu 4 asarni nima bog'laydi?",
+     "options": ["Barchasi Shekspir tragediyasi", "Barchasi komediya", "Barchasi bitta muallif she'ri", "Barchasi bolalar ertagi"],
+     "correct": 0},
+    {"items": ["O'tkan kunlar", "Boburnoma", "Xamsa", "Qutadg'u bilig"],
+     "q": "Bu 4 asarni nima bog'laydi?",
+     "options": ["Barchasi turkiy/o'zbek adabiyoti durdonasi", "Barchasi rus adabiyoti", "Barchasi zamonaviy detektiv", "Barchasi ilmiy fantastika"],
+     "correct": 0},
+    {"items": ["Urush va tinchlik", "Jinoyat va jazo", "Anna Karenina", "Idiot"],
+     "q": "Bu 4 asarni nima bog'laydi?",
+     "options": ["Barchasi rus mumtoz nasri", "Barchasi frantsuz romani", "Barchasi bolalar kitobi", "Barchasi she'riy doston"],
+     "correct": 0},
+]

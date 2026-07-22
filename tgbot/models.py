@@ -1396,11 +1396,278 @@ class EmojiScore(BaseModel):
 # point at whichever game is live right now, and get advanced by the per-minute
 # finalize ticks once that game finishes.
 # ─────────────────────────────────────────────────────────────────────────────
+# Hikmat Xazinasi — MC quiz: a quote is shown, guess which Islamic thinker /
+# scholar / ulamo said it. Same live phase-based shape as Ko'pchilik/Emoji,
+# plus a consecutive-correct streak multiplier (wrong answer resets it).
+# ─────────────────────────────────────────────────────────────────────────────
+class WisdomGame(BaseModel):
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_LIVE = "live"
+    STATUS_FINISHED = "finished"
+    STATUS_CHOICES = [
+        (STATUS_SCHEDULED, "Rejalashtirilgan"), (STATUS_LIVE, "Jonli"),
+        (STATUS_FINISHED, "Tugagan"),
+    ]
+    title = models.CharField(max_length=120, default="Hikmat Xazinasi")
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    questions = models.JSONField(default=list, help_text='[{"quote","options":[4],"correct":idx}]')
+    answer_seconds = models.PositiveIntegerField(default=15)
+    reveal_seconds = models.PositiveIntegerField(default=5)
+    scored_indices = models.JSONField(default=list)
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "wisdom_games"
+        verbose_name = "Hikmat Xazinasi — O'yin"
+        verbose_name_plural = "Hikmat Xazinasi — O'yinlar"
+        ordering = ("-starts_at",)
+
+    def __str__(self):
+        return f"Hikmat #{self.id} — {self.status}"
+
+
+class WisdomAnswer(BaseModel):
+    game = models.ForeignKey(WisdomGame, on_delete=models.CASCADE, related_name="answers")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="wisdom_answers")
+    q_index = models.PositiveSmallIntegerField()
+    choice = models.PositiveSmallIntegerField()
+    is_correct = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "wisdom_answers"
+        unique_together = ("game", "user", "q_index")
+        ordering = ("created_at",)
+
+
+class WisdomScore(BaseModel):
+    game = models.ForeignKey(WisdomGame, on_delete=models.CASCADE, related_name="scores")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="wisdom_scores")
+    points = models.PositiveIntegerField(default=0)
+    streak = models.PositiveIntegerField(default=0, help_text="Current consecutive-correct streak.")
+    best_streak = models.PositiveIntegerField(default=0)
+    reward = models.PositiveIntegerField(default=0)
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "wisdom_scores"
+        verbose_name = "Hikmat Xazinasi — Ball"
+        verbose_name_plural = "Hikmat Xazinasi — Ballar"
+        unique_together = ("game", "user")
+        ordering = ("-points", "created_at")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Kitob Detektivi — a mystery book is revealed through progressively less vague
+# clues; the FIRST correct free-text guess in a round wins it (earlier clue =
+# more points) and the game advances to the next mystery book.
+# ─────────────────────────────────────────────────────────────────────────────
+class DetectiveGame(BaseModel):
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_LIVE = "live"
+    STATUS_FINISHED = "finished"
+    STATUS_CHOICES = [
+        (STATUS_SCHEDULED, "Rejalashtirilgan"), (STATUS_LIVE, "Jonli"),
+        (STATUS_FINISHED, "Tugagan"),
+    ]
+    title = models.CharField(max_length=120, default="Kitob Detektivi")
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    rounds = models.JSONField(
+        default=list,
+        help_text='[{"norms":[accepted normalized answers],"display","clues":[c1,c2,c3]}]',
+    )
+    round_seconds = models.PositiveIntegerField(default=45)
+    clue_interval_seconds = models.PositiveIntegerField(default=15)
+    solved = models.JSONField(
+        default=dict,
+        help_text='{"<round_index>": {"user_id","name","display","clue_stage","at"}} — '
+                  "first correct guess per round, keyed by round index as a string.",
+    )
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "detective_games"
+        verbose_name = "Kitob Detektivi — O'yin"
+        verbose_name_plural = "Kitob Detektivi — O'yinlar"
+        ordering = ("-starts_at",)
+
+    def __str__(self):
+        return f"Detektiv #{self.id} — {self.status}"
+
+
+class DetectiveScore(BaseModel):
+    game = models.ForeignKey(DetectiveGame, on_delete=models.CASCADE, related_name="scores")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="detective_scores")
+    points = models.PositiveIntegerField(default=0)
+    solved_count = models.PositiveIntegerField(default=0)
+    reward = models.PositiveIntegerField(default=0)
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "detective_scores"
+        verbose_name = "Kitob Detektivi — Ball"
+        verbose_name_plural = "Kitob Detektivi — Ballar"
+        unique_together = ("game", "user")
+        ordering = ("-points", "created_at")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Omon qolish — elimination survival. Every MC question round, anyone who
+# answers wrong (or doesn't answer at all) loses a life; 0 lives = eliminated.
+# Whoever is still standing when the rounds run out splits the jackpot.
+# ─────────────────────────────────────────────────────────────────────────────
+class SurvivalGame(BaseModel):
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_LIVE = "live"
+    STATUS_FINISHED = "finished"
+    STATUS_CHOICES = [
+        (STATUS_SCHEDULED, "Rejalashtirilgan"), (STATUS_LIVE, "Jonli"),
+        (STATUS_FINISHED, "Tugagan"),
+    ]
+    title = models.CharField(max_length=120, default="Omon qolish")
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    questions = models.JSONField(default=list, help_text='[{"q","options":[4],"correct":idx}]')
+    question_seconds = models.PositiveIntegerField(default=15)
+    max_lives = models.PositiveSmallIntegerField(default=3)
+    scored_indices = models.JSONField(default=list, help_text="Rounds already resolved (lives deducted).")
+    jackpot = models.PositiveIntegerField(default=300, help_text="Kitobcha pool split among survivors at the end.")
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "survival_games"
+        verbose_name = "Omon qolish — O'yin"
+        verbose_name_plural = "Omon qolish — O'yinlar"
+        ordering = ("-starts_at",)
+
+    def __str__(self):
+        return f"Omon qolish #{self.id} — {self.status}"
+
+
+class SurvivalPlayer(BaseModel):
+    game = models.ForeignKey(SurvivalGame, on_delete=models.CASCADE, related_name="players")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="survival_games")
+    lives = models.PositiveSmallIntegerField(default=3)
+    correct_count = models.PositiveIntegerField(default=0)
+    eliminated = models.BooleanField(default=False)
+    eliminated_at_round = models.PositiveSmallIntegerField(null=True, blank=True)
+    reward = models.PositiveIntegerField(default=0)
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "survival_players"
+        verbose_name = "Omon qolish — O'yinchi"
+        verbose_name_plural = "Omon qolish — O'yinchilar"
+        unique_together = ("game", "user")
+        ordering = ("-correct_count", "created_at")
+
+
+class SurvivalAnswer(BaseModel):
+    game = models.ForeignKey(SurvivalGame, on_delete=models.CASCADE, related_name="answers")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="survival_answers")
+    q_index = models.PositiveSmallIntegerField()
+    choice = models.PositiveSmallIntegerField()
+    is_correct = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "survival_answers"
+        unique_together = ("game", "user", "q_index")
+        ordering = ("created_at",)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bilim O'yini — one shared MC-quiz engine for content variants that are all
+# the same underlying shape, distinguished by `flavor`:
+#   twofacts   — Ikki haqiqat, bir yolg'on (spot the fake fact)
+#   impostor   — Kim yolg'onchi? (spot the fake book description)
+#   connection — Yashirin bog'lanish (find what 4 items have in common)
+#   teams      — Jamoa Jangi: players are auto-split into two balanced teams
+#                as they join (alternating A/B), and a team's cumulative
+#                correct answers (not individuals) decide the winning side.
+# ─────────────────────────────────────────────────────────────────────────────
+class QuizGame(BaseModel):
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_LIVE = "live"
+    STATUS_FINISHED = "finished"
+    STATUS_CHOICES = [
+        (STATUS_SCHEDULED, "Rejalashtirilgan"), (STATUS_LIVE, "Jonli"),
+        (STATUS_FINISHED, "Tugagan"),
+    ]
+    FLAVOR_CHOICES = [
+        ("twofacts", "Ikki haqiqat, bir yolg'on"),
+        ("impostor", "Kim yolg'onchi?"),
+        ("connection", "Yashirin bog'lanish"),
+        ("teams", "Jamoa Jangi"),
+    ]
+    flavor = models.CharField(max_length=12, choices=FLAVOR_CHOICES)
+    title = models.CharField(max_length=120, default="Bilim O'yini")
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    questions = models.JSONField(default=list, help_text='[{"q","options":[..],"correct":idx}]')
+    answer_seconds = models.PositiveIntegerField(default=15)
+    reveal_seconds = models.PositiveIntegerField(default=5)
+    scored_indices = models.JSONField(default=list)
+    # Team mode only ("teams" flavor) — ignored by the other 3 flavors.
+    team_a = models.JSONField(default=list, help_text="TelegramProfile ids on Team A (teams flavor only).")
+    team_b = models.JSONField(default=list, help_text="TelegramProfile ids on Team B (teams flavor only).")
+    team_a_points = models.PositiveIntegerField(default=0)
+    team_b_points = models.PositiveIntegerField(default=0)
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "quiz_games"
+        verbose_name = "Bilim O'yini"
+        verbose_name_plural = "Bilim O'yinlari"
+        ordering = ("-starts_at",)
+
+    def __str__(self):
+        return f"{self.get_flavor_display()} #{self.id} — {self.status}"
+
+
+class QuizAnswer(BaseModel):
+    game = models.ForeignKey(QuizGame, on_delete=models.CASCADE, related_name="answers")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="quiz_answers")
+    q_index = models.PositiveSmallIntegerField()
+    choice = models.PositiveSmallIntegerField()
+    is_correct = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "quiz_answers"
+        unique_together = ("game", "user", "q_index")
+        ordering = ("created_at",)
+
+
+class QuizScore(BaseModel):
+    game = models.ForeignKey(QuizGame, on_delete=models.CASCADE, related_name="scores")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="quiz_scores")
+    points = models.PositiveIntegerField(default=0)
+    team = models.CharField(max_length=1, blank=True, default="", help_text="'a' or 'b' (teams flavor only).")
+    reward = models.PositiveIntegerField(default=0)
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "quiz_scores"
+        verbose_name = "Bilim O'yini — Ball"
+        verbose_name_plural = "Bilim O'yini — Ballar"
+        unique_together = ("game", "user")
+        ordering = ("-points", "created_at")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 class GameSequence(BaseModel):
     SLOT_MORNING = "morning"
     SLOT_EVENING = "evening"
     SLOT_CHOICES = [(SLOT_MORNING, "10:00"), (SLOT_EVENING, "22:00")]
-    GAME_TYPES = ["chain", "feud", "castle", "emoji"]
+    GAME_TYPES = [
+        "chain", "feud", "castle", "emoji",
+        "wisdom", "detective", "survival",
+        "twofacts", "impostor", "connection", "teams",
+    ]
 
     slot = models.CharField(max_length=10, choices=SLOT_CHOICES)
     date = models.DateField()

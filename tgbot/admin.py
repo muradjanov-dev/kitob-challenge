@@ -592,6 +592,62 @@ class EmojiScoreAdmin(admin.ModelAdmin):
     search_fields = ('user__full_name', 'user__telegram_id')
 
 
+@admin.register(models.WisdomGame)
+class WisdomGameAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'status', 'starts_at', 'ends_at', 'rewarded')
+    list_filter = ('status', 'rewarded')
+    readonly_fields = ('questions', 'scored_indices', 'created_at', 'updated_at')
+
+
+@admin.register(models.WisdomScore)
+class WisdomScoreAdmin(admin.ModelAdmin):
+    list_display = ('id', 'game', 'user', 'points', 'streak', 'best_streak', 'reward', 'rewarded')
+    list_filter = ('rewarded',)
+    search_fields = ('user__full_name', 'user__telegram_id')
+
+
+@admin.register(models.DetectiveGame)
+class DetectiveGameAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'status', 'starts_at', 'ends_at', 'rewarded')
+    list_filter = ('status', 'rewarded')
+    readonly_fields = ('rounds', 'solved', 'created_at', 'updated_at')
+
+
+@admin.register(models.DetectiveScore)
+class DetectiveScoreAdmin(admin.ModelAdmin):
+    list_display = ('id', 'game', 'user', 'points', 'solved_count', 'reward', 'rewarded')
+    list_filter = ('rewarded',)
+    search_fields = ('user__full_name', 'user__telegram_id')
+
+
+@admin.register(models.SurvivalGame)
+class SurvivalGameAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'status', 'max_lives', 'jackpot', 'rewarded')
+    list_filter = ('status', 'rewarded')
+    readonly_fields = ('questions', 'scored_indices', 'created_at', 'updated_at')
+
+
+@admin.register(models.SurvivalPlayer)
+class SurvivalPlayerAdmin(admin.ModelAdmin):
+    list_display = ('id', 'game', 'user', 'lives', 'correct_count', 'eliminated', 'reward', 'rewarded')
+    list_filter = ('eliminated', 'rewarded')
+    search_fields = ('user__full_name', 'user__telegram_id')
+
+
+@admin.register(models.QuizGame)
+class QuizGameAdmin(admin.ModelAdmin):
+    list_display = ('id', 'flavor', 'title', 'status', 'team_a_points', 'team_b_points', 'rewarded')
+    list_filter = ('flavor', 'status', 'rewarded')
+    readonly_fields = ('questions', 'scored_indices', 'team_a', 'team_b', 'created_at', 'updated_at')
+
+
+@admin.register(models.QuizScore)
+class QuizScoreAdmin(admin.ModelAdmin):
+    list_display = ('id', 'game', 'user', 'points', 'team', 'reward', 'rewarded')
+    list_filter = ('team', 'rewarded')
+    search_fields = ('user__full_name', 'user__telegram_id')
+
+
 @admin.register(models.GameSequence)
 class GameSequenceAdmin(admin.ModelAdmin):
     list_display = ('id', 'date', 'slot', 'game_types', 'current_index',

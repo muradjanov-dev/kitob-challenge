@@ -50,15 +50,15 @@ def _add_ball_flat(user, amount: int) -> int:
     return amount
 
 
-def charge_entry_fee(profile) -> bool:
-    """Deduct ENTRY_FEE from profile.ball if affordable. Shared by every live
-    game (Zanjiri/Ko'pchilik/Qal'a/Emoji) so the 25-Kitobcha join cost is
-    consistent across all of them."""
+def charge_entry_fee(profile, amount: int = ENTRY_FEE) -> bool:
+    """Deduct `amount` Kitobcha from profile.ball if affordable (defaults to
+    ENTRY_FEE=25). Shared by every live game so the join-cost logic is
+    consistent; newer games pass a higher `amount` for their pricier entry."""
     with transaction.atomic():
         p = TelegramProfile.objects.select_for_update().get(id=profile.id)
-        if int(p.ball or 0) < ENTRY_FEE:
+        if int(p.ball or 0) < amount:
             return False
-        p.ball = p.ball - ENTRY_FEE
+        p.ball = p.ball - amount
         p.save(update_fields=["ball"])
     return True
 

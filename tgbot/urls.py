@@ -8,6 +8,10 @@ from tgbot.game_views import (
     feud_index, api_feud_state, api_feud_submit,
     castle_index, api_castle_state, api_castle_submit,
     emoji_index, api_emoji_state, api_emoji_submit,
+    wisdom_index, api_wisdom_state, api_wisdom_submit,
+    detective_index, api_detective_state, api_detective_submit,
+    survival_index, api_survival_state, api_survival_submit,
+    quiz_index, api_quiz_state, api_quiz_submit,
 )
 
 
@@ -33,4 +37,33 @@ urlpatterns = [
     path("emoji/", emoji_index, name="emoji"),
     path("emoji/api/state/", api_emoji_state, name="emoji-api-state"),
     path("emoji/api/submit/", api_emoji_submit, name="emoji-api-submit"),
+
+    path("hikmat/", wisdom_index, name="wisdom"),
+    path("hikmat/api/state/", api_wisdom_state, name="wisdom-api-state"),
+    path("hikmat/api/submit/", api_wisdom_submit, name="wisdom-api-submit"),
+
+    path("detektiv/", detective_index, name="detective"),
+    path("detektiv/api/state/", api_detective_state, name="detective-api-state"),
+    path("detektiv/api/submit/", api_detective_submit, name="detective-api-submit"),
+
+    path("omon-qolish/", survival_index, name="survival"),
+    path("omon-qolish/api/state/", api_survival_state, name="survival-api-state"),
+    path("omon-qolish/api/submit/", api_survival_submit, name="survival-api-submit"),
+
+    # Bilim O'yini — 4 flavors sharing one engine/template, distinct URLs.
+    path("ikki-haqiqat/", quiz_index, {"flavor": "twofacts"}, name="quiz-twofacts"),
+    path("ikki-haqiqat/api/state/", api_quiz_state, {"flavor": "twofacts"}, name="quiz-twofacts-api-state"),
+    path("ikki-haqiqat/api/submit/", api_quiz_submit, {"flavor": "twofacts"}, name="quiz-twofacts-api-submit"),
+
+    path("kim-yolgonchi/", quiz_index, {"flavor": "impostor"}, name="quiz-impostor"),
+    path("kim-yolgonchi/api/state/", api_quiz_state, {"flavor": "impostor"}, name="quiz-impostor-api-state"),
+    path("kim-yolgonchi/api/submit/", api_quiz_submit, {"flavor": "impostor"}, name="quiz-impostor-api-submit"),
+
+    path("bog-lanish/", quiz_index, {"flavor": "connection"}, name="quiz-connection"),
+    path("bog-lanish/api/state/", api_quiz_state, {"flavor": "connection"}, name="quiz-connection-api-state"),
+    path("bog-lanish/api/submit/", api_quiz_submit, {"flavor": "connection"}, name="quiz-connection-api-submit"),
+
+    path("jamoa-jangi/", quiz_index, {"flavor": "teams"}, name="quiz-teams"),
+    path("jamoa-jangi/api/state/", api_quiz_state, {"flavor": "teams"}, name="quiz-teams-api-state"),
+    path("jamoa-jangi/api/submit/", api_quiz_submit, {"flavor": "teams"}, name="quiz-teams-api-submit"),
 ]

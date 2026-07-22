@@ -758,10 +758,10 @@ _HOW_IT_WORKS_UZ = (
     "   «Yigirma bet», «Kunlik marafon», «Birinchi kitob»... Kolleksioner bo'ling!\n\n"
 
     "🎮 <b>5. JONLI O'YINLAR — eng qizig'i!</b>\n"
-    "   Har kuni <b>10:00</b> va <b>22:00</b> da saytda tasodifiy o'yin:\n"
-    "   🔗 <b>Kitob Zanjiri</b> — harf bo'yicha kitob nomini ayting (poyga!)\n"
-    "   🗣 <b>Ko'pchilik nima dedi?</b> — ko'pchilik bilan bir xil javob bering\n"
-    "   🏰 <b>Bilim Qal'asi</b> — jamoa bo'lib «boss»ni yenging ⚔️\n"
+    "   Har kuni <b>10:00</b> va <b>22:00</b> da saytda 3 tasodifiy o'yin ketma-ket:\n"
+    "   🔗 <b>Kitob Zanjiri</b>, 🗣 <b>Ko'pchilik nima dedi?</b>, 🏰 <b>Bilim Qal'asi</b>, "
+    "🎬 <b>Emoji Kitob</b>, ☪️ <b>Hikmat Xazinasi</b>, 📖 <b>Kitob Detektivi</b>, "
+    "💀 <b>Omon qolish</b>, 👥 <b>Jamoa Jangi</b> va yana boshqalari!\n"
     "   🧩 <b>Kitob Viktorina</b> — 08:30, 14:00, 21:00 (guruhda)\n"
     "   G'oliblarga Kitobcha, qatnashganga sovg'a. Yutqazsangiz ham... baribir sovg'a 🎁\n\n"
 

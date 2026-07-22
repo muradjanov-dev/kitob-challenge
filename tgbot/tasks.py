@@ -4158,6 +4158,67 @@ def expire_trial_premium(user_id):
 
 
 @shared_task
+def announce_top_game_players():
+    """23:00 every day — announce the 5 users who joined the most live games
+    today (Zanjiri/Ko'pchilik/Qal'a/Emoji/Hikmat/Detektiv/Omon qolish/Bilim
+    O'yini, all 4 flavors), counted as one participation per distinct game."""
+    from collections import Counter
+    from tgbot.models import (
+        ChainScore, FeudScore, CastleHit, EmojiScore,
+        WisdomScore, DetectiveScore, SurvivalPlayer, QuizScore, TelegramProfile,
+    )
+
+    today = timezone.localdate()
+    counts = Counter()
+
+    def _tally(qs):
+        for uid in qs.filter(game__starts_at__date=today).values_list("user_id", flat=True):
+            counts[uid] += 1
+
+    _tally(ChainScore.objects.all())
+    _tally(FeudScore.objects.all())
+    _tally(EmojiScore.objects.all())
+    _tally(WisdomScore.objects.all())
+    _tally(DetectiveScore.objects.all())
+    _tally(SurvivalPlayer.objects.all())
+    _tally(QuizScore.objects.all())
+    # CastleHit has no per-user-per-game "joined" row, so dedupe (user, game) pairs.
+    for uid, _gid in set(
+        CastleHit.objects.filter(game__starts_at__date=today).values_list("user_id", "game_id")
+    ):
+        counts[uid] += 1
+
+    if not counts:
+        print("announce_top_game_players: no game activity today")
+        return
+
+    top = counts.most_common(5)
+    users = {u.id: u for u in TelegramProfile.objects.filter(id__in=[uid for uid, _ in top])}
+    medals = ["🥇", "🥈", "🥉", "4.", "5."]
+    lines = ["🎮 <b>Bugungi eng faol o'yinchilar!</b>\n"]
+    shown = 0
+    for i, (uid, cnt) in enumerate(top):
+        u = users.get(uid)
+        if not u:
+            continue
+        lines.append(f"{medals[i]} {escape(u.full_name or 'Kitobxon')} — <b>{cnt}</b> ta o'yin")
+        shown += 1
+    if not shown:
+        return
+    lines.append("\n🔥 Ertaga ham 10:00 va 22:00 dagi o'yinlarda faol bo'ling!")
+    text = "\n".join(lines)
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    for group_id in _group_chat_ids():
+        try:
+            requests.post(url, data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                                     "disable_web_page_preview": "true"}, timeout=10)
+        except Exception as e:
+            print(f"announce_top_game_players group {group_id}: {e}")
+    print(f"announce_top_game_players: top5={top}")
+
+
+@shared_task
 def send_admin_daily_report():
     """
     23:55 every day — send a full platform summary to every admin in settings.ADMINS.
@@ -4442,6 +4503,119 @@ def start_emoji_game():
     return game
 
 
+@shared_task
+def start_wisdom_game():
+    from tgbot.services.wisdom_game import create_scheduled_wisdom, finalize_due_games, LEAD_SECONDS, ENTRY_FEE
+    finalize_due_games()
+    game = create_scheduled_wisdom()
+    text = (
+        "☪️ <b>HIKMAT XAZINASI</b> — kim aytgan?\n\n"
+        f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+        "Hikmatli gap ko'rsatiladi — qaysi olim yoki ulamo aytganini toping. "
+        "Ketma-ket to'g'ri javoblar ochkoni oshiradi (x1→x2→x3)!\n\n"
+        f"💰 <b>Kirish: {ENTRY_FEE} Kitobcha.</b>\n"
+        "🏆 G'oliblar ko'p Kitobcha oladi.\n👇 Kiring:"
+    )
+    _announce_game(text, "hikmat")
+    print(f"start_wisdom_game: game #{game.id}")
+    return game
+
+
+@shared_task
+def start_detective_game():
+    from tgbot.services.detective_game import create_scheduled_detective, finalize_due_games, LEAD_SECONDS, ENTRY_FEE
+    finalize_due_games()
+    game = create_scheduled_detective()
+    text = (
+        "📖 <b>KITOB DETEKTIVI</b> — maxfiy kitobni top!\n\n"
+        f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+        "Har raundda maxfiy kitob asta-sekin ipuchlari orqali ochiladi. "
+        "Birinchi to'g'ri topgan g'olib — qancha erta, shuncha ko'p ochko!\n\n"
+        f"💰 <b>Kirish: {ENTRY_FEE} Kitobcha.</b>\n"
+        "🏆 G'oliblar ko'p Kitobcha oladi.\n👇 Kiring:"
+    )
+    _announce_game(text, "detektiv")
+    print(f"start_detective_game: game #{game.id}")
+    return game
+
+
+@shared_task
+def start_survival_game():
+    from tgbot.services.survival_game import create_scheduled_survival, finalize_due_games, LEAD_SECONDS, ENTRY_FEE
+    finalize_due_games()
+    game = create_scheduled_survival()
+    text = (
+        "💀 <b>OMON QOLISH</b> — elimination o'yin!\n\n"
+        f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+        "Har savolga javob bering — noto'g'ri yoki javobsiz qolsangiz jon yo'qotasiz "
+        "(3 jon). Oxirigacha omon qolganlar jackpotni bo'lishadi!\n\n"
+        f"💰 <b>Kirish: {ENTRY_FEE} Kitobcha.</b>\n👇 Kiring:"
+    )
+    _announce_game(text, "omon-qolish")
+    print(f"start_survival_game: game #{game.id}")
+    return game
+
+
+def _start_quiz_flavor(flavor):
+    from tgbot.services.quiz_game import create_scheduled_quiz, finalize_due_games, LEAD_SECONDS, ENTRY_FEES
+    finalize_due_games(flavor)
+    game = create_scheduled_quiz(flavor)
+    texts = {
+        "twofacts": (
+            "🎭 <b>IKKI HAQIQAT, BIR YOLG'ON</b>\n\n"
+            f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+            "3 ta gapdan qaysi biri yolg'on ekanini tez toping!\n\n"
+            f"💰 <b>Kirish: {ENTRY_FEES['twofacts']} Kitobcha.</b>\n👇 Kiring:"
+        ),
+        "impostor": (
+            "🃏 <b>KIM YOLG'ONCHI?</b>\n\n"
+            f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+            "3 haqiqiy va 1 soxta juftlik orasidan soxtasini toping!\n\n"
+            f"💰 <b>Kirish: {ENTRY_FEES['impostor']} Kitobcha.</b>\n👇 Kiring:"
+        ),
+        "connection": (
+            "🧩 <b>YASHIRIN BOG'LANISH</b>\n\n"
+            f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+            "4 ta narsani bog'lovchi yashirin mavzuni toping!\n\n"
+            f"💰 <b>Kirish: {ENTRY_FEES['connection']} Kitobcha.</b>\n👇 Kiring:"
+        ),
+        "teams": (
+            "👥 <b>JAMOA JANGI</b> — ikki jamoa bo'lib jang!\n\n"
+            f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+            "Kirganlaringiz avtomatik ikki jamoaga bo'linadi. Jamoangiz ko'proq "
+            "to'g'ri javob bersa — jamoa jackpotni bo'lishadi!\n\n"
+            f"💰 <b>Kirish: {ENTRY_FEES['teams']} Kitobcha.</b>\n👇 Kiring:"
+        ),
+    }
+    deep_link_params = {
+        "twofacts": "ikki-haqiqat", "impostor": "kim-yolgonchi",
+        "connection": "bog-lanish", "teams": "jamoa-jangi",
+    }
+    _announce_game(texts[flavor], deep_link_params[flavor])
+    print(f"start_quiz_{flavor}: game #{game.id}")
+    return game
+
+
+@shared_task
+def start_quiz_twofacts_game():
+    return _start_quiz_flavor("twofacts")
+
+
+@shared_task
+def start_quiz_impostor_game():
+    return _start_quiz_flavor("impostor")
+
+
+@shared_task
+def start_quiz_connection_game():
+    return _start_quiz_flavor("connection")
+
+
+@shared_task
+def start_quiz_teams_game():
+    return _start_quiz_flavor("teams")
+
+
 # Maps a game-type slug to the task that starts it (each returns the created
 # game instance). Shared by start_game_sequence and _advance_game_sequence to
 # run the daily 10:00/22:00 slot: 3 different types, back to back, no repeats.
@@ -4450,6 +4624,13 @@ _GAME_STARTERS = {
     "feud": start_feud_game,
     "castle": start_castle_game,
     "emoji": start_emoji_game,
+    "wisdom": start_wisdom_game,
+    "detective": start_detective_game,
+    "survival": start_survival_game,
+    "twofacts": start_quiz_twofacts_game,
+    "impostor": start_quiz_impostor_game,
+    "connection": start_quiz_connection_game,
+    "teams": start_quiz_teams_game,
 }
 
 
@@ -4605,3 +4786,124 @@ def games_finalize_tick():
             except Exception:
                 pass
         _advance_game_sequence("emoji", game.id)
+
+    _finalize_wisdom()
+    _finalize_detective()
+    _finalize_survival()
+    for flavor in ("twofacts", "impostor", "connection", "teams"):
+        _finalize_quiz_flavor(flavor)
+
+
+def _broadcast_and_dm(header_lines, winners, dm_text_fn):
+    """Post `header_lines` to every group, then DM each rewarded winner via
+    `dm_text_fn(winner) -> str`. Shared by the new games' finalize announcements."""
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    text = "\n".join(header_lines)
+    for gid in _group_chat_ids():
+        try:
+            requests.post(url, data={"chat_id": gid, "text": text, "parse_mode": "HTML",
+                                     "disable_web_page_preview": "true"}, timeout=10)
+        except Exception:
+            pass
+    for w in winners:
+        if not w.get("reward"):
+            continue
+        try:
+            requests.post(url, data={"chat_id": w["telegram_id"], "text": dm_text_fn(w),
+                                     "parse_mode": "HTML"}, timeout=8)
+        except Exception:
+            pass
+
+
+def _finalize_wisdom():
+    from tgbot.services import wisdom_game
+    medals = ["🥇", "🥈", "🥉"]
+    for game, summary in wisdom_game.finalize_due_games():
+        winners = summary.get("winners", [])
+        lines = ["☪️ <b>Hikmat Xazinasi — yakun!</b>\n"]
+        if winners:
+            for i, w in enumerate(winners[:5]):
+                m = medals[i] if i < 3 else f"{i + 1}."
+                rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
+                streak_note = f" · eng uzun ketma-ket: {w['best_streak']}" if w.get("best_streak") else ""
+                lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{rew}{streak_note}")
+        else:
+            lines.append("Bu safar hech kim ochko olmadi 😔")
+        _broadcast_and_dm(lines, winners, lambda w: (
+            f"☪️ Hikmat Xazinasi — <b>{w['rank']}-o'rin</b>!\n"
+            f"🪙 <b>+{w['reward']} Kitobcha</b> · Ball: {w['points']}"
+        ))
+        _advance_game_sequence("wisdom", game.id)
+
+
+def _finalize_detective():
+    from tgbot.services import detective_game
+    medals = ["🥇", "🥈", "🥉"]
+    for game, summary in detective_game.finalize_due_games():
+        winners = summary.get("winners", [])
+        lines = [f"📖 <b>Kitob Detektivi — yakun!</b>\n\n🔍 Topilgan kitoblar: <b>{summary.get('solved', 0)}</b>"]
+        if winners:
+            for i, w in enumerate(winners[:5]):
+                m = medals[i] if i < 3 else f"{i + 1}."
+                rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
+                lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko ({w['solved_count']} topgan){rew}")
+        else:
+            lines.append("Bu safar hech kim topa olmadi 😔")
+        _broadcast_and_dm(lines, winners, lambda w: (
+            f"📖 Kitob Detektivi — <b>{w['rank']}-o'rin</b>!\n"
+            f"🪙 <b>+{w['reward']} Kitobcha</b> · Ball: {w['points']}"
+        ))
+        _advance_game_sequence("detective", game.id)
+
+
+def _finalize_survival():
+    from tgbot.services import survival_game
+    for game, summary in survival_game.finalize_due_games():
+        winners = summary.get("winners", [])
+        survivors = summary.get("survivors", 0)
+        head = (f"💀 <b>Omon qolish — yakun!</b>\n\n🏆 Omon qolganlar: <b>{survivors}</b> / {summary.get('players', 0)}"
+                if survivors else "💀 <b>Omon qolish — yakun!</b>\n\n☠️ Hamma chetlatildi — eng ko'p to'g'ri javob berganlar g'olib!")
+        lines = [head]
+        for w in winners[:5]:
+            tag = "✅" if w.get("survived") else "🎖"
+            lines.append(f"{tag} {escape(w['name'])} — {w['correct']} to'g'ri (+{w['reward']} 🪙)")
+        _broadcast_and_dm(lines, winners, lambda w: (
+            f"💀 Omon qolish — {'omon qoldingiz!' if w.get('survived') else 'yaxshi harakat!'}\n"
+            f"🪙 <b>+{w['reward']} Kitobcha</b> · To'g'ri javoblar: {w['correct']}"
+        ))
+        _advance_game_sequence("survival", game.id)
+
+
+def _finalize_quiz_flavor(flavor):
+    from tgbot.services import quiz_game
+    medals = ["🥇", "🥈", "🥉"]
+    titles = {"twofacts": "Ikki haqiqat, bir yolg'on", "impostor": "Kim yolg'onchi?",
+              "connection": "Yashirin bog'lanish", "teams": "Jamoa Jangi"}
+    emojis = {"twofacts": "🎭", "impostor": "🃏", "connection": "🧩", "teams": "👥"}
+    for game, summary in quiz_game.finalize_due_games(flavor):
+        winners = summary.get("winners", [])
+        emoji_, title = emojis[flavor], titles[flavor]
+        if flavor == "teams":
+            ap, bp = summary.get("team_a_points", 0), summary.get("team_b_points", 0)
+            if summary.get("tie"):
+                lines = [f"{emoji_} <b>{title} — durrang!</b>\n\n🔵 Jamoa A: {ap} · 🔴 Jamoa B: {bp}"]
+            else:
+                wt = "A" if summary.get("winning_team") == "a" else "B"
+                lines = [f"{emoji_} <b>{title} — Jamoa {wt} g'olib!</b>\n\n🔵 Jamoa A: {ap} · 🔴 Jamoa B: {bp}"]
+            for w in winners[:8]:
+                tag = "🔵" if w.get("team") == "a" else "🔴"
+                rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
+                lines.append(f"{tag} {escape(w['name'])} — {w['points']} ochko{rew}")
+        else:
+            lines = [f"{emoji_} <b>{title} — yakun!</b>\n"]
+            if winners:
+                for i, w in enumerate(winners[:5]):
+                    m = medals[i] if i < 3 else f"{i + 1}."
+                    rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
+                    lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{rew}")
+            else:
+                lines.append("Bu safar hech kim ochko olmadi 😔")
+        _broadcast_and_dm(lines, winners, lambda w: (
+            f"{emoji_} {title} — <b>+{w['reward']} Kitobcha</b>! Ball: {w['points']}"
+        ))
+        _advance_game_sequence(flavor, game.id)

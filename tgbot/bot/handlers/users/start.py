@@ -133,8 +133,21 @@ async def do_start(message: types.Message, state: FSMContext):
         )
         return
 
-    # Ko'pchilik / Qal'a / Emoji deep links — open the respective game Mini App.
-    if args in ("kopchilik", "qala", "emoji") and already_registered:
+    # Ko'pchilik / Qal'a / Emoji / Hikmat / Detektiv / Omon qolish / Bilim
+    # O'yini (4 flavors) deep links — open the respective game Mini App.
+    _GAME_DEEPLINKS = {
+        "kopchilik": ("/kopchilik/", "🗣 O'yinni ochish", "Ko'pchilik nima dedi?"),
+        "qala": ("/qala/", "🏰 O'yinni ochish", "Bilim Qal'asi"),
+        "emoji": ("/emoji/", "🎬 O'yinni ochish", "Emoji Kitob"),
+        "hikmat": ("/hikmat/", "☪️ O'yinni ochish", "Hikmat Xazinasi"),
+        "detektiv": ("/detektiv/", "📖 O'yinni ochish", "Kitob Detektivi"),
+        "omon-qolish": ("/omon-qolish/", "💀 O'yinni ochish", "Omon qolish"),
+        "ikki-haqiqat": ("/ikki-haqiqat/", "🎭 O'yinni ochish", "Ikki haqiqat, bir yolg'on"),
+        "kim-yolgonchi": ("/kim-yolgonchi/", "🃏 O'yinni ochish", "Kim yolg'onchi?"),
+        "bog-lanish": ("/bog-lanish/", "🧩 O'yinni ochish", "Yashirin bog'lanish"),
+        "jamoa-jangi": ("/jamoa-jangi/", "👥 O'yinni ochish", "Jamoa Jangi"),
+    }
+    if args in _GAME_DEEPLINKS and already_registered:
         if user and not user.is_registered:
             user.is_registered = True
             await sync_to_async(user.save)(update_fields=["is_registered"])
@@ -143,12 +156,7 @@ async def do_start(message: types.Message, state: FSMContext):
             InlineKeyboardMarkup as _IKM2, InlineKeyboardButton as _IKB2, WebAppInfo as _WAI2,
         )
         from src.settings import WEB_DOMAIN
-        if args == "kopchilik":
-            path, label, title = "/kopchilik/", "🗣 O'yinni ochish", "Ko'pchilik nima dedi?"
-        elif args == "qala":
-            path, label, title = "/qala/", "🏰 O'yinni ochish", "Bilim Qal'asi"
-        else:
-            path, label, title = "/emoji/", "🎬 O'yinni ochish", "Emoji Kitob"
+        path, label, title = _GAME_DEEPLINKS[args]
         kb = _IKM2().add(_IKB2(label, web_app=_WAI2(url=f"{WEB_DOMAIN}{path}")))
         await message.answer(
             f"<b>{title}</b> — jonli o'yin boshlandi!\nPastdagi tugmani bosing 👇",

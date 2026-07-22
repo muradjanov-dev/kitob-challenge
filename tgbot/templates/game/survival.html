@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Omon qolish</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root{--bg:#0f1115;--card:#171a21;--card2:#1e222b;--text:#eef1f6;--muted:#9aa4b2;
+      --accent:#ff4d6d;--accent2:#ff8a3d;--ok:#25c26e;--bad:#ff5d6c;--line:#262b36;}
+    @media (prefers-color-scheme: light){:root{--bg:#f4f6fb;--card:#fff;--card2:#f0f2f8;--text:#141821;--muted:#5b6472;--accent:#e0334f;--accent2:#e5711f;--line:#e6e9f2;}}
+    *{box-sizing:border-box}html,body{margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;padding:14px 12px 28px;max-width:640px;margin:0 auto}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+    .title{font-weight:800;font-size:18px}.title small{display:block;font-weight:600;font-size:12px;color:var(--muted)}
+    .timer{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-weight:800;font-variant-numeric:tabular-nums;min-width:70px;text-align:center}
+    .timer .lbl{display:block;font-size:10px;color:var(--muted);font-weight:600}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:12px}
+    .lives{text-align:center;font-size:26px;letter-spacing:6px}
+    .qtext{font-size:18px;font-weight:800;line-height:1.3;margin-bottom:12px}
+    .opt{display:block;width:100%;text-align:left;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:13px 14px;font-size:15px;font-weight:600;margin-bottom:9px;cursor:pointer}
+    .opt:hover{border-color:var(--accent)}
+    .opt.correct{background:rgba(37,194,110,.18);border-color:var(--ok);color:var(--ok);font-weight:800}
+    .opt.wrong{background:rgba(255,93,108,.15);border-color:var(--bad);color:var(--bad)}
+    .opt:disabled{cursor:default}
+    .stat{display:flex;justify-content:space-between;margin-bottom:12px;gap:8px}
+    .stat .box{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center}
+    .stat .box b{display:block;font-size:20px;color:var(--accent)}
+    .stat .box span{font-size:11px;color:var(--muted)}
+    .toast{min-height:20px;margin-top:9px;font-size:14px;font-weight:700;text-align:center}
+    .toast.ok{color:var(--ok)}.toast.bad{color:var(--bad)}
+    .sect{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:2px 0 10px}
+    .lb{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+    .lb:last-child{border-bottom:0}.rank{width:26px;text-align:center;font-weight:900}
+    .lb-name{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .lb-name.out{text-decoration:line-through;opacity:.5}
+    .pts{font-weight:900;color:var(--accent)}
+    .big{text-align:center;padding:26px 16px}.big .em{font-size:52px}.big h2{margin:10px 0 6px;font-size:22px}.big p{color:var(--muted);margin:0;font-size:14px;line-height:1.5}
+    .eliminated-box{background:rgba(255,93,108,.14);border:1px solid var(--bad);color:var(--bad);border-radius:12px;padding:14px;text-align:center;font-weight:700;margin-bottom:12px;line-height:1.5}
+    .lifetime{text-align:center;color:var(--muted);font-size:12px;margin-top:14px}
+    .statsgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:14px}
+    .sbox{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 4px;text-align:center}
+    .sbox b{display:block;font-size:18px;color:var(--accent)}.sbox span{font-size:10px;color:var(--muted)}
+    .hrow{text-align:left;padding:9px 2px;border-bottom:1px solid var(--line)}.hrow:last-child{border-bottom:0}
+    .hrow .hd{font-size:11px;color:var(--muted)}.hrow .hw{font-weight:700}
+    .muted{color:var(--muted)}.hidden{display:none}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="title">💀 Omon qolish <small id="subtitle">Jonli o'yin</small></div>
+    <div class="timer"><span class="lbl" id="timerLbl">QOLDI</span><span id="timer">--:--</span></div>
+  </div>
+
+  <div id="live" class="hidden">
+    <div class="eliminated-box hidden" id="elimBox">💀 Siz chetlatildingiz — 3 marta noto'g'ri/javobsiz qoldingiz. Reytingda kuzatib boring!</div>
+    <div class="card" style="background:rgba(255,204,77,.12);border:1px solid #ffcc4d;font-size:12.5px;line-height:1.5;padding:10px 12px">💰 <b>Kirish: 50 Kitobcha</b> (birinchi javobda). ❤️ 3 ta jon — noto'g'ri yoki javobsiz qolgan tur jon oladi. Oxirigacha omon qolganlar jackpotni bo'lishadi!</div>
+    <div class="card">
+      <div class="lives" id="lives">❤️❤️❤️</div>
+    </div>
+    <div class="card" id="qcard">
+      <div class="qtext" id="qtext">—</div>
+      <div id="opts"></div>
+      <div class="toast" id="toast"></div>
+    </div>
+    <div class="stat">
+      <div class="box"><b id="myCorrect">0</b><span>To'g'ri javoblar</span></div>
+      <div class="box"><b id="qnum">1/1</b><span>Savol</span></div>
+    </div>
+    <div class="card"><div class="sect">🏆 Omon qolganlar</div><div id="board"></div></div>
+  </div>
+
+  <div id="info" class="card big hidden"></div>
+  <div id="lifetime" class="lifetime hidden"></div>
+
+  <script>
+    var tg=(window.Telegram&&window.Telegram.WebApp)?window.Telegram.WebApp:null;
+    if(tg){try{tg.ready();tg.expand();}catch(e){}}
+    function readInit(){if(tg&&tg.initData)return tg.initData;try{var q=new URLSearchParams(location.search).get('tgWebAppData');if(q)return q;}catch(e){}var h=(location.hash||'').replace(/^#/,'');if(h){try{var d=new URLSearchParams(h).get('tgWebAppData');if(d)return d;}catch(e){}}return'';}
+    var INIT=readInit();
+    var $=function(id){return document.getElementById(id);};
+    var localSeconds=0,busy=false,lastQ=-1;
+    function fmt(s){s=Math.max(0,s|0);var m=Math.floor(s/60),r=s%60;return(m<10?'0':'')+m+':'+(r<10?'0':'')+r;}
+    function esc(t){return(t||'').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    function api(path,opts){opts=opts||{};opts.headers=Object.assign({'X-Telegram-Init-Data':INIT},opts.headers||{});return fetch(path,opts).then(function(r){return r.json();});}
+
+    var curOpts=[],curAnswered=false,curCorrectIdx=-1,curChoice=-1;
+
+    function renderOpts(disabled){
+      var box=$('opts');box.innerHTML='';
+      curOpts.forEach(function(o,i){
+        var b=document.createElement('button');b.className='opt';b.textContent=(i+1)+'. '+o;
+        if(curAnswered||disabled){
+          b.disabled=true;
+          if(i===curCorrectIdx)b.className='opt correct';
+          else if(i===curChoice)b.className='opt wrong';
+        }else{
+          b.addEventListener('click',function(){answer(i);});
+        }
+        box.appendChild(b);
+      });
+    }
+
+    function statsHistoryHtml(s){
+      var lt=s.lifetime||{};
+      var h='<div class="statsgrid"><div class="sbox"><b>'+(lt.games||0)+'</b><span>O\'yin</span></div><div class="sbox"><b>'+(lt.survived||0)+'</b><span>Omon qolgan</span></div></div>';
+      if(s.history&&s.history.length){
+        h+='<div class="sect" style="margin-top:16px;text-align:left">🕘 O\'tgan o\'yinlar</div>';
+        s.history.forEach(function(g){h+='<div class="hrow"><div class="hd">'+esc(g.date)+'</div><div class="hw">💀 '+g.survivors+' / '+g.players+' omon qoldi</div></div>';});
+      }
+      return h;
+    }
+
+    function render(s){
+      var live=$('live'),info=$('info');
+      if(s.status==='live'){
+        live.classList.remove('hidden');info.classList.add('hidden');
+        $('subtitle').textContent='Savol '+s.q_number+' / '+s.q_total;
+        $('elimBox').classList.toggle('hidden', !s.eliminated);
+        var hearts='';for(var i=0;i<s.max_lives;i++){hearts += i<s.your_lives?'❤️':'🖤';}
+        $('lives').textContent=hearts;
+        $('myCorrect').textContent=s.your_correct||0;$('qnum').textContent=s.q_number+'/'+s.q_total;
+        if(s.q_number-1!==lastQ){lastQ=s.q_number-1;curAnswered=false;curCorrectIdx=-1;curChoice=-1;$('toast').textContent='';}
+        $('qtext').textContent=s.question||'';
+        curOpts=s.options||[];
+        if(s.answered){curAnswered=true;curCorrectIdx=(s.correct_index!==undefined?s.correct_index:-1);}
+        renderOpts(s.eliminated);
+        var b='';(s.leaderboard||[]).forEach(function(r,i){
+          var cls=r.eliminated?'lb-name out':'lb-name';
+          b+='<div class="lb"><div class="rank">'+(r.eliminated?'💀':'❤️'.repeat(0)||(i+1))+'</div><div class="'+cls+'">'+esc(r.name)+'</div><div class="pts">'+r.correct+' ✓</div></div>';
+        });
+        $('board').innerHTML=b||'<div class="muted" style="padding:6px 0">Hali hech kim qatnashmadi.</div>';
+        localSeconds=s.seconds;$('timerLbl').textContent='SAVOL';
+      }else{
+        live.classList.add('hidden');info.classList.remove('hidden');
+        if(s.status==='scheduled'){
+          $('timerLbl').textContent='BOSHLANISH';$('subtitle').textContent='Tez orada';
+          info.className='card big';
+          info.innerHTML='<div class="em">💀</div><h2>Omon qolish boshlanmoqda</h2><p>Har savolga javob bering — noto\'g\'ri yoki javobsiz qolsangiz jon yo\'qotasiz! 3 jon tugasa chetlatilasiz. Oxirigacha omon qolganlar jackpotni bo\'lishadi. Tayyor turing!</p>'+statsHistoryHtml(s);
+          localSeconds=s.seconds;
+        }else if(s.status==='finished'){
+          $('timerLbl').textContent='TUGADI';$('timer').textContent='00:00';$('subtitle').textContent='Tugadi';
+          var rew=s.your_reward?('<div class="stat" style="margin-top:12px"><div class="box"><b>🪙 +'+s.your_reward+'</b><span>Sizning mukofotingiz</span></div></div>'):'';
+          info.className='card big';
+          info.innerHTML='<div class="em">🏁</div><h2>O\'yin tugadi!</h2><p>Omon qolganlar jackpotni bo\'lishdi 🎉</p>'+rew+statsHistoryHtml(s);
+          localSeconds=0;
+        }else{
+          $('timerLbl').textContent='—';$('timer').textContent='--:--';$('subtitle').textContent='Kutilmoqda';
+          info.className='card big';
+          info.innerHTML='<div class="em">💀</div><h2>Hozircha o\'yin yo\'q</h2><p>Omon qolish tez orada boshlanadi — guruhni kuzating!</p>'+statsHistoryHtml(s);
+          localSeconds=0;
+        }
+      }
+      var lt=s.lifetime||{games:0,survived:0};var lel=$('lifetime');lel.classList.remove('hidden');
+      lel.innerHTML="📊 Umumiy: <b>"+lt.games+"</b> o'yin · <b>"+lt.survived+"</b> marta omon qolgan";
+      $('timer').textContent=fmt(localSeconds);
+    }
+
+    function poll(){api('/omon-qolish/api/state/').then(function(s){if(!s||s.ok===false){$('info').classList.remove('hidden');$('live').classList.add('hidden');$('info').className='card big';$('info').innerHTML='<div class="em">🔒</div><h2>Kirish xatosi</h2><p>Saytni ✨ Sayt tugmasi orqali qayta oching.</p>';return;}render(s);}).catch(function(){});}
+
+    function answer(choice){
+      if(busy||curAnswered)return;busy=true;
+      api('/omon-qolish/api/submit/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({choice:choice})}).then(function(r){
+        if(r.ok||r.error==='already_answered'){
+          $('toast').textContent='';
+          curAnswered=true;curCorrectIdx=(r.correct_index!==undefined?r.correct_index:-1);renderOpts(false);
+          if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.notificationOccurred(r.correct?'success':'error')}catch(e){}}
+          poll();
+        }else{
+          var t=$('toast');t.className='toast bad';
+          t.textContent=({insufficient_balance:"🪙 Kirish uchun 50 Kitobcha kerak — balansingiz yetarli emas.",eliminated:"Siz chetlatilgansiz.",not_live:"O'yin faol emas."})[r.error]||"Qabul qilinmadi.";
+        }
+      }).catch(function(){}).then(function(){busy=false;});
+    }
+    setInterval(function(){if(localSeconds>0){localSeconds--;$('timer').textContent=fmt(localSeconds);}},1000);
+    poll();setInterval(poll,1500);
+  </script>
+</body>
+</html>

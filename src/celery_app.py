@@ -226,6 +226,13 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=12, minute=0),
     },
 
+    # Top 5 most active game players today — 23:00, after the evening game
+    # sequence has wrapped up, before the admin summary and personal reports.
+    'announce-top-game-players': {
+        'task': 'tgbot.tasks.announce_top_game_players',
+        'schedule': crontab(hour=23, minute=0),
+    },
+
     # Admin daily summary — 23:55 every day, 2 minutes before the personal
     # reports go out so the admin sees platform totals first.
     'send-admin-daily-report': {
