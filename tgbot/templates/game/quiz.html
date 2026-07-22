@@ -81,15 +81,17 @@
   <script>
     var FLAVOR = document.body.getAttribute('data-flavor');
     var META = {
-      twofacts:  {emoji:'🎭', title:"Ikki haqiqat, bir yolg'on", fee:25, api:'/ikki-haqiqat/api/', none:"Ikki haqiqat, bir yolg'on tez orada boshlanadi — guruhni kuzating!", scheduled:"3 ta gapdan qaysi biri yolg'on ekanini tez toping!"},
-      impostor:  {emoji:'🃏', title:"Kim yolg'onchi?", fee:25, api:'/kim-yolgonchi/api/', none:"Kim yolg'onchi? tez orada boshlanadi — guruhni kuzating!", scheduled:"3 haqiqiy va 1 soxta juftlik orasidan soxtasini toping!"},
-      connection:{emoji:'🧩', title:"Yashirin bog'lanish", fee:25, api:'/bog-lanish/api/', none:"Yashirin bog'lanish tez orada boshlanadi — guruhni kuzating!", scheduled:"4 ta narsani bog'lovchi yashirin mavzuni toping!"},
-      teams:     {emoji:'👥', title:"Jamoa Jangi", fee:30, api:'/jamoa-jangi/api/', none:"Jamoa Jangi tez orada boshlanadi — guruhni kuzating!", scheduled:"Ikki jamoaga bo'linasiz — jamoangiz ko'proq to'g'ri javob bersin!"},
-      timeline:  {emoji:'🕰️', title:"Vaqt Mashinasi", fee:25, api:'/vaqt-mashinasi/api/', none:"Vaqt Mashinasi tez orada boshlanadi — guruhni kuzating!", scheduled:"Kitob yoki mutafakkir qaysi asrga tegishli ekanini toping!"},
-      matchbook: {emoji:'🎯', title:"Muallif-Asar Moslashtirish", fee:25, api:'/muallif-asar/api/', none:"Muallif-Asar Moslashtirish tez orada boshlanadi — guruhni kuzating!", scheduled:"Muallifga tegishli haqiqiy asarni 4 variantdan tez toping!"},
-      reverse:   {emoji:'🔄', title:"Teskari Viktorina", fee:25, api:'/teskari-viktorina/api/', none:"Teskari Viktorina tez orada boshlanadi — guruhni kuzating!", scheduled:"Javob avval ko'rsatiladi — qaysi savolga mos kelishini toping!"}
+      twofacts:  {emoji:'🎭', title:"Ikki haqiqat, bir yolg'on", fee:25, api:'/ikki-haqiqat/api/', none:"Ikki haqiqat, bir yolg'on tez orada boshlanadi — guruhni kuzating!", scheduled:"3 ta gapdan qaysi biri yolg'on ekanini tez toping!", accent:'#8a5cff', accent2:'#c77dff'},
+      impostor:  {emoji:'🃏', title:"Kim yolg'onchi?", fee:25, api:'/kim-yolgonchi/api/', none:"Kim yolg'onchi? tez orada boshlanadi — guruhni kuzating!", scheduled:"3 haqiqiy va 1 soxta juftlik orasidan soxtasini toping!", accent:'#e0334f', accent2:'#ff8a9d'},
+      connection:{emoji:'🧩', title:"Yashirin bog'lanish", fee:25, api:'/bog-lanish/api/', none:"Yashirin bog'lanish tez orada boshlanadi — guruhni kuzating!", scheduled:"4 ta narsani bog'lovchi yashirin mavzuni toping!", accent:'#00b8a9', accent2:'#5ce1d6'},
+      teams:     {emoji:'👥', title:"Jamoa Jangi", fee:30, api:'/jamoa-jangi/api/', none:"Jamoa Jangi tez orada boshlanadi — guruhni kuzating!", scheduled:"Ikki jamoaga bo'linasiz — jamoangiz ko'proq to'g'ri javob bersin!", accent:'#3d7bff', accent2:'#7ca6ff'},
+      timeline:  {emoji:'🕰️', title:"Vaqt Mashinasi", fee:25, api:'/vaqt-mashinasi/api/', none:"Vaqt Mashinasi tez orada boshlanadi — guruhni kuzating!", scheduled:"Kitob yoki mutafakkir qaysi asrga tegishli ekanini toping!", accent:'#c9962c', accent2:'#ffcc4d'},
+      matchbook: {emoji:'🎯', title:"Muallif-Asar Moslashtirish", fee:25, api:'/muallif-asar/api/', none:"Muallif-Asar Moslashtirish tez orada boshlanadi — guruhni kuzating!", scheduled:"Muallifga tegishli haqiqiy asarni 4 variantdan tez toping!", accent:'#2e9e5b', accent2:'#6fd88a'},
+      reverse:   {emoji:'🔄', title:"Teskari Viktorina", fee:25, api:'/teskari-viktorina/api/', none:"Teskari Viktorina tez orada boshlanadi — guruhni kuzating!", scheduled:"Javob avval ko'rsatiladi — qaysi savolga mos kelishini toping!", accent:'#6a3dbf', accent2:'#e05cc7'}
     };
     var M = META[FLAVOR] || META.twofacts;
+    document.documentElement.style.setProperty('--accent', M.accent);
+    document.documentElement.style.setProperty('--accent2', M.accent2);
     document.getElementById('pageTitle').textContent = M.title;
     document.getElementById('gameEmoji').textContent = M.emoji;
     document.getElementById('gameTitle').textContent = M.title;
