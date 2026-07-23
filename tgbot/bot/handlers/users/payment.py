@@ -193,29 +193,11 @@ async def premium_menu_handler(message: types.Message, state: FSMContext):
     user = await aget_user(telegram_id=message.from_user.id)
     lang = user.language if user else "uz"
 
-    # Check existing active subscription — still show the buy/gift menu below
-    # even when active, so users can extend early or gift to a friend.
-    active = Payment.objects.filter(
-        user=user, status="paid", end_date__gte=timezone.localdate()
-    ).first() if user else None
-
-    intro = ""
-    if active:
-        if lang == "ru":
-            intro = (
-                f"✅ <b>У вас уже есть активная подписка</b> до "
-                f"<b>{active.end_date.strftime('%d.%m.%Y')}</b>. Вы можете продлить её "
-                "или подарить подписку другу ниже.\n\n"
-            )
-        else:
-            intro = (
-                f"✅ <b>Sizda faol obuna bor</b> — <b>{active.end_date.strftime('%d.%m.%Y')}</b> "
-                "gacha. Xohlasangiz uzaytirishingiz yoki do'stingizga sovg'a qilishingiz mumkin, "
-                "quyida.\n\n"
-            )
-
+    # Always a plain upsell — buy/extend/gift — with no "you already have
+    # Premium" framing. Active users can still extend early or gift a friend
+    # from the same menu; a purchase here extends their remaining time.
     await message.answer(
-        intro + premium_features_text(lang),
+        premium_features_text(lang),
         parse_mode="HTML",
         reply_markup=premium_menu_markup(lang)
     )
