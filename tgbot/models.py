@@ -428,6 +428,22 @@ class GlobalBook(BaseModel):
         db_table = "global_book"
 
 
+class BookComment(BaseModel):
+    book = models.ForeignKey(GlobalBook, on_delete=models.CASCADE, related_name="comments")
+    user = models.ForeignKey("TelegramProfile", on_delete=models.CASCADE, related_name="book_comments")
+    text = models.TextField(max_length=1000)
+
+    class Meta:
+        verbose_name = "Book Comment"
+        verbose_name_plural = "Book Comments"
+        db_table = "book_comment"
+        ordering = ["-created_at"]
+        unique_together = [("book", "user")]
+
+    def __str__(self):
+        return f"{self.user} → {self.book.title[:30]}"
+
+
 class BooksToRead(BaseModel):
     user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE)
     global_book = models.ForeignKey(GlobalBook, on_delete=models.SET_NULL, null=True, blank=True, related_name="user_books")

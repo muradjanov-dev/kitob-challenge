@@ -1,0 +1,162 @@
+"""Library API — comments on GlobalBook entries.
+
+Auth: Telegram WebApp initData, same pattern as shop_views.py.
+Users who haven't registered in the bot yet get a 403.
+Each user can leave one comment per book (upsert on re-submit).
+"""
+import hashlib
+import hmac
+import json
+from urllib.parse import parse_qsl
+
+from django.conf import settings
+from django.http import HttpRequest, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
+
+from tgbot.models import BookComment, GlobalBook, TelegramProfile
+
+
+# ── initData auth ──────────────────────────────────────────────────────────
+
+def _verify_init_data(init_data: str) -> dict | None:
+    if not init_data:
+        return None
+    try:
+        pairs = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=False))
+    except ValueError:
+        return None
+    received_hash = pairs.pop("hash", None)
+    if not received_hash:
+        return None
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
+    secret_key = hmac.new(b"WebAppData", settings.API_TOKEN.encode(), hashlib.sha256).digest()
+    computed = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(computed, received_hash):
+        return None
+    user_json = pairs.get("user")
+    if not user_json:
+        return None
+    try:
+        user = json.loads(user_json)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(user, dict) or "id" not in user:
+        return None
+    return user
+
+
+def _read_init_data(request: HttpRequest) -> str:
+    return (
+        request.headers.get("X-Telegram-Init-Data")
+        or request.POST.get("initData")
+        or request.GET.get("initData")
+        or ""
+    )
+
+
+def _resolve_profile(init_data: str) -> tuple:
+    tg_user = _verify_init_data(init_data)
+    if not tg_user:
+        return None, "invalid_init_data"
+    profile = TelegramProfile.objects.filter(telegram_id=str(tg_user["id"])).first()
+    if not profile:
+        return None, "not_registered"
+    return profile, None
+
+
+# ── GET /kutubxona/api/comments/?book_id=N ────────────────────────────────
+
+@require_GET
+def api_comments(request: HttpRequest):
+    book_id = request.GET.get("book_id")
+    if not book_id or not book_id.isdigit():
+        return JsonResponse({"error": "book_id required"}, status=400)
+
+    comments = (
+        BookComment.objects
+        .filter(book_id=int(book_id))
+        .select_related("user")
+        .order_by("-created_at")[:50]
+    )
+    return JsonResponse({
+        "comments": [
+            {
+                "id": c.id,
+                "user": c.user.full_name or "Kitobxon",
+                "text": c.text,
+                "created_at": c.created_at.strftime("%Y-%m-%d %H:%M"),
+            }
+            for c in comments
+        ]
+    })
+
+
+# ── POST /kutubxona/api/comment/ ──────────────────────────────────────────
+
+@csrf_exempt
+@require_POST
+def api_add_comment(request: HttpRequest):
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "invalid_json"}, status=400)
+
+    init_data = body.get("initData") or _read_init_data(request)
+    profile, err = _resolve_profile(init_data)
+    if err:
+        return JsonResponse({"error": err}, status=403)
+
+    book_id = body.get("book_id")
+    text = (body.get("text") or "").strip()
+
+    if not book_id:
+        return JsonResponse({"error": "book_id required"}, status=400)
+    if not text:
+        return JsonResponse({"error": "text required"}, status=400)
+    if len(text) > 1000:
+        return JsonResponse({"error": "too_long"}, status=400)
+
+    book = GlobalBook.objects.filter(id=book_id).first()
+    if not book:
+        return JsonResponse({"error": "not_found"}, status=404)
+
+    comment, created = BookComment.objects.update_or_create(
+        book=book,
+        user=profile,
+        defaults={"text": text},
+    )
+    return JsonResponse({
+        "ok": True,
+        "created": created,
+        "comment": {
+            "id": comment.id,
+            "user": profile.full_name or "Kitobxon",
+            "text": comment.text,
+            "created_at": comment.created_at.strftime("%Y-%m-%d %H:%M"),
+        },
+    })
+
+
+# ── DELETE /kutubxona/api/comment/ ────────────────────────────────────────
+
+@csrf_exempt
+def api_delete_comment(request: HttpRequest):
+    if request.method != "DELETE":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "invalid_json"}, status=400)
+
+    init_data = body.get("initData") or _read_init_data(request)
+    profile, err = _resolve_profile(init_data)
+    if err:
+        return JsonResponse({"error": err}, status=403)
+
+    book_id = body.get("book_id")
+    if not book_id:
+        return JsonResponse({"error": "book_id required"}, status=400)
+
+    deleted, _ = BookComment.objects.filter(book_id=book_id, user=profile).delete()
+    return JsonResponse({"ok": True, "deleted": deleted > 0})
