@@ -491,7 +491,9 @@
     async function getInitData() {
       let data = _readInitDataOnce();
       if (data) return data;
-      for (let i = 0; i < 15; i++) {
+      // 30 × 100ms = 3s — covers slow cold-start WebViews (older Android
+      // devices, Telegram Desktop) that hand off initData late.
+      for (let i = 0; i < 30; i++) {
         await new Promise(r => setTimeout(r, 100));
         data = _readInitDataOnce();
         if (data) return data;
@@ -574,20 +576,39 @@
     };
 
     // ─── Loaders ─────────────────────────────────────────────
-    async function loadProducts() {
+    async function loadProducts(attempt) {
+      attempt = attempt || 1;
       const r = await api("/shop/api/products/");
       const spinner = document.getElementById("spinner");
-      spinner.style.display = "none";
       if (!r.ok) {
+        // invalid_init_data is almost always a timing race (initData handed
+        // off late by the WebView, or a request that raced Telegram's own
+        // hash refresh) rather than a real auth failure — retry a few times
+        // with backoff before showing the user anything.
+        if (r.status === 403 && r.data.error === "invalid_init_data" && attempt < 5) {
+          await new Promise(res => setTimeout(res, attempt * 700));
+          return loadProducts(attempt + 1);
+        }
+        spinner.style.display = "none";
         if (r.status === 403 && r.data.error === "profile_not_found") {
           document.getElementById("locked").style.display = "block";
         } else {
           document.getElementById("empty").style.display = "block";
           document.getElementById("empty").innerHTML =
-            '<div class="em">⚠️</div><div>Yuklab bo\'lmadi: ' + (r.data.error || r.status) + '</div>';
+            '<div class="em">⚠️</div><div>Yuklab bo\'lmadi: ' + (r.data.error || r.status) + '</div>' +
+            '<button id="retryLoadBtn" style="margin-top:14px;padding:10px 20px;border-radius:12px;' +
+            'border:1px solid var(--card-border);background:var(--card);color:var(--text);' +
+            'font-size:15px;cursor:pointer;">🔄 Qayta urinish</button>';
+          const btn = document.getElementById("retryLoadBtn");
+          if (btn) btn.addEventListener("click", () => {
+            document.getElementById("empty").style.display = "none";
+            spinner.style.display = "block";
+            loadProducts(1);
+          });
         }
         return;
       }
+      spinner.style.display = "none";
       products = r.data.products || [];
       balance = r.data.me ? r.data.me.balance : 0;
       renderBalance(false);
