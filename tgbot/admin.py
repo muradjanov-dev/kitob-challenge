@@ -417,6 +417,59 @@ class ShopProductAdmin(admin.ModelAdmin):
         'stock_qty', 'sort_order', 'is_active',
     )
 
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if not change:
+            _announce_new_shop_product(obj)
+
+
+def _announce_new_shop_product(product):
+    """New shop items are announced to the groups (not DMed) — mirrors the
+    bot-wizard announcement in shop_admin.py, for products added straight
+    from the Django admin instead."""
+    token = os.environ.get("API_TOKEN", "")
+    if not token:
+        return
+    boys = os.environ.get("BOYS_GROUP_ID", "").strip()
+    girls = os.environ.get("GIRLS_GROUP_ID", "").strip()
+    general = "-1002237773868"
+    group_ids = []
+    for gid in [general, boys, girls]:
+        if gid and gid not in group_ids:
+            group_ids.append(gid)
+
+    from django.utils.html import escape as _esc
+    desc = (product.description or "").strip()
+    desc_line = f"\n{_esc(desc)}\n" if desc else ""
+    stock_label = "cheksiz" if product.stock_qty is None else str(product.stock_qty)
+    text = (
+        "🛍 <b>Do'konga yangi mahsulot qo'shildi!</b>\n\n"
+        f"<b>{_esc(product.name)}</b>\n"
+        f"{desc_line}\n"
+        f"💰 <b>{product.price_kitobcha} Kitobcha</b> • 📦 {stock_label}\n\n"
+        "Sotib olish uchun: «🛒 Do'kon» bo'limiga o'ting!"
+    )
+
+    for gid in group_ids:
+        try:
+            if product.image:
+                with product.image.open("rb") as f:
+                    requests.post(
+                        f"https://api.telegram.org/bot{token}/sendPhoto",
+                        data={"chat_id": gid, "caption": text, "parse_mode": "HTML"},
+                        files={"photo": f},
+                        timeout=15,
+                    )
+            else:
+                requests.post(
+                    f"https://api.telegram.org/bot{token}/sendMessage",
+                    data={"chat_id": gid, "text": text, "parse_mode": "HTML",
+                          "disable_web_page_preview": "true"},
+                    timeout=10,
+                )
+        except Exception as e:
+            print(f"admin ShopProduct announce to {gid} failed: {e}")
+
 
 @admin.register(models.ShopPurchase)
 class ShopPurchaseAdmin(admin.ModelAdmin):

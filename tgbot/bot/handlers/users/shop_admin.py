@@ -284,6 +284,39 @@ async def shopadm_save(call: types.CallbackQuery, state: FSMContext):
         reply_markup=_shop_admin_menu_kb(),
     )
 
+    await _announce_new_product_to_groups(product)
+
+
+async def _announce_new_product_to_groups(product: ShopProduct):
+    """New shop items are announced to the groups, not DMed to individual
+    users — the shop is visible to everyone there and a group post is the
+    natural "look what's new" moment."""
+    from tgbot.tasks import _group_chat_ids
+    from tgbot.bot.loader import bot as _bot
+
+    desc = (product.description or "").strip()
+    desc_line = f"\n{_escape(desc)}\n" if desc else ""
+    stock_label = "cheksiz" if product.stock_qty is None else str(product.stock_qty)
+    text = (
+        "🛍 <b>Do'konga yangi mahsulot qo'shildi!</b>\n\n"
+        f"<b>{_escape(product.name)}</b>\n"
+        f"{desc_line}\n"
+        f"💰 <b>{product.price_kitobcha} Kitobcha</b> • 📦 {stock_label}\n\n"
+        "Sotib olish uchun: «🛒 Do'kon» bo'limiga o'ting!"
+    )
+
+    for gid in _group_chat_ids():
+        try:
+            if product.image:
+                await _bot.send_photo(
+                    gid, types.InputFile(product.image.path),
+                    caption=text, parse_mode="HTML",
+                )
+            else:
+                await _bot.send_message(gid, text, parse_mode="HTML", disable_web_page_preview=True)
+        except Exception as e:
+            print(f"shop_admin: new product group announce to {gid} failed: {e}")
+
 
 @dp.callback_query_handler(lambda c: c.data == "shopadm:cancel", state=ShopProductCreateState.states)
 async def shopadm_cancel_cb(call: types.CallbackQuery, state: FSMContext):
