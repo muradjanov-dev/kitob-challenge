@@ -24,10 +24,34 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--date", type=str, default=None,
                              help="YYYY-MM-DD to report on. Defaults to the server's current date.")
+        parser.add_argument("--check-telegram-id", type=int, default=None,
+                             help="Diagnose why one specific telegram_id did/didn't receive the report "
+                                  "(for --date), without sending anything.")
 
     def handle(self, *args, **options):
         import requests
         from tgbot.models import ConfirmationReport, TelegramProfile, Payment as _Pay
+
+        if options["check_telegram_id"]:
+            tid = options["check_telegram_id"]
+            check_date = (_dt.datetime.strptime(options["date"], "%Y-%m-%d").date()
+                          if options["date"] else timezone.localdate())
+            user = TelegramProfile.objects.filter(telegram_id=tid).first()
+            if not user:
+                self.stdout.write(self.style.ERROR(f"No TelegramProfile with telegram_id={tid}"))
+                return
+            self.stdout.write(f"User: {user.full_name} (id={user.id}, blocked={user.is_blocked})")
+            reports = list(ConfirmationReport.objects.filter(user=user, date__date=check_date)
+                           .values("id", "is_audio", "pages_read", "minutes_listened", "date"))
+            self.stdout.write(f"Reports on {check_date}: {reports}")
+            is_prem = _Pay.objects.filter(user=user, status="paid", end_date__gte=check_date).exists()
+            self.stdout.write(f"Premium on {check_date}: {is_prem}")
+            qualifies = any(not r["is_audio"] and (r["pages_read"] or 0) > 0 for r in reports)
+            self.stdout.write(self.style.SUCCESS(f"Qualifies for report: {qualifies}")
+                              if qualifies else self.style.WARNING(
+                f"Does NOT qualify: {'no report that day' if not reports else 'audio-only or 0 pages'}"
+            ))
+            return
         from tgbot.tasks import BOT_TOKEN
 
         today = (_dt.datetime.strptime(options["date"], "%Y-%m-%d").date()
