@@ -395,6 +395,15 @@ def normalize_uzbek_text(text: str) -> str:
     return " ".join(latin_text.split())
 
 
+BOOK_LANGUAGE_CHOICES = [
+    ("uz", "O'zbekcha"),
+    ("ru", "Ruscha"),
+    ("en", "Inglizcha"),
+    ("tr", "Turkcha"),
+    ("ar", "Arabcha"),
+    ("other", "Boshqa"),
+]
+
 class GlobalBook(BaseModel):
     title = models.CharField(max_length=255, unique=True, verbose_name="Book Title")
     normalized_title = models.CharField(max_length=255, db_index=True)
@@ -403,6 +412,8 @@ class GlobalBook(BaseModel):
     cover = models.ImageField(upload_to="library/covers/", blank=True, null=True)
     pdf_file = models.FileField(upload_to="library/pdfs/", blank=True, null=True)
     audio_file = models.FileField(upload_to="library/audio/", blank=True, null=True)
+    language = models.CharField(max_length=10, choices=BOOK_LANGUAGE_CHOICES, default="uz", db_index=True)
+    is_premium_only = models.BooleanField(default=False, verbose_name="Faqat Premium uchun")
 
     def save(self, *args, **kwargs):
         self.normalized_title = normalize_uzbek_text(self.title)

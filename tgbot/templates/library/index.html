@@ -236,6 +236,17 @@
     .dl-audio{ background: rgba(31,107,76,0.10); color: var(--green); border-color: rgba(31,107,76,0.28); }
     .dl-pdf:hover  { filter: brightness(1.1); }
     .dl-audio:hover{ filter: brightness(1.1); }
+    .dl-lock {
+      background: rgba(200,146,46,0.12); color: var(--accent);
+      border-color: rgba(200,146,46,0.32); cursor: default;
+      font-size: 11px; font-weight: 700; padding: 4px 10px;
+      border-radius: 999px; border: 1px solid; display: inline-flex;
+      align-items: center; gap: 4px;
+    }
+    .book-badge.premium {
+      background: rgba(200,146,46,0.14); color: #a8720f;
+      border: 1px solid rgba(200,146,46,0.36);
+    }
 
     /* ─── Empty state ─── */
     .empty-state {
@@ -362,6 +373,8 @@
         <button class="filter-btn active" data-sort="popular">🔥 Mashhur</button>
         <button class="filter-btn" data-sort="az">A–Z tartibda</button>
         <button class="filter-btn" data-sort="finished">✅ Ko'p tugatilgan</button>
+        <button class="filter-btn" data-filter="free">🆓 Bepul</button>
+        <button class="filter-btn" data-filter="premium">💎 Premium</button>
       </div>
     </div>
   </section>
@@ -377,7 +390,8 @@
            data-author="{{ book.author|default:''|lower }}"
            data-readers="{{ book.readers_count }}"
            data-finished="{{ book.finished_count }}"
-           data-letter="{{ book.title|first|upper }}">
+           data-letter="{{ book.title|first|upper }}"
+           data-premium="{{ book.is_premium_only|yesno:'1,0' }}">
         <div class="book-cover">
           <div class="spine"></div>
           {% if book.cover %}
@@ -392,6 +406,9 @@
           <div class="book-author">✍️ {{ book.author }}</div>
           {% endif %}
           <div class="book-meta">
+            {% if book.is_premium_only %}
+            <span class="book-badge premium">💎 Premium</span>
+            {% endif %}
             {% if book.readers_count %}
             <span class="book-badge reading">📖 {{ book.readers_count }} o'qimoqda</span>
             {% endif %}
@@ -401,11 +418,15 @@
           </div>
           {% if book.pdf_file or book.audio_file %}
           <div class="book-dl">
-            {% if book.pdf_file %}
-            <a class="dl-btn dl-pdf" href="{{ book.pdf_file.url }}" download target="_blank" rel="noopener">📄 PDF</a>
-            {% endif %}
-            {% if book.audio_file %}
-            <a class="dl-btn dl-audio" href="{{ book.audio_file.url }}" download target="_blank" rel="noopener">🎧 Audio</a>
+            {% if book.is_premium_only %}
+              <span class="dl-lock">🔒 Botdan yuklab oling</span>
+            {% else %}
+              {% if book.pdf_file %}
+              <a class="dl-btn dl-pdf" href="{{ book.pdf_file.url }}" download target="_blank" rel="noopener">📄 PDF</a>
+              {% endif %}
+              {% if book.audio_file %}
+              <a class="dl-btn dl-audio" href="{{ book.audio_file.url }}" download target="_blank" rel="noopener">🎧 Audio</a>
+              {% endif %}
             {% endif %}
           </div>
           {% endif %}
@@ -449,6 +470,7 @@
     const cards   = Array.from(grid.querySelectorAll(".book-card"));
 
     let currentSort = "popular";
+    let currentFilter = "all";
 
     function sortCards(list) {
       if (currentSort === "az") {
@@ -464,17 +486,18 @@
     function renderCards() {
       const q = input.value.trim().toLowerCase();
       let visible = cards.filter(c => {
-        if (!q) return true;
-        return c.dataset.title.includes(q) || c.dataset.author.includes(q);
+        const matchQ = !q || c.dataset.title.includes(q) || c.dataset.author.includes(q);
+        const matchF = currentFilter === "all"
+          || (currentFilter === "free" && c.dataset.premium === "0")
+          || (currentFilter === "premium" && c.dataset.premium === "1");
+        return matchQ && matchF;
       });
       const sorted = sortCards(visible.slice());
       const hidden = cards.filter(c => !visible.includes(c));
 
-      // Re-order in DOM
       sorted.forEach(c => { c.style.display = ""; grid.appendChild(c); });
       hidden.forEach(c => { c.style.display = "none"; });
 
-      // Trigger reveal for newly visible cards
       sorted.forEach(c => {
         if (!c.classList.contains("in")) {
           requestAnimationFrame(() => c.classList.add("in"));
@@ -491,9 +514,19 @@
 
     document.querySelectorAll(".filter-btn[data-sort]").forEach(btn => {
       btn.addEventListener("click", () => {
-        document.querySelectorAll(".filter-btn[data-sort]").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
         currentSort = btn.dataset.sort;
+        currentFilter = "all";
+        renderCards();
+      });
+    });
+
+    document.querySelectorAll(".filter-btn[data-filter]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentFilter = btn.dataset.filter;
         renderCards();
       });
     });

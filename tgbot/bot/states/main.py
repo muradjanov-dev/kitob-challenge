@@ -148,10 +148,12 @@ class AdminUserBrowse(StatesGroup):
 class LibraryBookCreateState(StatesGroup):
     title = State()
     author = State()
+    language = State()
     cover = State()
     description = State()
     pdf_file = State()
     audio_file = State()
+    premium = State()
 
 
 class LibraryBookEditState(StatesGroup):

@@ -1,8 +1,8 @@
 """Library admin — manage GlobalBook rows directly from the bot.
 
 Add-book wizard:
-  title → author (/skip) → cover (/skip) → description (/skip)
-        → pdf (/skip) → audio (/skip) → confirm
+  title → author (/skip) → language → cover (/skip) → description (/skip)
+        → pdf (/skip) → audio (/skip) → premium toggle → confirm
   /bekor at any step aborts.
 
 List view (paginated, 10 per page) with per-book edit/delete actions.
@@ -21,19 +21,30 @@ from django.utils import timezone
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.utils import aget_user
 from tgbot.bot.states.main import LibraryBookCreateState, LibraryBookEditState
-from tgbot.models import GlobalBook
+from tgbot.models import GlobalBook, BOOK_LANGUAGE_CHOICES
 
 _BOOKS_PER_PAGE = 10
 _CANCEL_STATES = [
     LibraryBookCreateState.title,
     LibraryBookCreateState.author,
+    LibraryBookCreateState.language,
     LibraryBookCreateState.cover,
     LibraryBookCreateState.description,
     LibraryBookCreateState.pdf_file,
     LibraryBookCreateState.audio_file,
+    LibraryBookCreateState.premium,
     LibraryBookEditState.field,
 ]
 _FILE_FIELDS = {"cover", "pdf_file", "audio_file"}
+
+_LANG_LABELS = {
+    "uz": "🇺🇿 O'zbekcha",
+    "ru": "🇷🇺 Ruscha",
+    "en": "🇬🇧 Inglizcha",
+    "tr": "🇹🇷 Turkcha",
+    "ar": "🇸🇦 Arabcha",
+    "other": "🌐 Boshqa",
+}
 
 
 def _is_admin(user) -> bool:
@@ -50,6 +61,22 @@ def _lib_menu_kb() -> InlineKeyboardMarkup:
     kb.add(InlineKeyboardButton("➕ Kitob qo'shish", callback_data="libadm:add"))
     kb.add(InlineKeyboardButton("📋 Kitoblar ro'yxati", callback_data="libadm:list:1"))
     kb.add(InlineKeyboardButton("🔙 Admin panelga qaytish", callback_data="menu:admin"))
+    return kb
+
+
+def _lang_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardMarkup(row_width=2)
+    for code, label in _LANG_LABELS.items():
+        kb.insert(InlineKeyboardButton(label, callback_data=f"libadm:lang:{code}"))
+    return kb
+
+
+def _premium_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.row(
+        InlineKeyboardButton("💎 Faqat Premium", callback_data="libadm:premium:1"),
+        InlineKeyboardButton("🆓 Barchaga bepul", callback_data="libadm:premium:0"),
+    )
     return kb
 
 
@@ -122,7 +149,7 @@ async def libadm_get_title(message: types.Message, state: FSMContext):
 @dp.message_handler(commands=["skip"], state=LibraryBookCreateState.author)
 async def libadm_skip_author(message: types.Message, state: FSMContext):
     await state.update_data(author="")
-    await _ask_cover(message)
+    await _ask_language(message)
 
 
 @dp.message_handler(state=LibraryBookCreateState.author, content_types=types.ContentTypes.TEXT)
@@ -132,13 +159,33 @@ async def libadm_get_author(message: types.Message, state: FSMContext):
         await message.answer("Muallif ismi 255 belgidan oshmasligi kerak. Qaytadan.")
         return
     await state.update_data(author=author)
-    await _ask_cover(message)
+    await _ask_language(message)
+
+
+async def _ask_language(message: types.Message):
+    await LibraryBookCreateState.language.set()
+    await message.answer(
+        "3️⃣ <b>Kitob tilini tanlang</b>",
+        parse_mode="HTML",
+        reply_markup=_lang_kb(),
+    )
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("libadm:lang:"), state=LibraryBookCreateState.language)
+async def libadm_get_language(call: types.CallbackQuery, state: FSMContext):
+    lang = call.data.split(":")[-1]
+    if lang not in dict(BOOK_LANGUAGE_CHOICES):
+        await call.answer("Noto'g'ri til", show_alert=True)
+        return
+    await call.answer(_LANG_LABELS.get(lang, lang))
+    await state.update_data(language=lang)
+    await _ask_cover(call.message)
 
 
 async def _ask_cover(message: types.Message):
     await LibraryBookCreateState.cover.set()
     await message.answer(
-        "3️⃣ <b>Muqova rasmini yuboring</b>\n\nO'tkazib yuborish: /skip",
+        "4️⃣ <b>Muqova rasmini yuboring</b>\n\nO'tkazib yuborish: /skip",
         parse_mode="HTML",
     )
 
@@ -164,7 +211,7 @@ async def libadm_cover_invalid(message: types.Message):
 async def _ask_description(message: types.Message):
     await LibraryBookCreateState.description.set()
     await message.answer(
-        "4️⃣ <b>Kitob tavsifi</b>\n\nQisqacha tavsif (ixtiyoriy). O'tkazib yuborish: /skip",
+        "5️⃣ <b>Kitob tavsifi</b>\n\nQisqacha tavsif (ixtiyoriy). O'tkazib yuborish: /skip",
         parse_mode="HTML",
     )
 
@@ -188,7 +235,7 @@ async def libadm_get_description(message: types.Message, state: FSMContext):
 async def _ask_pdf(message: types.Message):
     await LibraryBookCreateState.pdf_file.set()
     await message.answer(
-        "5️⃣ <b>PDF faylini yuboring</b>\n\n"
+        "6️⃣ <b>PDF faylini yuboring</b>\n\n"
         "Kitobning PDF versiyasini fayl sifatida yuboring.\n"
         "O'tkazib yuborish: /skip",
         parse_mode="HTML",
@@ -220,7 +267,7 @@ async def libadm_pdf_invalid(message: types.Message):
 async def _ask_audio(message: types.Message):
     await LibraryBookCreateState.audio_file.set()
     await message.answer(
-        "6️⃣ <b>Audio faylini yuboring</b>\n\n"
+        "7️⃣ <b>Audio faylini yuboring</b>\n\n"
         "MP3, M4A, OGG yoki boshqa audio formatdagi fayl.\n"
         "O'tkazib yuborish: /skip",
         parse_mode="HTML",
@@ -230,7 +277,7 @@ async def _ask_audio(message: types.Message):
 @dp.message_handler(commands=["skip"], state=LibraryBookCreateState.audio_file)
 async def libadm_skip_audio(message: types.Message, state: FSMContext):
     await state.update_data(audio_file_id=None, audio_filename=None)
-    await _show_add_preview(message, state)
+    await _ask_premium(message)
 
 
 @dp.message_handler(state=LibraryBookCreateState.audio_file, content_types=types.ContentTypes.AUDIO)
@@ -240,7 +287,7 @@ async def libadm_get_audio_native(message: types.Message, state: FSMContext):
         audio_file_id=audio.file_id,
         audio_filename=audio.file_name or "audio.mp3",
     )
-    await _show_add_preview(message, state)
+    await _ask_premium(message)
 
 
 @dp.message_handler(state=LibraryBookCreateState.audio_file, content_types=types.ContentTypes.DOCUMENT)
@@ -251,7 +298,7 @@ async def libadm_get_audio_doc(message: types.Message, state: FSMContext):
         await message.answer("Iltimos audio fayl yuboring (MP3, M4A, OGG…) yoki /skip.")
         return
     await state.update_data(audio_file_id=doc.file_id, audio_filename=doc.file_name or "audio")
-    await _show_add_preview(message, state)
+    await _ask_premium(message)
 
 
 @dp.message_handler(state=LibraryBookCreateState.audio_file)
@@ -259,14 +306,37 @@ async def libadm_audio_invalid(message: types.Message):
     await message.answer("Iltimos audio fayl yuboring yoki /skip.")
 
 
+async def _ask_premium(message: types.Message):
+    await LibraryBookCreateState.premium.set()
+    await message.answer(
+        "8️⃣ <b>PDF/Audio kim uchun?</b>\n\n"
+        "Bu kitobning fayllari (PDF/Audio) faqat Premium foydalanuvchilarga ko'rinadimi\n"
+        "yoki hamma uchun bepulmi?",
+        parse_mode="HTML",
+        reply_markup=_premium_kb(),
+    )
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("libadm:premium:"), state=LibraryBookCreateState.premium)
+async def libadm_get_premium(call: types.CallbackQuery, state: FSMContext):
+    is_premium = call.data.endswith(":1")
+    await call.answer("💎 Premium" if is_premium else "🆓 Bepul")
+    await state.update_data(is_premium_only=is_premium)
+    await _show_add_preview(call.message, state)
+
+
 async def _show_add_preview(message: types.Message, state: FSMContext):
     data = await state.get_data()
     title = data.get("title", "")
     author = data.get("author") or "—"
     desc = data.get("description") or "—"
+    lang_code = data.get("language", "uz")
+    lang_label = _LANG_LABELS.get(lang_code, lang_code)
+    is_premium = data.get("is_premium_only", False)
     has_cover = "Ha ✅" if data.get("cover_file_id") else "Yo'q"
     has_pdf = "Ha ✅" if data.get("pdf_file_id") else "Yo'q"
     has_audio = "Ha ✅" if data.get("audio_file_id") else "Yo'q"
+    premium_label = "💎 Faqat Premium" if is_premium else "🆓 Barchaga bepul"
     kb = InlineKeyboardMarkup(row_width=2)
     kb.row(
         InlineKeyboardButton("✅ Saqlash", callback_data="libadm:save"),
@@ -276,9 +346,11 @@ async def _show_add_preview(message: types.Message, state: FSMContext):
         "📋 <b>Kitobni tasdiqlang</b>\n\n"
         f"<b>Nomi:</b> {_esc(title)}\n"
         f"<b>Muallif:</b> {_esc(author)}\n"
+        f"<b>Til:</b> {lang_label}\n"
         f"<b>Muqova:</b> {has_cover}\n"
         f"<b>PDF:</b> {has_pdf}\n"
-        f"<b>Audio:</b> {has_audio}\n\n"
+        f"<b>Audio:</b> {has_audio}\n"
+        f"<b>Kirish:</b> {premium_label}\n\n"
         f"<b>Tavsif:</b> {_esc(desc)}",
         parse_mode="HTML",
         reply_markup=kb,
@@ -293,11 +365,13 @@ async def libadm_cancel_add(call: types.CallbackQuery, state: FSMContext):
 
 
 @sync_to_async
-def _create_book_sync(title, author, description):
+def _create_book_sync(title, author, description, language, is_premium_only):
     return GlobalBook.objects.create(
         title=title,
         author=author or "",
         description=description or "",
+        language=language or "uz",
+        is_premium_only=is_premium_only,
     )
 
 
@@ -315,6 +389,8 @@ async def libadm_save(call: types.CallbackQuery, state: FSMContext):
     title = data.get("title") or ""
     author = data.get("author") or ""
     description = data.get("description") or ""
+    language = data.get("language") or "uz"
+    is_premium_only = bool(data.get("is_premium_only", False))
     cover_file_id = data.get("cover_file_id")
     pdf_file_id = data.get("pdf_file_id")
     pdf_filename = data.get("pdf_filename") or "book.pdf"
@@ -327,7 +403,7 @@ async def libadm_save(call: types.CallbackQuery, state: FSMContext):
         return
 
     await call.answer("Saqlanmoqda…")
-    book = await _create_book_sync(title, author, description)
+    book = await _create_book_sync(title, author, description, language, is_premium_only)
     ts = int(timezone.now().timestamp())
 
     if cover_file_id:
@@ -360,12 +436,15 @@ async def libadm_save(call: types.CallbackQuery, state: FSMContext):
     await state.finish()
     book = await _get_book_sync(book.id)
     yoq = "Yo'q"
+    premium_tag = "💎 Faqat Premium" if book.is_premium_only else "🆓 Bepul"
     await call.message.answer(
         f"✅ <b>Kitob qo'shildi!</b>\n\n"
         f"📖 <b>{_esc(book.title)}</b>\n"
         f"✍️ {_esc(book.author) if book.author else '—'}\n"
+        f"🌐 {_LANG_LABELS.get(book.language, book.language)}\n"
         f"📄 PDF: {'Ha ✅' if book.pdf_file else yoq}\n"
-        f"🎧 Audio: {'Ha ✅' if book.audio_file else yoq}",
+        f"🎧 Audio: {'Ha ✅' if book.audio_file else yoq}\n"
+        f"🔐 Kirish: {premium_tag}",
         parse_mode="HTML",
         reply_markup=_lib_menu_kb(),
     )
@@ -447,6 +526,10 @@ def _book_card_kb(book: GlobalBook) -> InlineKeyboardMarkup:
         InlineKeyboardButton("✏️ Muallif", callback_data=f"libadm:edit:author:{book.id}"),
     )
     kb.row(
+        InlineKeyboardButton("🌐 Til", callback_data=f"libadm:edit:language:{book.id}"),
+        InlineKeyboardButton("🔐 Kirish", callback_data=f"libadm:edit:premium:{book.id}"),
+    )
+    kb.row(
         InlineKeyboardButton("🖼 Muqova", callback_data=f"libadm:edit:cover:{book.id}"),
         InlineKeyboardButton("📝 Tavsif", callback_data=f"libadm:edit:description:{book.id}"),
     )
@@ -473,9 +556,12 @@ async def libadm_view(call: types.CallbackQuery, state: FSMContext):
     await call.answer()
     yoq = "Yo'q"
     no_desc = "<i>Tavsif yo'q</i>"
+    premium_tag = "💎 Faqat Premium" if book.is_premium_only else "🆓 Bepul"
     text = (
         f"📖 <b>{_esc(book.title)}</b>\n"
         f"✍️ {_esc(book.author) if book.author else '—'}\n"
+        f"🌐 {_LANG_LABELS.get(book.language, book.language)}\n"
+        f"🔐 Kirish: {premium_tag}\n"
         f"🖼 Muqova: {'Ha ✅' if book.cover else yoq}\n"
         f"📄 PDF: {'Ha ✅' if book.pdf_file else yoq}\n"
         f"🎧 Audio: {'Ha ✅' if book.audio_file else yoq}\n\n"
@@ -512,13 +598,88 @@ async def libadm_edit_start(call: types.CallbackQuery, state: FSMContext):
         await call.answer("Topilmadi", show_alert=True)
         return
     await call.answer()
+
+    # language and premium have inline keyboards — handle here directly
+    if field == "language":
+        await LibraryBookEditState.field.set()
+        await state.update_data(edit_book_id=bid, edit_field="language")
+        await call.message.answer(
+            "🌐 <b>Yangi tilni tanlang</b>",
+            parse_mode="HTML",
+            reply_markup=_lang_kb(),
+        )
+        return
+
+    if field == "premium":
+        await LibraryBookEditState.field.set()
+        await state.update_data(edit_book_id=bid, edit_field="premium")
+        await call.message.answer(
+            "🔐 <b>Kirish turini tanlang</b>",
+            parse_mode="HTML",
+            reply_markup=_premium_kb(),
+        )
+        return
+
     await LibraryBookEditState.field.set()
     await state.update_data(edit_book_id=bid, edit_field=field)
     await call.message.answer(_EDIT_PROMPTS.get(field, "Yangi qiymat yuboring:"), parse_mode="HTML")
 
 
+@dp.callback_query_handler(lambda c: c.data.startswith("libadm:lang:"), state=LibraryBookEditState.field)
+async def libadm_edit_language(call: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    if data.get("edit_field") != "language":
+        await call.answer()
+        return
+    lang = call.data.split(":")[-1]
+    bid = data.get("edit_book_id")
+    book = await _update_book_text_field(bid, "language", lang)
+    await call.answer(_LANG_LABELS.get(lang, lang))
+    await state.finish()
+    if book:
+        await call.message.answer(
+            f"✅ <b>{_esc(book.title)}</b> tili yangilandi: {_LANG_LABELS.get(lang, lang)}",
+            parse_mode="HTML",
+            reply_markup=_lib_menu_kb(),
+        )
+    else:
+        await call.message.answer("Kitob topilmadi.", reply_markup=_lib_menu_kb())
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("libadm:premium:"), state=LibraryBookEditState.field)
+async def libadm_edit_premium(call: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    if data.get("edit_field") != "premium":
+        await call.answer()
+        return
+    is_premium = call.data.endswith(":1")
+    bid = data.get("edit_book_id")
+    book = await _update_book_bool_field(bid, "is_premium_only", is_premium)
+    await call.answer("💎 Premium" if is_premium else "🆓 Bepul")
+    await state.finish()
+    label = "💎 Faqat Premium" if is_premium else "🆓 Barchaga bepul"
+    if book:
+        await call.message.answer(
+            f"✅ <b>{_esc(book.title)}</b> kirish turi: {label}",
+            parse_mode="HTML",
+            reply_markup=_lib_menu_kb(),
+        )
+    else:
+        await call.message.answer("Kitob topilmadi.", reply_markup=_lib_menu_kb())
+
+
 @sync_to_async
 def _update_book_text_field(bid: int, field: str, value: str):
+    book = GlobalBook.objects.filter(id=bid).first()
+    if not book:
+        return None
+    setattr(book, field, value)
+    book.save()
+    return book
+
+
+@sync_to_async
+def _update_book_bool_field(bid: int, field: str, value: bool):
     book = GlobalBook.objects.filter(id=bid).first()
     if not book:
         return None
@@ -704,8 +865,8 @@ async def libadm_edit_text(message: types.Message, state: FSMContext):
     field = data.get("edit_field")
     value = (message.text or "").strip()
 
-    if field in _FILE_FIELDS:
-        await message.answer("Iltimos fayl yuboring yoki /clear yoki /bekor.")
+    if field in _FILE_FIELDS or field in ("language", "premium"):
+        await message.answer("Iltimos tugmadan tanlang yoki /bekor.")
         return
 
     if field == "title":
