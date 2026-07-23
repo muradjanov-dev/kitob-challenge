@@ -234,7 +234,7 @@ async def _daily_top_read_user_action_button():
             name = escape(r['full_name'] or "Foydalanuvchi")
             badge = "💎 " if tg_id in premium_ids else ""
             stat = _format_top_stat(r['pages'], r['minutes'])
-            message += f"{index}) <b><a href='tg://user?id={tg_id}'>{badge}{name}</a></b>: {stat}\n\n"
+            message += f"{index}) <b>{badge}{name}</b>: {stat}\n\n"
     else:
         message = "📚 Bugun hisobot yuborgan foydalanuvchilar yo'q."
 
@@ -266,7 +266,7 @@ def _send_period_report(start_date, end_date, limit, period_name):
             full_name = escape(r['full_name'] or "Foydalanuvchi")
             badge = "💎 " if tg_id in premium_ids else ""
             stat = _format_top_stat(r['pages'], r['minutes'])
-            message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {stat}\n"
+            message += f"{index}. <b>{badge}{full_name}</b>: {stat}\n"
 
     for _cid in _group_chat_ids():
         send_message(_cid, message)
@@ -465,7 +465,7 @@ def _build_top_readers_message(start_date, end_date, period_label, limit=20):
         full_name = escape(r['full_name'] or "Foydalanuvchi")
         badge = "💎 " if tg_id in premium_ids else ""
         stat = _format_top_stat(r['pages'], r['minutes'])
-        message += f"{index}. <b><a href='tg://user?id={tg_id}'>{badge}{full_name}</a></b>: {stat}\n"
+        message += f"{index}. <b>{badge}{full_name}</b>: {stat}\n"
     total_stat = _format_top_stat(grand_pages, grand_minutes)
     message += f"\n📊 Jami: <b>{total_stat}</b>"
     return message
