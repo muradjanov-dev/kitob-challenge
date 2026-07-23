@@ -619,26 +619,10 @@ async def _menu_premium(call, user, state: FSMContext):
     await state.finish()
     lang = _user_lang(user)
 
-    active = await sync_to_async(
-        lambda: Payment.objects.filter(
-            user=user, status="paid", end_date__gte=timezone.localdate()
-        ).first() if user else None
-    )()
-
-    if active:
-        if lang == "ru":
-            text = (
-                f"✅ <b>У вас активная подписка!</b>\n\n"
-                f"📅 Действует до: <b>{active.end_date.strftime('%d.%m.%Y')}</b>"
-            )
-        else:
-            text = (
-                f"✅ <b>Sizda faol obuna mavjud!</b>\n\n"
-                f"📅 Amal qilish muddati: <b>{active.end_date.strftime('%d.%m.%Y')}</b>"
-            )
-        await call.message.answer(text, parse_mode="HTML")
-        return
-
+    # Always a plain upsell — buy/extend/gift — with no "you already have
+    # Premium" framing that stops short of the menu. A purchase now extends
+    # remaining time (Payment.grant_or_extend), so active users should see
+    # the same offer as everyone else.
     await call.message.answer(
         premium_features_text(lang),
         parse_mode="HTML",
