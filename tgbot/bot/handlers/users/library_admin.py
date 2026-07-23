@@ -359,12 +359,13 @@ async def libadm_save(call: types.CallbackQuery, state: FSMContext):
 
     await state.finish()
     book = await _get_book_sync(book.id)
+    yoq = "Yo'q"
     await call.message.answer(
         f"✅ <b>Kitob qo'shildi!</b>\n\n"
         f"📖 <b>{_esc(book.title)}</b>\n"
         f"✍️ {_esc(book.author) if book.author else '—'}\n"
-        f"📄 PDF: {'Ha ✅' if book.pdf_file else 'Yo\\'q'}\n"
-        f"🎧 Audio: {'Ha ✅' if book.audio_file else 'Yo\\'q'}",
+        f"📄 PDF: {'Ha ✅' if book.pdf_file else yoq}\n"
+        f"🎧 Audio: {'Ha ✅' if book.audio_file else yoq}",
         parse_mode="HTML",
         reply_markup=_lib_menu_kb(),
     )
@@ -470,13 +471,15 @@ async def libadm_view(call: types.CallbackQuery, state: FSMContext):
         await call.answer("Topilmadi", show_alert=True)
         return
     await call.answer()
+    yoq = "Yo'q"
+    no_desc = "<i>Tavsif yo'q</i>"
     text = (
         f"📖 <b>{_esc(book.title)}</b>\n"
         f"✍️ {_esc(book.author) if book.author else '—'}\n"
-        f"🖼 Muqova: {'Ha ✅' if book.cover else 'Yo\\'q'}\n"
-        f"📄 PDF: {'Ha ✅' if book.pdf_file else 'Yo\\'q'}\n"
-        f"🎧 Audio: {'Ha ✅' if book.audio_file else 'Yo\\'q'}\n\n"
-        f"{_esc(book.description) if book.description else '<i>Tavsif yo\\'q</i>'}"
+        f"🖼 Muqova: {'Ha ✅' if book.cover else yoq}\n"
+        f"📄 PDF: {'Ha ✅' if book.pdf_file else yoq}\n"
+        f"🎧 Audio: {'Ha ✅' if book.audio_file else yoq}\n\n"
+        f"{_esc(book.description) if book.description else no_desc}"
     )
     await call.message.answer(text, parse_mode="HTML", reply_markup=_book_card_kb(book))
 
