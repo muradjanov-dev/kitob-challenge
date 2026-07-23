@@ -194,6 +194,9 @@ admin_keyboard.row(
     InlineKeyboardButton(text="📊 So'rovnoma natijalari", callback_data="admin:poll_results"),
 )
 admin_keyboard.row(
+    InlineKeyboardButton(text="📊 Loyiha so'rovnomasi (500 🪙)", callback_data="admin:project_survey"),
+)
+admin_keyboard.row(
     InlineKeyboardButton(text="🏆 Top kitobxonlar (broadcast)", callback_data="admin:top_readers"),
 )
 admin_keyboard.row(

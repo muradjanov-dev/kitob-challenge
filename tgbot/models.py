@@ -628,6 +628,31 @@ class BotPollVote(BaseModel):
         ordering = ("-created_at",)
 
 
+class ProjectSurveyResponse(BaseModel):
+    """One-off 5-question 'help us improve' survey — 500 Kitobcha reward on
+    completion. Each answer is DMed to admins live as it comes in (see
+    tgbot/bot/handlers/users/project_survey.py); this row is just the
+    durable record + completion/reward guard."""
+    user = models.OneToOneField(
+        TelegramProfile, on_delete=models.CASCADE, related_name="survey_response"
+    )
+    years_reading = models.CharField(max_length=20, null=True, blank=True)      # "0-1"/"1-3"/"3-5"/"6+"
+    wishes_text = models.TextField(null=True, blank=True)
+    books_per_year = models.CharField(max_length=20, null=True, blank=True)     # "1-5".."30+"
+    suggestions_text = models.TextField(null=True, blank=True)
+    suggestions_content_type = models.CharField(max_length=20, null=True, blank=True)
+    rating = models.PositiveSmallIntegerField(null=True, blank=True)            # 1-10
+    completed = models.BooleanField(default=False)
+    rewarded = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Survey({self.user_id}) completed={self.completed}"
+
+    class Meta:
+        db_table = "project_survey_responses"
+        ordering = ("-created_at",)
+
+
 class UserAchievement(BaseModel):
     """Records that a user has unlocked a particular achievement.
     Achievement metadata (title, emoji, criteria) lives in code, not DB —

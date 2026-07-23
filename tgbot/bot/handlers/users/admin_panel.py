@@ -1696,6 +1696,30 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
             "bir-ikki daqiqada yakunlanadi.</i>",
             parse_mode="HTML",
         )
+    elif action == "project_survey":
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(InlineKeyboardButton(
+            "✅ Ha, hammaga yuborish", callback_data="admin:project_survey_go",
+        ))
+        await call.message.answer(
+            "📊 <b>Loyihani yaxshilash so'rovnomasi</b>\n\n"
+            "5 ta savol (kitobxonlik staji, 3 oylik istaklar, yiliga o'qiladigan "
+            "kitoblar soni, takliflar — istalgan formatda, va 1-10 baho). "
+            "Qatnashganlarga <b>500 Kitobcha</b> beriladi, har bir javob sizga "
+            "shaxsan DM orqali kelib turadi.\n\n"
+            "Barcha ro'yxatdan o'tgan foydalanuvchilarga yuborilib, 6 soatga pin "
+            "qilinadi. Davom etamizmi?",
+            parse_mode="HTML",
+            reply_markup=kb,
+        )
+    elif action == "project_survey_go":
+        from tgbot.tasks import broadcast_project_survey
+        broadcast_project_survey.delay()
+        await call.message.answer(
+            "✅ So'rovnoma barcha foydalanuvchilarga yuborilmoqda va 6 soatga pin "
+            "qilinadi. Har bir javob sizga shaxsan kelib turadi. 📊"
+        )
     elif action == "top_readers":
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
         kb = InlineKeyboardMarkup(row_width=2)

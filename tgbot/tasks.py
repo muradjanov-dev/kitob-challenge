@@ -1417,6 +1417,81 @@ def broadcast_poll(poll_id: int):
     print(f"broadcast_poll #{poll_id}: sent={sent} failed={failed}")
 
 
+SURVEY_PIN_HOURS = 6
+
+
+@shared_task
+def unpin_project_survey_pins(pairs):
+    """Follow-up to broadcast_project_survey: unpin the announcement in every
+    chat it was pinned in, `SURVEY_PIN_HOURS` after it went out."""
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/unpinChatMessage"
+    ok, failed = 0, 0
+    for chat_id, message_id in pairs:
+        try:
+            resp = requests.post(url, data={"chat_id": chat_id, "message_id": message_id}, timeout=5)
+            if resp.ok:
+                ok += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    print(f"unpin_project_survey_pins: unpinned={ok} failed={failed}")
+
+
+@shared_task
+def broadcast_project_survey():
+    """Send the 'help us improve' survey announcement to every registered
+    user, pin it in their private chat, and schedule an auto-unpin
+    SURVEY_PIN_HOURS later (a specific message_id, not unpin_all — so we
+    never touch any other pin a user already has)."""
+    text = (
+        "📊 <b>Loyihani yaxshilash uchun so'rovnoma!</b>\n\n"
+        "Fikringiz biz uchun juda muhim — bir necha savolga javob bering va "
+        "<b>500 Kitobcha</b> yutib oling! 🎁\n\n"
+        "⏱ Atigi 2 daqiqa vaqtingizni oladi."
+    )
+    reply_markup = json.dumps({"inline_keyboard": [[
+        {"text": "📊 So'rovnomada qatnashish (+500 🪙)", "callback_data": "survey_start"}
+    ]]})
+
+    send_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    pin_url = f"https://api.telegram.org/bot{BOT_TOKEN}/pinChatMessage"
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+
+    sent, pinned, failed = 0, 0, 0
+    pinned_pairs = []
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                send_url,
+                data={"chat_id": chat_id, "text": text, "parse_mode": "HTML", "reply_markup": reply_markup},
+                timeout=5,
+            )
+            if not resp.ok:
+                failed += 1
+                continue
+            sent += 1
+            message_id = resp.json()["result"]["message_id"]
+            try:
+                pin_resp = requests.post(
+                    pin_url,
+                    data={"chat_id": chat_id, "message_id": message_id, "disable_notification": True},
+                    timeout=5,
+                )
+                if pin_resp.ok:
+                    pinned += 1
+                    pinned_pairs.append((chat_id, message_id))
+            except Exception:
+                pass
+        except Exception:
+            failed += 1
+
+    if pinned_pairs:
+        unpin_project_survey_pins.apply_async(args=[pinned_pairs], countdown=SURVEY_PIN_HOURS * 3600)
+
+    print(f"broadcast_project_survey: sent={sent} pinned={pinned} failed={failed}")
+
+
 # ────────────────────────────────────────────────────────────────────────
 # Phase 3: progress bar, percentile & reminders.
 # ────────────────────────────────────────────────────────────────────────

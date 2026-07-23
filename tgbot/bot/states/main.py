@@ -93,6 +93,11 @@ class GiftPremiumStates(StatesGroup):
     choose_from_list = State()
 
 
+class ProjectSurveyState(StatesGroup):
+    q2_wishes = State()
+    q4_suggestions = State()
+
+
 class QuizCreateState(StatesGroup):
     title = State()
     description = State()
