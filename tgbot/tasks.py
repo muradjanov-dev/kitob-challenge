@@ -1606,14 +1606,34 @@ def _send_and_pin_progress(user) -> int:
     _award_level_rewards(user, pages)
 
     from django.conf import settings as _settings
+    from urllib.parse import quote as _urlquote
 
     text = _progress_bar_text(pages)
-    site_button = json.dumps({
-        "inline_keyboard": [[{
-            "text": "✨ Sayt",
-            "web_app": {"url": f"{_settings.WEB_DOMAIN}/"},
-        }]]
-    })
+
+    buttons = [[{
+        "text": "✨ Sayt",
+        "web_app": {"url": f"{_settings.WEB_DOMAIN}/"},
+    }]]
+
+    bot_username = _get_bot_username()
+    code = _ensure_referral_code(user) if bot_username else None
+    if bot_username and code:
+        ref_link = f"https://t.me/{bot_username}?start={code}"
+        text += (
+            "\n\n🌟 <b>Sizning referal havolangiz:</b>\n"
+            f"<code>{ref_link}</code>\n\n"
+            "Havolani nusxalab kitobxonlarga ulashing — har taklif uchun Kitobcha, "
+            "har 3 taklifga 1 kun Premium va boshqa sovg'alardan foydalaning! 🎁"
+        )
+        share_text = _urlquote(
+            "📚 Kitob Challenge botiga qo'shil — birga o'qib, sovg'alar yutib olamiz! 🎁"
+        )
+        buttons.append([{
+            "text": "📤 Referalni ulashish",
+            "url": f"https://t.me/share/url?url={_urlquote(ref_link)}&text={share_text}",
+        }])
+
+    site_button = json.dumps({"inline_keyboard": buttons})
     resp = requests.post(
         url,
         data={
@@ -3252,10 +3272,19 @@ def send_ai_report_to_admin(admin_tg_id: int = 917456291, lang: str = "uz"):
 #   finalize_referral_boom → deactivate + wrap-up DMs + admin summary
 # ────────────────────────────────────────────────────────────────────────
 def _get_bot_username():
+    """Cached — the bot's username never changes, and callers like the daily
+    per-user progress pin would otherwise hit Telegram's getMe once per user."""
+    from django.core.cache import cache
+    cached = cache.get("bot_username")
+    if cached:
+        return cached
     try:
         r = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getMe", timeout=5)
         if r.ok:
-            return r.json().get("result", {}).get("username")
+            username = r.json().get("result", {}).get("username")
+            if username:
+                cache.set("bot_username", username, 60 * 60 * 24)
+            return username
     except Exception:
         pass
     return None
