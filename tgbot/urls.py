@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import home, telegram
+from .views import home, telegram, library_view
 from src.settings import WEBHOOK_PATH
 from tgbot.views import health_check_celery, health_check_redis
 from tgbot.shop_views import shop_index, api_products, api_me, api_buy
@@ -17,6 +17,7 @@ from tgbot.game_views import (
 
 urlpatterns = [
     path('', home, name='home'),
+    path('kutubxona/', library_view, name='library'),
     path(WEBHOOK_PATH, telegram, name='webhook'),
     path("health-check/redis/", health_check_redis, name="health-check-redis"),
     path("health-check/celery/", health_check_celery, name="health-check-celery"),

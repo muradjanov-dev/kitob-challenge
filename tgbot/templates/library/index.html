@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Kutubxona — Kitob Challenge</title>
+  <meta name="description" content="Kitob Challenge platformasidagi barcha kitoblar. Qidiring, o'qiganlarni ko'ring." />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg-0: #f7f1e3;
+      --bg-1: #fffdf7;
+      --paper: #fffdf8;
+      --card: #ffffff;
+      --card-border: rgba(31,67,52,0.12);
+      --text: #1b2a23;
+      --text-dim: rgba(27,42,35,0.66);
+      --text-faint: rgba(27,42,35,0.46);
+      --accent: #c8922e;
+      --accent-2: #e6b450;
+      --green: #1f6b4c;
+      --green-2: #2a8a63;
+      --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+      --shadow: 0 8px 26px rgba(31,67,52,0.08);
+      --maxw: 1120px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html { scroll-behavior: smooth; }
+    body {
+      background:
+        radial-gradient(1100px 650px at 8% -10%, rgba(31,107,76,0.10), transparent 60%),
+        radial-gradient(900px 700px at 112% 0%, rgba(230,180,80,0.16), transparent 60%),
+        radial-gradient(760px 540px at 100% 100%, rgba(255,107,53,0.13), transparent 62%),
+        linear-gradient(180deg, var(--bg-0), var(--bg-1) 55%, #f3ead9);
+      background-attachment: fixed;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
+    h1, h2, h3, .serif { font-family: var(--serif); font-weight: 700; line-height: 1.18; color: #16241d; }
+    a { color: inherit; text-decoration: none; }
+    .gold { color: var(--accent); }
+
+    /* ─── Header ─── */
+    header {
+      position: sticky; top: 0; z-index: 50;
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      background: linear-gradient(180deg, rgba(255,253,247,0.94), rgba(255,253,247,0.74));
+      border-bottom: 1px solid var(--card-border);
+    }
+    .nav { display: flex; align-items: center; gap: 18px; height: 64px; }
+    .logo { display: flex; align-items: center; gap: 10px; font-family: var(--serif); font-size: 18px; font-weight: 700; }
+    .logo .mark {
+      width: 36px; height: 36px; border-radius: 11px;
+      background: linear-gradient(135deg, var(--green), var(--green-2));
+      display: grid; place-items: center; font-size: 19px;
+      box-shadow: 0 8px 20px rgba(31,107,76,0.28);
+    }
+    .nav .links { display: flex; gap: 22px; margin-left: 14px; }
+    .nav .links a { color: var(--text-dim); font-size: 14px; transition: color .15s; }
+    .nav .links a:hover, .nav .links a.active { color: var(--green); font-weight: 600; }
+    .nav .spacer { flex: 1; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 11px 20px; border-radius: 12px; font-weight: 700; font-size: 14px;
+      cursor: pointer; border: 1px solid transparent; transition: transform .12s, filter .15s, background .15s;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary {
+      background: linear-gradient(135deg, #103d2b, #1a6044);
+      color: #f6f1e6; box-shadow: 0 12px 24px rgba(16,60,42,0.32);
+    }
+    .btn-primary:hover { filter: brightness(1.08); }
+    .nav .menu-toggle { display: none; background: none; border: 0; color: var(--text); font-size: 24px; cursor: pointer; }
+
+    /* ─── Hero ─── */
+    .lib-hero {
+      padding: 52px 0 28px;
+      text-align: center;
+    }
+    .pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+      background: rgba(31,107,76,0.10); border: 1px solid rgba(31,107,76,0.26); color: var(--green);
+      margin-bottom: 16px;
+    }
+    .lib-hero h1 { font-size: 42px; letter-spacing: -0.5px; margin-bottom: 10px; }
+    .lib-hero h1 .grad {
+      background: linear-gradient(135deg, var(--green-2), var(--accent) 60%, var(--green));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .lib-hero p { color: var(--text-dim); font-size: 16px; margin-bottom: 28px; }
+
+    /* ─── Stats strip ─── */
+    .stats-strip {
+      display: flex; justify-content: center; gap: 32px;
+      flex-wrap: wrap; margin-bottom: 32px;
+    }
+    .stat-item { text-align: center; }
+    .stat-item .n { font-family: var(--serif); font-size: 28px; font-weight: 700; color: var(--green); }
+    .stat-item .l { color: var(--text-faint); font-size: 12.5px; }
+
+    /* ─── Search ─── */
+    .search-wrap {
+      max-width: 600px; margin: 0 auto 32px; position: relative;
+    }
+    .search-wrap .icon {
+      position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+      color: var(--text-faint); pointer-events: none; font-size: 18px;
+    }
+    #searchInput {
+      width: 100%; padding: 14px 16px 14px 46px;
+      border: 1px solid var(--card-border); border-radius: 14px;
+      background: var(--card); color: var(--text); font-size: 15px;
+      outline: none; box-shadow: var(--shadow);
+      transition: border-color .18s, box-shadow .18s;
+    }
+    #searchInput:focus {
+      border-color: rgba(31,107,76,0.40);
+      box-shadow: 0 0 0 3px rgba(31,107,76,0.10), var(--shadow);
+    }
+    #searchInput::placeholder { color: var(--text-faint); }
+
+    /* ─── Sort / filter tabs ─── */
+    .filter-row {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      justify-content: center; margin-bottom: 28px;
+    }
+    .filter-btn {
+      padding: 8px 18px; border-radius: 999px;
+      border: 1px solid var(--card-border); background: var(--card);
+      color: var(--text-dim); font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all .15s;
+    }
+    .filter-btn:hover { background: #fbf7ee; }
+    .filter-btn.active {
+      background: linear-gradient(135deg, #103d2b, #1a6044);
+      color: #f6f1e6; border-color: transparent;
+      box-shadow: 0 6px 16px rgba(16,60,42,0.24);
+    }
+
+    /* ─── Books grid ─── */
+    .books-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      padding-bottom: 60px;
+    }
+    .book-card {
+      background: var(--card); border: 1px solid var(--card-border);
+      border-radius: 18px; overflow: hidden;
+      box-shadow: var(--shadow);
+      transition: transform .18s, box-shadow .18s, border-color .18s;
+      cursor: default;
+      display: flex; flex-direction: column;
+    }
+    .book-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 34px rgba(31,67,52,0.13);
+      border-color: rgba(31,107,76,0.26);
+    }
+    .book-cover {
+      height: 160px;
+      background: linear-gradient(135deg, rgba(31,107,76,0.12), rgba(230,180,80,0.16));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 48px;
+      position: relative; overflow: hidden;
+    }
+    .book-cover::before {
+      content: "";
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 14px,
+        rgba(31,107,76,0.04) 14px,
+        rgba(31,107,76,0.04) 16px
+      );
+    }
+    .book-cover .spine {
+      position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
+      background: linear-gradient(180deg, var(--green), var(--green-2));
+      opacity: 0.7;
+    }
+    .book-cover img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    .book-body { padding: 14px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .book-title {
+      font-family: var(--serif); font-size: 14px; font-weight: 700;
+      color: #16241d; line-height: 1.3;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .book-author {
+      font-size: 12px; color: var(--text-dim);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+    .book-meta {
+      display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;
+    }
+    .book-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 600; padding: 3px 8px;
+      border-radius: 999px;
+    }
+    .book-badge.reading {
+      background: rgba(31,107,76,0.10); color: var(--green);
+      border: 1px solid rgba(31,107,76,0.22);
+    }
+    .book-badge.finished {
+      background: rgba(200,146,46,0.12); color: var(--accent);
+      border: 1px solid rgba(200,146,46,0.28);
+    }
+
+    /* ─── Download buttons ─── */
+    .book-dl {
+      display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap;
+    }
+    .dl-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 700; padding: 4px 10px;
+      border-radius: 999px; border: 1px solid transparent;
+      transition: filter .15s, transform .1s;
+      text-decoration: none;
+    }
+    .dl-btn:active { transform: scale(0.96); }
+    .dl-pdf  { background: rgba(200,60,60,0.10); color: #b03030; border-color: rgba(200,60,60,0.28); }
+    .dl-audio{ background: rgba(31,107,76,0.10); color: var(--green); border-color: rgba(31,107,76,0.28); }
+    .dl-pdf:hover  { filter: brightness(1.1); }
+    .dl-audio:hover{ filter: brightness(1.1); }
+
+    /* ─── Empty state ─── */
+    .empty-state {
+      text-align: center; padding: 64px 20px; color: var(--text-dim);
+      grid-column: 1 / -1;
+    }
+    .empty-state .em { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 15px; }
+
+    /* ─── Letter index ─── */
+    .letter-index {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      justify-content: center; margin-bottom: 24px;
+    }
+    .letter-btn {
+      width: 34px; height: 34px; border-radius: 8px;
+      border: 1px solid var(--card-border); background: var(--card);
+      font-size: 13px; font-weight: 700; color: var(--text-dim);
+      cursor: pointer; display: grid; place-items: center;
+      transition: all .15s;
+    }
+    .letter-btn:hover { background: #fbf7ee; color: var(--green); }
+    .letter-btn.active {
+      background: var(--green); color: #fff; border-color: transparent;
+    }
+
+    /* ─── Count badge ─── */
+    .result-count {
+      text-align: center; margin-bottom: 20px;
+      color: var(--text-faint); font-size: 13px;
+    }
+
+    /* ─── Alphabet section headers ─── */
+    .alpha-section { grid-column: 1 / -1; }
+    .alpha-header {
+      font-family: var(--serif); font-size: 22px; color: var(--green);
+      padding: 16px 0 8px; border-bottom: 2px solid rgba(31,107,76,0.14);
+      margin-bottom: 4px;
+    }
+
+    /* Footer */
+    footer { border-top: 1px solid var(--card-border); padding: 36px 0; color: var(--text-faint); font-size: 13.5px; }
+    .foot { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+    footer a { color: var(--text-dim); }
+    footer a:hover { color: var(--green); }
+
+    /* Reveal */
+    .reveal { opacity: 0; transform: translateY(18px); transition: opacity .55s ease, transform .55s ease; }
+    .reveal.in { opacity: 1; transform: none; }
+
+    @media (max-width: 880px) {
+      .lib-hero h1 { font-size: 32px; }
+      .nav .links { display: none; }
+      .nav .menu-toggle { display: block; }
+      .nav .links.open {
+        display: flex; position: absolute; top: 64px; left: 0; right: 0;
+        flex-direction: column; background: var(--bg-1); padding: 16px 20px;
+        border-bottom: 1px solid var(--card-border);
+      }
+      .books-grid { grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 12px; }
+    }
+    @media (max-width: 480px) {
+      .books-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <a href="/" class="logo"><span class="mark">📚</span> Kitob Challenge</a>
+      <nav class="links" id="navLinks">
+        <a href="/">Bosh sahifa</a>
+        <a href="/#imkoniyatlar">Imkoniyatlar</a>
+        <a href="/#viktorina">Viktorina</a>
+        <a href="/#reyting">Reyting</a>
+        <a href="/kutubxona/" class="active">Kutubxona</a>
+        <a href="/shop/">Do'kon</a>
+      </nav>
+      <div class="spacer"></div>
+      <a href="https://t.me/kitob_challange_bot" class="btn btn-primary" target="_blank" rel="noopener">Telegramda boshlash</a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Menyu">☰</button>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="lib-hero">
+    <div class="wrap">
+      <span class="pill reveal in">📚 Barcha kitoblar</span>
+      <h1 class="reveal in">
+        Kitoblar <span class="grad">Kutubxonasi</span>
+      </h1>
+      <p class="reveal in">Platformada o'qilgan va o'qilayotgan kitoblar. Qidiring va kashf eting.</p>
+
+      <div class="stats-strip reveal in">
+        <div class="stat-item">
+          <div class="n">{{ total_books }}</div>
+          <div class="l">Jami kitob</div>
+        </div>
+        <div class="stat-item">
+          <div class="n">{{ total_readers }}</div>
+          <div class="l">O'qiyotganlar</div>
+        </div>
+        <div class="stat-item">
+          <div class="n">{{ total_finished }}</div>
+          <div class="l">Tugatilgan</div>
+        </div>
+      </div>
+
+      <!-- Search -->
+      <div class="search-wrap reveal in">
+        <span class="icon">🔍</span>
+        <input
+          type="search"
+          id="searchInput"
+          placeholder="Kitob nomi yoki muallif..."
+          autocomplete="off"
+          spellcheck="false"
+          value="{{ query|default:'' }}"
+        />
+      </div>
+
+      <!-- Sort tabs -->
+      <div class="filter-row reveal in">
+        <button class="filter-btn active" data-sort="popular">🔥 Mashhur</button>
+        <button class="filter-btn" data-sort="az">A–Z tartibda</button>
+        <button class="filter-btn" data-sort="finished">✅ Ko'p tugatilgan</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOOKS -->
+  <div class="wrap">
+    <div class="result-count" id="resultCount"></div>
+
+    <div class="books-grid" id="booksGrid">
+      {% for book in books %}
+      <div class="book-card reveal"
+           data-title="{{ book.title|lower }}"
+           data-author="{{ book.author|default:''|lower }}"
+           data-readers="{{ book.readers_count }}"
+           data-finished="{{ book.finished_count }}"
+           data-letter="{{ book.title|first|upper }}">
+        <div class="book-cover">
+          <div class="spine"></div>
+          {% if book.cover %}
+          <img src="{{ book.cover.url }}" alt="{{ book.title }}" loading="lazy" />
+          {% else %}
+          📖
+          {% endif %}
+        </div>
+        <div class="book-body">
+          <div class="book-title">{{ book.title }}</div>
+          {% if book.author %}
+          <div class="book-author">✍️ {{ book.author }}</div>
+          {% endif %}
+          <div class="book-meta">
+            {% if book.readers_count %}
+            <span class="book-badge reading">📖 {{ book.readers_count }} o'qimoqda</span>
+            {% endif %}
+            {% if book.finished_count %}
+            <span class="book-badge finished">✅ {{ book.finished_count }} tugatdi</span>
+            {% endif %}
+          </div>
+          {% if book.pdf_file or book.audio_file %}
+          <div class="book-dl">
+            {% if book.pdf_file %}
+            <a class="dl-btn dl-pdf" href="{{ book.pdf_file.url }}" download target="_blank" rel="noopener">📄 PDF</a>
+            {% endif %}
+            {% if book.audio_file %}
+            <a class="dl-btn dl-audio" href="{{ book.audio_file.url }}" download target="_blank" rel="noopener">🎧 Audio</a>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% empty %}
+      <div class="empty-state">
+        <div class="em">📭</div>
+        <p>Hozircha kutubxonada kitoblar yo'q.<br/>Kitobxonlar hisobot yuborishgach bu yerda ko'rinadi.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <footer>
+    <div class="wrap foot">
+      <div><span class="logo" style="font-size:15px"><span class="mark" style="width:28px;height:28px;font-size:15px">📚</span> Kitob Challenge</span></div>
+      <div>© 2026 Kitob Challenge · <a href="https://t.me/kitob_challange_bot" target="_blank" rel="noopener">@kitob_challange_bot</a></div>
+    </div>
+  </footer>
+
+  <script>
+    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+
+    // Mobile nav
+    document.getElementById("menuToggle").addEventListener("click", () => {
+      document.getElementById("navLinks").classList.toggle("open");
+    });
+
+    // Scroll reveal
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+    }, { threshold: 0.08 });
+    document.querySelectorAll(".reveal:not(.in)").forEach(el => io.observe(el));
+
+    // ── Search & sort ────────────────────────────────────────────────
+    const input   = document.getElementById("searchInput");
+    const grid    = document.getElementById("booksGrid");
+    const counter = document.getElementById("resultCount");
+    const cards   = Array.from(grid.querySelectorAll(".book-card"));
+
+    let currentSort = "popular";
+
+    function sortCards(list) {
+      if (currentSort === "az") {
+        list.sort((a, b) => a.dataset.title.localeCompare(b.dataset.title, 'uz'));
+      } else if (currentSort === "finished") {
+        list.sort((a, b) => Number(b.dataset.finished) - Number(a.dataset.finished));
+      } else {
+        list.sort((a, b) => Number(b.dataset.readers) - Number(a.dataset.readers));
+      }
+      return list;
+    }
+
+    function renderCards() {
+      const q = input.value.trim().toLowerCase();
+      let visible = cards.filter(c => {
+        if (!q) return true;
+        return c.dataset.title.includes(q) || c.dataset.author.includes(q);
+      });
+      const sorted = sortCards(visible.slice());
+      const hidden = cards.filter(c => !visible.includes(c));
+
+      // Re-order in DOM
+      sorted.forEach(c => { c.style.display = ""; grid.appendChild(c); });
+      hidden.forEach(c => { c.style.display = "none"; });
+
+      // Trigger reveal for newly visible cards
+      sorted.forEach(c => {
+        if (!c.classList.contains("in")) {
+          requestAnimationFrame(() => c.classList.add("in"));
+        }
+      });
+
+      const count = sorted.length;
+      counter.textContent = count === cards.length
+        ? `${count} ta kitob`
+        : `${count} ta natija topildi`;
+    }
+
+    input.addEventListener("input", renderCards);
+
+    document.querySelectorAll(".filter-btn[data-sort]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".filter-btn[data-sort]").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentSort = btn.dataset.sort;
+        renderCards();
+      });
+    });
+
+    renderCards();
+  </script>
+</body>
+</html>

@@ -143,3 +143,16 @@ class ShopProductEditState(StatesGroup):
 class AdminUserBrowse(StatesGroup):
     listing = State()    # showing the numbered users list; a sent number → detail
     searching = State()  # waiting for a search query (name / username / phone / id)
+
+
+class LibraryBookCreateState(StatesGroup):
+    title = State()
+    author = State()
+    cover = State()
+    description = State()
+    pdf_file = State()
+    audio_file = State()
+
+
+class LibraryBookEditState(StatesGroup):
+    field = State()   # waiting for new value after admin taps an edit button

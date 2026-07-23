@@ -26,3 +26,4 @@ from . import quiz_ai
 from . import shop_admin
 from . import book_quiz
 from . import project_survey
+from . import library_admin

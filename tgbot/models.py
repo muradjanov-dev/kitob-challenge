@@ -399,6 +399,10 @@ class GlobalBook(BaseModel):
     title = models.CharField(max_length=255, unique=True, verbose_name="Book Title")
     normalized_title = models.CharField(max_length=255, db_index=True)
     author = models.CharField(max_length=255, blank=True, null=True)
+    description = models.TextField(blank=True, default="")
+    cover = models.ImageField(upload_to="library/covers/", blank=True, null=True)
+    pdf_file = models.FileField(upload_to="library/pdfs/", blank=True, null=True)
+    audio_file = models.FileField(upload_to="library/audio/", blank=True, null=True)
 
     def save(self, *args, **kwargs):
         self.normalized_title = normalize_uzbek_text(self.title)

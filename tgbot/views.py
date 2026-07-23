@@ -124,6 +124,49 @@ def _build_landing_context():
     }
 
 
+def library_view(request: HttpRequest):
+    from django.db.models import Count, Q
+    from tgbot.models import GlobalBook, BooksToRead
+
+    books = (
+        GlobalBook.objects
+        .annotate(
+            readers_count=Count(
+                'user_books',
+                filter=Q(
+                    user_books__current_page__gt=0,
+                    user_books__total_pages__gt=0,
+                ),
+                distinct=True,
+            ),
+            finished_count=Count(
+                'user_books',
+                filter=Q(user_books__current_page__gte=1),
+                distinct=True,
+            ),
+        )
+        .order_by('-readers_count', '-finished_count', 'title')
+    )
+
+    total_readers = BooksToRead.objects.filter(current_page__gt=0).values('user').distinct().count()
+    total_finished = BooksToRead.objects.filter(
+        total_pages__gt=0,
+        current_page__gte=1,
+    ).count()
+
+    ctx = {
+        'books': books,
+        'total_books': GlobalBook.objects.count(),
+        'total_readers': total_readers,
+        'total_finished': total_finished,
+        'query': request.GET.get('q', ''),
+    }
+    resp = render(request, 'library/index.html', ctx)
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp["Pragma"] = "no-cache"
+    return resp
+
+
 def home(request: HttpRequest):
     from django.core.cache import cache
     ctx = cache.get("landing_ctx_v1")

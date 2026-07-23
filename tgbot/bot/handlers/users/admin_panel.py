@@ -1800,6 +1800,9 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "shop":
         from tgbot.bot.handlers.users.shop_admin import shop_admin_menu
         await shop_admin_menu(call.message, user)
+    elif action == "library":
+        from tgbot.bot.handlers.users.library_admin import library_admin_menu
+        await library_admin_menu(call.message, user)
     else:
         await msg.answer("Noma'lum amal.")
 

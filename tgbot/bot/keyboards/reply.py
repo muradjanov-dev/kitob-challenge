@@ -215,16 +215,6 @@ admin_keyboard.row(
     InlineKeyboardButton(text="🧩 Viktorina yuborish", callback_data="admin:book_quiz"),
 )
 admin_keyboard.row(
-    InlineKeyboardButton(text="🔗 Kitob Zanjiri boshlash", callback_data="admin:start_zanjir"),
-)
-admin_keyboard.row(
-    InlineKeyboardButton(text="🗣 Ko'pchilik nima dedi", callback_data="admin:start_feud"),
-    InlineKeyboardButton(text="🏰 Bilim Qal'asi", callback_data="admin:start_castle"),
-)
-admin_keyboard.row(
-    InlineKeyboardButton(text="🎬 Emoji Kitob", callback_data="admin:start_emoji"),
-)
-admin_keyboard.row(
     InlineKeyboardButton(text="🎮 Barcha o'yinlar (14 ta)", callback_data="admin:games_menu"),
 )
 admin_keyboard.row(
@@ -232,6 +222,9 @@ admin_keyboard.row(
 )
 admin_keyboard.row(
     InlineKeyboardButton(text="🛒 Do'kon boshqaruvi", callback_data="admin:shop"),
+)
+admin_keyboard.row(
+    InlineKeyboardButton(text="📚 Kutubxona boshqaruvi", callback_data="admin:library"),
 )
 
 # The deprecated reply-keyboard version (kept for any legacy callers).
