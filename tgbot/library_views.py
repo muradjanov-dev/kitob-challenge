@@ -14,7 +14,7 @@ from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from tgbot.models import BookComment, GlobalBook, TelegramProfile
+from tgbot.models import BookComment, BooksToRead, GlobalBook, TelegramProfile
 
 
 # ── initData auth ──────────────────────────────────────────────────────────
@@ -160,3 +160,45 @@ def api_delete_comment(request: HttpRequest):
 
     deleted, _ = BookComment.objects.filter(book_id=book_id, user=profile).delete()
     return JsonResponse({"ok": True, "deleted": deleted > 0})
+
+
+# ── GET /kutubxona/api/my-books/ ──────────────────────────────────────────────
+
+@require_GET
+def api_my_books(request: HttpRequest):
+    init_data = _read_init_data(request)
+    profile, err = _resolve_profile(init_data)
+    if err:
+        return JsonResponse({"error": err}, status=403)
+
+    book_ids = list(
+        BooksToRead.objects
+        .filter(user=profile, total_pages__gt=0)
+        .values_list("book_id", flat=True)
+    )
+    return JsonResponse({"book_ids": book_ids})
+
+
+# ── GET /kutubxona/api/comments/recent/ ───────────────────────────────────────
+
+@require_GET
+def api_recent_comments(request: HttpRequest):
+    limit = min(int(request.GET.get("limit", 20)), 50)
+    comments = (
+        BookComment.objects
+        .select_related("user", "book")
+        .order_by("-created_at")[:limit]
+    )
+    return JsonResponse({
+        "comments": [
+            {
+                "id": c.id,
+                "book": c.book.title,
+                "book_id": c.book_id,
+                "user": c.user.full_name or "Kitobxon",
+                "text": c.text,
+                "created_at": c.created_at.strftime("%Y-%m-%d %H:%M"),
+            }
+            for c in comments
+        ]
+    })
