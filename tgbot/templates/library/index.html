@@ -4,534 +4,648 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Kutubxona — Kitob Challenge</title>
-  <meta name="description" content="Kitob Challenge platformasidagi barcha kitoblar. Qidiring, o'qiganlarni ko'ring." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
-      --bg-0: #f7f1e3;
-      --bg-1: #fffdf7;
-      --paper: #fffdf8;
-      --card: #ffffff;
-      --card-border: rgba(31,67,52,0.12);
-      --text: #1b2a23;
-      --text-dim: rgba(27,42,35,0.66);
-      --text-faint: rgba(27,42,35,0.46);
-      --accent: #c8922e;
-      --accent-2: #e6b450;
-      --green: #1f6b4c;
-      --green-2: #2a8a63;
-      --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
-      --shadow: 0 8px 26px rgba(31,67,52,0.08);
-      --maxw: 1120px;
+      --bg:       #f5ead8;
+      --accent:   #c67139;
+      --accent2:  #7a8a5e;
+      --wood-dk:  #3d2e1f;
+      --wood-md:  #54402c;
+      --wood-lt:  #7a5a38;
+      --text:     #2d1f0e;
+      --text-dim: rgba(45,31,14,.62);
+      --text-faint: rgba(45,31,14,.42);
+      --card:     #fffdf6;
+      --border:   rgba(198,113,57,.22);
+      --shadow:   0 8px 28px rgba(45,31,14,.13);
+      --font-head: 'Caprasimo', cursive;
+      --font-body: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html { scroll-behavior: smooth; }
     body {
-      background:
-        radial-gradient(1100px 650px at 8% -10%, rgba(31,107,76,0.10), transparent 60%),
-        radial-gradient(900px 700px at 112% 0%, rgba(230,180,80,0.16), transparent 60%),
-        radial-gradient(760px 540px at 100% 100%, rgba(255,107,53,0.13), transparent 62%),
-        linear-gradient(180deg, var(--bg-0), var(--bg-1) 55%, #f3ead9);
-      background-attachment: fixed;
+      background: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      line-height: 1.6;
+      font-family: var(--font-body);
+      line-height: 1.55;
       min-height: 100vh;
       overflow-x: hidden;
     }
-    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
-    h1, h2, h3, .serif { font-family: var(--serif); font-weight: 700; line-height: 1.18; color: #16241d; }
     a { color: inherit; text-decoration: none; }
-    .gold { color: var(--accent); }
 
-    /* ─── Header ─── */
+    /* ── Header ── */
     header {
-      position: sticky; top: 0; z-index: 50;
-      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-      background: linear-gradient(180deg, rgba(255,253,247,0.94), rgba(255,253,247,0.74));
-      border-bottom: 1px solid var(--card-border);
+      position: sticky; top: 0; z-index: 80;
+      background: rgba(245,234,216,.92);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
     }
-    .nav { display: flex; align-items: center; gap: 18px; height: 64px; }
-    .logo { display: flex; align-items: center; gap: 10px; font-family: var(--serif); font-size: 18px; font-weight: 700; }
-    .logo .mark {
-      width: 36px; height: 36px; border-radius: 11px;
-      background: linear-gradient(135deg, var(--green), var(--green-2));
-      display: grid; place-items: center; font-size: 19px;
-      box-shadow: 0 8px 20px rgba(31,107,76,0.28);
+    .nav { display: flex; align-items: center; gap: 14px; height: 62px; padding: 0 20px; max-width: 1200px; margin: 0 auto; }
+    .logo { font-family: var(--font-head); font-size: 19px; color: var(--wood-dk); display: flex; align-items: center; gap: 9px; }
+    .logo-icon { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg,var(--wood-md),var(--wood-dk)); display: grid; place-items: center; font-size: 18px; box-shadow: 0 4px 12px rgba(61,46,31,.32); }
+    .nav-links { display: flex; gap: 18px; margin-left: 10px; }
+    .nav-links a { font-size: 13.5px; font-weight: 600; color: var(--text-dim); transition: color .15s; }
+    .nav-links a:hover, .nav-links a.active { color: var(--accent); }
+    .nav-spacer { flex: 1; }
+    .search-inline {
+      position: relative; flex: 0 1 260px;
     }
-    .nav .links { display: flex; gap: 22px; margin-left: 14px; }
-    .nav .links a { color: var(--text-dim); font-size: 14px; transition: color .15s; }
-    .nav .links a:hover, .nav .links a.active { color: var(--green); font-weight: 600; }
-    .nav .spacer { flex: 1; }
-    .btn {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 11px 20px; border-radius: 12px; font-weight: 700; font-size: 14px;
-      cursor: pointer; border: 1px solid transparent; transition: transform .12s, filter .15s, background .15s;
-      white-space: nowrap;
+    .search-inline input {
+      width: 100%; padding: 8px 12px 8px 34px;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      background: rgba(255,255,255,.7); font-family: var(--font-body); font-size: 13px;
+      color: var(--text); outline: none; transition: border-color .18s, background .18s;
     }
-    .btn:active { transform: scale(0.97); }
-    .btn-primary {
-      background: linear-gradient(135deg, #103d2b, #1a6044);
-      color: #f6f1e6; box-shadow: 0 12px 24px rgba(16,60,42,0.32);
+    .search-inline input:focus { border-color: var(--accent); background: #fff; }
+    .search-inline input::placeholder { color: var(--text-faint); }
+    .search-inline .si { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 15px; pointer-events: none; }
+    .btn-tg {
+      padding: 9px 18px; border-radius: 10px; font-weight: 700; font-size: 13px;
+      background: linear-gradient(135deg,var(--wood-md),var(--wood-dk));
+      color: var(--bg); border: none; cursor: pointer; white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(61,46,31,.28); transition: filter .15s;
     }
-    .btn-primary:hover { filter: brightness(1.08); }
-    .nav .menu-toggle { display: none; background: none; border: 0; color: var(--text); font-size: 24px; cursor: pointer; }
+    .btn-tg:hover { filter: brightness(1.1); }
+    .menu-toggle { display: none; background: none; border: 0; color: var(--text); font-size: 24px; cursor: pointer; }
 
-    /* ─── Hero ─── */
-    .lib-hero {
-      padding: 52px 0 28px;
-      text-align: center;
+    /* ── Hero ── */
+    .hero { padding: 44px 20px 28px; text-align: center; }
+    .hero-pill {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 5px 14px; border-radius: 999px; font-size: 12px; font-weight: 700;
+      background: rgba(122,138,94,.14); border: 1px solid rgba(122,138,94,.32); color: var(--accent2);
+      margin-bottom: 14px; letter-spacing: .3px;
     }
-    .pill {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 6px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
-      background: rgba(31,107,76,0.10); border: 1px solid rgba(31,107,76,0.26); color: var(--green);
-      margin-bottom: 16px;
-    }
-    .lib-hero h1 { font-size: 42px; letter-spacing: -0.5px; margin-bottom: 10px; }
-    .lib-hero h1 .grad {
-      background: linear-gradient(135deg, var(--green-2), var(--accent) 60%, var(--green));
+    .hero h1 { font-family: var(--font-head); font-size: 40px; color: var(--wood-dk); letter-spacing: -.3px; margin-bottom: 6px; }
+    .hero h1 .grad {
+      background: linear-gradient(135deg,var(--accent) 20%,#a05a2e 80%);
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
-    .lib-hero p { color: var(--text-dim); font-size: 16px; margin-bottom: 28px; }
+    .hero-sub { color: var(--text-dim); font-size: 15px; margin-bottom: 26px; }
 
-    /* ─── Stats strip ─── */
-    .stats-strip {
-      display: flex; justify-content: center; gap: 32px;
-      flex-wrap: wrap; margin-bottom: 32px;
-    }
-    .stat-item { text-align: center; }
-    .stat-item .n { font-family: var(--serif); font-size: 28px; font-weight: 700; color: var(--green); }
-    .stat-item .l { color: var(--text-faint); font-size: 12.5px; }
+    /* ── Stats strip ── */
+    .stats-row { display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; margin-bottom: 26px; }
+    .stat { text-align: center; }
+    .stat .n { font-family: var(--font-head); font-size: 26px; color: var(--accent); }
+    .stat .l { font-size: 12px; color: var(--text-faint); font-weight: 600; }
 
-    /* ─── Search ─── */
-    .search-wrap {
-      max-width: 600px; margin: 0 auto 32px; position: relative;
+    /* ── Filter tabs ── */
+    .tabs-row {
+      display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
+      padding: 0 20px 20px; max-width: 1200px; margin: 0 auto;
     }
-    .search-wrap .icon {
-      position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
-      color: var(--text-faint); pointer-events: none; font-size: 18px;
+    .tab-btn {
+      padding: 7px 16px; border-radius: 999px; font-size: 13px; font-weight: 700;
+      border: 1.5px solid var(--border); background: var(--card);
+      color: var(--text-dim); cursor: pointer; transition: all .15s; font-family: var(--font-body);
     }
-    #searchInput {
-      width: 100%; padding: 14px 16px 14px 46px;
-      border: 1px solid var(--card-border); border-radius: 14px;
-      background: var(--card); color: var(--text); font-size: 15px;
-      outline: none; box-shadow: var(--shadow);
-      transition: border-color .18s, box-shadow .18s;
-    }
-    #searchInput:focus {
-      border-color: rgba(31,107,76,0.40);
-      box-shadow: 0 0 0 3px rgba(31,107,76,0.10), var(--shadow);
-    }
-    #searchInput::placeholder { color: var(--text-faint); }
-
-    /* ─── Sort / filter tabs ─── */
-    .filter-row {
-      display: flex; gap: 8px; flex-wrap: wrap;
-      justify-content: center; margin-bottom: 28px;
-    }
-    .filter-btn {
-      padding: 8px 18px; border-radius: 999px;
-      border: 1px solid var(--card-border); background: var(--card);
-      color: var(--text-dim); font-size: 13px; font-weight: 600;
-      cursor: pointer; transition: all .15s;
-    }
-    .filter-btn:hover { background: #fbf7ee; }
-    .filter-btn.active {
-      background: linear-gradient(135deg, #103d2b, #1a6044);
-      color: #f6f1e6; border-color: transparent;
-      box-shadow: 0 6px 16px rgba(16,60,42,0.24);
+    .tab-btn:hover { background: rgba(198,113,57,.08); }
+    .tab-btn.active {
+      background: var(--accent); color: #f5ead8; border-color: transparent;
+      box-shadow: 0 4px 14px rgba(198,113,57,.34);
     }
 
-    /* ─── Books grid ─── */
-    .books-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 16px;
-      padding-bottom: 60px;
+    /* ── Search mobile ── */
+    .search-mob { display: none; padding: 0 20px 16px; }
+    .search-mob input {
+      width: 100%; padding: 10px 14px 10px 36px;
+      border: 1.5px solid var(--border); border-radius: 12px;
+      background: var(--card); font-family: var(--font-body); font-size: 14px;
+      color: var(--text); outline: none;
     }
-    .book-card {
-      background: var(--card); border: 1px solid var(--card-border);
-      border-radius: 18px; overflow: hidden;
-      box-shadow: var(--shadow);
-      transition: transform .18s, box-shadow .18s, border-color .18s;
-      cursor: default;
-      display: flex; flex-direction: column;
+    .search-mob input::placeholder { color: var(--text-faint); }
+    .search-mob .si { left: 32px; }
+
+    /* ── Main content wrap ── */
+    .main { max-width: 1200px; margin: 0 auto; padding: 0 20px 60px; }
+
+    /* ── Shelf section ── */
+    .shelf-section { margin-bottom: 40px; }
+    .shelf-label {
+      font-family: var(--font-head); font-size: 20px; color: var(--wood-dk);
+      margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
     }
-    .book-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 16px 34px rgba(31,67,52,0.13);
-      border-color: rgba(31,107,76,0.26);
+    .shelf-label::after {
+      content: ''; flex: 1; height: 2px;
+      background: linear-gradient(90deg,var(--border),transparent);
+      margin-left: 10px;
     }
-    .book-cover {
-      height: 160px;
-      background: linear-gradient(135deg, rgba(31,107,76,0.12), rgba(230,180,80,0.16));
-      display: flex; align-items: center; justify-content: center;
-      font-size: 48px;
-      position: relative; overflow: hidden;
+
+    /* ── Bookshelf ── */
+    .bookshelf {
+      background: linear-gradient(180deg, var(--wood-md) 0%, var(--wood-dk) 100%);
+      border-radius: 14px;
+      padding: 18px 18px 0;
+      box-shadow: 0 8px 28px rgba(61,46,31,.28), inset 0 1px 0 rgba(255,255,255,.08);
+      overflow: hidden;
+      position: relative;
     }
-    .book-cover::before {
-      content: "";
-      position: absolute; inset: 0;
-      background: repeating-linear-gradient(
-        45deg,
-        transparent,
-        transparent 14px,
-        rgba(31,107,76,0.04) 14px,
-        rgba(31,107,76,0.04) 16px
-      );
-    }
-    .book-cover .spine {
-      position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
-      background: linear-gradient(180deg, var(--green), var(--green-2));
-      opacity: 0.7;
-    }
-    .book-cover img {
-      position: absolute; inset: 0;
-      width: 100%; height: 100%;
-      object-fit: cover;
-    }
-    .book-body { padding: 14px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
-    .book-title {
-      font-family: var(--serif); font-size: 14px; font-weight: 700;
-      color: #16241d; line-height: 1.3;
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    .shelf-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      min-height: 160px;
+      padding-bottom: 0;
+      flex-wrap: wrap;
       overflow: hidden;
     }
-    .book-author {
-      font-size: 12px; color: var(--text-dim);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      margin-top: 2px;
+    /* The shelf plank */
+    .shelf-plank {
+      width: 100%;
+      height: 16px;
+      background: linear-gradient(180deg, var(--wood-lt) 0%, var(--wood-md) 60%, var(--wood-dk) 100%);
+      border-radius: 0 0 4px 4px;
+      box-shadow: 0 4px 10px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.12);
+      margin-top: 4px;
+      position: relative;
     }
-    .book-meta {
-      display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;
-    }
-    .book-badge {
-      display: inline-flex; align-items: center; gap: 4px;
-      font-size: 11px; font-weight: 600; padding: 3px 8px;
-      border-radius: 999px;
-    }
-    .book-badge.reading {
-      background: rgba(31,107,76,0.10); color: var(--green);
-      border: 1px solid rgba(31,107,76,0.22);
-    }
-    .book-badge.finished {
-      background: rgba(200,146,46,0.12); color: var(--accent);
-      border: 1px solid rgba(200,146,46,0.28);
+    .shelf-plank::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(180deg, rgba(255,255,255,.18), transparent);
+      border-radius: 4px 4px 0 0;
     }
 
-    /* ─── Download buttons ─── */
-    .book-dl {
-      display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap;
+    /* ── Book spine ── */
+    .book-spine {
+      width: 36px;
+      min-height: 110px;
+      max-height: 160px;
+      border-radius: 4px 4px 0 0;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      cursor: pointer;
+      transition: transform .18s, box-shadow .18s;
+      flex-shrink: 0;
+      box-shadow: 2px 0 6px rgba(0,0,0,.25), -1px 0 0 rgba(255,255,255,.06);
     }
-    .dl-btn {
-      display: inline-flex; align-items: center; gap: 4px;
-      font-size: 11px; font-weight: 700; padding: 4px 10px;
-      border-radius: 999px; border: 1px solid transparent;
-      transition: filter .15s, transform .1s;
-      text-decoration: none;
+    .book-spine:hover {
+      transform: translateY(-10px);
+      box-shadow: 4px -2px 16px rgba(0,0,0,.4), -1px 0 0 rgba(255,255,255,.06);
+      z-index: 2;
     }
-    .dl-btn:active { transform: scale(0.96); }
-    .dl-pdf  { background: rgba(200,60,60,0.10); color: #b03030; border-color: rgba(200,60,60,0.28); }
-    .dl-audio{ background: rgba(31,107,76,0.10); color: var(--green); border-color: rgba(31,107,76,0.28); }
-    .dl-pdf:hover  { filter: brightness(1.1); }
-    .dl-audio:hover{ filter: brightness(1.1); }
-    .dl-lock {
-      background: rgba(200,146,46,0.12); color: var(--accent);
-      border-color: rgba(200,146,46,0.32); cursor: default;
-      font-size: 11px; font-weight: 700; padding: 4px 10px;
-      border-radius: 999px; border: 1px solid; display: inline-flex;
-      align-items: center; gap: 4px;
+    .book-spine.hidden { display: none; }
+    .book-spine-title {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      transform: rotate(180deg);
+      font-size: 11px; font-weight: 700; font-family: var(--font-body);
+      padding: 8px 4px;
+      overflow: hidden;
+      max-height: 140px;
+      text-overflow: ellipsis;
+      line-height: 1.2;
+      color: rgba(255,255,255,.92);
+      text-shadow: 0 1px 2px rgba(0,0,0,.3);
+      user-select: none;
     }
-    .book-badge.premium {
-      background: rgba(200,146,46,0.14); color: #a8720f;
-      border: 1px solid rgba(200,146,46,0.36);
+    /* Spine left edge highlight */
+    .book-spine::before {
+      content: '';
+      position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+      background: linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,.05));
+      border-radius: 4px 0 0 4px;
     }
-
-    /* ─── Empty state ─── */
-    .empty-state {
-      text-align: center; padding: 64px 20px; color: var(--text-dim);
-      grid-column: 1 / -1;
-    }
-    .empty-state .em { font-size: 48px; margin-bottom: 12px; }
-    .empty-state p { font-size: 15px; }
-
-    /* ─── Letter index ─── */
-    .letter-index {
-      display: flex; flex-wrap: wrap; gap: 6px;
-      justify-content: center; margin-bottom: 24px;
-    }
-    .letter-btn {
-      width: 34px; height: 34px; border-radius: 8px;
-      border: 1px solid var(--card-border); background: var(--card);
-      font-size: 13px; font-weight: 700; color: var(--text-dim);
-      cursor: pointer; display: grid; place-items: center;
-      transition: all .15s;
-    }
-    .letter-btn:hover { background: #fbf7ee; color: var(--green); }
-    .letter-btn.active {
-      background: var(--green); color: #fff; border-color: transparent;
+    /* Cover thumb (if exists) */
+    .book-spine .spine-cover {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; border-radius: 4px 4px 0 0; opacity: .82;
     }
 
-    /* ─── Count badge ─── */
-    .result-count {
-      text-align: center; margin-bottom: 20px;
-      color: var(--text-faint); font-size: 13px;
+    /* ── Book detail overlay ── */
+    #overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(45,31,14,.55); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center; padding: 20px;
     }
-
-    /* ─── Alphabet section headers ─── */
-    .alpha-section { grid-column: 1 / -1; }
-    .alpha-header {
-      font-family: var(--serif); font-size: 22px; color: var(--green);
-      padding: 16px 0 8px; border-bottom: 2px solid rgba(31,107,76,0.14);
-      margin-bottom: 4px;
+    #overlay.open { display: flex; }
+    .detail-card {
+      background: var(--card); border-radius: 20px;
+      max-width: 420px; width: 100%;
+      box-shadow: 0 24px 60px rgba(45,31,14,.35);
+      overflow: hidden; position: relative;
+      animation: popIn .22s cubic-bezier(.34,1.56,.64,1);
     }
+    @keyframes popIn { from { transform: scale(.88); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .detail-cover {
+      height: 180px;
+      background: linear-gradient(135deg,var(--accent) 0%,var(--wood-dk) 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 56px; position: relative;
+    }
+    .detail-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .detail-body { padding: 20px; }
+    .detail-title { font-family: var(--font-head); font-size: 20px; color: var(--wood-dk); margin-bottom: 4px; line-height: 1.2; }
+    .detail-author { font-size: 13px; color: var(--text-dim); font-weight: 600; margin-bottom: 14px; }
+    .detail-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+    .dbadge {
+      padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; border: 1.5px solid;
+    }
+    .dbadge-lang { background: rgba(122,138,94,.12); color: var(--accent2); border-color: rgba(122,138,94,.3); }
+    .dbadge-read  { background: rgba(122,138,94,.10); color: var(--accent2); border-color: rgba(122,138,94,.24); }
+    .dbadge-done  { background: rgba(198,113,57,.10); color: var(--accent); border-color: rgba(198,113,57,.28); }
+    .dbadge-prem  { background: rgba(160,90,46,.12); color: #a05a2e; border-color: rgba(160,90,46,.28); }
+    .detail-desc { font-size: 13.5px; color: var(--text-dim); line-height: 1.55; margin-bottom: 16px; }
+    .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .da-btn {
+      flex: 1; min-width: 120px; padding: 11px 16px; border-radius: 12px;
+      font-weight: 700; font-size: 13px; font-family: var(--font-body);
+      border: none; cursor: pointer; transition: filter .15s, transform .1s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .da-btn:active { transform: scale(.97); }
+    .da-pdf  { background: rgba(180,50,50,.1); color: #9a2020; border: 1.5px solid rgba(180,50,50,.28); }
+    .da-audio{ background: rgba(122,138,94,.12); color: var(--accent2); border: 1.5px solid rgba(122,138,94,.3); }
+    .da-lock { background: rgba(198,113,57,.10); color: #a05a2e; border: 1.5px solid rgba(198,113,57,.28); cursor: default; }
+    .da-pdf:hover, .da-audio:hover { filter: brightness(1.12); }
+    .close-btn {
+      position: absolute; top: 12px; right: 14px;
+      background: rgba(0,0,0,.3); border: none; border-radius: 999px;
+      color: #fff; font-size: 18px; width: 30px; height: 30px;
+      display: grid; place-items: center; cursor: pointer; transition: background .15s;
+    }
+    .close-btn:hover { background: rgba(0,0,0,.5); }
 
-    /* Footer */
-    footer { border-top: 1px solid var(--card-border); padding: 36px 0; color: var(--text-faint); font-size: 13.5px; }
-    .foot { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+    /* ── All books grid (search results) ── */
+    .grid-view { display: none; }
+    .grid-view.active { display: block; }
+    .shelf-view.hidden { display: none; }
+    .books-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px,1fr));
+      gap: 14px; padding-bottom: 20px;
+    }
+    .book-card {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 14px; overflow: hidden; cursor: pointer;
+      transition: transform .18s, box-shadow .18s;
+    }
+    .book-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+    .book-card .bc-cover {
+      height: 130px; background: linear-gradient(135deg,var(--accent) 0%,var(--wood-dk) 100%);
+      display: flex; align-items: center; justify-content: center; font-size: 36px;
+      position: relative;
+    }
+    .book-card .bc-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .book-card .bc-body { padding: 10px; }
+    .book-card .bc-title { font-size: 12.5px; font-weight: 700; color: var(--wood-dk); line-height: 1.25;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .book-card .bc-author { font-size: 11px; color: var(--text-dim); margin-top: 3px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ── Result count ── */
+    .result-count { text-align: center; color: var(--text-faint); font-size: 13px; margin-bottom: 18px; }
+
+    /* ── Empty ── */
+    .empty { text-align: center; padding: 56px 20px; color: var(--text-dim); }
+    .empty .em { font-size: 48px; margin-bottom: 12px; }
+
+    /* ── Footer ── */
+    footer { border-top: 1px solid var(--border); padding: 28px 20px; }
+    .foot { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; color: var(--text-faint); font-size: 13px; }
     footer a { color: var(--text-dim); }
-    footer a:hover { color: var(--green); }
 
-    /* Reveal */
-    .reveal { opacity: 0; transform: translateY(18px); transition: opacity .55s ease, transform .55s ease; }
-    .reveal.in { opacity: 1; transform: none; }
-
-    @media (max-width: 880px) {
-      .lib-hero h1 { font-size: 32px; }
-      .nav .links { display: none; }
-      .nav .menu-toggle { display: block; }
-      .nav .links.open {
-        display: flex; position: absolute; top: 64px; left: 0; right: 0;
-        flex-direction: column; background: var(--bg-1); padding: 16px 20px;
-        border-bottom: 1px solid var(--card-border);
+    /* ── Responsive ── */
+    @media (max-width: 820px) {
+      .nav-links { display: none; }
+      .search-inline { display: none; }
+      .search-mob { display: block; position: relative; }
+      .menu-toggle { display: block; }
+      .nav-links.open {
+        display: flex; flex-direction: column;
+        position: absolute; top: 62px; left: 0; right: 0;
+        background: rgba(245,234,216,.97); border-bottom: 1px solid var(--border);
+        padding: 12px 20px 16px; gap: 12px; z-index: 100;
       }
-      .books-grid { grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 12px; }
+      .hero h1 { font-size: 30px; }
     }
     @media (max-width: 480px) {
-      .books-grid { grid-template-columns: repeat(2, 1fr); }
+      .books-grid { grid-template-columns: repeat(2,1fr); }
+      .shelf-row { min-height: 120px; }
+      .book-spine { width: 30px; min-height: 88px; }
+      .book-spine-title { font-size: 9.5px; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="wrap nav">
-      <a href="/" class="logo"><span class="mark">📚</span> Kitob Challenge</a>
-      <nav class="links" id="navLinks">
-        <a href="/">Bosh sahifa</a>
-        <a href="/#imkoniyatlar">Imkoniyatlar</a>
-        <a href="/#viktorina">Viktorina</a>
-        <a href="/#reyting">Reyting</a>
-        <a href="/kutubxona/" class="active">Kutubxona</a>
-        <a href="/shop/">Do'kon</a>
-      </nav>
-      <div class="spacer"></div>
-      <a href="https://t.me/kitob_challange_bot" class="btn btn-primary" target="_blank" rel="noopener">Telegramda boshlash</a>
-      <button class="menu-toggle" id="menuToggle" aria-label="Menyu">☰</button>
+
+<!-- HEADER -->
+<header>
+  <div class="nav">
+    <a href="/" class="logo"><span class="logo-icon">📚</span> Kitob Challenge</a>
+    <nav class="nav-links" id="navLinks">
+      <a href="/">Bosh sahifa</a>
+      <a href="/#imkoniyatlar">Imkoniyatlar</a>
+      <a href="/#viktorina">Viktorina</a>
+      <a href="/#reyting">Reyting</a>
+      <a href="/kutubxona/" class="active">Kutubxona</a>
+      <a href="/shop/">Do'kon</a>
+    </nav>
+    <div class="nav-spacer"></div>
+    <div class="search-inline">
+      <span class="si">🔍</span>
+      <input type="search" id="searchDesktop" placeholder="Kitob yoki muallif…" autocomplete="off" />
     </div>
-  </header>
+    <a href="https://t.me/kitob_challange_bot" class="btn-tg" target="_blank" rel="noopener">Telegramda boshlash</a>
+    <button class="menu-toggle" id="menuToggle">☰</button>
+  </div>
+</header>
 
-  <!-- HERO -->
-  <section class="lib-hero">
-    <div class="wrap">
-      <span class="pill reveal in">📚 Barcha kitoblar</span>
-      <h1 class="reveal in">
-        Kitoblar <span class="grad">Kutubxonasi</span>
-      </h1>
-      <p class="reveal in">Platformada o'qilgan va o'qilayotgan kitoblar. Qidiring va kashf eting.</p>
+<!-- HERO -->
+<section class="hero">
+  <span class="hero-pill">📚 Kitob Challenge Kutubxonasi</span>
+  <h1>Katta <span class="grad">Mutolaa Zali</span></h1>
+  <p class="hero-sub">Platformadagi barcha kitoblar — kitob javorida, til bo'yicha.</p>
+  <div class="stats-row">
+    <div class="stat"><div class="n">{{ total_books }}</div><div class="l">Jami kitob</div></div>
+    <div class="stat"><div class="n">{{ total_readers }}</div><div class="l">O'qiyotganlar</div></div>
+    <div class="stat"><div class="n">{{ total_finished }}</div><div class="l">Tugatilgan</div></div>
+  </div>
+</section>
 
-      <div class="stats-strip reveal in">
-        <div class="stat-item">
-          <div class="n">{{ total_books }}</div>
-          <div class="l">Jami kitob</div>
+<!-- FILTER TABS -->
+<div class="tabs-row">
+  <button class="tab-btn active" data-filter="all">📚 Barchasi</button>
+  <button class="tab-btn" data-filter="uz">🇺🇿 O'zbekcha</button>
+  <button class="tab-btn" data-filter="ru">🇷🇺 Ruscha</button>
+  <button class="tab-btn" data-filter="en">🇬🇧 Inglizcha</button>
+  <button class="tab-btn" data-filter="tr">🇹🇷 Turkcha</button>
+  <button class="tab-btn" data-filter="ar">🇸🇦 Arabcha</button>
+  <button class="tab-btn" data-filter="free">🆓 Bepul</button>
+  <button class="tab-btn" data-filter="premium">💎 Premium</button>
+</div>
+
+<!-- MOBILE SEARCH -->
+<div class="search-mob">
+  <span class="si">🔍</span>
+  <input type="search" id="searchMobile" placeholder="Kitob yoki muallif…" autocomplete="off" />
+</div>
+
+<div class="main">
+  <div class="result-count" id="resultCount"></div>
+
+  <!-- SHELF VIEW -->
+  <div class="shelf-view" id="shelfView">
+    {% for shelf in shelves %}
+    <div class="shelf-section" data-lang="{{ shelf.code }}">
+      <div class="shelf-label">{{ shelf.label }}</div>
+      <div class="bookshelf">
+        <div class="shelf-row" id="row-{{ shelf.code }}">
+          {% for book in shelf.books %}
+          {# Deterministic color from book id #}
+          <div class="book-spine"
+               data-id="{{ book.id }}"
+               data-title="{{ book.title|lower }}"
+               data-author="{{ book.author|default:''|lower }}"
+               data-lang="{{ book.language }}"
+               data-premium="{{ book.is_premium_only|yesno:'1,0' }}"
+               title="{{ book.title }}{% if book.author %} — {{ book.author }}{% endif %}">
+            {% if book.cover %}
+            <img class="spine-cover" src="{{ book.cover.url }}" alt="" loading="lazy" />
+            {% endif %}
+            <span class="book-spine-title">{{ book.title }}</span>
+          </div>
+          {% endfor %}
         </div>
-        <div class="stat-item">
-          <div class="n">{{ total_readers }}</div>
-          <div class="l">O'qiyotganlar</div>
-        </div>
-        <div class="stat-item">
-          <div class="n">{{ total_finished }}</div>
-          <div class="l">Tugatilgan</div>
-        </div>
-      </div>
-
-      <!-- Search -->
-      <div class="search-wrap reveal in">
-        <span class="icon">🔍</span>
-        <input
-          type="search"
-          id="searchInput"
-          placeholder="Kitob nomi yoki muallif..."
-          autocomplete="off"
-          spellcheck="false"
-          value="{{ query|default:'' }}"
-        />
-      </div>
-
-      <!-- Sort tabs -->
-      <div class="filter-row reveal in">
-        <button class="filter-btn active" data-sort="popular">🔥 Mashhur</button>
-        <button class="filter-btn" data-sort="az">A–Z tartibda</button>
-        <button class="filter-btn" data-sort="finished">✅ Ko'p tugatilgan</button>
-        <button class="filter-btn" data-filter="free">🆓 Bepul</button>
-        <button class="filter-btn" data-filter="premium">💎 Premium</button>
+        <div class="shelf-plank"></div>
       </div>
     </div>
-  </section>
+    {% empty %}
+    <div class="empty"><div class="em">📭</div><p>Kutubxona hali bo'sh.<br/>Admin kitoblar qo'shgach bu yerda ko'rinadi.</p></div>
+    {% endfor %}
+  </div>
 
-  <!-- BOOKS -->
-  <div class="wrap">
-    <div class="result-count" id="resultCount"></div>
-
+  <!-- GRID VIEW (search results) -->
+  <div class="grid-view" id="gridView">
     <div class="books-grid" id="booksGrid">
       {% for book in books %}
-      <div class="book-card reveal"
+      <div class="book-card"
+           data-id="{{ book.id }}"
            data-title="{{ book.title|lower }}"
            data-author="{{ book.author|default:''|lower }}"
-           data-readers="{{ book.readers_count }}"
-           data-finished="{{ book.finished_count }}"
-           data-letter="{{ book.title|first|upper }}"
+           data-lang="{{ book.language }}"
            data-premium="{{ book.is_premium_only|yesno:'1,0' }}">
-        <div class="book-cover">
-          <div class="spine"></div>
-          {% if book.cover %}
-          <img src="{{ book.cover.url }}" alt="{{ book.title }}" loading="lazy" />
-          {% else %}
-          📖
-          {% endif %}
+        <div class="bc-cover">
+          {% if book.cover %}<img src="{{ book.cover.url }}" alt="" loading="lazy" />{% else %}📖{% endif %}
         </div>
-        <div class="book-body">
-          <div class="book-title">{{ book.title }}</div>
-          {% if book.author %}
-          <div class="book-author">✍️ {{ book.author }}</div>
-          {% endif %}
-          <div class="book-meta">
-            {% if book.is_premium_only %}
-            <span class="book-badge premium">💎 Premium</span>
-            {% endif %}
-            {% if book.readers_count %}
-            <span class="book-badge reading">📖 {{ book.readers_count }} o'qimoqda</span>
-            {% endif %}
-            {% if book.finished_count %}
-            <span class="book-badge finished">✅ {{ book.finished_count }} tugatdi</span>
-            {% endif %}
-          </div>
-          {% if book.pdf_file or book.audio_file %}
-          <div class="book-dl">
-            {% if book.is_premium_only %}
-              <span class="dl-lock">🔒 Botdan yuklab oling</span>
-            {% else %}
-              {% if book.pdf_file %}
-              <a class="dl-btn dl-pdf" href="{{ book.pdf_file.url }}" download target="_blank" rel="noopener">📄 PDF</a>
-              {% endif %}
-              {% if book.audio_file %}
-              <a class="dl-btn dl-audio" href="{{ book.audio_file.url }}" download target="_blank" rel="noopener">🎧 Audio</a>
-              {% endif %}
-            {% endif %}
-          </div>
-          {% endif %}
+        <div class="bc-body">
+          <div class="bc-title">{{ book.title }}</div>
+          {% if book.author %}<div class="bc-author">{{ book.author }}</div>{% endif %}
         </div>
-      </div>
-      {% empty %}
-      <div class="empty-state">
-        <div class="em">📭</div>
-        <p>Hozircha kutubxonada kitoblar yo'q.<br/>Kitobxonlar hisobot yuborishgach bu yerda ko'rinadi.</p>
       </div>
       {% endfor %}
     </div>
   </div>
+</div>
 
-  <footer>
-    <div class="wrap foot">
-      <div><span class="logo" style="font-size:15px"><span class="mark" style="width:28px;height:28px;font-size:15px">📚</span> Kitob Challenge</span></div>
-      <div>© 2026 Kitob Challenge · <a href="https://t.me/kitob_challange_bot" target="_blank" rel="noopener">@kitob_challange_bot</a></div>
+<!-- BOOK DETAIL OVERLAY -->
+<div id="overlay" role="dialog" aria-modal="true">
+  <div class="detail-card" id="detailCard">
+    <button class="close-btn" id="closeBtn" aria-label="Yopish">✕</button>
+    <div class="detail-cover" id="detailCover">📖</div>
+    <div class="detail-body">
+      <div class="detail-title" id="detailTitle"></div>
+      <div class="detail-author" id="detailAuthor"></div>
+      <div class="detail-badges" id="detailBadges"></div>
+      <div class="detail-desc" id="detailDesc"></div>
+      <div class="detail-actions" id="detailActions"></div>
     </div>
-  </footer>
+  </div>
+</div>
 
-  <script>
-    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-    if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+<footer>
+  <div class="foot">
+    <span>📚 <strong>Kitob Challenge</strong> Kutubxonasi</span>
+    <span>© 2026 · <a href="https://t.me/kitob_challange_bot" target="_blank" rel="noopener">@kitob_challange_bot</a></span>
+  </div>
+</footer>
 
-    // Mobile nav
-    document.getElementById("menuToggle").addEventListener("click", () => {
-      document.getElementById("navLinks").classList.toggle("open");
+<!-- All book data for JS -->
+<script>
+const BOOKS = {{ books_json|safe }};
+
+const LANG_LABELS = {uz:"O'zbekcha",ru:"Ruscha",en:"Inglizcha",tr:"Turkcha",ar:"Arabcha",other:"Boshqa"};
+
+// Assign spine colors and heights
+const SPINE_COLORS = [
+  '#a05a2e','#7a8a5e','#c67139','#5c6b45','#8a4f28','#4a6340',
+  '#b8762e','#6b7a50','#9a5525','#527044','#c4893a','#3d5c35',
+  '#a86530','#647d4a','#b5742c','#4c6640','#9c5e2a','#5a7348',
+];
+const SPINE_HEIGHTS = [120,130,140,150,110,145,125,135,155,118,142,128,138,148,115,132,122,144];
+
+document.querySelectorAll('.book-spine').forEach(el => {
+  const id = +el.dataset.id;
+  el.style.background = SPINE_COLORS[id % SPINE_COLORS.length];
+  el.style.height = SPINE_HEIGHTS[id % SPINE_HEIGHTS.length] + 'px';
+});
+
+// Telegram init
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { try { tg.ready(); tg.expand(); } catch(e) {} }
+
+// Mobile nav
+document.getElementById('menuToggle').addEventListener('click', () => {
+  document.getElementById('navLinks').classList.toggle('open');
+});
+
+// Overlay / detail
+const overlay   = document.getElementById('overlay');
+const closeBtn  = document.getElementById('closeBtn');
+const detailCover   = document.getElementById('detailCover');
+const detailTitle   = document.getElementById('detailTitle');
+const detailAuthor  = document.getElementById('detailAuthor');
+const detailBadges  = document.getElementById('detailBadges');
+const detailDesc    = document.getElementById('detailDesc');
+const detailActions = document.getElementById('detailActions');
+
+function openDetail(id) {
+  const b = BOOKS.find(x => x.id === id);
+  if (!b) return;
+
+  // Cover
+  detailCover.innerHTML = '';
+  if (b.cover) {
+    const img = document.createElement('img');
+    img.src = b.cover; img.alt = b.title;
+    img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;';
+    detailCover.appendChild(img);
+  } else {
+    detailCover.textContent = '📖';
+  }
+
+  detailTitle.textContent  = b.title;
+  detailAuthor.textContent = b.author ? '✍️ ' + b.author : '';
+
+  // Badges
+  let badges = '';
+  if (b.lang) badges += `<span class="dbadge dbadge-lang">${LANG_LABELS[b.lang] || b.lang}</span>`;
+  if (b.premium) badges += `<span class="dbadge dbadge-prem">💎 Faqat Premium</span>`;
+  if (b.readers) badges += `<span class="dbadge dbadge-read">📖 ${b.readers} o'qimoqda</span>`;
+  if (b.finished) badges += `<span class="dbadge dbadge-done">✅ ${b.finished} tugatdi</span>`;
+  detailBadges.innerHTML = badges;
+
+  detailDesc.textContent = b.desc || '';
+
+  // Actions
+  let actions = '';
+  if (b.hasPdf || b.hasAudio) {
+    if (b.premium) {
+      actions += `<span class="da-btn da-lock">🔒 Botdan yuklab oling</span>`;
+    } else {
+      if (b.pdf)   actions += `<a class="da-btn da-pdf" href="${b.pdf}" download target="_blank" rel="noopener">📄 PDF yuklab olish</a>`;
+      if (b.audio) actions += `<a class="da-btn da-audio" href="${b.audio}" download target="_blank" rel="noopener">🎧 Audio yuklab olish</a>`;
+    }
+  }
+  detailActions.innerHTML = actions;
+
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDetail() {
+  overlay.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+closeBtn.addEventListener('click', closeDetail);
+overlay.addEventListener('click', e => { if (e.target === overlay) closeDetail(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+
+// Wire up spines
+document.querySelectorAll('.book-spine').forEach(el => {
+  el.addEventListener('click', () => openDetail(+el.dataset.id));
+});
+
+// Wire up grid cards
+document.querySelectorAll('.book-card').forEach(el => {
+  el.addEventListener('click', () => openDetail(+el.dataset.id));
+});
+
+// ── Filter & search ──────────────────────────────────────────
+let currentFilter = 'all';
+let searchQ = '';
+
+const shelfView = document.getElementById('shelfView');
+const gridView  = document.getElementById('gridView');
+const resultCount = document.getElementById('resultCount');
+
+function applyFilter() {
+  const q = searchQ;
+  const f = currentFilter;
+  const isSearch = q.length > 0;
+  const isPremiumFilter = f === 'premium';
+  const isFreeFilter    = f === 'free';
+  const isLangFilter    = !['all','free','premium'].includes(f);
+
+  if (isSearch) {
+    // Show grid, hide shelves
+    shelfView.classList.add('hidden');
+    gridView.classList.add('active');
+
+    let count = 0;
+    document.querySelectorAll('.book-card').forEach(card => {
+      const matchQ = card.dataset.title.includes(q) || card.dataset.author.includes(q);
+      const matchF = !isLangFilter || card.dataset.lang === f;
+      const matchPrem = !isPremiumFilter || card.dataset.premium === '1';
+      const matchFree = !isFreeFilter    || card.dataset.premium === '0';
+      const show = matchQ && matchF && matchPrem && matchFree;
+      card.style.display = show ? '' : 'none';
+      if (show) count++;
     });
+    resultCount.textContent = count + ' ta natija topildi';
+  } else {
+    // Shelf view
+    shelfView.classList.remove('hidden');
+    gridView.classList.remove('active');
+    resultCount.textContent = '';
 
-    // Scroll reveal
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
-    }, { threshold: 0.08 });
-    document.querySelectorAll(".reveal:not(.in)").forEach(el => io.observe(el));
+    document.querySelectorAll('.shelf-section').forEach(section => {
+      const lang = section.dataset.lang;
+      const matchLang = !isLangFilter || lang === f;
+      section.style.display = matchLang ? '' : 'none';
 
-    // ── Search & sort ────────────────────────────────────────────────
-    const input   = document.getElementById("searchInput");
-    const grid    = document.getElementById("booksGrid");
-    const counter = document.getElementById("resultCount");
-    const cards   = Array.from(grid.querySelectorAll(".book-card"));
-
-    let currentSort = "popular";
-    let currentFilter = "all";
-
-    function sortCards(list) {
-      if (currentSort === "az") {
-        list.sort((a, b) => a.dataset.title.localeCompare(b.dataset.title, 'uz'));
-      } else if (currentSort === "finished") {
-        list.sort((a, b) => Number(b.dataset.finished) - Number(a.dataset.finished));
-      } else {
-        list.sort((a, b) => Number(b.dataset.readers) - Number(a.dataset.readers));
+      // Within shelf filter by premium/free
+      if (matchLang && (isPremiumFilter || isFreeFilter)) {
+        let visible = 0;
+        section.querySelectorAll('.book-spine').forEach(spine => {
+          const show = isPremiumFilter ? spine.dataset.premium === '1' : spine.dataset.premium === '0';
+          spine.style.display = show ? '' : 'none';
+          if (show) visible++;
+        });
+        section.style.display = visible > 0 ? '' : 'none';
+      } else if (matchLang) {
+        section.querySelectorAll('.book-spine').forEach(s => s.style.display = '');
       }
-      return list;
-    }
-
-    function renderCards() {
-      const q = input.value.trim().toLowerCase();
-      let visible = cards.filter(c => {
-        const matchQ = !q || c.dataset.title.includes(q) || c.dataset.author.includes(q);
-        const matchF = currentFilter === "all"
-          || (currentFilter === "free" && c.dataset.premium === "0")
-          || (currentFilter === "premium" && c.dataset.premium === "1");
-        return matchQ && matchF;
-      });
-      const sorted = sortCards(visible.slice());
-      const hidden = cards.filter(c => !visible.includes(c));
-
-      sorted.forEach(c => { c.style.display = ""; grid.appendChild(c); });
-      hidden.forEach(c => { c.style.display = "none"; });
-
-      sorted.forEach(c => {
-        if (!c.classList.contains("in")) {
-          requestAnimationFrame(() => c.classList.add("in"));
-        }
-      });
-
-      const count = sorted.length;
-      counter.textContent = count === cards.length
-        ? `${count} ta kitob`
-        : `${count} ta natija topildi`;
-    }
-
-    input.addEventListener("input", renderCards);
-
-    document.querySelectorAll(".filter-btn[data-sort]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        currentSort = btn.dataset.sort;
-        currentFilter = "all";
-        renderCards();
-      });
     });
+  }
+}
 
-    document.querySelectorAll(".filter-btn[data-filter]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        currentFilter = btn.dataset.filter;
-        renderCards();
-      });
-    });
+// Search inputs (desktop + mobile stay in sync)
+function onSearch(val) {
+  searchQ = val.trim().toLowerCase();
+  document.getElementById('searchDesktop').value = val;
+  document.getElementById('searchMobile').value  = val;
+  applyFilter();
+}
+document.getElementById('searchDesktop').addEventListener('input', e => onSearch(e.target.value));
+document.getElementById('searchMobile').addEventListener('input',  e => onSearch(e.target.value));
 
-    renderCards();
-  </script>
+// Tabs
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    applyFilter();
+  });
+});
+
+applyFilter();
+</script>
 </body>
 </html>

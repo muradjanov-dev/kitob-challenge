@@ -128,7 +128,7 @@ def library_view(request: HttpRequest):
     from django.db.models import Count, Q
     from tgbot.models import GlobalBook, BooksToRead
 
-    books = (
+    books_qs = (
         GlobalBook.objects
         .annotate(
             readers_count=Count(
@@ -148,14 +148,46 @@ def library_view(request: HttpRequest):
         .order_by('-readers_count', '-finished_count', 'title')
     )
 
+    # Group books by language for shelf display
+    lang_order = [('uz', "O'zbekcha"), ('ru', 'Ruscha'), ('en', 'Inglizcha'),
+                  ('tr', 'Turkcha'), ('ar', 'Arabcha'), ('other', 'Boshqa')]
+    shelves = []
+    all_books = list(books_qs)
+    for lang_code, lang_label in lang_order:
+        group = [b for b in all_books if b.language == lang_code]
+        if group:
+            shelves.append({'code': lang_code, 'label': lang_label, 'books': group})
+
     total_readers = BooksToRead.objects.filter(current_page__gt=0).values('user').distinct().count()
     total_finished = BooksToRead.objects.filter(
         total_pages__gt=0,
         current_page__gte=1,
     ).count()
 
+    import json as _json
+    books_json = _json.dumps([
+        {
+            'id': b.id,
+            'title': b.title,
+            'author': b.author or '',
+            'lang': b.language,
+            'premium': b.is_premium_only,
+            'readers': b.readers_count,
+            'finished': b.finished_count,
+            'desc': b.description or '',
+            'cover': b.cover.url if b.cover else None,
+            'pdf': b.pdf_file.url if (b.pdf_file and not b.is_premium_only) else None,
+            'audio': b.audio_file.url if (b.audio_file and not b.is_premium_only) else None,
+            'hasPdf': bool(b.pdf_file),
+            'hasAudio': bool(b.audio_file),
+        }
+        for b in all_books
+    ], ensure_ascii=False)
+
     ctx = {
-        'books': books,
+        'books': all_books,
+        'shelves': shelves,
+        'books_json': books_json,
         'total_books': GlobalBook.objects.count(),
         'total_readers': total_readers,
         'total_finished': total_finished,
