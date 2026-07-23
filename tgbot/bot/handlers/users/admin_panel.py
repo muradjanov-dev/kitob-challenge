@@ -1214,16 +1214,23 @@ def _user_detail_markup(target_user, is_premium: bool) -> InlineKeyboardMarkup:
             "✉️ Xabar yozish (Loyiha asoschisidan)",
             callback_data=f"owner_reply:{target_user.telegram_id}",
         ))
-        # Premium grant / revoke — admin-only.
+        # Premium grant / revoke — admin-only. Grant buttons always show, even
+        # if the user is already Premium: a grant here EXTENDS their current
+        # end date rather than replacing it (2 days left + 30 = 32 days).
+        kb.row(
+            InlineKeyboardButton(
+                "💎 +1 oy",
+                callback_data=f"adm_prem_toggle:{target_user.id}:1:30",
+            ),
+            InlineKeyboardButton(
+                "💎 +3 oy",
+                callback_data=f"adm_prem_toggle:{target_user.id}:1:90",
+            ),
+        )
         if is_premium:
             kb.add(InlineKeyboardButton(
                 "❌ Premiumni o'chirish",
                 callback_data=f"adm_prem_toggle:{target_user.id}:0",
-            ))
-        else:
-            kb.add(InlineKeyboardButton(
-                "💎 Premium berish (30 kun)",
-                callback_data=f"adm_prem_toggle:{target_user.id}:1",
             ))
         # Block / Unblock toggle — admin-only control over user access.
         if target_user.is_blocked:
@@ -1373,8 +1380,9 @@ async def adm_block_toggle(call: types.CallbackQuery):
 )
 async def adm_prem_toggle(call: types.CallbackQuery):
     """Grant or revoke Premium for any user from the admin user-detail card.
-    Grant = a 30-day paid Payment (extends an existing active one). Revoke =
-    expire every active paid Payment. Notifies the target and re-renders."""
+    Grant = a paid Payment for the chosen number of days (extends an existing
+    active one instead of resetting it). Revoke = expire every active paid
+    Payment. Notifies the target and re-renders."""
     actor = await aget_user(call.from_user.id)
     if not (actor and actor.is_admin):
         await call.answer("Siz admin emassiz!", show_alert=True)
@@ -1386,6 +1394,7 @@ async def adm_prem_toggle(call: types.CallbackQuery):
         return
     target_id = int(parts[1])
     grant = parts[2] == "1"
+    days = int(parts[3]) if grant and len(parts) > 3 else 30
 
     @sync_to_async
     def _apply():
@@ -1396,20 +1405,8 @@ async def adm_prem_toggle(call: types.CallbackQuery):
             return None, None
         today = timezone.localdate()
         if grant:
-            active = Payment.objects.filter(
-                user=target, status="paid", end_date__gte=today
-            ).order_by("-end_date").first()
-            if active:
-                active.end_date = active.end_date + timedelta(days=30)
-                active.save(update_fields=["end_date"])
-                new_until = active.end_date
-            else:
-                p = Payment.objects.create(
-                    user=target, amount=0, start_date=today,
-                    end_date=today + timedelta(days=30), status="paid",
-                )
-                new_until = p.end_date
-            return target, new_until
+            payment = Payment.grant_or_extend(target, days, amount=0)
+            return target, payment.end_date
         else:
             Payment.objects.filter(
                 user=target, status="paid", end_date__gte=today

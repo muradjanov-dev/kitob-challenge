@@ -407,14 +407,14 @@ class QuizSessionAdmin(admin.ModelAdmin):
 class ShopProductAdmin(admin.ModelAdmin):
     list_display = (
         'name', 'price_kitobcha', 'stock_qty', 'is_active',
-        'sort_order', 'created_at',
+        'grants_premium_days', 'sort_order', 'created_at',
     )
     list_filter = ('is_active',)
     list_editable = ('price_kitobcha', 'stock_qty', 'is_active', 'sort_order')
     search_fields = ('name', 'description')
     fields = (
         'name', 'description', 'image', 'price_kitobcha',
-        'stock_qty', 'sort_order', 'is_active',
+        'stock_qty', 'sort_order', 'is_active', 'grants_premium_days',
     )
 
     def save_model(self, request, obj, form, change):

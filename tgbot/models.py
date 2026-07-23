@@ -568,6 +568,25 @@ class Payment(BaseModel):
     def __str__(self) -> str:
         return f"""{self.user} | {self.start_date.strftime("%d/%m/%Y")}-{self.end_date.strftime("%d/%m/%Y")}"""
 
+    @classmethod
+    def grant_or_extend(cls, user, days: int, amount=0) -> "Payment":
+        """Grant `days` of Premium, EXTENDING any currently-active paid
+        subscription instead of resetting it — 15 days left + a 30-day grant
+        = 45 days, not 30. Always writes a new row (keeps a full purchase/grant
+        history); the effective end date is just the latest one, which every
+        active-Premium check already reads via end_date__gte=today."""
+        from django.db.models import Max
+        today = timezone.localdate()
+        current_end = cls.objects.filter(
+            user=user, status="paid", end_date__gte=today,
+        ).aggregate(Max("end_date"))["end_date__max"]
+        base = current_end if current_end and current_end > today else today
+        from datetime import timedelta
+        return cls.objects.create(
+            user=user, amount=amount, start_date=today,
+            end_date=base + timedelta(days=days), status="paid",
+        )
+
 
 auditlog.register(RequiredGroup)
 auditlog.register(TelegramProfile)
@@ -886,6 +905,15 @@ class ShopProduct(BaseModel):
         help_text="Lower = shown first. Ties broken by newest-first.",
     )
     is_active = models.BooleanField(default=True)
+    grants_premium_days = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="If set, buying this product automatically grants/extends "
+                   "this many days of bot Premium (e.g. 30 for a 1-month "
+                   "Kitob Challenge Premium item) and the purchase is "
+                   "auto-fulfilled — no manual pickup needed. Leave blank for "
+                   "ordinary prizes that still need manual hand-off (e.g. a "
+                   "3rd-party 'Mutolaa Premium' code).",
+    )
 
     class Meta:
         verbose_name = "Shop Product"

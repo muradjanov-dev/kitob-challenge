@@ -30,7 +30,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from tgbot.models import ShopProduct, ShopPurchase, TelegramProfile
+from tgbot.models import Payment, ShopProduct, ShopPurchase, TelegramProfile
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -250,15 +250,31 @@ def api_buy(request: HttpRequest) -> JsonResponse:
                 code=code,
                 status=ShopPurchase.STATUS_PENDING,
             )
+
+            # Premium-granting products (e.g. "Kitob Challenge Premium — 1
+            # oy") are fulfilled instantly: no admin hand-off needed, and any
+            # remaining active Premium is extended rather than reset.
+            premium_grant = None
+            if product.grants_premium_days:
+                premium_grant = Payment.grant_or_extend(user, product.grants_premium_days)
+                purchase.status = ShopPurchase.STATUS_FULFILLED
+                purchase.save(update_fields=["status"])
     except TelegramProfile.DoesNotExist:
         return JsonResponse({"ok": False, "error": "profile_missing"}, status=403)
 
-    # Fire-and-forget admin notifications. Wrapped in try/except so a Telegram
-    # API hiccup never fails the actual purchase — the user already paid.
-    try:
-        _notify_admins_of_purchase(purchase, user)
-    except Exception as e:
-        print(f"shop: admin notify failed for purchase {purchase.code}: {e}")
+    if premium_grant:
+        try:
+            _notify_user_of_premium_grant(user, product, premium_grant)
+        except Exception as e:
+            print(f"shop: premium-grant notify failed for purchase {purchase.code}: {e}")
+    else:
+        # Fire-and-forget admin notifications. Wrapped in try/except so a
+        # Telegram API hiccup never fails the actual purchase — the user
+        # already paid.
+        try:
+            _notify_admins_of_purchase(purchase, user)
+        except Exception as e:
+            print(f"shop: admin notify failed for purchase {purchase.code}: {e}")
 
     return JsonResponse({
         "ok": True,
@@ -334,3 +350,22 @@ def _notify_admins_of_purchase(purchase: ShopPurchase, buyer: TelegramProfile) -
             }, timeout=5)
         except Exception as e:
             print(f"shop: notify admin {admin_id} failed: {e}")
+
+
+def _notify_user_of_premium_grant(buyer: TelegramProfile, product: ShopProduct, grant: Payment) -> None:
+    """DM the buyer that their Premium-granting shop purchase was applied
+    instantly — no admin hand-off needed for these, unlike ordinary prizes."""
+    text = (
+        "🎉 <b>Tabriklaymiz! Premium faollashtirildi!</b>\n\n"
+        f"🛍 <b>{_html.escape(product.name)}</b> sotib olindi.\n"
+        f"📅 Muddati: <b>{grant.start_date.strftime('%d.%m.%Y')}</b> — "
+        f"<b>{grant.end_date.strftime('%d.%m.%Y')}</b>\n\n"
+        "Agar avvaldan faol Premiumingiz bo'lsa, yangi kunlar shu muddatga "
+        "qo'shildi — muddat qisqarmadi, faqat uzaydi.\n\n"
+        "Kabinetingizni oching va barcha imkoniyatlardan bahramand bo'ling! 🚀"
+    )
+    requests.post(
+        f"https://api.telegram.org/bot{settings.API_TOKEN}/sendMessage",
+        data={"chat_id": buyer.telegram_id, "text": text, "parse_mode": "HTML"},
+        timeout=5,
+    )

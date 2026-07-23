@@ -1,12 +1,10 @@
 import os
 
+from asgiref.sync import sync_to_async
 from aiogram import types
 from aiogram.dispatcher.filters.builtin import ChatTypeFilter
 from aiogram.types import ChatType, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.dispatcher import FSMContext
-from django.utils import timezone
-from datetime import timedelta
-
 from tgbot.bot.loader import dp, bot, gettext as _
 from tgbot.models import Payment
 from tgbot.bot.utils import aget_user
@@ -47,15 +45,8 @@ async def confirm_payment_message_handler(call: types.CallbackQuery, state: FSMC
         return
 
     try:
-        start_date = timezone.localdate()
-        end_date = timezone.localdate() + timedelta(days=days)
-        Payment.objects.create(
-            user=user,
-            amount=price,
-            start_date=start_date,
-            end_date=end_date,
-            status="paid"
-        )
+        payment = await sync_to_async(Payment.grant_or_extend)(user, days, amount=price)
+        start_date, end_date = payment.start_date, payment.end_date
 
         message_to_user = _build_premium_welcome(start_date, end_date)
         data = await state.get_data()
@@ -167,21 +158,10 @@ async def padmin_accept(call: types.CallbackQuery):
         await call.answer("Foydalanuvchi topilmadi.", show_alert=True)
         return
 
-    # Prevent duplicate payments
-    if Payment.objects.filter(user=user, status="paid", end_date__gte=timezone.localdate()).exists():
-        await call.answer("Bu foydalanuvchida allaqachon faol obuna bor.", show_alert=True)
-        try:
-            await call.message.edit_reply_markup(reply_markup=None)
-        except Exception:
-            pass
-        return
-
-    start_date = timezone.localdate()
-    end_date = start_date + timedelta(days=days)
-    Payment.objects.create(
-        user=user, amount=price,
-        start_date=start_date, end_date=end_date, status="paid",
-    )
+    # An existing active subscription is EXTENDED, not blocked — buying/
+    # granting again while Premium is still active adds the new days on top.
+    payment = await sync_to_async(Payment.grant_or_extend)(user, days, amount=price)
+    start_date, end_date = payment.start_date, payment.end_date
 
     try:
         await call.message.edit_reply_markup(reply_markup=None)
@@ -280,12 +260,8 @@ async def gift_premium_accept(call: types.CallbackQuery):
         await call.answer("Qabul qiluvchi topilmadi.", show_alert=True)
         return
 
-    start_date = timezone.localdate()
-    end_date = start_date + timedelta(days=days)
-    Payment.objects.create(
-        user=recipient, amount=price,
-        start_date=start_date, end_date=end_date, status="paid",
-    )
+    payment = await sync_to_async(Payment.grant_or_extend)(recipient, days, amount=price)
+    start_date, end_date = payment.start_date, payment.end_date
 
     try:
         await call.message.edit_reply_markup(reply_markup=None)
