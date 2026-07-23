@@ -85,6 +85,12 @@ class AdminReplyState(StatesGroup):
     message = State()
     confirm = State()
     padmin_reject_reason = State()
+    gift_reject_reason = State()
+
+
+class GiftPremiumStates(StatesGroup):
+    enter_telegram_id = State()
+    choose_from_list = State()
 
 
 class QuizCreateState(StatesGroup):

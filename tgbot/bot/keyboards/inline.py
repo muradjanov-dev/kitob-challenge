@@ -112,10 +112,10 @@ send_receipt_button = InlineKeyboardMarkup().add(
 )
 
 
-async def make_send_receipt_to_group_button(price: int, telegram_id: str, message_id: int):
+async def make_send_receipt_to_group_button(price: int, telegram_id: str, message_id: int, days: int = 30):
     return InlineKeyboardMarkup(row_width=2).add(
         InlineKeyboardButton(
-            _("✅ Ruxsat berish"), callback_data=f"accept:{price}:{telegram_id}:{message_id}"),
+            _("✅ Ruxsat berish"), callback_data=f"accept:{price}:{telegram_id}:{message_id}:{days}"),
         InlineKeyboardButton(
             _("❗️ Rad etish"), callback_data=f"rejection:{price}:{telegram_id}:{message_id}"),
     )

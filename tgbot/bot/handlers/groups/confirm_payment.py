@@ -39,6 +39,7 @@ async def confirm_payment_message_handler(call: types.CallbackQuery, state: FSMC
     price = int(split_data[1])
     user_telegram_id = split_data[2]
     photo_message_id = split_data[3] if len(split_data) > 3 and split_data[3] != 'None' else None
+    days = int(split_data[4]) if len(split_data) > 4 and split_data[4] else 30
 
     user = await aget_user(telegram_id=user_telegram_id)
 
@@ -47,7 +48,7 @@ async def confirm_payment_message_handler(call: types.CallbackQuery, state: FSMC
 
     try:
         start_date = timezone.localdate()
-        end_date = timezone.localdate() + timedelta(days=30)
+        end_date = timezone.localdate() + timedelta(days=days)
         Payment.objects.create(
             user=user,
             amount=price,
@@ -160,6 +161,7 @@ async def padmin_accept(call: types.CallbackQuery):
     split_data = call.data.split(":")
     price = int(split_data[1])
     user_telegram_id = split_data[2]
+    days = int(split_data[3]) if len(split_data) > 3 and split_data[3] else 30
     user = await aget_user(telegram_id=user_telegram_id)
     if not user:
         await call.answer("Foydalanuvchi topilmadi.", show_alert=True)
@@ -175,7 +177,7 @@ async def padmin_accept(call: types.CallbackQuery):
         return
 
     start_date = timezone.localdate()
-    end_date = start_date + timedelta(days=30)
+    end_date = start_date + timedelta(days=days)
     Payment.objects.create(
         user=user, amount=price,
         start_date=start_date, end_date=end_date, status="paid",
@@ -254,3 +256,122 @@ async def padmin_reject_reason(message: types.Message, state: FSMContext):
         print(f"padmin_reject notify user failed: {e}")
 
     await message.answer("✅ Rad etish sababi foydalanuvchiga yuborildi.")
+
+
+# ── Gift Premium approve/reject (admin DM only) ───────────────────────────────
+
+@dp.callback_query_handler(
+    ChatTypeFilter(ChatType.PRIVATE),
+    lambda c: c.data and c.data.startswith("gpacc:"),
+)
+async def gift_premium_accept(call: types.CallbackQuery):
+    if not _is_admin(call.from_user.id):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+
+    _, price, buyer_tid, recipient_tid, days, anon = call.data.split(":")
+    price = int(price)
+    days = int(days)
+    anonymous = anon == "1"
+
+    recipient = await aget_user(telegram_id=recipient_tid)
+    buyer = await aget_user(telegram_id=buyer_tid)
+    if not recipient:
+        await call.answer("Qabul qiluvchi topilmadi.", show_alert=True)
+        return
+
+    start_date = timezone.localdate()
+    end_date = start_date + timedelta(days=days)
+    Payment.objects.create(
+        user=recipient, amount=price,
+        start_date=start_date, end_date=end_date, status="paid",
+    )
+
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+    await call.answer("✅ Sovg'a tasdiqlandi!", show_alert=True)
+
+    giver_label = "Anonim xayrixoh 🎁" if anonymous else f"<b>{buyer.full_name if buyer else buyer_tid}</b>"
+    try:
+        await bot.send_message(
+            chat_id=recipient_tid,
+            text=(
+                "🎁 <b>Sizga Premium sovg'a qilindi!</b>\n\n"
+                f"👤 Kimdan: {giver_label}\n\n"
+                + _build_premium_welcome(start_date, end_date)
+            ),
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        print(f"gift notify recipient failed: {e}")
+
+    try:
+        await bot.send_message(
+            chat_id=buyer_tid,
+            text=(
+                "✅ <b>Sovg'angiz yetkazildi!</b>\n\n"
+                f"🎁 {recipient.full_name or recipient_tid} endi {days} kunlik Premiumdan "
+                "foydalanmoqda. Rahmat! 💚"
+            ),
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        print(f"gift notify buyer failed: {e}")
+
+
+@dp.callback_query_handler(
+    ChatTypeFilter(ChatType.PRIVATE),
+    lambda c: c.data and c.data.startswith("gprej:"),
+)
+async def gift_premium_reject(call: types.CallbackQuery, state: FSMContext):
+    if not _is_admin(call.from_user.id):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+
+    _, price, buyer_tid, recipient_tid = call.data.split(":")
+    await state.update_data(gift_reject_buyer=buyer_tid, gift_reject_recipient=recipient_tid)
+
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+    await call.answer()
+    await call.message.answer(
+        f"❌ Rad etish sababi yozing (xaridor: <code>{buyer_tid}</code>):",
+        parse_mode="HTML",
+    )
+    from tgbot.bot.states.main import AdminReplyState as _ARS
+    await _ARS.gift_reject_reason.set()
+
+
+@dp.message_handler(
+    ChatTypeFilter(ChatType.PRIVATE),
+    state="AdminReplyState:gift_reject_reason",
+)
+async def gift_reject_reason(message: types.Message, state: FSMContext):
+    if not _is_admin(message.from_user.id):
+        await state.finish()
+        return
+
+    data = await state.get_data()
+    buyer_tid = data.get("gift_reject_buyer")
+    await state.finish()
+
+    try:
+        await bot.send_message(
+            chat_id=buyer_tid,
+            text=(
+                "❌ <b>Sovg'a to'lovingiz rad etildi.</b>\n\n"
+                f"💡 Sabab: {message.text}\n\n"
+                "Iltimos, to'lovni qayta amalga oshirib, chekni yuboring."
+            ),
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        print(f"gift_reject notify buyer failed: {e}")
+
+    await message.answer("✅ Rad etish sababi xaridorga yuborildi.")

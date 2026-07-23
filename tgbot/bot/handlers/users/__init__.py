@@ -8,6 +8,7 @@ from . import change_language
 from . import report
 from . import admin_panel
 from . import payment
+from . import gift_premium
 from . import send_message_from_bot
 from . import restart
 from . import cabinet
