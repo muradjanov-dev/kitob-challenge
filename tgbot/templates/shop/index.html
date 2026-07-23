@@ -140,6 +140,10 @@
       font-size: 11px; color: var(--text-dim);
     }
     .card .stock.low { color: var(--error); }
+    .card .stock.urgent {
+      color: #ff9f1c; font-weight: 800; font-size: 12.5px;
+      text-shadow: 0 0 12px rgba(255,159,28,0.45);
+    }
     .card.unavailable { opacity: 0.55; filter: grayscale(0.25); }
     .card.unavailable:hover { transform: none; box-shadow: none; }
     .card .badge-soldout {
@@ -621,7 +625,7 @@
           : (p.stock_qty <= 0
               ? '<div class="stock low">Tugadi</div>'
               : (p.stock_qty <= 3
-                  ? '<div class="stock low">Faqat ' + p.stock_qty + ' qoldi</div>'
+                  ? '<div class="stock urgent">🔥 Faqat ' + p.stock_qty + ' qoldi!</div>'
                   : '<div class="stock">Mavjud: ' + p.stock_qty + '</div>'));
         const soldBadge = (p.stock_qty != null && p.stock_qty <= 0)
           ? '<div class="badge-soldout">TUGADI</div>' : '';
