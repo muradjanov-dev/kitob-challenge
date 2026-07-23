@@ -403,6 +403,32 @@
     .da-lock  { background: rgba(198,113,57,.08); color: #a05a2e; border-color: rgba(198,113,57,.26); cursor: default; }
     .da-pdf:hover,.da-audio:hover { filter: brightness(1.12); }
 
+    /* PDF Reader */
+    #pdfReader {
+      display: none; position: fixed; inset: 0; z-index: 300;
+      background: #111; flex-direction: column;
+    }
+    #pdfReader.open { display: flex; }
+    .pdf-hd {
+      display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+      background: var(--wood-dk); border-bottom: 1px solid rgba(255,255,255,.1); flex-shrink: 0;
+    }
+    .pdf-hd-title {
+      flex: 1; font-size: 14px; font-weight: 700; color: var(--bg);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .pdf-hd-close {
+      background: rgba(255,255,255,.12); border: none; border-radius: 8px;
+      color: var(--bg); padding: 7px 14px; font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: background .15s; white-space: nowrap; font-family: var(--fb);
+    }
+    .pdf-hd-close:hover { background: rgba(255,255,255,.22); }
+    #pdfFrame { flex: 1; border: none; }
+
+    /* Audio player */
+    .audio-wrap { margin-top: 8px; padding: 12px; background: rgba(122,138,94,.08); border: 1.5px solid rgba(122,138,94,.22); border-radius: 12px; }
+    .audio-wrap audio { width: 100%; }
+
     /* Comments inside detail */
     .cmt-section { border-top: 1px solid var(--border); padding-top: 14px; }
     .cmt-title { font-size: 13px; font-weight: 700; color: var(--text-dim); margin-bottom: 10px; letter-spacing: .3px; }
@@ -689,6 +715,9 @@
       <div class="detail-badges" id="detailBadges"></div>
       <div class="detail-desc"   id="detailDesc"></div>
       <div class="detail-actions" id="detailActions"></div>
+      <div class="audio-wrap" id="audioWrap" style="display:none">
+        <audio id="audioPlayer" controls></audio>
+      </div>
 
       <div class="cmt-section">
         <div class="cmt-title">💬 Izohlar</div>
@@ -704,6 +733,15 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- ═══════════════ PDF READER ═══════════════ -->
+<div id="pdfReader">
+  <div class="pdf-hd">
+    <button class="pdf-hd-close" id="pdfClose">✕ Yopish</button>
+    <div class="pdf-hd-title" id="pdfTitle"></div>
+  </div>
+  <iframe id="pdfFrame" title="PDF o'quvchi"></iframe>
 </div>
 
 <!-- ═══════════════ SEARCH OVERLAY ═══════════════ -->
@@ -911,6 +949,38 @@ const detailDesc  = document.getElementById('detailDesc');
 const detailActions=document.getElementById('detailActions');
 
 let _currentBookId = null;
+let _currentPdfUrl   = null;
+let _currentAudioUrl = null;
+
+// ── PDF Reader ───────────────────────────────────────────────────
+function openPdfReader() {
+  if (!_currentPdfUrl) return;
+  document.getElementById('pdfTitle').textContent = detailTitle.textContent;
+  document.getElementById('pdfFrame').src = _currentPdfUrl;
+  document.getElementById('pdfReader').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closePdfReader() {
+  document.getElementById('pdfReader').classList.remove('open');
+  document.getElementById('pdfFrame').src = '';
+  document.body.style.overflow = '';
+}
+document.getElementById('pdfClose').addEventListener('click', closePdfReader);
+
+// ── Audio Player ─────────────────────────────────────────────────
+function toggleAudio() {
+  const wrap = document.getElementById('audioWrap');
+  const ap   = document.getElementById('audioPlayer');
+  if (wrap.style.display === 'none') {
+    ap.src = _currentAudioUrl;
+    wrap.style.display = '';
+    ap.play().catch(() => {});
+  } else {
+    ap.pause();
+    ap.src = '';
+    wrap.style.display = 'none';
+  }
+}
 
 function _esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -945,15 +1015,24 @@ function openDetail(id) {
   let actions = '';
   if (b.hasPdf || b.hasAudio) {
     if (b.premium) {
-      actions = `<span class="da-btn da-lock">🔒 Botdan yuklab oling</span>`;
+      actions = `<span class="da-btn da-lock">🔒 Premium kitob — botdan foydalaning</span>`;
     } else {
-      if (b.pdf)   actions += `<a class="da-btn da-pdf"   href="${b.pdf}"   download target="_blank" rel="noopener">📄 PDF yuklab olish</a>`;
-      if (b.audio) actions += `<a class="da-btn da-audio" href="${b.audio}" download target="_blank" rel="noopener">🎧 Audio yuklab olish</a>`;
+      if (b.pdf)   actions += `<button class="da-btn da-pdf"   onclick="openPdfReader()">📖 Kitobni o'qish</button>`;
+      if (b.audio) actions += `<button class="da-btn da-audio" onclick="toggleAudio()">🎧 Audio tinglash</button>`;
     }
   }
   detailActions.innerHTML = actions;
 
   _currentBookId = id;
+  _currentPdfUrl   = b.pdf   || null;
+  _currentAudioUrl = b.audio || null;
+
+  // reset audio player
+  const aw = document.getElementById('audioWrap');
+  const ap = document.getElementById('audioPlayer');
+  if (ap.src) { ap.pause(); ap.src = ''; }
+  aw.style.display = 'none';
+
   document.getElementById('cmtText').value = '';
   document.getElementById('cmtNoAuth').style.display = _initData ? 'none' : '';
   document.getElementById('cmtForm').style.display   = _initData ? '' : 'none';
@@ -970,7 +1049,7 @@ function closeDetail() {
 
 closeBtn.addEventListener('click', closeDetail);
 overlay.addEventListener('click', e => { if (e.target === overlay) closeDetail(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDetail(); closeSearch(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closePdfReader(); closeDetail(); closeSearch(); } });
 
 // ── Comments ─────────────────────────────────────────────────────
 const cmtList = document.getElementById('cmtList');
