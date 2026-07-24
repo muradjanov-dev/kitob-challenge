@@ -1808,22 +1808,21 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
 
 
 async def _send_kitobcha_top(message):
-    """Admin-only ranking of users by Kitobcha (ball) balance, Top 30."""
+    """Admin-only ranking of users by Kitobcha (ball) balance, Top 30 — plus
+    the grand total currently held across every registered user."""
     from asgiref.sync import sync_to_async
+    from django.db.models import Sum
     from django.utils.html import escape as _esc
     from tgbot.models import TelegramProfile
 
     @sync_to_async
     def _load():
-        return list(
-            TelegramProfile.objects
-            .filter(is_registered=True)
-            .exclude(ball__isnull=True)
-            .order_by("-ball", "id")[:30]
-            .values_list("telegram_id", "full_name", "ball")
-        )
+        qs = TelegramProfile.objects.filter(is_registered=True).exclude(ball__isnull=True)
+        top = list(qs.order_by("-ball", "id")[:30].values_list("telegram_id", "full_name", "ball"))
+        grand_total = qs.aggregate(s=Sum("ball"))["s"] or 0
+        return top, grand_total
 
-    rows = await _load()
+    rows, grand_total = await _load()
     rows = [r for r in rows if (r[2] or 0) > 0]
     if not rows:
         await message.answer("🪙 Hozircha hech kimda Kitobcha yo'q.")
@@ -1837,8 +1836,12 @@ async def _send_kitobcha_top(message):
         lines.append(
             f"{marker} <a href='tg://user?id={tg_id}'>{nm}</a>: <b>{int(ball or 0)}</b> 🪙"
         )
-    total = sum(int(r[2] or 0) for r in rows)
-    lines.append(f"\n📊 Top 30 jami: <b>{total}</b> 🪙")
+    top_total = sum(int(r[2] or 0) for r in rows)
+    lines.append(f"\n📊 Top 30 jami: <b>{top_total}</b> 🪙")
+    lines.append(
+        f"💰 Shu kungacha barcha foydalanuvchilarda jami: <b>{int(grand_total)}</b> 🪙 "
+        "(joriy balanslar yig'indisi — do'kondan sarflangan Kitobchalar bu songa kirmaydi)"
+    )
     await message.answer(
         "\n".join(lines),
         parse_mode="HTML",
