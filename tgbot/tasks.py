@@ -2832,16 +2832,28 @@ def _finalize_challenge_results(challenge_id: int):
 
 @shared_task
 def announce_challenge():
-    """Every 3 days: finalize previous challenge (and any active boom), then
-    either launch a queued Referral BOOM for this slot or pick the next pool
+    """Runs daily at 00:15; only actually does anything once the active
+    challenge's end_date has passed. This used to be pinned to a fixed
+    day-of-month cron list (1,4,7,...,28), which drifted at every month
+    boundary that isn't a multiple of 3 (e.g. a 31-day month leaves a 4-day
+    gap between day 28 and day 1) — some challenges sat "finished but not
+    announced" for an extra day or more. Checking end_date directly here
+    ties the finalize+next-announce moment to the challenge's real lifecycle
+    instead of the calendar.
+
+    When due: finalize previous challenge (and any active boom), then either
+    launch a queued Referral BOOM for this slot or pick the next pool
     challenge, and announce to groups + users."""
     import datetime as _dt
     import random as _rand
     import time as _time
     from tgbot.models import Challenge, ReferralBoom
 
-    # Finalize any still-active challenge
+    # Finalize any still-active challenge, but only once its window is over —
+    # a challenge that started today or yesterday isn't due yet.
     prev = Challenge.objects.filter(is_active=True).first()
+    if prev and prev.end_date >= timezone.localdate():
+        return
     if prev:
         _finalize_challenge_results(prev.id)
 

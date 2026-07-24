@@ -85,8 +85,12 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=23, minute=50),
     },
     'announce-challenge': {
+        # Runs every day; the task itself no-ops unless the active challenge's
+        # end_date has actually passed (see docstring in tasks.py) — this
+        # replaces a fixed day-of-month list that drifted at month boundaries
+        # not divisible by 3, leaving some challenges unannounced for days.
         'task': 'tgbot.tasks.announce_challenge',
-        'schedule': crontab(hour=9, minute=5, day_of_month='1,4,7,10,13,16,19,22,25,28'),
+        'schedule': crontab(hour=0, minute=15),
     },
     'boom-reminder-tick': {
         'task': 'tgbot.tasks.boom_reminder_tick',
