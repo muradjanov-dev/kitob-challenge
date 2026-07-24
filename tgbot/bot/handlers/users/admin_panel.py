@@ -1808,42 +1808,59 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
 
 
 async def _send_kitobcha_top(message):
-    """Admin-only ranking of users by Kitobcha (ball) balance, Top 30 — plus
-    the grand total currently held across every registered user."""
+    """Admin-only ranking of EVERY user by Kitobcha (ball) balance (chunked —
+    doesn't fit in one Telegram message), plus aggregate stats: current grand
+    total, shop spend/transaction count, and an estimated lifetime total ever
+    granted. There's no award ledger, so "lifetime given" is reconstructed as
+    current balances + shop spend (spent Kitobcha was still given to the user
+    before they spent it; game entry fees are just redistributed among users
+    and already counted in current balances, so they're not added again)."""
     from asgiref.sync import sync_to_async
     from django.db.models import Sum
     from django.utils.html import escape as _esc
-    from tgbot.models import TelegramProfile
+    from tgbot.models import TelegramProfile, ShopPurchase
 
     @sync_to_async
     def _load():
-        qs = TelegramProfile.objects.filter(is_registered=True).exclude(ball__isnull=True)
-        top = list(qs.order_by("-ball", "id")[:30].values_list("telegram_id", "full_name", "ball"))
+        qs = TelegramProfile.objects.filter(is_registered=True, ball__gt=0)
+        rows = list(qs.order_by("-ball", "id").values_list("telegram_id", "full_name", "ball"))
         grand_total = qs.aggregate(s=Sum("ball"))["s"] or 0
-        return top, grand_total
+        purchase_count = ShopPurchase.objects.count()
+        spent_total = ShopPurchase.objects.aggregate(s=Sum("price_at_purchase"))["s"] or 0
+        return rows, grand_total, purchase_count, spent_total
 
-    rows, grand_total = await _load()
-    rows = [r for r in rows if (r[2] or 0) > 0]
+    rows, grand_total, purchase_count, spent_total = await _load()
     if not rows:
         await message.answer("🪙 Hozircha hech kimda Kitobcha yo'q.")
         return
 
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-    lines = ["🪙 <b>Kitobcha bo'yicha reyting (Top 30):</b>\n"]
+    header = f"🪙 <b>Kitobcha bo'yicha reyting — barcha {len(rows)} foydalanuvchi:</b>\n\n"
+    chunks = []
+    current = header
     for i, (tg_id, name, ball) in enumerate(rows, 1):
         marker = medals.get(i, f"{i}.")
         nm = _esc(name or "Kitobxon")
-        lines.append(
-            f"{marker} <a href='tg://user?id={tg_id}'>{nm}</a>: <b>{int(ball or 0)}</b> 🪙"
-        )
-    top_total = sum(int(r[2] or 0) for r in rows)
-    lines.append(f"\n📊 Top 30 jami: <b>{top_total}</b> 🪙")
-    lines.append(
-        f"💰 Shu kungacha barcha foydalanuvchilarda jami: <b>{int(grand_total)}</b> 🪙 "
-        "(joriy balanslar yig'indisi — do'kondan sarflangan Kitobchalar bu songa kirmaydi)"
+        line = f"{marker} <a href='tg://user?id={tg_id}'>{nm}</a>: <b>{int(ball or 0)}</b> 🪙\n"
+        if len(current) + len(line) > 3500:
+            chunks.append(current)
+            current = line
+        else:
+            current += line
+    chunks.append(current)
+
+    for chunk in chunks:
+        await message.answer(chunk, parse_mode="HTML", disable_web_page_preview=True)
+
+    lifetime_total = int(grand_total) + int(spent_total)
+    summary = (
+        "📊 <b>Umumiy statistika</b>\n\n"
+        f"💰 Joriy balanslar yig'indisi: <b>{int(grand_total)}</b> 🪙\n"
+        f"🛒 Do'kondan sarflangan: <b>{int(spent_total)}</b> 🪙 ({purchase_count} ta tranzaksiya)\n"
+        f"🏆 Shu kungacha jami berilgan (taxminiy): <b>{lifetime_total}</b> 🪙\n\n"
+        "<i>Eslatma: alohida tranzaksiya jurnali yo'q, shuning uchun \"jami berilgan\" "
+        "joriy balans + do'kondan sarflangan miqdor asosida hisoblangan. O'yinlarga "
+        "kirish haqi kabi foydalanuvchilar orasida qayta taqsimlangan mablag'lar "
+        "allaqachon joriy balansda hisobga olingan, shuning uchun qayta qo'shilmadi.</i>"
     )
-    await message.answer(
-        "\n".join(lines),
-        parse_mode="HTML",
-        disable_web_page_preview=True,
-    )
+    await message.answer(summary, parse_mode="HTML")
