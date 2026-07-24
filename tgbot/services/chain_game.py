@@ -28,7 +28,7 @@ from django.db.models import Sum, Count
 from django.utils import timezone
 
 from tgbot.models import ChainGame, ChainScore, TelegramProfile, GlobalBook
-from tgbot.services.chain_text import normalize
+from tgbot.services.chain_text import normalize, is_guessable_letter
 
 ENTRY_FEE = 25  # Kitobcha to join a game (charged once, on first attempt)
 POINTS_PER_ROUND = 10
@@ -69,14 +69,14 @@ def _pick_round(used_book_ids) -> dict | None:
     used (small catalog / long game) rather than stalling the game."""
     all_books = [
         (i, t) for i, t in GlobalBook.objects.values_list("id", "title")
-        if sum(c.isalpha() for c in t) >= MIN_TITLE_LETTERS
+        if sum(is_guessable_letter(c) for c in t) >= MIN_TITLE_LETTERS
     ]
     if not all_books:
         return None
     fresh = [b for b in all_books if b[0] not in (used_book_ids or [])]
     book_id, title = random.choice(fresh or all_books)
 
-    letter_positions = [i for i, c in enumerate(title) if c.isalpha()]
+    letter_positions = [i for i, c in enumerate(title) if is_guessable_letter(c)]
     n_blanks = min(random.choice([1, 2]), len(letter_positions))
     positions = sorted(random.sample(letter_positions, n_blanks))
     blanks = [{"pos": p, "letter": title[p]} for p in positions]

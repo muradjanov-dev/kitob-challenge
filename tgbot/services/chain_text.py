@@ -1,9 +1,10 @@
-"""Pure text helpers for the Kitob Zanjiri (book chain) game.
+"""Pure text helpers for the Kitob Zanjiri (missing-letter) game.
 
 No Django imports — safe to use from data migrations and the game service.
-Chaining is done on single Latin letters (a-z). Uzbek digraphs (sh, ch, ng)
-and the o'/g' apostrophe letters are treated by their base letter, which keeps
-matching simple and predictable for players.
+`normalize`/`is_guessable_letter` are used by the current mechanic (guessing
+blanked-out letters in a real book title); `first_letter`/`last_letter` are
+leftovers from the earlier free-text chain mechanic, unused today but kept
+since ChainWordAdmin (admin.py) still calls them for the legacy dictionary.
 """
 
 import re
@@ -54,3 +55,29 @@ def last_letter(text: str) -> str:
     """Last Latin letter of the (normalized) text, or '' if none."""
     ls = _letters(text)
     return ls[-1] if ls else ""
+
+
+# Apostrophe glyphs unified above, plus the plain apostrophe itself — any of
+# these are typeable as "'" and match via normalize().
+_GUESSABLE_APOS = set("'‘’`ʻʼ´")
+
+
+def is_guessable_letter(c: str) -> bool:
+    """True if `c` is a character a player could plausibly type on an
+    ordinary keyboard: plain ASCII letters, Cyrillic (typeable in Cyrillic or
+    its Latin transliteration — both match via normalize()), or one of the
+    apostrophe glyphs used for Uzbek's o'/g' digraphs.
+
+    Excludes diacritic Latin letters (ö, ü, ş, ə, ĝ, ģ, ...) that occasionally
+    show up in imported book titles (Turkish titles, or data-entry mistakes
+    substituting a single accented letter for Uzbek's "g'"/"o'" digraphs).
+    Those can't be reproduced by a player who can only see a blank — masking
+    one would make the round unsolvable."""
+    if not c:
+        return False
+    if c in _GUESSABLE_APOS:
+        return True
+    lc = c.lower()
+    if "a" <= lc <= "z":
+        return True
+    return lc in _CYR
