@@ -1200,11 +1200,15 @@ class ReferralBoomParticipant(BaseModel):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Kitob Zanjiri — a live, twice-a-week "book chain" race on the website Mini
-# App. A session shows a required starting letter; everyone races to submit a
-# book title / author name starting with it (from the ChainWord dictionary, not
-# already used). The first valid submission wins the link, scores a point, and
-# the chain advances to a new letter. Top scorers earn Kitobcha at the end.
+# Kitob Zanjiri — a live, twice-a-day "missing letter" race on the website Mini
+# App. A round shows a real GlobalBook title with 1-2 letters blanked out;
+# everyone races to type the missing letter(s). The first correct guess wins
+# the round, scores a point, and a new round starts with a different title.
+# Top scorers earn Kitobcha at the end. See tgbot/services/chain_game.py.
+#
+# ChainWord (below) was the dictionary for an earlier free-text mechanic and is
+# no longer read by the live game — left in place, unused, rather than risk a
+# destructive migration over dead gameplay data.
 # ─────────────────────────────────────────────────────────────────────────────
 class ChainWord(BaseModel):
     KIND_BOOK = "book"
@@ -1245,23 +1249,27 @@ class ChainGame(BaseModel):
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
     starts_at = models.DateTimeField()
     ends_at = models.DateTimeField()
-    current_letter = models.CharField(max_length=1, default="")
+    current_letter = models.CharField(
+        max_length=1, default="",
+        help_text="Unused since the missing-letter mechanic replaced the free-text "
+                  "chain — kept only to avoid a destructive migration.",
+    )
     chain = models.JSONField(
         default=list,
-        help_text='Won links: [{"norm","display","user_id","name","letter","at"}].',
+        help_text='Solved rounds: [{"idx","title","masked","user_id","name","at"}].',
     )
     used_norms = models.JSONField(
-        default=list, help_text="Normalized words already played (no repeats).",
+        default=list, help_text="GlobalBook ids already used this game (no repeats).",
     )
     pending = models.JSONField(
         null=True, blank=True, default=None,
-        help_text='Candidate awaiting a crowd vote: {"norm","display","user_id","name",'
-                  '"letter","last_letter","started_at","yes":[ids],"no":[ids]}.',
+        help_text='Current in-progress round: {"book_id","title","masked",'
+                  '"blanks":[{"pos","letter"}],"started_at"}.',
     )
     rejected_norms = models.JSONField(
         default=list,
-        help_text="Norms voted down for the CURRENT letter — blocked from resubmission "
-                  "until the letter advances.",
+        help_text="Unused since the missing-letter mechanic replaced the free-text "
+                  "chain — kept only to avoid a destructive migration.",
     )
     rewarded = models.BooleanField(default=False)
 
@@ -1285,13 +1293,19 @@ class ChainScore(BaseModel):
         TelegramProfile, on_delete=models.CASCADE, related_name="chain_scores",
     )
     points = models.PositiveIntegerField(default=0)
-    links = models.PositiveIntegerField(default=0, help_text="Links this user won.")
+    links = models.PositiveIntegerField(default=0, help_text="Rounds this user solved.")
     reward = models.PositiveIntegerField(default=0, help_text="Kitobcha paid at finish.")
     rewarded = models.BooleanField(default=False)
     strikes = models.PositiveIntegerField(
-        default=0, help_text="How many of this user's links the crowd rejected.")
+        default=0,
+        help_text="Unused since the missing-letter mechanic replaced the free-text "
+                  "chain — kept only to avoid a destructive migration.",
+    )
     kicked = models.BooleanField(
-        default=False, help_text="Removed from the game after 3 rejected links.")
+        default=False,
+        help_text="Unused since the missing-letter mechanic replaced the free-text "
+                  "chain — kept only to avoid a destructive migration.",
+    )
 
     class Meta:
         db_table = "chain_scores"

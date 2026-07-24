@@ -1,17 +1,23 @@
-"""Kitob Zanjiri — live "book chain" game logic.
+"""Kitob Zanjiri — live "missing letter" game logic.
 
-A session shows a required starting letter; players race to submit a book title
-or author name starting with that letter and not already used. The FIRST valid
-submission for that letter becomes a "pending" candidate that goes to a crowd
-vote (see `submit`/`vote_pending`): if it collects more than ACCEPT_VOTES_THRESHOLD-1
-"to'g'ri" votes, or is ahead when the VOTE_WINDOW_SECONDS window closes, it's
-accepted and the chain advances (+10, next letter). Otherwise it's rejected —
-the letter stays open and the next person to submit for it becomes the new
-candidate. No fixed dictionary: any text is accepted as a candidate, the crowd
-vets it.
+A round shows a real book title with 1-2 letters blanked out; players race to
+type the missing letter(s), in left-to-right order. The FIRST correct guess
+wins the round immediately (+10, no crowd vote needed — the answer is a known
+fact, not an opinion), and a new round starts right away with a different book
+title. Titles are drawn from the real `GlobalBook` catalog, no repeats within
+a game.
 
 Concurrency: every write locks the ChainGame row (select_for_update), so under
-simultaneous answers exactly one becomes the pending candidate.
+simultaneous guesses exactly one submission wins the round.
+
+Field reuse note: this replaces the old free-text "book chain" mechanic
+in-place, reusing the same nullable JSON columns instead of adding new ones —
+`pending` now holds the in-progress round (book/masked title/blanks) instead
+of a vote candidate, `chain` holds solved-round history instead of accepted
+chain links, `used_norms` holds used GlobalBook ids instead of normalized
+words. `current_letter`, `rejected_norms` and ChainScore's `strikes`/`kicked`
+are no longer written — there's nothing to vote down or strike in the new
+mechanic, since every answer is checked against a known correct title.
 """
 
 import random
@@ -20,21 +26,15 @@ from datetime import timedelta
 from django.db import transaction
 from django.db.models import Sum, Count
 from django.utils import timezone
-from django.utils.dateparse import parse_datetime
 
-from tgbot.models import ChainGame, ChainScore, TelegramProfile
-from tgbot.services.chain_text import normalize, first_letter, last_letter
+from tgbot.models import ChainGame, ChainScore, TelegramProfile, GlobalBook
+from tgbot.services.chain_text import normalize
 
 ENTRY_FEE = 25  # Kitobcha to join a game (charged once, on first attempt)
-POINTS_PER_LINK = 10
+POINTS_PER_ROUND = 10
 DEFAULT_DURATION_MIN = 10
 LEAD_SECONDS = 30  # lobby countdown after the announcement, so everyone can join
-VOTE_WINDOW_SECONDS = 10  # how long a pending candidate stays open to votes
-ACCEPT_VOTES_THRESHOLD = 6  # more than 5 "to'g'ri" votes accepts immediately
-
-# Letters that comfortably start Uzbek book/author names — used for the opening
-# letter and as a fallback when a word ends in a hard/rare letter.
-START_LETTERS = list("abdegijklmnopqrstuvyfh")
+MIN_TITLE_LETTERS = 4  # skip titles too short to blank meaningfully
 
 REWARD_TIERS = {0: 300, 1: 200, 2: 100}
 PARTICIPATION = 30  # guest Kitobcha for EVERY participant who didn't place
@@ -63,12 +63,34 @@ def charge_entry_fee(profile, amount: int = ENTRY_FEE) -> bool:
     return True
 
 
-def _initial_letter() -> str:
-    return random.choice(START_LETTERS)
+def _pick_round(used_book_ids) -> dict | None:
+    """Pick a random GlobalBook not already used this game, blank 1-2 of its
+    letters. Falls back to allowing repeats if every eligible book has been
+    used (small catalog / long game) rather than stalling the game."""
+    all_books = [
+        (i, t) for i, t in GlobalBook.objects.values_list("id", "title")
+        if sum(c.isalpha() for c in t) >= MIN_TITLE_LETTERS
+    ]
+    if not all_books:
+        return None
+    fresh = [b for b in all_books if b[0] not in (used_book_ids or [])]
+    book_id, title = random.choice(fresh or all_books)
 
+    letter_positions = [i for i, c in enumerate(title) if c.isalpha()]
+    n_blanks = min(random.choice([1, 2]), len(letter_positions))
+    positions = sorted(random.sample(letter_positions, n_blanks))
+    blanks = [{"pos": p, "letter": title[p]} for p in positions]
+    masked = list(title)
+    for b in blanks:
+        masked[b["pos"]] = "_"
 
-def _next_letter(word_last: str) -> str:
-    return word_last or random.choice(START_LETTERS)
+    return {
+        "book_id": book_id,
+        "title": title,
+        "masked": "".join(masked),
+        "blanks": blanks,
+        "started_at": timezone.now().isoformat(),
+    }
 
 
 # ── Game lifecycle ───────────────────────────────────────────────────────────
@@ -77,7 +99,7 @@ def create_scheduled_game(lead_seconds: int = LEAD_SECONDS,
                           title: str = "Kitob Zanjiri") -> ChainGame:
     """Create a game that opens after a short lobby (default 30s) so players who
     just saw the announcement can get ready. It auto-flips to live at starts_at
-    (see get_or_activate_live_game)."""
+    (see get_or_activate_live_game), which is also when the first round starts."""
     now = timezone.now()
     starts = now + timedelta(seconds=lead_seconds)
     return ChainGame.objects.create(
@@ -85,7 +107,6 @@ def create_scheduled_game(lead_seconds: int = LEAD_SECONDS,
         status=ChainGame.STATUS_SCHEDULED,
         starts_at=starts,
         ends_at=starts + timedelta(minutes=duration_minutes),
-        current_letter=_initial_letter(),
         chain=[],
         used_norms=[],
     )
@@ -93,26 +114,27 @@ def create_scheduled_game(lead_seconds: int = LEAD_SECONDS,
 
 def get_or_activate_live_game():
     """Return the currently-live game, activating a scheduled one whose window
-    has opened. Does NOT finish expired games (see finalize)."""
+    has opened (and starting its first round). Does NOT finish expired games
+    (see finalize)."""
     now = timezone.now()
     g = ChainGame.objects.filter(status=ChainGame.STATUS_LIVE).order_by("-starts_at").first()
     if g:
         return g
-    pending = (
+    scheduled = (
         ChainGame.objects
         .filter(status=ChainGame.STATUS_SCHEDULED, starts_at__lte=now, ends_at__gte=now)
         .order_by("starts_at")
         .first()
     )
-    if not pending:
+    if not scheduled:
         return None
     with transaction.atomic():
-        g = ChainGame.objects.select_for_update().get(id=pending.id)
+        g = ChainGame.objects.select_for_update().get(id=scheduled.id)
         if g.status == ChainGame.STATUS_SCHEDULED:
             g.status = ChainGame.STATUS_LIVE
-            if not g.current_letter:
-                g.current_letter = _initial_letter()
-            g.save(update_fields=["status", "current_letter", "updated_at"])
+            if not g.pending:
+                g.pending = _pick_round(g.used_norms or [])
+            g.save(update_fields=["status", "pending", "updated_at"])
     return g
 
 
@@ -120,130 +142,55 @@ def latest_game():
     return ChainGame.objects.order_by("-starts_at").first()
 
 
-def _mk_pending(profile, text: str, norm: str, ll: str, letter: str) -> dict:
-    display = " ".join((text or "").strip().split())[:60]
-    return {
-        "norm": norm,
-        "display": display,
+def _accept_round(g: ChainGame, round_: dict, profile) -> dict:
+    """Commit the winning guess: score it, record the solved round, start the
+    next one. Caller must hold the row lock (select_for_update) on `g`."""
+    solved = g.chain or []
+    solved.append({
+        "idx": len(solved),
+        "title": round_["title"],
+        "masked": round_["masked"],
         "user_id": profile.id,
         "name": (profile.full_name or "Kitobxon")[:40],
-        "letter": letter,
-        "last_letter": ll,
-        "started_at": timezone.now().isoformat(),
-        "yes": [],
-        "no": [],
-    }
-
-
-def _pending_elapsed(pending: dict) -> float:
-    started = parse_datetime(pending["started_at"])
-    if started and timezone.is_naive(started):
-        started = timezone.make_aware(started)
-    return (timezone.now() - started).total_seconds()
-
-
-def _accept_pending(g: ChainGame) -> dict:
-    """Commit the pending candidate as a won link and advance the letter.
-    Caller must hold the row lock (select_for_update) on `g`."""
-    p = g.pending
-    chain = g.chain or []
-    chain.append({
-        "idx": len(chain),
-        "norm": p["norm"],
-        "display": p["display"],
-        "user_id": p["user_id"],
-        "name": p["name"],
-        "letter": p["letter"],
         "at": timezone.now().isoformat(),
     })
     used = list(g.used_norms or [])
-    used.append(p["norm"])
-    g.chain = chain
+    used.append(round_["book_id"])
+    g.chain = solved
     g.used_norms = used
-    g.current_letter = _next_letter(p.get("last_letter"))
-    g.pending = None
-    g.rejected_norms = []
-    g.save(update_fields=[
-        "chain", "used_norms", "current_letter", "pending", "rejected_norms", "updated_at",
-    ])
+    g.pending = _pick_round(used)
+    g.save(update_fields=["chain", "used_norms", "pending", "updated_at"])
 
-    score, _ = ChainScore.objects.get_or_create(game=g, user_id=p["user_id"])
-    score.points = (score.points or 0) + POINTS_PER_LINK
+    score, _created = ChainScore.objects.get_or_create(game=g, user_id=profile.id)
+    score.points = (score.points or 0) + POINTS_PER_ROUND
     score.links = (score.links or 0) + 1
     score.save(update_fields=["points", "links", "updated_at"])
-    return {
-        "accepted": True, "display": p["display"], "gained": POINTS_PER_LINK,
-        "next_letter": g.current_letter, "user_id": p["user_id"],
-    }
+    return {"title": round_["title"], "gained": POINTS_PER_ROUND}
 
 
-def _reject_pending(g: ChainGame) -> dict:
-    """Drop the pending candidate — the letter stays open for the next
-    submitter. Strikes the submitter (shown as a warning), but no one is ever
-    removed from the game for it."""
-    p = g.pending
-    rejected = list(g.rejected_norms or [])
-    rejected.append(p["norm"])
-    g.pending = None
-    g.rejected_norms = rejected
-    g.save(update_fields=["pending", "rejected_norms", "updated_at"])
-
-    score = ChainScore.objects.filter(game=g, user_id=p["user_id"]).first()
-    if score:
-        score.strikes = (score.strikes or 0) + 1
-        score.save(update_fields=["strikes", "updated_at"])
-    return {"accepted": False, "display": p["display"], "user_id": p["user_id"], "kicked_user": False}
-
-
-def _resolve_if_expired(g: ChainGame) -> dict | None:
-    """If the pending candidate's vote window has elapsed, resolve it now:
-    accepted if it has more "to'g'ri" than "noto'g'ri" votes, else rejected.
-    Caller must hold the row lock. Returns the resolution, or None if there's
-    nothing to resolve yet."""
-    if not g.pending:
-        return None
-    if _pending_elapsed(g.pending) < VOTE_WINDOW_SECONDS:
-        return None
-    yes = len(g.pending.get("yes") or [])
-    no = len(g.pending.get("no") or [])
-    if yes > no:
-        return _accept_pending(g)
-    return _reject_pending(g)
-
-
-def submit(game_id: int, profile, text: str) -> dict:
-    """Submit a candidate answer for the current letter. The FIRST valid
-    submission becomes the pending candidate and goes to a crowd vote (see
-    `vote_pending`) — it does not score immediately. Any later submission while
-    a vote is in progress is rejected with `vote_in_progress`."""
-    norm = normalize(text)
-    fl = first_letter(text)
-    ll = last_letter(text)
-    if not norm or not fl or len(norm) < 2:
+def submit(game_id: int, profile, guess: str) -> dict:
+    """Submit a guess for the current round's missing letter(s). Correct
+    guesses score immediately and start a new round; wrong guesses just get
+    rejected so the round stays open for someone else."""
+    guess_norm = normalize(guess).replace(" ", "")
+    if not guess_norm:
         return {"ok": False, "error": "empty"}
 
     # Optimistic, LOCK-FREE pre-check: sheds the vast majority of racing / late /
     # wrong submissions without contending on the game row lock, keeping the web
-    # responsive during a big live game (only real candidates take the lock below).
+    # responsive during a big live game (only real winners take the lock below).
     g0 = ChainGame.objects.filter(id=game_id).first()
     now = timezone.now()
     if not g0 or not (g0.status == ChainGame.STATUS_LIVE and g0.starts_at <= now <= g0.ends_at):
         return {"ok": False, "error": "not_live"}
 
     # Entry fee: joining this competition costs ENTRY_FEE Kitobcha, charged once
-    # on the first attempt. The crowd vets every candidate via a vote before it
-    # scores. Rejected candidates strike the submitter (shown as a warning) but
-    # no one is ever removed from the game for it.
+    # on the first attempt.
     score0, created0 = ChainScore.objects.get_or_create(game_id=g0.id, user=profile)
     if created0:
         if not charge_entry_fee(profile):
             ChainScore.objects.filter(id=score0.id).delete()  # undo the join
             return {"ok": False, "error": "insufficient_balance", "need": ENTRY_FEE}
-
-    if g0.current_letter and fl != g0.current_letter:
-        return {"ok": False, "error": "wrong_letter", "required": g0.current_letter}
-    if norm in (g0.used_norms or []):
-        return {"ok": False, "error": "already_used"}
 
     with transaction.atomic():
         g = ChainGame.objects.select_for_update().get(id=game_id)
@@ -251,64 +198,22 @@ def submit(game_id: int, profile, text: str) -> dict:
         if not (g.status == ChainGame.STATUS_LIVE and g.starts_at <= now <= g.ends_at):
             return {"ok": False, "error": "not_live"}
 
-        # A vote may have just expired — resolve it before deciding what this
-        # submission means (acceptance/rejection may change the current letter).
-        _resolve_if_expired(g)
+        round_ = g.pending
+        if not round_:
+            # Shouldn't normally happen (activation always starts a round), but
+            # don't stall the game if it does.
+            round_ = _pick_round(g.used_norms or [])
+            if not round_:
+                return {"ok": False, "error": "no_books"}
+            g.pending = round_
+            g.save(update_fields=["pending", "updated_at"])
 
-        if g.pending:
-            return {"ok": False, "error": "vote_in_progress"}
+        expected = normalize("".join(b["letter"] for b in round_["blanks"])).replace(" ", "")
+        if guess_norm != expected:
+            return {"ok": False, "error": "wrong_guess"}
 
-        required = g.current_letter
-        if required and fl != required:
-            return {"ok": False, "error": "wrong_letter", "required": required}
-        if norm in (g.used_norms or []):
-            return {"ok": False, "error": "already_used"}
-        if norm in (g.rejected_norms or []):
-            return {"ok": False, "error": "already_rejected"}
-
-        g.pending = _mk_pending(profile, text, norm, ll, required)
-        g.save(update_fields=["pending", "updated_at"])
-        return {
-            "ok": True, "pending": True, "display": g.pending["display"],
-            "seconds": VOTE_WINDOW_SECONDS,
-        }
-
-
-def vote_pending(game_id: int, profile, accept: bool) -> dict:
-    """Vote the pending candidate 'to'g'ri' (accept) or 'noto'g'ri' (reject).
-    Immediately accepts once ACCEPT_VOTES_THRESHOLD 'to'g'ri' votes are in;
-    otherwise waits for the window to close (see `_resolve_if_expired`). You
-    can't vote your own candidate, nor vote twice."""
-    with transaction.atomic():
-        g = ChainGame.objects.select_for_update().get(id=game_id)
-
-        resolved = _resolve_if_expired(g)
-        if resolved is not None:
-            return {"ok": True, "resolved": True, **resolved}
-
-        if not g.pending:
-            return {"ok": False, "error": "no_pending"}
-        if g.pending.get("user_id") == profile.id:
-            return {"ok": False, "error": "own_pending"}
-
-        yes = list(g.pending.get("yes") or [])
-        no = list(g.pending.get("no") or [])
-        if profile.id in yes or profile.id in no:
-            return {"ok": True, "already": True, "yes": len(yes), "no": len(no)}
-
-        if accept:
-            yes.append(profile.id)
-        else:
-            no.append(profile.id)
-        g.pending["yes"] = yes
-        g.pending["no"] = no
-
-        if len(yes) >= ACCEPT_VOTES_THRESHOLD:
-            resolved = _accept_pending(g)
-            return {"ok": True, "resolved": True, **resolved}
-
-        g.save(update_fields=["pending", "updated_at"])
-        return {"ok": True, "resolved": False, "yes": len(yes), "no": len(no)}
+        result = _accept_round(g, round_, profile)
+        return {"ok": True, **result}
 
 
 def finalize(game_id: int) -> dict | None:
@@ -316,8 +221,6 @@ def finalize(game_id: int) -> dict | None:
     with transaction.atomic():
         g = ChainGame.objects.select_for_update().get(id=game_id)
         already = g.rewarded
-        # A candidate still awaiting votes when time runs out never scored —
-        # just drop it, no strike (the game ending isn't the crowd's fault).
         if g.pending:
             g.pending = None
             g.save(update_fields=["pending", "updated_at"])
@@ -328,10 +231,10 @@ def finalize(game_id: int) -> dict | None:
         return None
 
     # Option A — only players who actually SCORED are rewarded. Freeloaders
-    # (0 points) and kicked cheaters get nothing and forfeit their entry fee.
-    # Top-3 scorers get the tiered prize; every other scorer gets PARTICIPATION.
+    # (0 points) get nothing and forfeit their entry fee. Top-3 scorers get
+    # the tiered prize; every other scorer gets PARTICIPATION.
     scores = list(
-        ChainScore.objects.filter(game=g).exclude(kicked=True)
+        ChainScore.objects.filter(game=g)
         .select_related("user")
         .order_by("-points", "created_at")
     )
@@ -364,8 +267,7 @@ def finalize(game_id: int) -> dict | None:
 
     g.rewarded = True
     g.save(update_fields=["rewarded", "updated_at"])
-    valid_links = sum(1 for c in (g.chain or []) if not c.get("rejected"))
-    return {"winners": winners, "players": len(scores), "links": valid_links}
+    return {"winners": winners, "players": len(scores), "links": len(g.chain or [])}
 
 
 def finalize_due_games() -> list:
@@ -424,7 +326,7 @@ def _history(limit: int = 6) -> list:
             "winner": (top.user.full_name if top else "—") or "—",
             "winner_points": (top.points if top else 0),
             "players": ChainScore.objects.filter(game=g).count(),
-            "links": sum(1 for c in (g.chain or []) if not c.get("rejected")),
+            "links": len(g.chain or []),
         })
     return out
 
@@ -458,23 +360,16 @@ def state_payload(profile) -> dict:
         return {"ok": True, "status": "none", "lifetime": _lifetime_stats(profile),
                 "history": _history()}
 
-    # Lazily resolve an expired vote so polling clients see the outcome quickly,
-    # even if nobody has submitted/voted since the window closed.
-    if g.status == ChainGame.STATUS_LIVE and g.pending:
-        with transaction.atomic():
-            g = ChainGame.objects.select_for_update().get(id=g.id)
-            _resolve_if_expired(g)
-
-    chain = g.chain or []
+    solved = g.chain or []
     recent = [
         {
             "idx": c.get("idx"),
-            "display": c.get("display", ""),
+            "title": c.get("title", ""),
+            "masked": c.get("masked", ""),
             "name": c.get("name", ""),
-            "letter": c.get("letter", ""),
             "mine": c.get("user_id") == profile.id,
         }
-        for c in reversed(chain[-14:])
+        for c in reversed(solved[-14:])
     ]
     my = ChainScore.objects.filter(game=g, user=profile).first()
 
@@ -488,41 +383,29 @@ def state_payload(profile) -> dict:
         status = "finished"
         seconds = 0
 
-    pending_payload = None
+    round_payload = None
     if status == "live" and g.pending:
-        p = g.pending
-        yes, no = p.get("yes") or [], p.get("no") or []
-        pending_payload = {
-            "display": p["display"],
-            "name": p["name"],
-            "mine": p["user_id"] == profile.id,
-            "yes": len(yes),
-            "no": len(no),
-            "your_vote": "yes" if profile.id in yes else ("no" if profile.id in no else None),
-            "seconds_left": max(0, int(VOTE_WINDOW_SECONDS - _pending_elapsed(p))),
+        r = g.pending
+        round_payload = {
+            "masked": r.get("masked", ""),
+            "blanks": len(r.get("blanks") or []),
         }
 
-    valid_links = sum(1 for c in chain if not c.get("rejected"))
     finished = status == "finished"
     return {
         "ok": True,
         "status": status,
         "game_id": g.id,
         "title": g.title,
-        "current_letter": (g.current_letter or "").upper(),
         "seconds": seconds,
-        "chain_len": valid_links,
+        "chain_len": len(solved),
         "recent": recent,
-        "pending": pending_payload,
-        "vote_threshold": ACCEPT_VOTES_THRESHOLD,
-        "vote_seconds": VOTE_WINDOW_SECONDS,
+        "round": round_payload,
         # Top 50; finished also includes every participant with their Kitobcha.
         "leaderboard": _cached_leaderboard(g, 50, finished),
         "your_points": (my.points if my else 0),
         "your_links": (my.links if my else 0),
         "your_reward": (my.reward if my else 0),
-        "your_strikes": (my.strikes if my else 0),
-        "kicked": (my.kicked if my else False),
         "lifetime": _lifetime_stats(profile),
         "history": _history() if status != "live" else [],
     }

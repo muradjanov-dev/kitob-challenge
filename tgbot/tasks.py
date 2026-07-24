@@ -4470,14 +4470,11 @@ def start_chain_game():
         f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring va "
         "tayyor turing!\n"
         f"⏱ O'yin {DEFAULT_DURATION_MIN} daqiqa davom etadi.\n\n"
-        "Berilgan <b>harf</b> bilan boshlanadigan <b>kitob yoki muallif</b> nomini "
-        "birinchi yozgan ovozga qo'yiladi — ko'pchilik «to'g'ri» desa qabul "
-        "qilinadi va zanjir davom etadi!\n\n"
+        "📖 Kitob nomidan tushib qolgan <b>1 yoki 2 ta harfni</b> birinchi bo'lib "
+        "topgan ochko oladi — va zanjir darhol yangi kitobga o'tadi!\n\n"
         "💰 <b>Kirish: 25 Kitobcha.</b>\n"
         "🏆 Ochko olganlar mukofot oladi (1/2/3-o'rin: <b>300/200/100 🪙</b>); "
-        "bekorchi va firibgar kirish haqini yo'qotadi.\n"
-        "🤝 <b>Halol o'ynang</b> — faqat haqiqiy nom yozing, aks holda ovoz bilan "
-        "chetlatilasiz. Barakangizni yo'qotmang 🤲\n"
+        "bekorchi kirish haqini yo'qotadi.\n"
         "👇 Hoziroq kiring:"
     )
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -4511,7 +4508,7 @@ def chain_game_tick():
         winners = summary.get("winners", [])
         lines = [
             "🏁 <b>Kitob Zanjiri yakunlandi!</b>\n",
-            f"⛓ Zanjir: <b>{summary.get('links', 0)}</b> · "
+            f"📖 Topilgan kitoblar: <b>{summary.get('links', 0)}</b> · "
             f"Qatnashchilar: <b>{summary.get('players', 0)}</b>\n",
         ]
         scorers = [w for w in winners if (w.get("points") or 0) > 0]
@@ -4520,7 +4517,7 @@ def chain_game_tick():
                 m = medals[i] if i < 3 else f"{i + 1}."
                 rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
                 lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{rew}")
-            lines.append("\n💰 Kirish 25 🪙 · faqat ochko olganlar mukofot oldi. Halol o'yin uchun rahmat! 🤲")
+            lines.append("\n💰 Kirish 25 🪙 · faqat ochko olganlar mukofot oldi. O'ynaganingiz uchun rahmat! 📚")
         else:
             lines.append("Bu safar hech kim ochko olmadi 😔")
         text = "\n".join(lines)
@@ -4542,7 +4539,7 @@ def chain_game_tick():
                     "text": (
                         f"🎉 Kitob Zanjirida <b>{w['rank']}-o'rin</b>!\n"
                         f"🪙 <b>+{w['reward']} Kitobcha</b> qo'shildi.\n"
-                        f"Ballaringiz: {w['points']} · Zanjirlar: {w['links']}"
+                        f"Ballaringiz: {w['points']} · Topilgan kitoblar: {w['links']}"
                     ),
                     "parse_mode": "HTML",
                 }, timeout=8)

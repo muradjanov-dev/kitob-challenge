@@ -590,9 +590,9 @@ class ChainWordAdmin(admin.ModelAdmin):
 
 @admin.register(models.ChainGame)
 class ChainGameAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'status', 'current_letter', 'starts_at', 'ends_at', 'rewarded')
+    list_display = ('id', 'title', 'status', 'starts_at', 'ends_at', 'rewarded')
     list_filter = ('status', 'rewarded')
-    readonly_fields = ('chain', 'used_norms', 'created_at', 'updated_at')
+    readonly_fields = ('chain', 'used_norms', 'pending', 'created_at', 'updated_at')
 
 
 @admin.register(models.ChainScore)
