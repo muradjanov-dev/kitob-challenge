@@ -20,7 +20,7 @@ env = environ.Env()
 BOT_TOKEN = env.str("API_TOKEN")
 
 
-def send_notification(chat_id, text, photo=None, reply_markup=None):
+def send_notification(chat_id, text, photo=None, reply_markup=None, thread_id=None):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     if photo:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
@@ -29,6 +29,8 @@ def send_notification(chat_id, text, photo=None, reply_markup=None):
         "chat_id": chat_id,
         "parse_mode": "HTML"
     }
+    if thread_id:
+        data["message_thread_id"] = thread_id
 
     if photo:
         data["caption"] = text
@@ -89,7 +91,7 @@ def delete_message_after_delay(chat_id, message_id):
 
 
 
-def send_message(chat_id, text):
+def send_message(chat_id, text, thread_id=None):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     max_length = 4096
     for i in range(0, len(text), max_length):
@@ -100,6 +102,8 @@ def send_message(chat_id, text):
             "text": chunk,
             "parse_mode": "HTML"
         }
+        if thread_id:
+            data["message_thread_id"] = thread_id
         response = requests.post(url, data=data)
         if response.status_code != 200:
             if response.status_code == 400 and ("chat not found" in response.text or "user is deactivated" in response.text):
@@ -126,8 +130,8 @@ async def _user_total_pages_read():
     else:
         message = "📚 Kecha uchun kitob o'qigan foydalanuvchilar yo'q."
 
-    for _cid in _group_chat_ids():
-        send_notification(_cid, message)
+    for _cid, _tid in _leaderboard_targets():
+        send_notification(_cid, message, thread_id=_tid)
 
 
 @shared_task(acks_late=True)
@@ -238,8 +242,8 @@ async def _daily_top_read_user_action_button():
     else:
         message = "📚 Bugun hisobot yuborgan foydalanuvchilar yo'q."
 
-    for _cid in _group_chat_ids():
-        send_message(_cid, message)
+    for _cid, _tid in _leaderboard_targets():
+        send_message(_cid, message, thread_id=_tid)
 
 
 def _get_premium_tg_ids() -> set:
@@ -268,8 +272,8 @@ def _send_period_report(start_date, end_date, limit, period_name):
             stat = _format_top_stat(r['pages'], r['minutes'])
             message += f"{index}. <b>{badge}{full_name}</b>: {stat}\n"
 
-    for _cid in _group_chat_ids():
-        send_message(_cid, message)
+    for _cid, _tid in _leaderboard_targets():
+        send_message(_cid, message, thread_id=_tid)
 
 
 @shared_task
@@ -486,27 +490,20 @@ def _broadcast_top_to_groups_and_users(message: str, period: str, date_str: str)
     keyboard = _toplist_congrats_keyboard(period, date_str)
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-    # Build group list: general group + boys + girls
-    import os as _os
-    girls_group = _os.environ.get("GIRLS_GROUP_ID", "").strip()
-    group_ids = list(_group_chat_ids())
-    if girls_group and girls_group not in group_ids:
-        group_ids.append(girls_group)
-
-    print(f"_broadcast_top_to_groups_and_users: sending to groups {group_ids}")
-    for group_id in group_ids:
+    group_targets = _leaderboard_targets()
+    print(f"_broadcast_top_to_groups_and_users: sending to groups {group_targets}")
+    for group_id, thread_id in group_targets:
         try:
-            resp = requests.post(
-                url,
-                data={
-                    "chat_id": group_id,
-                    "text": message,
-                    "parse_mode": "HTML",
-                    "disable_web_page_preview": "true",
-                    "reply_markup": keyboard,
-                },
-                timeout=10,
-            )
+            data = {
+                "chat_id": group_id,
+                "text": message,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": "true",
+                "reply_markup": keyboard,
+            }
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            resp = requests.post(url, data=data, timeout=10)
             print(f"group send {group_id}: {resp.status_code} {resp.text[:200]}")
         except Exception as e:
             print(f"group send {group_id} exception: {e}")
@@ -608,8 +605,8 @@ def _post_period_top(start_date, end_date, label, limit):
     msg = _build_top_readers_message(start_date, end_date, label, limit=limit)
     if msg is None:
         msg = f"📚 {label} Top {limit} Kitobxonlar: ma'lumot yo'q."
-    for _cid in _group_chat_ids():
-        send_message(_cid, msg)
+    for _cid, _tid in _leaderboard_targets():
+        send_message(_cid, msg, thread_id=_tid)
 
 
 @shared_task
@@ -1091,6 +1088,38 @@ def _group_chat_ids():
     if girls and girls not in ids:
         ids.append(girls)
     return ids
+
+
+def _category_targets(boys_thread_id, girls_thread_id):
+    """(chat_id, thread_id) pairs for the boys + girls groups for one forum-topic
+    category (announcements/games/leaderboard). `GENERAL_GROUP_ID` is the same
+    chat as the girls group (see its definition above), so there's no separate
+    "general" target here — just these two. A None thread_id falls back to
+    the group's default topic, same as before this routing existed."""
+    import os as _os
+    out = []
+    boys = _os.environ.get("BOYS_GROUP_ID", "").strip()
+    if boys:
+        out.append((boys, boys_thread_id))
+    girls = _os.environ.get("GIRLS_GROUP_ID", "").strip()
+    if girls:
+        out.append((girls, girls_thread_id))
+    return out
+
+
+def _announce_targets():
+    from tgbot.bot.consts import ANNOUNCE_BOYS_THREAD_ID, ANNOUNCE_GIRLS_THREAD_ID
+    return _category_targets(ANNOUNCE_BOYS_THREAD_ID, ANNOUNCE_GIRLS_THREAD_ID)
+
+
+def _game_targets():
+    from tgbot.bot.consts import GAMES_BOYS_THREAD_ID, GAMES_GIRLS_THREAD_ID
+    return _category_targets(GAMES_BOYS_THREAD_ID, GAMES_GIRLS_THREAD_ID)
+
+
+def _leaderboard_targets():
+    from tgbot.bot.consts import LEADERBOARD_BOYS_THREAD_ID, LEADERBOARD_GIRLS_THREAD_ID
+    return _category_targets(LEADERBOARD_BOYS_THREAD_ID, LEADERBOARD_GIRLS_THREAD_ID)
 
 
 @shared_task
@@ -2920,14 +2949,13 @@ def announce_challenge():
     })
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    for group_id in _group_chat_ids():
+    for group_id, thread_id in _announce_targets():
         try:
-            requests.post(
-                url,
-                data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
-                      "reply_markup": keyboard},
-                timeout=10,
-            )
+            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                    "reply_markup": keyboard}
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            requests.post(url, data=data, timeout=10)
         except Exception as e:
             print(f"challenge announce group {group_id}: {e}")
 
@@ -3410,12 +3438,15 @@ def announce_referral_boom(boom_id):
     keyboard = _boom_join_keyboard(boom.id)
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-    for group_id in _group_chat_ids():
+    for group_id, thread_id in _announce_targets():
         try:
+            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                    "reply_markup": keyboard, "disable_web_page_preview": "true"}
+            if thread_id:
+                data["message_thread_id"] = thread_id
             requests.post(
                 url,
-                data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
-                      "reply_markup": keyboard, "disable_web_page_preview": "true"},
+                data=data,
                 timeout=10,
             )
         except Exception as e:
@@ -3760,14 +3791,13 @@ def announce_reader_titles():
     keyboard = json.dumps({"inline_keyboard": kb_rows})
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-    for group_id in _group_chat_ids():
+    for group_id, thread_id in _leaderboard_targets():
         try:
-            resp = requests.post(
-                url,
-                data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
-                      "reply_markup": keyboard},
-                timeout=10,
-            )
+            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                    "reply_markup": keyboard}
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            resp = requests.post(url, data=data, timeout=10)
             if not resp.ok:
                 print(f"reader_titles group {group_id} FAILED: {resp.status_code} {resp.text[:200]}")
         except Exception as e:
@@ -3838,14 +3868,13 @@ def grant_everyone_premium(days=1, announce=True):
     keyboard = _cta_reply_markup()
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-    for group_id in _group_chat_ids():
+    for group_id, thread_id in _announce_targets():
         try:
-            resp = requests.post(
-                url,
-                data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
-                      "reply_markup": keyboard},
-                timeout=10,
-            )
+            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                    "reply_markup": keyboard}
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            resp = requests.post(url, data=data, timeout=10)
             if not resp.ok:
                 print(f"founder gift group {group_id} FAILED: {resp.status_code} {resp.text[:200]}")
         except Exception as e:
@@ -3908,14 +3937,13 @@ def _broadcast_quiz_round(quiz_round):
     # 1) Groups — everyone sees it; any group-member can answer (Premium = ×2).
     #    Remember each posted copy so the live right/wrong board can edit them.
     posted = []
-    for group_id in _group_chat_ids():
+    for group_id, thread_id in _game_targets():
         try:
-            resp = requests.post(
-                url,
-                data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
-                      "reply_markup": keyboard, "disable_web_page_preview": "true"},
-                timeout=10,
-            )
+            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                    "reply_markup": keyboard, "disable_web_page_preview": "true"}
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            resp = requests.post(url, data=data, timeout=10)
             if resp.ok:
                 mid = resp.json().get("result", {}).get("message_id")
                 if mid:
@@ -4339,10 +4367,13 @@ def announce_top_game_players():
     text = "\n".join(lines)
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    for group_id in _group_chat_ids():
+    for group_id, thread_id in _game_targets():
         try:
-            requests.post(url, data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
-                                     "disable_web_page_preview": "true"}, timeout=10)
+            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                    "disable_web_page_preview": "true"}
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            requests.post(url, data=data, timeout=10)
         except Exception as e:
             print(f"announce_top_game_players group {group_id}: {e}")
     print(f"announce_top_game_players: top5={top}")
@@ -4490,11 +4521,13 @@ def start_chain_game():
         "👇 Hoziroq kiring:"
     )
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    for group_id in _group_chat_ids():
+    for group_id, thread_id in _game_targets():
         data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
                 "disable_web_page_preview": "true"}
         if keyboard:
             data["reply_markup"] = keyboard
+        if thread_id:
+            data["message_thread_id"] = thread_id
         try:
             requests.post(url, data=data, timeout=10)
         except Exception as e:
@@ -4533,12 +4566,15 @@ def chain_game_tick():
         else:
             lines.append("Bu safar hech kim ochko olmadi 😔")
         text = "\n".join(lines)
-        for group_id in _group_chat_ids():
+        for group_id, thread_id in _game_targets():
             try:
-                requests.post(url, data={
+                data = {
                     "chat_id": group_id, "text": text, "parse_mode": "HTML",
                     "disable_web_page_preview": "true",
-                }, timeout=10)
+                }
+                if thread_id:
+                    data["message_thread_id"] = thread_id
+                requests.post(url, data=data, timeout=10)
             except Exception as e:
                 print(f"chain_game_tick group {group_id}: {e}")
 
@@ -4571,11 +4607,13 @@ def _announce_game(text, start_param):
         rows.append([{"text": "🎮 O'yinga kirish", "url": f"https://t.me/{username}?start={start_param}"}])
     keyboard = json.dumps({"inline_keyboard": rows}) if rows else None
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    for group_id in _group_chat_ids():
+    for group_id, thread_id in _game_targets():
         data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
                 "disable_web_page_preview": "true"}
         if keyboard:
             data["reply_markup"] = keyboard
+        if thread_id:
+            data["message_thread_id"] = thread_id
         try:
             requests.post(url, data=data, timeout=10)
         except Exception as e:
@@ -4861,10 +4899,13 @@ def start_special_evening_event(count=5, bonus_count=2):
         "Barchasida qatnashib, ko'proq Kitobcha va sovg'alar yutib oling! 👇"
     )
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    for group_id in _group_chat_ids():
+    for group_id, thread_id in _game_targets():
         try:
-            requests.post(url, data={"chat_id": group_id, "text": text, "parse_mode": "HTML",
-                                     "disable_web_page_preview": "true"}, timeout=10)
+            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                    "disable_web_page_preview": "true"}
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            requests.post(url, data=data, timeout=10)
         except Exception as e:
             print(f"start_special_evening_event announce {group_id}: {e}")
     start_game_sequence("evening", count=count, pool=NEW_GAME_TYPES)
@@ -4925,10 +4966,13 @@ def games_finalize_tick():
         else:
             lines.append("Bu safar hech kim qatnashmadi 😔")
         text = "\n".join(lines)
-        for gid in _group_chat_ids():
+        for gid, tid in _game_targets():
             try:
-                requests.post(url, data={"chat_id": gid, "text": text, "parse_mode": "HTML",
-                                         "disable_web_page_preview": "true"}, timeout=10)
+                data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
+                        "disable_web_page_preview": "true"}
+                if tid:
+                    data["message_thread_id"] = tid
+                requests.post(url, data=data, timeout=10)
             except Exception:
                 pass
         for w in winners:
@@ -4954,10 +4998,13 @@ def games_finalize_tick():
         for i, w in enumerate(winners[:5]):
             lines.append(f"{i + 1}. {escape(w['name'])} — {w['correct']} ✓ (+{w['reward']} 🪙)")
         text = "\n".join(lines)
-        for gid in _group_chat_ids():
+        for gid, tid in _game_targets():
             try:
-                requests.post(url, data={"chat_id": gid, "text": text, "parse_mode": "HTML",
-                                         "disable_web_page_preview": "true"}, timeout=10)
+                data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
+                        "disable_web_page_preview": "true"}
+                if tid:
+                    data["message_thread_id"] = tid
+                requests.post(url, data=data, timeout=10)
             except Exception:
                 pass
         for w in winners:
@@ -4984,10 +5031,13 @@ def games_finalize_tick():
         else:
             lines.append("Bu safar hech kim ochko olmadi 😔")
         text = "\n".join(lines)
-        for gid in _group_chat_ids():
+        for gid, tid in _game_targets():
             try:
-                requests.post(url, data={"chat_id": gid, "text": text, "parse_mode": "HTML",
-                                         "disable_web_page_preview": "true"}, timeout=10)
+                data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
+                        "disable_web_page_preview": "true"}
+                if tid:
+                    data["message_thread_id"] = tid
+                requests.post(url, data=data, timeout=10)
             except Exception:
                 pass
         for w in winners:
@@ -5015,10 +5065,13 @@ def _broadcast_and_dm(header_lines, winners, dm_text_fn):
     `dm_text_fn(winner) -> str`. Shared by the new games' finalize announcements."""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     text = "\n".join(header_lines)
-    for gid in _group_chat_ids():
+    for gid, tid in _game_targets():
         try:
-            requests.post(url, data={"chat_id": gid, "text": text, "parse_mode": "HTML",
-                                     "disable_web_page_preview": "true"}, timeout=10)
+            data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
+                    "disable_web_page_preview": "true"}
+            if tid:
+                data["message_thread_id"] = tid
+            requests.post(url, data=data, timeout=10)
         except Exception:
             pass
     for w in winners:

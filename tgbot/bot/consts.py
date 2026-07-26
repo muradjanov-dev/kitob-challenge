@@ -16,7 +16,18 @@ def _thread(name):
 TECHNICAL_SUPPORT_THREAD_ID = _thread("TECHNICAL_SUPPORT_THREAD_ID")
 MESSAGE_THREAD_ID = _thread("MESSAGE_THREAD_ID")
 PAYMENT_THREAD_ID = _thread("PAYMENT_THREAD_ID")
-GAMES_THREAD_ID = _thread("GAMES_THREAD_ID")
+
+# Per-group forum-topic routing for the reading groups (boys/girls), so
+# announcements/games/leaderboard posts land in their own topic instead of
+# the group's default topic. Unset -> None -> Telegram uses the default topic
+# (today's behavior), so these are safe to roll out group-by-group.
+ANNOUNCE_BOYS_THREAD_ID = _thread("ANNOUNCE_BOYS_THREAD_ID")
+ANNOUNCE_GIRLS_THREAD_ID = _thread("ANNOUNCE_GIRLS_THREAD_ID")
+GAMES_BOYS_THREAD_ID = _thread("GAMES_BOYS_THREAD_ID")
+GAMES_GIRLS_THREAD_ID = _thread("GAMES_GIRLS_THREAD_ID")
+LEADERBOARD_BOYS_THREAD_ID = _thread("LEADERBOARD_BOYS_THREAD_ID")
+LEADERBOARD_GIRLS_THREAD_ID = _thread("LEADERBOARD_GIRLS_THREAD_ID")
+
 B_BOYS_THREAD_ID = _thread("B_BOYS_THREAD_ID")
 B_GIRLS_THREAD_ID = _thread("B_GIRLS_THREAD_ID")
 D_BOYS_THREAD_ID = _thread("D_BOYS_THREAD_ID")

@@ -291,7 +291,7 @@ async def _announce_new_product_to_groups(product: ShopProduct):
     """New shop items are announced to the groups, not DMed to individual
     users — the shop is visible to everyone there and a group post is the
     natural "look what's new" moment."""
-    from tgbot.tasks import _group_chat_ids
+    from tgbot.tasks import _announce_targets
     from tgbot.bot.loader import bot as _bot
 
     desc = (product.description or "").strip()
@@ -305,15 +305,16 @@ async def _announce_new_product_to_groups(product: ShopProduct):
         "Sotib olish uchun: «🛒 Do'kon» bo'limiga o'ting!"
     )
 
-    for gid in _group_chat_ids():
+    for gid, tid in _announce_targets():
         try:
             if product.image:
                 await _bot.send_photo(
                     gid, types.InputFile(product.image.path),
-                    caption=text, parse_mode="HTML",
+                    caption=text, parse_mode="HTML", message_thread_id=tid,
                 )
             else:
-                await _bot.send_message(gid, text, parse_mode="HTML", disable_web_page_preview=True)
+                await _bot.send_message(gid, text, parse_mode="HTML",
+                                         disable_web_page_preview=True, message_thread_id=tid)
         except Exception as e:
             print(f"shop_admin: new product group announce to {gid} failed: {e}")
 

@@ -1770,14 +1770,13 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
                 ])
 
                 # ── 1. Groups: sent immediately via bot (reliable, no Celery) ──
-                GENERAL_GROUP_ID = -1002237773868
-                general_thread = __import__('os').environ.get("MESSAGE_THREAD_ID")
-                general_thread = int(general_thread) if general_thread else None
+                # Note: the historical "GENERAL_GROUP_ID" IS the girls group
+                # (same chat id) — there's no separate third group, just these two.
+                from tgbot.bot.consts import LEADERBOARD_BOYS_THREAD_ID, LEADERBOARD_GIRLS_THREAD_ID
 
                 for group_id, thread_id in [
-                    (GENERAL_GROUP_ID, general_thread),
-                    (int(BOYS_GROUP_ID), None),
-                    (int(GIRLS_GROUP_ID), None),
+                    (int(BOYS_GROUP_ID), LEADERBOARD_BOYS_THREAD_ID),
+                    (int(GIRLS_GROUP_ID), LEADERBOARD_GIRLS_THREAD_ID),
                 ]:
                     try:
                         await bot.send_message(
