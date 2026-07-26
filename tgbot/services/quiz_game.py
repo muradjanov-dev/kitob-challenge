@@ -26,7 +26,7 @@ from django.db.models import F, Sum, Count, Max
 from django.utils import timezone
 
 from tgbot.models import QuizGame, QuizAnswer, QuizScore
-from tgbot.services.chain_game import _add_ball_flat, charge_entry_fee, REWARD_TIERS, PARTICIPATION
+from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, REWARD_TIERS, PARTICIPATION
 from tgbot.services.game_questions import (
     QUIZ_TWOFACTS_QUESTIONS, QUIZ_IMPOSTOR_QUESTIONS, QUIZ_CONNECTION_QUESTIONS,
     QUIZ_TIMELINE_QUESTIONS, QUIZ_MATCHBOOK_QUESTIONS, QUIZ_REVERSE_QUESTIONS,
@@ -268,7 +268,7 @@ def _finalize_individual(g) -> dict:
     for i, s in enumerate(scores):
         reward = REWARD_TIERS[i] if i < 3 else PARTICIPATION
         if not s.rewarded:
-            applied = _add_ball_flat(s.user, reward)
+            applied = _add_ball_reward(s.user, reward)
             s.rewarded = True
             s.reward = applied
             s.save(update_fields=["rewarded", "reward", "updated_at"])
@@ -299,7 +299,7 @@ def _finalize_teams(g) -> dict:
         elif s.points > 0:
             reward = PARTICIPATION
         if reward and not s.rewarded:
-            applied = _add_ball_flat(s.user, reward)
+            applied = _add_ball_reward(s.user, reward)
             s.rewarded = True
             s.reward = applied
             s.save(update_fields=["rewarded", "reward", "updated_at"])

@@ -40,14 +40,12 @@ REWARD_TIERS = {0: 300, 1: 200, 2: 100}
 PARTICIPATION = 30  # guest Kitobcha for EVERY participant who didn't place
 
 
-def _add_ball_flat(user, amount: int) -> int:
-    """Add Kitobcha WITHOUT the premium 2× multiplier — competition prizes are
-    strictly by rank (otherwise a Premium 2nd place could out-earn a 1st)."""
-    with transaction.atomic():
-        user.refresh_from_db(fields=["ball"])
-        user.ball = (user.ball or 0) + amount
-        user.save(update_fields=["ball"])
-    return amount
+def _add_ball_reward(user, amount: int) -> int:
+    """Add Kitobcha for a live-game reward. Premium users get the same 2×
+    multiplier here as everywhere else (see TelegramProfile.update_ball) —
+    rank/tier is decided first on raw points, then this only scales the
+    payout, so a Premium 2nd place still can't out-earn a non-Premium 1st."""
+    return user.update_ball(True, amount)
 
 
 def charge_entry_fee(profile, amount: int = ENTRY_FEE) -> bool:
@@ -247,7 +245,7 @@ def finalize(game_id: int) -> dict | None:
         else:
             reward = PARTICIPATION
         if reward and not s.rewarded:
-            applied = _add_ball_flat(s.user, reward)
+            applied = _add_ball_reward(s.user, reward)
             s.rewarded = True
             s.reward = applied
             s.save(update_fields=["rewarded", "reward", "updated_at"])

@@ -10,13 +10,14 @@ Workflow:
 from datetime import timedelta
 from typing import Callable, List, Optional, TypedDict
 
-from django.db.models import Count, Sum, Avg, F
+from django.db.models import Count, Sum, Avg, F, Max
 from django.db.models.functions import Length, TruncDate
 from django.utils import timezone
 
 from tgbot.models import (
     TelegramProfile, ConfirmationReport, BooksToRead, UserAchievement,
-    UserReferal,
+    UserReferal, ChainScore, FeudScore, CastleHit, EmojiScore, WisdomScore,
+    DetectiveScore, SurvivalPlayer, QuizScore, ShopPurchase, Payment,
 )
 
 
@@ -39,6 +40,17 @@ class Stats(TypedDict):
     max_day_pages: int
     quizzes_played: int
     quiz_correct: int
+    live_games_played: int
+    live_games_won: int
+    shop_purchases: int
+    premium_payments: int
+    account_age_days: int
+    perfect_months: int
+    combo_days: int
+    distinct_authors: int
+    comeback: bool
+    phoenix: bool
+    wisdom_best_streak: int
 
 
 def compute_user_stats(user: TelegramProfile) -> Stats:
@@ -82,6 +94,27 @@ def compute_user_stats(user: TelegramProfile) -> Stats:
     quizzes_played = QuizParticipant.objects.filter(user=user).count()
     quiz_correct = BookQuizAnswer.objects.filter(user=user, is_correct=True).count()
 
+    live_games_played, live_games_won = _live_games_stats(user)
+    shop_purchases = ShopPurchase.objects.filter(user=user).count()
+    premium_payments = Payment.objects.filter(user=user, status="paid").count()
+    account_age_days = (timezone.now() - user.created_at).days
+    report_dates = list(
+        ConfirmationReport.objects.filter(user=user)
+        .annotate(_d=TruncDate("date")).values_list("_d", flat=True).distinct().order_by("_d")
+    )
+    perfect_months = _perfect_months_count(report_dates)
+    combo_days = _combo_days_count(user)
+    distinct_authors = (
+        BooksToRead.objects.filter(
+            user=user, current_page__gte=F("total_pages"), total_pages__gt=0,
+            global_book__author__isnull=False,
+        ).exclude(global_book__author="")
+        .values_list("global_book__author", flat=True).distinct().count()
+    )
+    comeback = _gap_then_streak(report_dates, min_gap_days=14, min_streak=7)
+    phoenix = _gap_then_streak(report_dates, min_gap_days=30, min_streak=14)
+    wisdom_best_streak = WisdomScore.objects.filter(user=user).aggregate(m=Max("best_streak"))["m"] or 0
+
     return {
         "reports": reports_count,
         "pages": pages,
@@ -95,7 +128,89 @@ def compute_user_stats(user: TelegramProfile) -> Stats:
         "max_day_pages": max_day_pages,
         "quizzes_played": quizzes_played,
         "quiz_correct": quiz_correct,
+        "live_games_played": live_games_played,
+        "live_games_won": live_games_won,
+        "shop_purchases": shop_purchases,
+        "premium_payments": premium_payments,
+        "account_age_days": account_age_days,
+        "perfect_months": perfect_months,
+        "combo_days": combo_days,
+        "distinct_authors": distinct_authors,
+        "comeback": comeback,
+        "phoenix": phoenix,
+        "wisdom_best_streak": wisdom_best_streak,
     }
+
+
+# Reward value that separates "placed/won" from mere participation across the
+# live-game score tables (all use PARTICIPATION=30 for non-placing players and
+# REWARD_TIERS starting at 100 for 3rd place — see chain_game.py).
+_WIN_REWARD_THRESHOLD = 100
+
+
+def _live_games_stats(user: TelegramProfile) -> tuple[int, int]:
+    """(games played, games won) across all 7 live-game types. Castle is a
+    cooperative boss fight with no stored per-user reward, so it only counts
+    toward `played` (via distinct games in CastleHit), never `won`."""
+    played = 0
+    won = 0
+    for model in (ChainScore, FeudScore, EmojiScore, WisdomScore, DetectiveScore, SurvivalPlayer, QuizScore):
+        rows = model.objects.filter(user=user).values_list("reward", flat=True)
+        played += len(rows)
+        won += sum(1 for r in rows if (r or 0) >= _WIN_REWARD_THRESHOLD)
+    played += CastleHit.objects.filter(user=user).values("game_id").distinct().count()
+    return played, won
+
+
+def _perfect_months_count(dates: list) -> int:
+    """Count calendar months where the user has a report on every day (through
+    today, for the current month)."""
+    if not dates:
+        return 0
+    from calendar import monthrange
+    by_month = {}
+    for d in dates:
+        by_month.setdefault((d.year, d.month), set()).add(d.day)
+    today = timezone.localdate()
+    count = 0
+    for (y, m), days in by_month.items():
+        last_day = today.day if (y, m) == (today.year, today.month) else monthrange(y, m)[1]
+        if days >= set(range(1, last_day + 1)):
+            count += 1
+    return count
+
+
+def _combo_days_count(user: TelegramProfile) -> int:
+    """Days on which the user logged both a page report and an audio report."""
+    page_dates = set(
+        ConfirmationReport.objects.filter(user=user, is_audio=False)
+        .annotate(_d=TruncDate("date")).values_list("_d", flat=True)
+    )
+    audio_dates = set(
+        ConfirmationReport.objects.filter(user=user, is_audio=True)
+        .annotate(_d=TruncDate("date")).values_list("_d", flat=True)
+    )
+    return len(page_dates & audio_dates)
+
+
+def _gap_then_streak(dates: list, min_gap_days: int, min_streak: int) -> bool:
+    """True if the user ever had a break of >= min_gap_days with no report,
+    immediately followed by a fresh run of >= min_streak consecutive days."""
+    if len(dates) < min_streak:
+        return False
+    run_start = 0
+    run_len = 1
+    for i in range(1, len(dates)):
+        if (dates[i] - dates[i - 1]).days == 1:
+            run_len += 1
+        else:
+            run_start = i
+            run_len = 1
+        if run_len >= min_streak and run_start > 0:
+            gap_before = (dates[run_start] - dates[run_start - 1]).days
+            if gap_before >= min_gap_days:
+                return True
+    return False
 
 
 def _max_consecutive_days(user: TelegramProfile) -> int:
@@ -243,6 +358,58 @@ ACHIEVEMENTS_RAW = [
     {"code": "vq_25",  "emoji": "📚", "title_uz": "Kitob bilimdon",              "title_ru": "Книжный знаток",            "cond": _at_least("quiz_correct", 25),  "points": 250},
     {"code": "vq_50",  "emoji": "🏆", "title_uz": "Viktorina chempioni",         "title_ru": "Чемпион викторины",         "cond": _at_least("quiz_correct", 50),  "points": 500},
     {"code": "vq_100", "emoji": "🌟", "title_uz": "Viktorina ustasi — 100 ta",   "title_ru": "Мастер викторины — 100",    "cond": _at_least("quiz_correct", 100), "points": 1000},
+
+    # ── NEW ACHIEVEMENTS ROUND 2 — 30 entries, new behavioral dimensions ──────
+
+    # — Live games participation —
+    {"code": "lg_1",   "emoji": "🎲", "title_uz": "Birinchi jonli o'yin",          "title_ru": "Первая live-игра",           "cond": _at_least("live_games_played", 1),   "points": 20},
+    {"code": "lg_10",  "emoji": "🕹", "title_uz": "O'n jonli o'yin",               "title_ru": "Десять live-игр",            "cond": _at_least("live_games_played", 10),  "points": 100},
+    {"code": "lg_50",  "emoji": "🎰", "title_uz": "Ellik jonli o'yin — faol o'yinchi", "title_ru": "Пятьдесят live-игр",     "cond": _at_least("live_games_played", 50),  "points": 350},
+    {"code": "lg_200", "emoji": "🎳", "title_uz": "Ikki yuz jonli o'yin — afsonaviy o'yinchi", "title_ru": "Двести live-игр — легенда", "cond": _at_least("live_games_played", 200), "points": 800},
+
+    # — Live game wins (top-3 / jackpot reward, not mere participation) —
+    {"code": "lgw_1",  "emoji": "🥉", "title_uz": "Birinchi g'alaba",              "title_ru": "Первая победа",              "cond": _at_least("live_games_won", 1),   "points": 50},
+    {"code": "lgw_5",  "emoji": "🥈", "title_uz": "Besh g'alaba",                  "title_ru": "Пять побед",                 "cond": _at_least("live_games_won", 5),   "points": 200},
+    {"code": "lgw_20", "emoji": "🥇", "title_uz": "Yigirma g'alaba — chempion",    "title_ru": "Двадцать побед — чемпион",   "cond": _at_least("live_games_won", 20),  "points": 700},
+    {"code": "lgw_50", "emoji": "👑", "title_uz": "Ellik g'alaba — yengilmas",     "title_ru": "Пятьдесят побед — непобедим","cond": _at_least("live_games_won", 50),  "points": 1500},
+
+    # — Shop purchases —
+    {"code": "shop_1",  "emoji": "🛍", "title_uz": "Birinchi xarid",               "title_ru": "Первая покупка",             "cond": _at_least("shop_purchases", 1),  "points": 20},
+    {"code": "shop_5",  "emoji": "🛒", "title_uz": "Besh xarid — doimiy mijoz",    "title_ru": "Пять покупок — постоянный клиент", "cond": _at_least("shop_purchases", 5),  "points": 150},
+    {"code": "shop_15", "emoji": "🏪", "title_uz": "O'n besh xarid — VIP mijoz",   "title_ru": "Пятнадцать покупок — VIP",   "cond": _at_least("shop_purchases", 15), "points": 500},
+
+    # — Premium loyalty (count of paid Payment rows) —
+    {"code": "prem_1", "emoji": "⭐", "title_uz": "Premium a'zo",                  "title_ru": "Premium-участник",           "cond": _at_least("premium_payments", 1), "points": 100},
+    {"code": "prem_3", "emoji": "🌠", "title_uz": "Sodiq Premium a'zo",            "title_ru": "Верный Premium-участник",    "cond": _at_least("premium_payments", 3), "points": 400},
+    {"code": "prem_6", "emoji": "💫", "title_uz": "Premium faxriysi",              "title_ru": "Ветеран Premium",            "cond": _at_least("premium_payments", 6), "points": 900},
+
+    # — Anniversary —
+    {"code": "anniv_1", "emoji": "🎂", "title_uz": "Bir yillik a'zo",              "title_ru": "Год с нами",                 "cond": _at_least("account_age_days", 365), "points": 200},
+    {"code": "anniv_2", "emoji": "🎉", "title_uz": "Ikki yillik a'zo — faxriy kitobxon", "title_ru": "Два года — почётный читатель", "cond": _at_least("account_age_days", 730), "points": 500},
+
+    # — Perfect month (report every single day of a calendar month) —
+    {"code": "pm_1", "emoji": "🗓", "title_uz": "Mukammal oy",                    "title_ru": "Идеальный месяц",            "cond": _at_least("perfect_months", 1), "points": 300},
+    {"code": "pm_3", "emoji": "📅", "title_uz": "Uch mukammal oy — barqaror",     "title_ru": "Три идеальных месяца",       "cond": _at_least("perfect_months", 3), "points": 800},
+
+    # — Combo days: both a page report and an audio report the same day —
+    {"code": "combo_5",  "emoji": "🎧", "title_uz": "Ikki tomonlama kitobxon",     "title_ru": "Читатель на два фронта",     "cond": _at_least("combo_days", 5),  "points": 80},
+    {"code": "combo_20", "emoji": "🎼", "title_uz": "Gibrid o'quvchi ustasi",      "title_ru": "Мастер гибридного чтения",   "cond": _at_least("combo_days", 20), "points": 300},
+    {"code": "combo_50", "emoji": "🎹", "title_uz": "Yuz foiz gibrid — afsonaviy", "title_ru": "Гибрид на все сто — легенда","cond": _at_least("combo_days", 50), "points": 900},
+
+    # — Distinct authors among finished books (reading breadth) —
+    {"code": "auth_5",  "emoji": "📗", "title_uz": "Besh muallif",                "title_ru": "Пять авторов",               "cond": _at_least("distinct_authors", 5),  "points": 60},
+    {"code": "auth_15", "emoji": "📘", "title_uz": "O'n besh muallif — ufqi keng", "title_ru": "Пятнадцать авторов",        "cond": _at_least("distinct_authors", 15), "points": 250},
+    {"code": "auth_30", "emoji": "📙", "title_uz": "O'ttiz muallif — bilimdon",   "title_ru": "Тридцать авторов — знаток",  "cond": _at_least("distinct_authors", 30), "points": 600},
+    {"code": "auth_50", "emoji": "📕", "title_uz": "Ellik muallif — universal kitobxon", "title_ru": "Пятьдесят авторов — универсал", "cond": _at_least("distinct_authors", 50), "points": 1200},
+
+    # — Comeback: a long silent gap followed by a fresh streak —
+    {"code": "cmb_1", "emoji": "🌅", "title_uz": "Qaytgan qahramon",              "title_ru": "Вернувшийся герой",          "cond": lambda s: s.get("comeback", False), "points": 150},
+    {"code": "cmb_2", "emoji": "🔥", "title_uz": "Feniks — qayta tug'ilish",      "title_ru": "Феникс — возрождение",       "cond": lambda s: s.get("phoenix", False),  "points": 400},
+
+    # — Hikmat Xazinasi consecutive-correct streak (personal best) —
+    {"code": "wst_3",  "emoji": "🧠", "title_uz": "Hikmat seriyasi — 3",          "title_ru": "Серия мудрости — 3",         "cond": _at_least("wisdom_best_streak", 3),  "points": 50},
+    {"code": "wst_10", "emoji": "🦉", "title_uz": "Hikmat seriyasi — 10, dono",   "title_ru": "Серия мудрости — 10",        "cond": _at_least("wisdom_best_streak", 10), "points": 300},
+    {"code": "wst_20", "emoji": "🔮", "title_uz": "Hikmat seriyasi — 20, ustoz",  "title_ru": "Серия мудрости — 20",        "cond": _at_least("wisdom_best_streak", 20), "points": 900},
 ]
 
 

@@ -17,7 +17,7 @@ from django.utils import timezone
 from tgbot.models import FeudGame, FeudAnswer, FeudScore
 from tgbot.services.chain_text import normalize
 from tgbot.services.chain_game import (
-    _add_ball_flat, charge_entry_fee, ENTRY_FEE, REWARD_TIERS, PARTICIPATION,
+    _add_ball_reward, charge_entry_fee, ENTRY_FEE, REWARD_TIERS, PARTICIPATION,
 )
 from tgbot.services.game_questions import FEUD_QUESTIONS
 
@@ -163,7 +163,7 @@ def finalize(game_id: int) -> dict | None:
     for i, s in enumerate(scores):
         reward = REWARD_TIERS[i] if (s.points > 0 and i < 3) else PARTICIPATION
         if not s.rewarded:
-            applied = _add_ball_flat(s.user, reward)
+            applied = _add_ball_reward(s.user, reward)
             s.rewarded = True
             s.reward = applied
             s.save(update_fields=["rewarded", "reward", "updated_at"])

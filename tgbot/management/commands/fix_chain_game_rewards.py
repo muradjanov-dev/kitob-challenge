@@ -28,7 +28,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from tgbot.models import ChainGame, ChainScore
-        from tgbot.services.chain_game import _add_ball_flat, REWARD_TIERS, PARTICIPATION
+        from tgbot.services.chain_game import _add_ball_reward, REWARD_TIERS, PARTICIPATION
 
         if options["list"]:
             games = ChainGame.objects.filter(status="finished").order_by("-starts_at")[:options["list"]]
@@ -94,7 +94,7 @@ class Command(BaseCommand):
         from tgbot.tasks import BOT_TOKEN, _group_chat_ids
 
         for s, correct, delta in fixes:
-            applied = _add_ball_flat(s.user, delta)
+            applied = _add_ball_reward(s.user, delta)
             s.reward = correct
             s.rewarded = True
             s.save(update_fields=["reward", "rewarded", "updated_at"])

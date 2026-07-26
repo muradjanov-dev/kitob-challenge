@@ -14,7 +14,7 @@ from django.db.models import Sum, Count, Max
 from django.utils import timezone
 
 from tgbot.models import WisdomGame, WisdomAnswer, WisdomScore
-from tgbot.services.chain_game import _add_ball_flat, charge_entry_fee, REWARD_TIERS, PARTICIPATION
+from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, REWARD_TIERS, PARTICIPATION
 from tgbot.services.game_questions import WISDOM_QUESTIONS
 
 ENTRY_FEE = 30
@@ -168,7 +168,7 @@ def finalize(game_id: int) -> dict | None:
     for i, s in enumerate(scores):
         reward = REWARD_TIERS[i] if i < 3 else PARTICIPATION
         if not s.rewarded:
-            applied = _add_ball_flat(s.user, reward)
+            applied = _add_ball_reward(s.user, reward)
             s.rewarded = True
             s.reward = applied
             s.save(update_fields=["rewarded", "reward", "updated_at"])

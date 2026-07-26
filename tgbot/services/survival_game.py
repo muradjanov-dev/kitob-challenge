@@ -16,7 +16,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from tgbot.models import SurvivalGame, SurvivalPlayer, SurvivalAnswer
-from tgbot.services.chain_game import _add_ball_flat, charge_entry_fee, PARTICIPATION
+from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, PARTICIPATION
 from tgbot.services.game_questions import SURVIVAL_QUESTIONS
 
 ENTRY_FEE = 50
@@ -180,7 +180,7 @@ def finalize(game_id: int) -> dict | None:
     if survivors:
         share = max(1, g.jackpot // len(survivors))
         for p in survivors:
-            applied = _add_ball_flat(p.user, share)
+            applied = _add_ball_reward(p.user, share)
             p.reward = applied
             p.rewarded = True
             p.save(update_fields=["reward", "rewarded", "updated_at"])
@@ -191,7 +191,7 @@ def finalize(game_id: int) -> dict | None:
             })
         for p in players:
             if p.eliminated and p.correct_count > 0 and not p.rewarded:
-                applied = _add_ball_flat(p.user, PARTICIPATION)
+                applied = _add_ball_reward(p.user, PARTICIPATION)
                 p.reward = applied
                 p.rewarded = True
                 p.save(update_fields=["reward", "rewarded", "updated_at"])
@@ -203,7 +203,7 @@ def finalize(game_id: int) -> dict | None:
         if top:
             share = max(1, g.jackpot // len(top))
             for p in top:
-                applied = _add_ball_flat(p.user, share)
+                applied = _add_ball_reward(p.user, share)
                 p.reward = applied
                 p.rewarded = True
                 p.save(update_fields=["reward", "rewarded", "updated_at"])

@@ -15,7 +15,7 @@ from django.db.models.functions import Greatest
 from django.utils import timezone
 
 from tgbot.models import CastleGame, CastleHit
-from tgbot.services.chain_game import _add_ball_flat, charge_entry_fee, ENTRY_FEE
+from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, ENTRY_FEE
 from tgbot.services.game_questions import CASTLE_QUESTIONS
 
 LEAD_SECONDS = 30
@@ -156,7 +156,7 @@ def finalize(game_id: int) -> dict | None:
         user = users.get(uid)
         if not user:
             continue
-        applied = _add_ball_flat(user, reward)
+        applied = _add_ball_reward(user, reward)
         if correct > 0:
             contributors += 1
         rewarded.append({
