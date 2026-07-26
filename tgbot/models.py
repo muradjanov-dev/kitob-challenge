@@ -231,6 +231,17 @@ class TelegramProfile(BaseModel):
             "NULL = not enough data yet; falls back to fixed broadcast slots."
         ),
     )
+    streak_freeze_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Banked 'streak muzlatish' tokens from the Market. Auto-consumed "
+                  "by tasks.apply_streak_freezes on the first day the user misses "
+                  "a report while holding a token — see StreakFreezeCoverage.",
+    )
+    bonus_survival_lives = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Extra starting lives for the next Omon qolish (Survival) game, "
+                  "from a Market 'Sirli quti' win. Consumed on join.",
+    )
 
     def has_active_premium(self) -> bool:
         """True if the user has a paid Payment active today, OR is inside a
@@ -999,6 +1010,47 @@ class ShopPurchase(BaseModel):
 
     def __str__(self):
         return f"{self.code} — {self.user.full_name} — {self.product_name_snapshot}"
+
+
+class StreakFreezeCoverage(BaseModel):
+    """A single calendar date that counts as 'reported' for streak purposes
+    even though the user didn't actually submit a report — created by
+    tasks.apply_streak_freezes when it spends one of the user's banked
+    streak_freeze_count tokens. Read by achievements._max_consecutive_days
+    and premium_conversion._compute_streaks (union'd into the real report
+    dates before scanning for gaps)."""
+    user = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="streak_freeze_coverages",
+    )
+    date = models.DateField()
+
+    class Meta:
+        verbose_name = "Streak Freeze Coverage"
+        verbose_name_plural = "Streak Freeze Coverages"
+        unique_together = ("user", "date")
+        ordering = ("-date",)
+
+    def __str__(self):
+        return f"{self.user.full_name} — {self.date}"
+
+
+class LeaderboardSponsor(BaseModel):
+    """A Market 'Reyting sponsorligi' purchase, queued to credit the buyer on
+    the next Top Kitobxonlar broadcast (oldest unused first). Consumed by
+    tasks._consume_leaderboard_sponsor."""
+    user = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="leaderboard_sponsorships",
+    )
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Leaderboard Sponsor"
+        verbose_name_plural = "Leaderboard Sponsors"
+        ordering = ("created_at",)
+
+    def __str__(self):
+        state = "used" if self.used_at else "pending"
+        return f"{self.user.full_name} — {state}"
 
 
 class ReaderTitleAnnouncement(BaseModel):

@@ -472,7 +472,32 @@ def _build_top_readers_message(start_date, end_date, period_label, limit=20):
         message += f"{index}. <b>{badge}{full_name}</b>: {stat}\n"
     total_stat = _format_top_stat(grand_pages, grand_minutes)
     message += f"\n📊 Jami: <b>{total_stat}</b>"
+    sponsor = _consume_leaderboard_sponsor()
+    if sponsor:
+        message += f"\n\n🏷 <i>Ushbu reyting {escape(sponsor.full_name or 'Kitobxon')} tomonidan taqdim etildi!</i>"
     return message
+
+
+def _consume_leaderboard_sponsor():
+    """Atomically claim the oldest unused Market 'Reyting sponsorligi'
+    purchase, mark it used, and return the sponsoring TelegramProfile (or
+    None if no one's queued). Consumed once per call, so at most one
+    broadcast gets credited per purchase."""
+    from django.db import transaction
+    from tgbot.models import LeaderboardSponsor
+    with transaction.atomic():
+        sponsor = (
+            LeaderboardSponsor.objects.select_for_update()
+            .filter(used_at__isnull=True)
+            .order_by("created_at")
+            .select_related("user")
+            .first()
+        )
+        if not sponsor:
+            return None
+        sponsor.used_at = timezone.now()
+        sponsor.save(update_fields=["used_at"])
+        return sponsor.user
 
 
 def _toplist_congrats_keyboard(period: str, date_str: str) -> str:
@@ -1072,6 +1097,55 @@ def send_streak_warning():
         except Exception:
             failed += 1
     print(f"send_streak_warning: sent={sent} failed={failed}")
+
+
+@shared_task
+def apply_streak_freezes():
+    """Auto-spend one banked Market 'Streak muzlatish' token for any user who
+    was active yesterday (report or an earlier freeze), holds a token, but
+    still hasn't reported today. Runs at 23:58 — the last practical moment
+    to still count as covering "today". See tgbot.services.market."""
+    from django.db import transaction
+    from tgbot.models import StreakFreezeCoverage
+
+    today = timezone.localdate()
+    yesterday = today - timezone.timedelta(days=1)
+
+    reported_today = set(
+        ConfirmationReport.objects.filter(date__date=today).values_list("user_id", flat=True)
+    )
+    active_yesterday = set(
+        ConfirmationReport.objects.filter(date__date=yesterday).values_list("user_id", flat=True)
+    ) | set(
+        StreakFreezeCoverage.objects.filter(date=yesterday).values_list("user_id", flat=True)
+    )
+
+    candidates = TelegramProfile.objects.filter(streak_freeze_count__gt=0, id__in=active_yesterday).exclude(
+        id__in=reported_today
+    )
+
+    applied = 0
+    for user in candidates.iterator():
+        with transaction.atomic():
+            p = TelegramProfile.objects.select_for_update().get(id=user.id)
+            if p.streak_freeze_count <= 0:
+                continue
+            _, created = StreakFreezeCoverage.objects.get_or_create(user=p, date=today)
+            if not created:
+                continue
+            p.streak_freeze_count -= 1
+            p.save(update_fields=["streak_freeze_count"])
+            applied += 1
+        try:
+            send_notification(
+                p.telegram_id,
+                "🛡 <b>Streak muzlatish</b> avtomatik ishlatildi — bugun hisobot "
+                "yubormasangiz ham, ketma-ketligingiz saqlanib qoldi!\n"
+                f"Qolgan tokenlar: <b>{p.streak_freeze_count}</b>",
+            )
+        except Exception:
+            pass
+    print(f"apply_streak_freezes: applied={applied}")
 
 
 GENERAL_GROUP_ID = -1002237773868

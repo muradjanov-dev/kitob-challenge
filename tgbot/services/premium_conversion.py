@@ -369,8 +369,11 @@ def _compute_streaks(user_ids: list[int]) -> dict[int, int]:
     Compute current streak (consecutive days ending today or yesterday)
     for all given user_ids in a single DB query.
     Returns {user_id: streak_length}.
+
+    Dates covered by a Market 'Streak muzlatish' (StreakFreezeCoverage) count
+    as reported even without an actual report.
     """
-    from tgbot.models import ConfirmationReport
+    from tgbot.models import ConfirmationReport, StreakFreezeCoverage
 
     today = timezone.localdate()
 
@@ -385,9 +388,14 @@ def _compute_streaks(user_ids: list[int]) -> dict[int, int]:
 
     # Group by user
     from collections import defaultdict
-    user_dates: dict[int, list[datetime.date]] = defaultdict(list)
+    user_dates: dict[int, set] = defaultdict(set)
     for row in rows:
-        user_dates[row["user_id"]].append(row["_d"])
+        user_dates[row["user_id"]].add(row["_d"])
+
+    for row in StreakFreezeCoverage.objects.filter(user_id__in=user_ids).values("user_id", "date"):
+        user_dates[row["user_id"]].add(row["date"])
+
+    user_dates = {uid: sorted(dates) for uid, dates in user_dates.items()}
 
     streaks: dict[int, int] = {}
     for uid, dates in user_dates.items():

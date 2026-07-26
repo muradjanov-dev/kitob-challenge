@@ -188,6 +188,14 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=20, minute=0),
     },
 
+    # Auto-spend a banked Market 'Streak muzlatish' token for anyone about to
+    # lose their streak today — runs just before midnight so it's the last
+    # possible moment to still count as "today".
+    'apply-streak-freezes': {
+        'task': 'tgbot.tasks.apply_streak_freezes',
+        'schedule': crontab(hour=23, minute=58),
+    },
+
     # End-of-day personal report — the one rich DM users actually want.
     # Percentile info is already included inside this report, so the separate
     # end_of_day_percentile task at 23:58 is no longer needed.

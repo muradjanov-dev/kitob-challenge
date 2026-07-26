@@ -489,6 +489,20 @@ class ShopPurchaseAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(models.StreakFreezeCoverage)
+class StreakFreezeCoverageAdmin(admin.ModelAdmin):
+    list_display = ('user', 'date', 'created_at')
+    list_filter = ('date',)
+    search_fields = ('user__full_name', 'user__telegram_id')
+
+
+@admin.register(models.LeaderboardSponsor)
+class LeaderboardSponsorAdmin(admin.ModelAdmin):
+    list_display = ('user', 'used_at', 'created_at')
+    list_filter = ('used_at',)
+    search_fields = ('user__full_name', 'user__telegram_id')
+
+
 @admin.register(models.ReferralBoom)
 class ReferralBoomAdmin(admin.ModelAdmin):
     list_display = (

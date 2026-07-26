@@ -15,7 +15,7 @@ from django.db import transaction
 
 from django.utils import timezone
 
-from tgbot.models import SurvivalGame, SurvivalPlayer, SurvivalAnswer
+from tgbot.models import SurvivalGame, SurvivalPlayer, SurvivalAnswer, TelegramProfile
 from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, PARTICIPATION
 from tgbot.services.game_questions import SURVIVAL_QUESTIONS
 
@@ -141,9 +141,16 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
     player, created = SurvivalPlayer.objects.get_or_create(
         game_id=g.id, user=profile, defaults={"lives": g.max_lives},
     )
-    if created and not charge_entry_fee(profile, amount=ENTRY_FEE):
-        SurvivalPlayer.objects.filter(id=player.id).delete()
-        return {"ok": False, "error": "insufficient_balance", "need": ENTRY_FEE}
+    if created:
+        if not charge_entry_fee(profile, amount=ENTRY_FEE):
+            SurvivalPlayer.objects.filter(id=player.id).delete()
+            return {"ok": False, "error": "insufficient_balance", "need": ENTRY_FEE}
+        # Spend any Market 'Sirli quti' bonus lives (capped at +2) on join.
+        bonus = min(int(getattr(profile, "bonus_survival_lives", 0) or 0), 2)
+        if bonus:
+            TelegramProfile.objects.filter(id=profile.id).update(bonus_survival_lives=0)
+            player.lives = player.lives + bonus
+            player.save(update_fields=["lives"])
     if player.eliminated:
         return {"ok": False, "error": "eliminated"}
 

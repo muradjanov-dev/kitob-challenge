@@ -159,6 +159,13 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
         await _menu_quiz(call, user, state)
     elif action == "shop":
         await _menu_shop(call, user, state)
+    elif action == "market":
+        from tgbot.bot.handlers.users.market import show_market_menu
+        await call.answer()
+        if not user:
+            await call.message.answer(_t(lang, "Avval /start bosing", "Сначала /start"))
+            return
+        await show_market_menu(call.message, user)
     else:
         await call.answer(_t(lang, "Noma'lum amal", "Неизвестное действие"))
 

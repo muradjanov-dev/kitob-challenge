@@ -214,14 +214,18 @@ def _gap_then_streak(dates: list, min_gap_days: int, min_streak: int) -> bool:
 
 
 def _max_consecutive_days(user: TelegramProfile) -> int:
-    """Longest streak (in days) of consecutive ConfirmationReport dates."""
-    dates = list(
+    """Longest streak (in days) of consecutive ConfirmationReport dates.
+    Dates covered by a Market 'Streak muzlatish' (StreakFreezeCoverage) count
+    as reported even without an actual report."""
+    from tgbot.models import StreakFreezeCoverage
+    dates = set(
         ConfirmationReport.objects.filter(user=user)
         .annotate(_d=TruncDate("date"))
         .values_list("_d", flat=True)
         .distinct()
-        .order_by("_d")
     )
+    dates |= set(StreakFreezeCoverage.objects.filter(user=user).values_list("date", flat=True))
+    dates = sorted(dates)
     if not dates:
         return 0
     best = current = 1
