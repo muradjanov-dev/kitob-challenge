@@ -133,47 +133,148 @@ def queue_leaderboard_sponsor(user) -> bool:
         return True
 
 
+_GOLD = (212, 175, 90)
+_GOLD_LIGHT = (238, 210, 140)
+_CREAM = (238, 232, 214)
+_NAVY_DARK = (10, 13, 24)
+_NAVY_MID = (18, 23, 40)
+_MUTED = (150, 155, 175)
+
+
+def _lerp(a, b, t):
+    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+
+
 def generate_certificate(user) -> bytes:
-    """Render a shareable PNG certificate with the user's key stats. Uses
-    Pillow's bundled scalable default font (no system/TTF dependency —
-    Pillow >= 10.1's ImageFont.load_default(size=...))."""
+    """Render a shareable, premium-styled PNG certificate with the user's key
+    stats: gold-on-navy, ornamental double border with corner flourishes, a
+    stat-card row, and a wax-seal-style medallion. Uses Pillow's bundled
+    scalable default font (no system/TTF dependency — Pillow >= 10.1's
+    ImageFont.load_default(size=...))."""
     from PIL import Image, ImageDraw, ImageFont
     from tgbot.services.achievements import compute_user_stats
 
     stats = compute_user_stats(user)
-    W, H = 1200, 800
-    img = Image.new("RGB", (W, H), color=(20, 24, 38))
-    draw = ImageDraw.Draw(img)
+    full_name = user.full_name or "Kitobxon"
 
-    draw.rectangle([20, 20, W - 20, H - 20], outline=(255, 200, 60), width=6)
-    draw.rectangle([40, 40, W - 40, H - 40], outline=(255, 200, 60), width=2)
+    W, H = 1400, 900
+    img = Image.new("RGB", (W, H), _NAVY_DARK)
+    draw = ImageDraw.Draw(img, "RGBA")
 
-    title_font = ImageFont.load_default(size=52)
-    name_font = ImageFont.load_default(size=44)
-    stat_font = ImageFont.load_default(size=32)
-    small_font = ImageFont.load_default(size=22)
+    # Vertical gradient background (subtle — lighter in the middle band).
+    for y in range(H):
+        t = y / H
+        draw.line([(0, y), (W, y)], fill=_lerp(_NAVY_DARK, _NAVY_MID, (0.5 - abs(t - 0.5)) * 2))
 
-    def center_text(y, text, font, fill=(255, 255, 255)):
+    # Ornamental double border, rounded, with a small gold diamond at each corner.
+    margin = 36
+    draw.rounded_rectangle([margin, margin, W - margin, H - margin], radius=22, outline=_GOLD, width=4)
+    margin2 = margin + 14
+    draw.rounded_rectangle([margin2, margin2, W - margin2, H - margin2], radius=14, outline=_GOLD, width=1)
+
+    def diamond(cx, cy, size, color=_GOLD):
+        draw.polygon([(cx, cy - size), (cx + size, cy), (cx, cy + size), (cx - size, cy)], fill=color)
+
+    for cx_, cy_ in [(margin, margin), (W - margin, margin), (margin, H - margin), (W - margin, H - margin)]:
+        diamond(cx_, cy_, 10)
+
+    title_font = ImageFont.load_default(size=30)
+    script_font = ImageFont.load_default(size=64)
+    name_font = ImageFont.load_default(size=50)
+    label_font = ImageFont.load_default(size=20)
+    num_font = ImageFont.load_default(size=44)
+    small_font = ImageFont.load_default(size=20)
+    tiny_font = ImageFont.load_default(size=16)
+    seal_font = ImageFont.load_default(size=40)
+
+    def center_text(y, text, font, fill=_CREAM):
         bbox = draw.textbbox((0, 0), text, font=font)
         w = bbox[2] - bbox[0]
         draw.text(((W - w) / 2, y), text, font=font, fill=fill)
+        return w
 
-    center_text(90, "KITOB CHALLENGE", title_font, (255, 200, 60))
-    center_text(160, "SERTIFIKAT", title_font, (255, 255, 255))
-    center_text(280, user.full_name or "Kitobxon", name_font, (255, 200, 60))
+    def center_text_spaced(y, text, font, fill, letter_spacing=8):
+        widths = [draw.textbbox((0, 0), ch, font=font)[2] for ch in text]
+        total = sum(widths) + letter_spacing * (len(text) - 1)
+        x = (W - total) / 2
+        for ch, wch in zip(text, widths):
+            draw.text((x, y), ch, font=font, fill=fill)
+            x += wch + letter_spacing
 
-    rows = [
-        f"{stats['pages']} bet o'qildi",
-        f"{stats['books_finished']} ta kitob tugallandi",
-        f"Eng uzun streak: {stats['max_streak']} kun",
-        f"{stats['referrals']} ta do'st taklif qilindi",
+    # Header ornament: line – diamond – line.
+    top_y = 100
+    diamond(W // 2, top_y, 7)
+    draw.line([(W // 2 - 160, top_y), (W // 2 - 20, top_y)], fill=_GOLD, width=2)
+    draw.line([(W // 2 + 20, top_y), (W // 2 + 160, top_y)], fill=_GOLD, width=2)
+
+    center_text_spaced(130, "KITOB CHALLENGE", title_font, _GOLD)
+
+    title = "SERTIFIKAT"
+    bbox = draw.textbbox((0, 0), title, font=script_font)
+    tw = bbox[2] - bbox[0]
+    draw.text(((W - tw) / 2 + 3, 183), title, font=script_font, fill=(0, 0, 0, 90))  # soft shadow
+    draw.text(((W - tw) / 2, 180), title, font=script_font, fill=_CREAM)
+
+    draw.line([(W // 2 - 220, 270), (W // 2 + 220, 270)], fill=_GOLD, width=2)
+
+    center_text(305, "Ushbu sertifikat quyidagi kitobxonga taqdim etiladi:", label_font, _MUTED)
+
+    name_y = 350
+    name_w = center_text(name_y, full_name, name_font, _GOLD_LIGHT)
+    uy = name_y + 68
+    draw.line([(W // 2 - name_w / 2 - 30, uy), (W // 2 + name_w / 2 + 30, uy)], fill=_GOLD, width=2)
+    diamond(W // 2 - name_w / 2 - 40, uy, 5)
+    diamond(W // 2 + name_w / 2 + 40, uy, 5)
+
+    # Stat-card row.
+    stat_items = [
+        (str(stats["pages"]), "BET O'QILDI"),
+        (str(stats["books_finished"]), "KITOB TUGALLANDI"),
+        (str(stats["max_streak"]), "KUNLIK STREAK"),
+        (str(stats["referrals"]), "TAKLIF QILINGAN"),
     ]
-    y = 380
-    for text in rows:
-        center_text(y, text, stat_font, (230, 230, 230))
-        y += 60
+    n = len(stat_items)
+    card_y0, card_y1 = 470, 620
+    pad_outer = 140
+    col_w = (W - 2 * pad_outer) / n
+    for i, (num, label) in enumerate(stat_items):
+        cx_ = pad_outer + col_w * i + col_w / 2
+        if i > 0:
+            draw.line(
+                [(pad_outer + col_w * i, card_y0 + 10), (pad_outer + col_w * i, card_y1 - 10)],
+                fill=(*_GOLD, 90), width=1,
+            )
+        num_w = draw.textbbox((0, 0), num, font=num_font)[2]
+        draw.text((cx_ - num_w / 2, card_y0), num, font=num_font, fill=_GOLD_LIGHT)
+        lbl_w = draw.textbbox((0, 0), label, font=small_font)[2]
+        draw.text((cx_ - lbl_w / 2, card_y0 + 70), label, font=small_font, fill=_MUTED)
 
-    center_text(H - 90, timezone.localdate().strftime("%d.%m.%Y"), small_font, (150, 150, 150))
+    # Seal / medallion, bottom-right.
+    seal_cx, seal_cy, seal_r = W - 210, H - 155, 55
+    draw.ellipse([seal_cx - seal_r, seal_cy - seal_r, seal_cx + seal_r, seal_cy + seal_r], outline=_GOLD, width=3)
+    draw.ellipse(
+        [seal_cx - seal_r + 10, seal_cy - seal_r + 10, seal_cx + seal_r - 10, seal_cy + seal_r - 10],
+        outline=_GOLD, width=1,
+    )
+    bbox = draw.textbbox((0, 0), "K", font=seal_font)
+    sw, sh = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    draw.text((seal_cx - sw / 2, seal_cy - sh / 2 - bbox[1]), "K", font=seal_font, fill=_GOLD)
+    draw.polygon(
+        [(seal_cx - 30, seal_cy + seal_r - 5), (seal_cx - 10, seal_cy + seal_r + 40), (seal_cx - 2, seal_cy + seal_r + 10)],
+        fill=_GOLD,
+    )
+    draw.polygon(
+        [(seal_cx + 30, seal_cy + seal_r - 5), (seal_cx + 10, seal_cy + seal_r + 40), (seal_cx + 2, seal_cy + seal_r + 10)],
+        fill=_GOLD,
+    )
+
+    draw.text((margin2 + 30, H - 175), "KITOB CHALLENGE", font=tiny_font, fill=_MUTED)
+    draw.text((margin2 + 30, H - 150), "Rasmiy Sertifikat", font=small_font, fill=_CREAM)
+    draw.text(
+        (margin2 + 30, H - 100),
+        f"Sana: {timezone.localdate().strftime('%d.%m.%Y')}",
+        font=tiny_font, fill=_MUTED,
+    )
 
     buf = BytesIO()
     img.save(buf, format="PNG")
