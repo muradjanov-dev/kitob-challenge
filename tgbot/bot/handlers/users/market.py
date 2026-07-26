@@ -20,8 +20,17 @@ def _market_menu_kb() -> InlineKeyboardMarkup:
             text=f"{item['emoji']} {item['title']} — {item['price']} 🪙",
             callback_data=f"market:view:{key}",
         ))
-    kb.add(InlineKeyboardButton(text="🏠 Bosh menyu", callback_data="menu:cabinet"))
+    kb.add(InlineKeyboardButton(text="🏠 Bosh menyu", callback_data="market:home"))
     return kb
+
+
+@dp.callback_query_handler(lambda c: c.data == "market:home")
+async def market_go_home(call: types.CallbackQuery):
+    from tgbot.bot.handlers.users.menu_router import send_main_menu
+
+    await call.answer()
+    user = await aget_user(call.from_user.id)
+    await send_main_menu(call.message, user)
 
 
 async def show_market_menu(message: types.Message, user):
@@ -56,8 +65,31 @@ async def market_view_item(call: types.CallbackQuery):
     )
     kb = InlineKeyboardMarkup(row_width=1)
     if balance >= item["price"]:
-        kb.add(InlineKeyboardButton(text="✅ Sotib olish", callback_data=f"market:buy:{key}"))
+        kb.add(InlineKeyboardButton(text="✅ Sotib olish", callback_data=f"market:confirm:{key}"))
     kb.add(InlineKeyboardButton(text="🔙 Marketga qaytish", callback_data="menu:market"))
+    await call.message.answer(text, parse_mode="HTML", reply_markup=kb)
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith("market:confirm:"))
+async def market_confirm_item(call: types.CallbackQuery):
+    """One extra tap before charging — Kun qahramoni posts publicly and
+    Reyting sponsorligi is queued irreversibly, so no purchase here should
+    ever fire off a single accidental tap."""
+    await call.answer()
+    key = call.data.split(":", 2)[2]
+    item = market_service.ITEMS.get(key)
+    if not item:
+        await call.message.answer("Noma'lum xizmat.")
+        return
+    text = (
+        f"{item['emoji']} <b>{item['title']}</b> — <b>{item['price']} Kitobcha</b>ni "
+        f"sarflashni tasdiqlaysizmi?\n\nBu amalni bekor qilib bo'lmaydi."
+    )
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.row(
+        InlineKeyboardButton(text="✅ Ha, tasdiqlayman", callback_data=f"market:buy:{key}"),
+        InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"market:view:{key}"),
+    )
     await call.message.answer(text, parse_mode="HTML", reply_markup=kb)
 
 
