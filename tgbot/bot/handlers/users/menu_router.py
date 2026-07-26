@@ -160,7 +160,10 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "shop":
         await _menu_shop(call, user, state)
     elif action == "market":
-        from tgbot.bot.handlers.users.market import show_market_menu
+        from tgbot.bot.handlers.users.market import show_market_menu, _is_private, _redirect_to_private
+        if not _is_private(call):
+            await _redirect_to_private(call)
+            return
         await call.answer()
         if not user:
             await call.message.answer(_t(lang, "Avval /start bosing", "Сначала /start"))

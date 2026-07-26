@@ -51,9 +51,21 @@ ITEMS = {
         "emoji": "🏷",
         "title": "Reyting sponsorligi",
         "price": 300,
-        "description": "Keyingi \"Top kitobxonlar\" e'lonida ismingiz sponsor sifatida ko'rsatiladi.",
+        "description": (
+            "Keyingi \"Top kitobxonlar\" e'lonida ismingiz sponsor sifatida "
+            "ko'rsatiladi. Kuniga faqat 5 ta joy bor!"
+        ),
     },
 }
+
+LEADERBOARD_SPONSOR_DAILY_LIMIT = 5
+
+
+def leaderboard_sponsor_slots_left_today() -> int:
+    from tgbot.models import LeaderboardSponsor
+    today = timezone.localdate()
+    used_today = LeaderboardSponsor.objects.filter(created_at__date=today).count()
+    return max(0, LEADERBOARD_SPONSOR_DAILY_LIMIT - used_today)
 
 
 def charge(user, price: int) -> bool:
@@ -108,9 +120,17 @@ def apply_streak_freeze_purchase(user) -> int:
         return p.streak_freeze_count
 
 
-def queue_leaderboard_sponsor(user) -> None:
+def queue_leaderboard_sponsor(user) -> bool:
+    """Create a LeaderboardSponsor row unless today's 5-slot scarcity cap is
+    already full. Returns False (no-op, no row created) if sold out."""
     from tgbot.models import LeaderboardSponsor
-    LeaderboardSponsor.objects.create(user=user)
+    with transaction.atomic():
+        today = timezone.localdate()
+        used_today = LeaderboardSponsor.objects.filter(created_at__date=today).count()
+        if used_today >= LEADERBOARD_SPONSOR_DAILY_LIMIT:
+            return False
+        LeaderboardSponsor.objects.create(user=user)
+        return True
 
 
 def generate_certificate(user) -> bytes:

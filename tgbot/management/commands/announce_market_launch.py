@@ -1,7 +1,10 @@
 """
 One-off: announce the new 🏪 Market to every group (E'lonlar topic) and DM
-every registered user, each with an inline button that opens the Market
-menu directly (callback_data="menu:market").
+every registered user. The group copy's button is a `url` deep link
+(https://t.me/<bot>?start=market) — inline buttons with callback_data only
+fire inside the chat they were posted in, and the Market menu must never be
+posted into a group (see tgbot/bot/handlers/users/market.py's private-chat
+guard). The DM copy can safely use callback_data since it's already private.
 
 Ishlatish (Railway console yoki SSH):
     python manage.py announce_market_launch
@@ -32,7 +35,7 @@ _TEXT = (
     "👇 Hoziroq ko'rib chiqing!"
 )
 
-_KEYBOARD = json.dumps({
+_DM_KEYBOARD = json.dumps({
     "inline_keyboard": [[{"text": "🏪 Marketni ochish", "callback_data": "menu:market"}]]
 })
 
@@ -41,17 +44,25 @@ class Command(BaseCommand):
     help = "Announce the new Market to every group and DM every registered user, right now."
 
     def handle(self, *args, **options):
-        from tgbot.tasks import BOT_TOKEN, _announce_targets
+        from tgbot.tasks import BOT_TOKEN, _announce_targets, _get_bot_username
         from tgbot.models import TelegramProfile
 
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        username = _get_bot_username()
+        group_keyboard = json.dumps({
+            "inline_keyboard": [[{
+                "text": "🏪 Marketni ochish",
+                "url": f"https://t.me/{username}?start=market" if username else "https://t.me/",
+            }]]
+        })
 
         # 1) Groups — E'lonlar topic (falls back to the group's default topic
         # if that env var isn't set for a given group, e.g. the boys group).
+        # Uses a url deep link (not callback_data) so it opens the bot's DM.
         g_sent = g_failed = 0
         for chat_id, thread_id in _announce_targets():
             data = {"chat_id": chat_id, "text": _TEXT, "parse_mode": "HTML",
-                    "reply_markup": _KEYBOARD, "disable_web_page_preview": "true"}
+                    "reply_markup": group_keyboard, "disable_web_page_preview": "true"}
             if thread_id:
                 data["message_thread_id"] = thread_id
             try:
@@ -73,7 +84,7 @@ class Command(BaseCommand):
                 resp = requests.post(
                     url,
                     data={"chat_id": chat_id, "text": _TEXT, "parse_mode": "HTML",
-                          "reply_markup": _KEYBOARD, "disable_web_page_preview": "true"},
+                          "reply_markup": _DM_KEYBOARD, "disable_web_page_preview": "true"},
                     timeout=10,
                 )
                 if resp.ok:

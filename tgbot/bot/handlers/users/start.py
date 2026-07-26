@@ -111,6 +111,19 @@ async def do_start(message: types.Message, state: FSMContext):
         await send_daily_report_handler(message, state)
         return
 
+    # Market deep link: /start market — from the "🏪 Marketni ochish" button
+    # in group announcements (callback_data buttons only fire inside the
+    # chat they're posted in, so a group post must use a url deep link that
+    # lands here instead).
+    if args == "market" and already_registered:
+        if user and not user.is_registered:
+            user.is_registered = True
+            await sync_to_async(user.save)(update_fields=["is_registered"])
+        await state.finish()
+        from tgbot.bot.handlers.users.market import show_market_menu
+        await show_market_menu(message, user)
+        return
+
     # Kitob Zanjiri deep link: /start zanjir — from the group announcement
     # button. Opens the live game Mini App (web_app buttons are only allowed in
     # private chats, so we hand it off here in the DM).
