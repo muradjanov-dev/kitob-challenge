@@ -8,6 +8,7 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from asgiref.sync import sync_to_async
+from django.db.models import F
 
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.utils import aget_user
@@ -115,31 +116,41 @@ def _get_session_data(session_id: int):
 
 @sync_to_async
 def _record_answer(session_id: int, user_id: int, question_id: int, option_id: int):
-    """Returns (already_answered, is_correct, correct_text, hint, participant).
+    """Returns (already_answered, is_correct, correct_text, hint, participant, session).
 
     For group sessions, auto-creates the participant on first answer so group
     members don't have to press Join separately.
+
+    Also returns `session` so the caller (answer_question) doesn't need its
+    own separate query for it — that used to cost a full extra DB round trip
+    (plus a separate thread hop) on every single answer tap.
     """
     session = QuizSession.objects.filter(id=session_id).first()
     if not session:
-        return True, False, "", "", None
+        return True, False, "", "", None, None
 
     participant = QuizParticipant.objects.filter(session_id=session_id, user_id=user_id).first()
     if not participant:
         if session.is_group and session.status == "active":
             participant = QuizParticipant.objects.create(session_id=session_id, user_id=user_id)
         else:
-            return True, False, "", "", None
+            return True, False, "", "", None, session
 
     if QuizUserAnswer.objects.filter(participant=participant, question_id=question_id).exists():
-        return True, False, "", "", participant
+        return True, False, "", "", participant, session
 
-    option = QuizOption.objects.filter(id=option_id).first()
+    # One query for the question + its options (was 3 separate .filter().first()
+    # calls: option, question, correct_opt) — find the picked/correct option
+    # in Python instead of round-tripping twice more for them.
+    question = QuizQuestion.objects.prefetch_related("options").filter(id=question_id).first()
+    if not question:
+        return True, False, "", "", participant, session
+
+    options = list(question.options.all())
+    option = next((o for o in options if o.id == option_id), None)
     if not option:
-        return True, False, "", "", participant
-
-    question = QuizQuestion.objects.filter(id=question_id).first()
-    correct_opt = QuizOption.objects.filter(question_id=question_id, is_correct=True).first()
+        return True, False, "", "", participant, session
+    correct_opt = next((o for o in options if o.is_correct), None)
     is_correct = option.is_correct
 
     QuizUserAnswer.objects.create(
@@ -149,14 +160,15 @@ def _record_answer(session_id: int, user_id: int, question_id: int, option_id: i
         is_correct=is_correct,
     )
     if is_correct:
-        QuizParticipant.objects.filter(id=participant.id).update(score=participant.score + 1)
+        QuizParticipant.objects.filter(id=participant.id).update(score=F("score") + 1)
 
     return (
         False,
         is_correct,
         correct_opt.text if correct_opt else "",
-        question.hint if question else "",
+        question.hint or "",
         participant,
+        session,
     )
 
 
@@ -419,11 +431,9 @@ async def answer_question(call: types.CallbackQuery, state: FSMContext):
         await call.answer()
         return
 
-    already, is_correct, correct_text, hint, participant = await _record_answer(
+    already, is_correct, correct_text, hint, participant, session = await _record_answer(
         session_id, user.id, question_id, option_id
     )
-
-    session = await sync_to_async(QuizSession.objects.filter(id=session_id).first)()
     is_group = bool(session and session.is_group)
 
     if already:
