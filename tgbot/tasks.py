@@ -2819,6 +2819,104 @@ def send_book_recommendations():
     print(f"[book_recs] done. sent={sent} skipped(no recs)={skipped} failed={failed}")
 
 
+@shared_task
+def send_recs_to_all_promo():
+    """One-off (not on the beat schedule — fire via a single apply_async(eta=...)):
+    send book recommendations to EVERY registered, non-blocked user regardless
+    of Premium status or how much reading history they have. Non-Premium users
+    get a CTA framing this as a Premium perk they're getting early because of
+    their activity; users with too little history for personalized CF
+    (get_recommendations needs 2+ distinct books) fall back to the overall
+    most-read books instead of being skipped."""
+    from tgbot.services.book_recommendations import (
+        build_similarity_index, get_recommendations, get_popular_fallback,
+    )
+
+    today = timezone.localdate()
+    premium_ids = _get_premium_tg_ids()  # returns telegram_ids, not pks — see below
+
+    build_similarity_index(force=True)
+
+    users = list(
+        TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+        .only("id", "telegram_id", "full_name", "language")
+    )
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    sent = skipped = failed = 0
+
+    for user in users:
+        recs = get_recommendations(user_id=user.id, top_n=3)
+        personalized = bool(recs)
+        if not recs:
+            recs = get_popular_fallback(user_id=user.id, top_n=3)
+        if not recs:
+            skipped += 1
+            continue
+
+        lang = user.language or "uz"
+        is_premium = user.telegram_id in premium_ids
+        name = user.full_name or "Kitobxon"
+
+        if lang == "ru":
+            if personalized:
+                head = f"📚 <b>{name}</b>, книги, которые читают похожие на вас читатели:\n"
+            else:
+                head = f"📚 <b>{name}</b>, самые популярные книги среди читателей:\n"
+            lines = [head]
+            for i, rec in enumerate(recs, 1):
+                if rec.because:
+                    lines.append(f"{i}. <b>{rec.title}</b>\n   <i>Читатели «{rec.because}» также полюбили эту книгу</i>")
+                else:
+                    lines.append(f"{i}. <b>{rec.title}</b>")
+            lines.append(
+                "\n<i>Чем больше отчётов и прочитанных книг у вас будет, тем точнее "
+                "станут эти рекомендации.</i>"
+            )
+            if not is_premium:
+                lines.append(
+                    "\n💎 Обычно такие рекомендации получают только <b>Premium</b>-читатели "
+                    "каждую неделю — вам прислали её за вашу активность! Оформите Premium, "
+                    "чтобы получать их регулярно."
+                )
+        else:
+            if personalized:
+                head = f"📚 <b>{name}</b>, sizga o'xshash kitobxonlar o'qigan kitoblar:\n"
+            else:
+                head = f"📚 <b>{name}</b>, kitobxonlar orasida eng mashhur kitoblar:\n"
+            lines = [head]
+            for i, rec in enumerate(recs, 1):
+                if rec.because:
+                    lines.append(f"{i}. <b>{rec.title}</b>\n   <i>«{rec.because}»ni o'qiganlar bu kitobni ham yoqtirgan</i>")
+                else:
+                    lines.append(f"{i}. <b>{rec.title}</b>")
+            lines.append(
+                "\n<i>Hisobot va o'qigan kitoblaringiz tarixi boyigan sari, bu "
+                "tavsiyalar yanada aniqroq bo'lib boradi.</i>"
+            )
+            if not is_premium:
+                lines.append(
+                    "\n💎 Odatda bunday tavsiyalar har hafta faqat <b>Premium</b> "
+                    "kitobxonlarga yuboriladi — sizga faolligingiz uchun maxsus jo'natdik! "
+                    "Doimiy shu tavsiyalarni olish uchun Premium'ga o'ting."
+                )
+
+        text = "\n".join(lines)
+        try:
+            resp = requests.post(
+                url, data={"chat_id": user.telegram_id, "text": text, "parse_mode": "HTML"}, timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+        except Exception as e:
+            print(f"[recs_promo] send failed uid={user.id}: {e}")
+            failed += 1
+
+    print(f"[recs_promo] done. sent={sent} skipped(no books at all)={skipped} failed={failed}")
+
+
 # ────────────────────────────────────────────────────────────────────────
 # Kitobxonlik Challenge tasks
 # ────────────────────────────────────────────────────────────────────────
@@ -4500,7 +4598,7 @@ def send_admin_daily_report():
     import datetime as _dt
     from django.conf import settings as _settings
     from django.db.models import Count as _Count, Sum as _Sum
-    from tgbot.models import Payment as _Pay, ShopPurchase as _SP
+    from tgbot.models import Payment as _Pay, ShopPurchase as _SP, KitobchaLedger as _KL
 
     today = timezone.localdate()
     yesterday = today - _dt.timedelta(days=7)  # same weekday last week
@@ -4540,6 +4638,14 @@ def send_admin_daily_report():
     quiz_answers_today = _BQA.objects.filter(created_at__date=today).count()
     quiz_correct_today = _BQA.objects.filter(created_at__date=today, is_correct=True).count()
 
+    # ── Kitobcha ledger (only tracks changes since the ledger shipped) ─────────
+    kitobcha_earned_today = _KL.objects.filter(
+        created_at__date=today, delta__gt=0
+    ).aggregate(s=_Sum("delta"))["s"] or 0
+    kitobcha_spent_today = -(
+        _KL.objects.filter(created_at__date=today, delta__lt=0).aggregate(s=_Sum("delta"))["s"] or 0
+    )
+
     # ── Build message ─────────────────────────────────────────────────────────
     text = (
         f"📋 <b>Admin kunlik hisobot — {today.strftime('%d.%m.%Y')}</b>\n\n"
@@ -4566,6 +4672,10 @@ def send_admin_daily_report():
         f"  Bugun javoblar: <b>{quiz_answers_today}</b> "
         f"(to'g'ri: {quiz_correct_today})\n\n"
 
+        f"🪙 <b>Kitobcha:</b>\n"
+        f"  Bugun qabul qilindi: <b>+{kitobcha_earned_today:,}</b>\n"
+        f"  Bugun ishlatildi: <b>-{kitobcha_spent_today:,}</b>\n\n"
+
         f"<i>Ushbu hisobot har kuni 23:55 da avtomatik yuboriladi.</i>"
     )
 
@@ -4574,18 +4684,88 @@ def send_admin_daily_report():
         print("[admin_daily_report] No ADMINS configured in settings.")
         return
 
+    reply_markup = json.dumps({"inline_keyboard": [[
+        {"text": "📅 Kecha", "callback_data": "admin_report:yesterday"},
+        {"text": "🗓 O'tgan hafta", "callback_data": "admin_report:week"},
+        {"text": "📆 O'tgan oy", "callback_data": "admin_report:month"},
+    ]]})
+
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     for admin_id in admin_ids:
         try:
             requests.post(
                 url,
-                data={"chat_id": admin_id, "text": text, "parse_mode": "HTML"},
+                data={"chat_id": admin_id, "text": text, "parse_mode": "HTML", "reply_markup": reply_markup},
                 timeout=5,
             )
         except Exception as e:
             print(f"[admin_daily_report] failed to send to {admin_id}: {e}")
 
     print(f"[admin_daily_report] sent to {len(admin_ids)} admins")
+
+
+def _admin_period_bounds(period: str):
+    """Returns (start_date, end_date, title) for a period-report button tap.
+    Ranges are inclusive and end the day before today (today's numbers are
+    still incomplete and already covered by the main daily report)."""
+    import datetime as _dt
+    today = timezone.localdate()
+    if period == "yesterday":
+        start = end = today - _dt.timedelta(days=1)
+        title = f"Kechagi hisobot — {start.strftime('%d.%m.%Y')}"
+    elif period == "week":
+        end = today - _dt.timedelta(days=1)
+        start = end - _dt.timedelta(days=6)
+        title = f"O'tgan hafta hisoboti — {start.strftime('%d.%m')}–{end.strftime('%d.%m.%Y')}"
+    elif period == "month":
+        end = today - _dt.timedelta(days=1)
+        start = end - _dt.timedelta(days=29)
+        title = f"O'tgan oy hisoboti — {start.strftime('%d.%m')}–{end.strftime('%d.%m.%Y')}"
+    else:
+        raise ValueError(f"unknown admin report period: {period}")
+    return start, end, title
+
+
+def build_admin_period_report_text(period: str) -> str:
+    """Same categories as send_admin_daily_report's snapshot, aggregated over
+    a past day/week/month instead of "today" — powers the inline period
+    buttons on the daily admin report."""
+    from django.db.models import Sum as _Sum
+    from tgbot.models import Payment as _Pay, ShopPurchase as _SP, KitobchaLedger as _KL, BookQuizAnswer as _BQA
+
+    start, end, title = _admin_period_bounds(period)
+
+    reports = ConfirmationReport.objects.filter(date__date__range=(start, end), user__is_blocked=False)
+    reporter_count = reports.values("user_id").distinct().count()
+    pages = reports.filter(is_audio=False).aggregate(s=_Sum("pages_read"))["s"] or 0
+    audio_min = reports.filter(is_audio=True).aggregate(s=_Sum("minutes_listened"))["s"] or 0
+
+    new_users = TelegramProfile.objects.filter(
+        created_at__date__range=(start, end), is_registered=True
+    ).count()
+    new_premium = _Pay.objects.filter(status="paid", start_date__range=(start, end)).count()
+    purchases = _SP.objects.filter(created_at__date__range=(start, end)).count()
+    quiz_answers = _BQA.objects.filter(created_at__date__range=(start, end)).count()
+
+    earned = _KL.objects.filter(created_at__date__range=(start, end), delta__gt=0).aggregate(s=_Sum("delta"))["s"] or 0
+    spent = -(
+        _KL.objects.filter(created_at__date__range=(start, end), delta__lt=0).aggregate(s=_Sum("delta"))["s"] or 0
+    )
+
+    return (
+        f"📋 <b>{title}</b>\n\n"
+        f"📚 <b>O'qish:</b>\n"
+        f"  👥 Hisobot berdi: <b>{reporter_count}</b> ta foydalanuvchi\n"
+        f"  📖 Jami betlar: <b>{pages:,}</b>\n"
+        f"  🎧 Audio: <b>{audio_min}</b> daqiqa\n\n"
+        f"👤 <b>Yangi foydalanuvchilar:</b> <b>{new_users}</b>\n\n"
+        f"💎 <b>Yangi Premium obunalar:</b> <b>{new_premium}</b>\n\n"
+        f"🪙 <b>Kitobcha:</b>\n"
+        f"  Qabul qilindi: <b>+{earned:,}</b>\n"
+        f"  Ishlatildi: <b>-{spent:,}</b>\n\n"
+        f"🏪 <b>Do'kon xaridlari:</b> <b>{purchases}</b>\n\n"
+        f"🧠 <b>Viktorina javoblari:</b> <b>{quiz_answers}</b>"
+    )
 
 
 # ────────────────────────────────────────────────────────────────────────

@@ -81,15 +81,17 @@ def log_purchase(user, item_key: str, price: int) -> None:
 
 
 def charge(user, price: int) -> bool:
-    """Deduct `price` Kitobcha from `user` if affordable. Atomic + row-locked
-    so concurrent taps can't double-spend."""
-    from tgbot.models import TelegramProfile
+    """Deduct `price` Kitobcha from `user` if affordable (or refund, when
+    `price` is negative — see the Reyting sponsorligi race-loss refund).
+    Atomic + row-locked so concurrent taps can't double-spend."""
+    from tgbot.models import TelegramProfile, KitobchaLedger
     with transaction.atomic():
         p = TelegramProfile.objects.select_for_update().get(id=user.id)
         if Decimal(p.ball or 0) < Decimal(price):
             return False
         p.ball = Decimal(p.ball or 0) - Decimal(price)
         p.save(update_fields=["ball"])
+        KitobchaLedger.objects.create(user=p, delta=-price, reason="market_charge")
     return True
 
 
@@ -109,7 +111,7 @@ def resolve_mystery_box(user):
     feel generous, not disappointing). Returns (text, wants_certificate) —
     the bot handler sends the certificate photo itself when the flag is set,
     since certificate delivery is a Telegram API call, not a DB write."""
-    from tgbot.models import TelegramProfile
+    from tgbot.models import TelegramProfile, KitobchaLedger
     pick = random.choices(
         [k for k, _ in MYSTERY_PRIZES],
         weights=[w for _, w in MYSTERY_PRIZES],
@@ -121,16 +123,19 @@ def resolve_mystery_box(user):
             amount = random.randint(50, 150)
             p.ball = Decimal(p.ball or 0) + Decimal(amount)
             p.save(update_fields=["ball"])
+            KitobchaLedger.objects.create(user=p, delta=amount, reason="mystery_box")
             return f"🪙 <b>+{amount} Kitobcha</b> yutdingiz!", False
         if pick == "kitobcha_big":
             amount = random.randint(250, 500)
             p.ball = Decimal(p.ball or 0) + Decimal(amount)
             p.save(update_fields=["ball"])
+            KitobchaLedger.objects.create(user=p, delta=amount, reason="mystery_box")
             return f"🤑 KATTA YUTUQ! <b>+{amount} Kitobcha</b>!", False
         if pick == "kitobcha_mega":
             amount = random.randint(800, 1500)
             p.ball = Decimal(p.ball or 0) + Decimal(amount)
             p.save(update_fields=["ball"])
+            KitobchaLedger.objects.create(user=p, delta=amount, reason="mystery_box")
             return f"💥 MEGA YUTUQ!!! <b>+{amount} Kitobcha</b>!!! 🎉", False
         if pick == "survival_life_1":
             p.bonus_survival_lives = (p.bonus_survival_lives or 0) + 1

@@ -30,7 +30,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from tgbot.models import Payment, ShopProduct, ShopPurchase, TelegramProfile
+from tgbot.models import Payment, ShopProduct, ShopPurchase, TelegramProfile, KitobchaLedger
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -232,6 +232,7 @@ def api_buy(request: HttpRequest) -> JsonResponse:
 
             user.ball = (user.ball or Decimal("0")) - Decimal(price)
             user.save(update_fields=["ball"])
+            KitobchaLedger.objects.create(user=user, delta=-price, reason="shop_purchase")
             if product.stock_qty is not None:
                 product.stock_qty = product.stock_qty - 1
                 product.save(update_fields=["stock_qty"])

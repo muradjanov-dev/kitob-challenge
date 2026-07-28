@@ -1863,3 +1863,21 @@ async def _send_kitobcha_top(message):
         "allaqachon joriy balansda hisobga olingan, shuning uchun qayta qo'shilmadi.</i>"
     )
     await message.answer(summary, parse_mode="HTML")
+
+
+def _is_report_admin(telegram_id: int) -> bool:
+    from django.conf import settings as _settings
+    return str(telegram_id) in [str(a).strip() for a in _settings.ADMINS]
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("admin_report:"), state="*")
+async def admin_period_report_cb(call: types.CallbackQuery):
+    """Kecha / o'tgan hafta / o'tgan oy buttons on the 23:55 admin daily report."""
+    if not _is_report_admin(call.from_user.id):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    await call.answer("Hisoblanmoqda…")
+    period = call.data.split(":", 1)[1]
+    from tgbot.tasks import build_admin_period_report_text
+    text = await sync_to_async(build_admin_period_report_text, thread_sensitive=True)(period)
+    await call.message.answer(text, parse_mode="HTML")

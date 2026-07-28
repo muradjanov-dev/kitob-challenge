@@ -264,6 +264,10 @@ class TelegramProfile(BaseModel):
             self.refresh_from_db()
             self.ball = self.ball + ball_decimal if is_completed else self.ball - ball_decimal
             self.save(update_fields=["ball"])
+            KitobchaLedger.objects.create(
+                user=self, delta=int(ball_decimal) if is_completed else -int(ball_decimal),
+                reason="update_ball",
+            )
         return int(ball_decimal)
 
     def __str__(self):
@@ -1071,6 +1075,27 @@ class MarketPurchase(BaseModel):
 
     def __str__(self):
         return f"{self.user.full_name} — {self.item_key} ({self.price} 🪙)"
+
+
+class KitobchaLedger(BaseModel):
+    """Signed log of every Kitobcha balance change (positive = earned,
+    negative = spent) — `TelegramProfile.ball` is just a running total with
+    no history, so this is the only place daily earned/spent totals (e.g.
+    the admin daily report) can be computed from. Only covers changes made
+    after this model shipped."""
+    user = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="kitobcha_ledger_entries",
+    )
+    delta = models.IntegerField(help_text="Positive = earned, negative = spent.")
+    reason = models.CharField(max_length=40, blank=True, default="")
+
+    class Meta:
+        verbose_name = "Kitobcha Ledger Entry"
+        verbose_name_plural = "Kitobcha Ledger Entries"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.user.full_name} — {self.delta:+d} ({self.reason})"
 
 
 class ReaderTitleAnnouncement(BaseModel):
