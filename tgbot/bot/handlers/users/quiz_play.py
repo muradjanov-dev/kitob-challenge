@@ -495,6 +495,11 @@ async def _send_question(chat_id: int, session_id: int, q_idx: int):
     _active_timers[session_id] = task
 
 
+def _progress_bar(pct: int, slots: int = 10) -> str:
+    filled = round(pct / 100 * slots)
+    return "▰" * filled + "▱" * (slots - filled)
+
+
 async def _finish_session_solo(session_id: int, chat_id: int):
     _cancel_timer(session_id)
 
@@ -526,18 +531,19 @@ async def _finish_session_solo(session_id: int, chat_id: int):
         emoji, headline, blurb = "📚", "Hali oldindasiz!", "Bu — boshlanish. Kitobni qo'lga olib, mazasini totib chiqsangiz, keyingi safar yorishasiz."
 
     bot_link = f"https://t.me/{BOT_USERNAME}"
+    bar = _progress_bar(pct)
     await bot.send_message(
         chat_id=chat_id,
         text=(
             f"{emoji} <b>{headline}</b>\n"
-            f"━━━━━━━━━━━━━━━━━\n\n"
-            f"📖 <b>{session.quiz.title}</b>\n\n"
-            f"🎯 To'g'ri:  <b>{score}/{total}</b>   ·   {pct}%\n\n"
+            f"<i>{session.quiz.title}</i>\n\n"
+            f"<code>{bar}</code>  <b>{pct}%</b>\n"
+            f"✅ To'g'ri javoblar: <b>{score}/{total}</b>\n\n"
             f"<i>{blurb}</i>\n\n"
-            f"━━━━━━━━━━━━━━━━━\n"
-            f"🚀 Yanada ko'proq quiz ishlash va o'zingiz quiz tuzish uchun:\n"
+            f"<blockquote>🚀 Yana quiz ishlang yoki o'zingiz tuzing:\n"
             f"👉 <a href=\"{bot_link}\">Kitob Challenge bot</a>\n\n"
-            f"💎 <b>Premium</b>'da AI yordamida quiz tuzish, kengaytirilgan statistikalar va boshqa imkoniyatlar ochiladi."
+            f"💎 <b>Premium</b> — AI yordamida quiz tuzish, kengaytirilgan "
+            f"statistikalar va boshqa imkoniyatlar</blockquote>"
         ),
         parse_mode="HTML",
         disable_web_page_preview=True,
@@ -853,29 +859,28 @@ async def _finish_group_session(session_id: int, chat_id: int):
         return
 
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    winner_name = participants[0].user.full_name or "Kitobxon"
     lines = [
-        f"🎊 <b>{session.quiz.title}</b>",
-        "<i>Yakuniy natijalar</i>",
-        "━━━━━━━━━━━━━━━━━",
+        "🎊 <b>Quiz yakunlandi!</b>",
+        f"<i>{session.quiz.title}</i>",
+        "",
+        f"🏆 G'olib: <b>{winner_name}</b>",
         "",
     ]
     for i, p in enumerate(participants, 1):
-        marker = medals.get(i, f"  {i}.")
+        marker = medals.get(i, f"<code>{i:>2}.</code>")
         pct = int((p.score or 0) * 100 / total) if total else 0
         name = p.user.full_name or "Kitobxon"
-        lines.append(f"{marker} <b>{name}</b>  —  {p.score}/{total}  ({pct}%)")
+        lines.append(f"{marker} <b>{name}</b> — {p.score}/{total} ({pct}%)")
     lines.append("")
-    lines.append(f"👥 Jami ishtirokchilar:  <b>{len(participants)}</b>")
-    lines.append("━━━━━━━━━━━━━━━━━")
+    lines.append(f"👥 Jami ishtirokchilar: <b>{len(participants)}</b>")
     lines.append("")
     bot_link = f"https://t.me/{BOT_USERNAME}"
     lines.append(
-        f"🚀 Yanada ko'proq quiz ishlash va o'zingiz quiz tuzish uchun:\n"
-        f"👉 <a href=\"{bot_link}\">Kitob Challenge bot</a>"
-    )
-    lines.append(
-        "💎 <b>Premium</b>'da AI yordamida quiz tuzish, kengaytirilgan "
-        "statistikalar va boshqa imkoniyatlar ochiladi."
+        f"<blockquote>🚀 Yana quiz ishlang yoki o'zingiz tuzing:\n"
+        f"👉 <a href=\"{bot_link}\">Kitob Challenge bot</a>\n\n"
+        f"💎 <b>Premium</b> — AI yordamida quiz tuzish, kengaytirilgan "
+        f"statistikalar va boshqa imkoniyatlar</blockquote>"
     )
 
     await bot.send_message(

@@ -4606,6 +4606,93 @@ def expire_trial_premium(user_id):
     TelegramProfile.objects.filter(id=user_id).update(trial_premium_until=None)
 
 
+AI_QUIZ_TRIAL_DAILY_COUNT = 3
+AI_QUIZ_TRIAL_HOURS = 1
+
+
+@shared_task
+def grant_daily_ai_quiz_trial():
+    """Daily: randomly grant AI_QUIZ_TRIAL_DAILY_COUNT non-Premium users a
+    1-hour window where they can use the 🤖 AI quiz-creation feature (normally
+    Premium-only — see quiz_admin.py's 'ai' action gate and
+    TelegramProfile.trial_ai_quiz_until). A taste of the feature, timed to
+    expire and nudge a Premium upsell."""
+    import datetime as _dt
+
+    now = timezone.now()
+    today = timezone.localdate()
+    eligible_ids = list(
+        TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+        .exclude(payments__status="paid", payments__end_date__gte=today)
+        .exclude(trial_ai_quiz_until__gte=now)
+        .values_list("id", flat=True)
+        .distinct()
+    )
+    if not eligible_ids:
+        print("grant_daily_ai_quiz_trial: no eligible users")
+        return
+
+    chosen = random.sample(eligible_ids, min(AI_QUIZ_TRIAL_DAILY_COUNT, len(eligible_ids)))
+    until = now + _dt.timedelta(hours=AI_QUIZ_TRIAL_HOURS)
+    text = (
+        "🎁 <b>Tabriklaymiz! Sizga maxsus sovg'a!</b>\n\n"
+        f"Keyingi <b>{AI_QUIZ_TRIAL_HOURS} soat</b> davomida 🤖 <b>AI yordamida quiz "
+        "yaratish</b> — odatda faqat Premium'da mavjud bo'lgan funksiya — siz uchun ham ochiq!\n\n"
+        "Matn, rasm yoki PDF yuboring — AI o'zi savollar tuzib beradi. "
+        "Asosiy menyu → 📝 Kitob Quiz → 🤖 AI yordamida Quiz yaratish.\n\n"
+        "⏳ Imkoniyat 1 soatdan keyin tugaydi — hoziroq sinab ko'ring!"
+    )
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    sent = 0
+    for uid in chosen:
+        try:
+            profile = TelegramProfile.objects.filter(id=uid).only("telegram_id").first()
+            if not profile:
+                continue
+            TelegramProfile.objects.filter(id=uid).update(trial_ai_quiz_until=until)
+            requests.post(
+                url,
+                data={"chat_id": profile.telegram_id, "text": text, "parse_mode": "HTML"},
+                timeout=5,
+            )
+            expire_ai_quiz_trial.apply_async(args=[uid], countdown=AI_QUIZ_TRIAL_HOURS * 3600)
+            sent += 1
+        except Exception as e:
+            print(f"grant_daily_ai_quiz_trial user {uid}: {e}")
+    print(f"grant_daily_ai_quiz_trial: granted to {sent}/{len(chosen)} users")
+
+
+@shared_task
+def expire_ai_quiz_trial(user_id):
+    """Fires AI_QUIZ_TRIAL_HOURS after grant_daily_ai_quiz_trial for one user.
+    If they haven't bought real Premium in the meantime, DM a quick upsell."""
+    from tgbot.models import Payment as _Pay
+
+    profile = TelegramProfile.objects.filter(id=user_id).first()
+    if not profile:
+        return
+
+    is_real_premium = _Pay.objects.filter(
+        user=profile, status="paid", end_date__gte=timezone.localdate()
+    ).exists()
+    if not is_real_premium:
+        text = (
+            "⌛ <b>AI quiz yaratish sovg'angiz tugadi.</b>\n\n"
+            "Yoqdimi? 💎 Premium bilan istalgan vaqt AI yordamida quiz yaratishingiz mumkin — "
+            "shu bilan birga ×2 Kitobcha va boshqa imkoniyatlar ham ochiladi!"
+        )
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                data={"chat_id": profile.telegram_id, "text": text, "parse_mode": "HTML"},
+                timeout=5,
+            )
+        except Exception as e:
+            print(f"expire_ai_quiz_trial DM failed for {user_id}: {e}")
+
+    TelegramProfile.objects.filter(id=user_id).update(trial_ai_quiz_until=None)
+
+
 @shared_task
 def announce_top_game_players():
     """Celebratory announcement of the 5 users who joined the most live games

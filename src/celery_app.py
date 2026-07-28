@@ -246,6 +246,14 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=12, minute=0),
     },
 
+    # 3 random non-Premium users get a 1-hour taste of AI quiz creation —
+    # separate slot from the trial-Premium giveaway above so they don't land
+    # on the same users' notifications back to back.
+    'grant-daily-ai-quiz-trial': {
+        'task': 'tgbot.tasks.grant_daily_ai_quiz_trial',
+        'schedule': crontab(hour=13, minute=0),
+    },
+
     # Top 5 most active game players today — 23:00, after the evening game
     # sequence has wrapped up, before the admin summary and personal reports.
     'announce-top-game-players': {

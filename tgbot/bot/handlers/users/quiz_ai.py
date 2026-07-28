@@ -47,6 +47,35 @@ def _script_hint(text: str) -> str:
     return ""
 
 
+def _sample_book_text(pages: list[str], budget: int = 80000) -> str:
+    """Sample PDF text from the beginning, middle, and end of the BODY (not
+    the raw first N chars) so a book's front matter — title page, TOC,
+    dedication, translator's/publisher's note, which can easily run 10-20+
+    pages — doesn't dominate what the AI sees. Feeding it mostly front
+    matter is the main reason AI-generated quizzes end up asking about the
+    publisher or table of contents instead of the actual story."""
+    full = "\n".join(pages)
+    if len(full) <= budget:
+        return full
+    if len(pages) < 6:
+        # Too few pages to safely trim front/back matter — just take the head.
+        return full[:budget]
+
+    skip = max(1, int(len(pages) * 0.04))
+    body_pages = pages[skip: len(pages) - skip] or pages
+    body = "\n".join(body_pages)
+    if len(body) <= budget:
+        return body
+
+    chunk = budget // 3
+    beginning = body[:chunk]
+    mid_start = max(0, len(body) // 2 - chunk // 2)
+    middle = body[mid_start: mid_start + chunk]
+    end = body[-chunk:]
+    sep = "\n\n[... kitobning ushbu qismi o'tkazib yuborildi ...]\n\n"
+    return beginning + sep + middle + sep + end
+
+
 # Shared language/content rules appended to every generation prompt.
 _PROMPT_RULES = """
 Make sure options are up to 4 items. correct_index is 0-indexed.
@@ -149,20 +178,20 @@ async def process_ai_input(message: types.Message, state: FSMContext):
     q_count = state_data.get("question_count", 5)
     t_limit = state_data.get("time_limit", 30)
     
-    # 10 limit per day check
+    # 1/day cap (≈30/month) — covers the OpenAI API cost many times over
+    # (see cost note below) while keeping usage predictable.
     cache_key = f"ai_quiz_limit_{user.id}"
     today_count = cache.get(cache_key, 0)
-    if today_count >= 10:
+    if today_count >= 1:
         await message.answer(
-            "⚠️ <b>Limit tugadi!</b>\n\n"
-            "AI tarmog'ini ortiqcha yuklamaslik uchun bir kunda maksimal <b>10 ta</b> quiz yaratish mumkin. "
-            "Iltimos, ertaga qayta urinib ko'ring.",
+            "⚠️ <b>Bugungi limit tugadi!</b>\n\n"
+            "Har bir foydalanuvchi kuniga <b>1 ta</b> AI quiz yaratishi mumkin "
+            "(oyiga ~30 ta). Ertaga qayta urinib ko'ring.",
             parse_mode="HTML"
         )
         await state.finish()
         return
 
-    pdf_cache_key = f"ai_quiz_pdf_limit_{user.id}"
     if message.document:
         if not message.document.file_name.lower().endswith('.pdf'):
             await message.answer("⚠️ Iltimos, faqat PDF formatidagi fayllarni yuboring.")
@@ -199,17 +228,6 @@ async def process_ai_input(message: types.Message, state: FSMContext):
                 f"Telegram bot orqali eng ko'pi bilan <b>20 MB</b> gacha PDF qabul qila oladi.\n"
                 f"Iltimos, kichikroq fayl yoki kitobning bir bo'limini alohida PDF qilib yuboring.",
                 parse_mode="HTML",
-            )
-            return
-
-        # Premium PDF cap: 1 generation per day (the 10/day general cap still
-        # applies on top, so this is a separate, stricter PDF-only counter).
-        if cache.get(pdf_cache_key, 0) >= 1:
-            await message.answer(
-                "⚠️ <b>Bugungi PDF limit tugadi!</b>\n\n"
-                "Premium foydalanuvchilar bir kunda <b>1 marta</b> PDF dan quiz yarata oladi. "
-                "Ertaga qayta urinib ko'ring (matn yoki rasm orqali esa kuniga 10 martagacha mumkin).",
-                parse_mode="HTML"
             )
             return
 
@@ -262,17 +280,16 @@ Return ONLY valid JSON in the following format:
 
             import fitz
             doc = fitz.open(stream=pdf_bytes_io.read(), filetype="pdf")
-            extracted_text = ""
-            for page in doc:
-                extracted_text += page.get_text() + "\n"
+            pages = [page.get_text() for page in doc]
             doc.close()
 
-            # Limit text if it's too huge to prevent token overflow (approx 80k chars)
-            extracted_text = extracted_text[:80000]
+            extracted_text = _sample_book_text(pages, budget=80000)
 
             hint = _script_hint(extracted_text)
             messages.append({"role": "user", "content": (
-                f"Quyidagi kitob matnidan foydalanib eng muhim joylaridan quiz yarating:"
+                f"Quyidagi kitob matnidan foydalanib eng muhim joylaridan quiz yarating. "
+                f"Matn kitobning boshi, o'rtasi va oxiridan olingan uch qismdan iborat — "
+                f"ular orasida uzilishlar bor, buni tabiiy qabul qiling:"
                 f"{hint}\n\n{extracted_text}"
             )})
         else:
@@ -345,11 +362,6 @@ Return ONLY valid JSON in the following format:
         else:
             cache.incr(cache_key)
 
-        # Separate PDF-specific 1/day counter so PDFs are gated even when the
-        # general 10/day cap isn't exhausted yet.
-        if message.document and cache.get(pdf_cache_key, 0) == 0:
-            cache.set(pdf_cache_key, 1, timeout=86400)
-        
         await msg.delete()
         
         text = await _quiz_view_text(quiz)

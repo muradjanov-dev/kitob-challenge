@@ -222,6 +222,12 @@ class TelegramProfile(BaseModel):
                   "(e.g. from the daily random giveaway) — see has_active_premium() "
                   "and tasks.grant_daily_trial_premium.",
     )
+    trial_ai_quiz_until = models.DateTimeField(
+        null=True, blank=True,
+        help_text="If set and in the future, this non-Premium user may create AI "
+                  "quizzes for a 1-hour window — see tasks.grant_daily_ai_quiz_trial "
+                  "and quiz_admin.py's 'ai' action gate.",
+    )
     optimal_send_hour = models.PositiveSmallIntegerField(
         null=True,
         blank=True,

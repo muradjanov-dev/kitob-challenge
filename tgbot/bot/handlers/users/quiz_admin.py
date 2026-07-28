@@ -226,7 +226,8 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
         is_premium = await sync_to_async(
             Payment.objects.filter(user=user, status="paid", end_date__gte=timezone.localdate()).exists
         )()
-        if not is_premium:
+        has_trial = bool(user.trial_ai_quiz_until and user.trial_ai_quiz_until >= timezone.now())
+        if not is_premium and not has_trial:
             await call.answer("Bu funksiya faqat Premium foydalanuvchilar uchun! ⭐", show_alert=True)
             return
             
