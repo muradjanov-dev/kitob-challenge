@@ -1694,6 +1694,36 @@ def _award_level_rewards(user: TelegramProfile, pages: int):
                 print(f"level award {code} failed for {user.id}: {e}")
 
 
+def _referral_share_texts(user) -> list:
+    """20 varied, personalized invite blurbs for the '📤 Referalni ulashish'
+    share button — a different random one each time this message is (re)sent
+    so frequent posters don't spam the same line to their contacts."""
+    name = (user.full_name or "").strip().split(" ")[0] if user.full_name else ""
+    name = name or "Kitobxon"
+    return [
+        "📚 Kitob Challenge botiga qo'shil — birga o'qib, sovg'alar yutib olamiz! 🎁",
+        f"👋 Salom! Men — {name}, har kuni kitob o'qiyapman va Kitobcha yig'yapman. Sen ham qo'shil! 📚🔥",
+        "🔥 Har kuni o'qigan sahifang uchun mukofot olasanmi? Kitob Challenge'da — HA! Qo'shil 🎁",
+        "📖 O'qish endi zerikarli emas — challenge, reyting va sovg'alar bilan! Bugun boshla 🚀",
+        f"🎯 {name} seni Kitob Challenge'ga taklif qilyapti — birga o'qib, birga g'olib bo'lamiz! 🏆",
+        "🎁 Kitob o'qib pul o'rniga \"Kitobcha\" yig'ish mumkinligini bilarmiding? Qo'shil, ko'r! 📚",
+        "💪 O'qish odatini shakllantirish qiyinmi? Kitob Challenge yordam beradi — reyting, streak, sovg'alar! 🔥",
+        "📚➡️🎁 Har bir o'qilgan bet — bir qadam mukofotga yaqinroq. Qo'shil, boshla!",
+        f"✨ {name} bilan birga o'qing — kim ko'proq bet o'qiydi, ko'proq yutadi! 🏆📖",
+        "🚀 Kitob o'qish + reyting + sovg'alar = Kitob Challenge. Bugun qo'shilib ko'r! 📚",
+        "📣 Do'stim, senga bir taklifim bor: birga kitob o'qiymiz, ikkalamiz ham yutib chiqamiz! 🎁",
+        "🏆 Har kuni eng ko'p o'qigan kitobxonlar orasida bo'lishni xohlaysanmi? Qo'shil! 📚🔥",
+        f"📖 {name} sizni chaqiryapti: kitob o'qi, Kitobcha yig', mukofot yut. Oddiy! 🎁",
+        "🎉 Kitob Challenge — o'qish + o'yin + sovg'a, hammasi bitta botda! Qo'shil, ko'proq bilib ol.",
+        "📚 Yolg'iz o'qish zerikarli, birga o'qish — qiziq! Kitob Challenge'ga xush kelibsan 🔥",
+        "🎁 Bugun ro'yxatdan o't — birinchi hisobotdan boshlab Kitobcha yig'a boshlaysan!",
+        f"👥 {name} allaqachon Kitob Challenge'da faol o'qiyapti. Sen ham qo'shilasanmi? 📖🚀",
+        "🔥 Streak, reyting, mukofotlar — barchasi bitta joyda. Kitob Challenge'ga xush kelibsiz! 📚",
+        "📚 Kitob o'qishni o'yinga aylantirgan bot bor — Kitob Challenge. Qo'shil, o'zing ko'r! 🎁",
+        "🌟 Har kuni bir necha bet o'qi, do'stlaring bilan raqobatlash, sovg'alar yut. Boshla! 🏆",
+    ]
+
+
 def _send_and_pin_progress(user) -> int:
     """Send fresh progress message to a user, unpin the previous, pin the new
     one, persist the new message_id to user.last_progress_msg_id. Returns the
@@ -1728,9 +1758,7 @@ def _send_and_pin_progress(user) -> int:
             "Havolani nusxalab kitobxonlarga ulashing — har taklif uchun Kitobcha, "
             "har 3 taklifga 1 kun Premium va boshqa sovg'alardan foydalaning! 🎁"
         )
-        share_text = _urlquote(
-            "📚 Kitob Challenge botiga qo'shil — birga o'qib, sovg'alar yutib olamiz! 🎁"
-        )
+        share_text = _urlquote(random.choice(_referral_share_texts(user)))
         buttons.append([{
             "text": "📤 Referalni ulashish",
             "url": f"https://t.me/share/url?url={_urlquote(ref_link)}&text={share_text}",
