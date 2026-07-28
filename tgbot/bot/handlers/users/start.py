@@ -111,7 +111,7 @@ async def do_start(message: types.Message, state: FSMContext):
         await send_daily_report_handler(message, state)
         return
 
-    # Market deep link: /start market — from the "🏪 Marketni ochish" button
+    # Market deep link: /start market — from the "🎪 Marketni ochish" button
     # in group announcements (callback_data buttons only fire inside the
     # chat they're posted in, so a group post must use a url deep link that
     # lands here instead).

@@ -742,7 +742,7 @@ _HOW_IT_WORKS_UZ = (
 
     "🪙 <b>2. Kitobcha to'plang</b>\n"
     "   O'qigan va yutuq olgan sayin hamyoningizga 🪙 <b>Kitobcha</b> tushadi.\n"
-    "   Ularni <b>🏪 Market</b> bo'limida sarflang: streak muzlatish, sirli "
+    "   Ularni <b>🎪 Market</b> bo'limida sarflang: streak muzlatish, sirli "
     "quti, shaxsiy sertifikat va boshqa qiziqarli narsalar bor! 😌\n\n"
 
     "📊 <b>3. Reytingda jang qiling</b>\n"
@@ -787,7 +787,7 @@ _HOW_IT_WORKS_RU = (
     "🪙 <b>2. Копите Kitobcha</b>\n"
     "   За каждое достижение и прочитанные страницы вам начисляется 🪙 "
     "<b>Kitobcha</b>.\n"
-    "   Тратьте их в <b>🏪 Market</b>: заморозка серии, сюрприз-бокс, "
+    "   Тратьте их в <b>🎪 Market</b>: заморозка серии, сюрприз-бокс, "
     "сертификат и другое! 😌\n\n"
 
     "📊 <b>3. Соревнуйтесь в рейтинге</b>\n"

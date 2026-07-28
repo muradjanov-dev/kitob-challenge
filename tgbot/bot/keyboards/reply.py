@@ -63,7 +63,7 @@ def main_markup(language="uz", is_admin=False):
             "contact": "📞 Admin bilan bog'lanish",
             "settings": "⚙️ Sozlamalar",
             "quiz": "📝 Kitob Quiz",
-            "market": "🏪 Market",
+            "market": "🎪 Market",
             "admin": "👑 Admin panel",
             "how": "❓ Qanday ishlaydi?",
         }
@@ -82,7 +82,7 @@ def main_markup(language="uz", is_admin=False):
         InlineKeyboardButton(text=labels["premium"], callback_data="menu:premium"),
         InlineKeyboardButton(text=labels["quiz"], callback_data="menu:quiz"),
     )
-    kb.row(InlineKeyboardButton(text=labels.get("market", "🏪 Market"), callback_data="menu:market"))
+    kb.row(InlineKeyboardButton(text=labels.get("market", "🎪 Market"), callback_data="menu:market"))
     kb.row(
         InlineKeyboardButton(text=labels["settings"], callback_data="menu:settings"),
         InlineKeyboardButton(text=labels["contact"], callback_data="menu:contact"),

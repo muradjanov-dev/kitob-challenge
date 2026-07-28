@@ -1,5 +1,5 @@
 """
-One-off: announce the new 🏪 Market to every group (E'lonlar topic) and DM
+One-off: announce the new 🎪 Market to every group (E'lonlar topic) and DM
 every registered user. The group copy's button is a `url` deep link
 (https://t.me/<bot>?start=market) — inline buttons with callback_data only
 fire inside the chat they were posted in, and the Market menu must never be
@@ -17,7 +17,7 @@ from django.core.management.base import BaseCommand
 
 
 _TEXT = (
-    "🏪 <b>YANGILIK: Kitob Challenge Market ochildi!</b>\n\n"
+    "🎪 <b>YANGILIK: Kitob Challenge Market ochildi!</b>\n\n"
     "Endi yig'gan 🪙 Kitobchalaringizni qiziqarli xizmatlarga sarflashingiz "
     "mumkin:\n\n"
     "🛡 <b>Streak muzlatish</b> — 750 🪙\n"
@@ -36,7 +36,7 @@ _TEXT = (
 )
 
 _DM_KEYBOARD = json.dumps({
-    "inline_keyboard": [[{"text": "🏪 Marketni ochish", "callback_data": "menu:market"}]]
+    "inline_keyboard": [[{"text": "🎪 Marketni ochish", "callback_data": "menu:market"}]]
 })
 
 
@@ -51,7 +51,7 @@ class Command(BaseCommand):
         username = _get_bot_username()
         group_keyboard = json.dumps({
             "inline_keyboard": [[{
-                "text": "🏪 Marketni ochish",
+                "text": "🎪 Marketni ochish",
                 "url": f"https://t.me/{username}?start=market" if username else "https://t.me/",
             }]]
         })
