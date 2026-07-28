@@ -164,7 +164,10 @@ def _product_payload(p: ShopProduct, request: HttpRequest) -> dict:
 @require_GET
 @_require_authed_admin
 def api_products(request: HttpRequest) -> JsonResponse:
-    products = ShopProduct.objects.filter(is_active=True).order_by("sort_order", "-created_at")
+    products = list(ShopProduct.objects.filter(is_active=True).order_by("sort_order", "-created_at"))
+    # In-stock items first (admin's sort_order/-created_at order preserved within
+    # each group) — sold-out items sink to the bottom instead of cluttering the top.
+    products.sort(key=lambda p: not p.is_available)
     return JsonResponse({
         "ok": True,
         "products": [_product_payload(p, request) for p in products],
