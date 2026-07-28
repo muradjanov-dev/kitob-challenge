@@ -178,15 +178,30 @@ async def process_ai_input(message: types.Message, state: FSMContext):
     q_count = state_data.get("question_count", 5)
     t_limit = state_data.get("time_limit", 30)
     
-    # 1/day cap (≈30/month) — covers the OpenAI API cost many times over
-    # (see cost note below) while keeping usage predictable.
+    # Daily cap, tiered by plan: regular Premium = 1/day (~30/month), Extra/
+    # Super Premium = 6/day — both comfortably inside the OpenAI cost budget
+    # for their respective subscription price (see cost note in the PR).
+    # Trial-window users (non-Premium, granted via grant_daily_ai_quiz_trial)
+    # get the regular 1/day cap for their trial hour.
+    from tgbot.bot.handlers.users.payment import SUPER_PREMIUM_PRICE
+
+    @sync_to_async
+    def _is_extra_premium():
+        p = (
+            Payment.objects.filter(user=user, status="paid", end_date__gte=timezone.localdate())
+            .order_by("-end_date").first()
+        )
+        return bool(p and p.amount >= SUPER_PREMIUM_PRICE)
+
+    daily_cap = 6 if await _is_extra_premium() else 1
+
     cache_key = f"ai_quiz_limit_{user.id}"
     today_count = cache.get(cache_key, 0)
-    if today_count >= 1:
+    if today_count >= daily_cap:
         await message.answer(
-            "⚠️ <b>Bugungi limit tugadi!</b>\n\n"
-            "Har bir foydalanuvchi kuniga <b>1 ta</b> AI quiz yaratishi mumkin "
-            "(oyiga ~30 ta). Ertaga qayta urinib ko'ring.",
+            f"⚠️ <b>Bugungi limit tugadi!</b>\n\n"
+            f"Sizning tarifingizda kuniga <b>{daily_cap} ta</b> AI quiz yaratish mumkin. "
+            "Ertaga qayta urinib ko'ring.",
             parse_mode="HTML"
         )
         await state.finish()

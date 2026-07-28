@@ -1835,12 +1835,22 @@ async def _send_kitobcha_top(message):
 
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
     header = f"🪙 <b>Kitobcha bo'yicha reyting — barcha {len(rows)} foydalanuvchi:</b>\n\n"
-    chunks = []
-    current = header
-    for i, (tg_id, name, ball) in enumerate(rows, 1):
+
+    def _entry(i, tg_id, name, ball):
         marker = medals.get(i, f"{i}.")
         nm = _esc(name or "Kitobxon")
-        line = f"{marker} <a href='tg://user?id={tg_id}'>{nm}</a>: <b>{int(ball or 0)}</b> 🪙\n"
+        return f"{marker} <a href='tg://user?id={tg_id}'>{nm}</a>: <b>{int(ball or 0)}</b> 🪙"
+
+    # Two entries per line (separated by "│") so the admin scrolls through
+    # half as many rows — names still stay clickable (tg://user links can't
+    # live inside <code>, so this is spacing-separated, not true monospace
+    # columns).
+    chunks = []
+    current = header
+    for pair_start in range(0, len(rows), 2):
+        pair = rows[pair_start: pair_start + 2]
+        parts = [_entry(pair_start + j + 1, tg_id, name, ball) for j, (tg_id, name, ball) in enumerate(pair)]
+        line = "  │  ".join(parts) + "\n"
         if len(current) + len(line) > 3500:
             chunks.append(current)
             current = line
