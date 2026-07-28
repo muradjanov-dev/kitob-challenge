@@ -1340,9 +1340,18 @@ async def toplist_congrats_handler(call: types.CallbackQuery, state: FSMContext)
     from django.db.models import Sum as _Sum
     from tgbot.tasks import BOT_TOKEN
 
-    # Delete the congrats DM from the user's chat 1 minute after they click.
+    # Delete the congrats prompt from the presser's own DM 1 minute after they
+    # click — but NEVER when this button was pressed on the shared group post
+    # (same broadcast + same callback_data is sent to groups AND to every
+    # registered user's DM — see _broadcast_top_to_groups_and_users). Without
+    # this chat-type check, tapping "Tabriklash" in a group deleted the
+    # group's own "Top Kitobxonlar" leaderboard post ~60s later for everyone —
+    # this was the leaderboard "disappearing" bug, not Telegram anti-spam or
+    # a human admin.
     async def _del_after():
         await _asyncio.sleep(60)
+        if call.message.chat.type != "private":
+            return
         try:
             await bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
         except Exception:
