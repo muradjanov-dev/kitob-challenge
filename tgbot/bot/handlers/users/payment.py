@@ -18,9 +18,10 @@ CARD_OWNER  = "N. Murodjonov"
 PREMIUM_PRICE = 24_000   # UZS — iyun 2026 dan yangilandi (17_000 dan)
 SUPER_PREMIUM_PRICE = 47_000 # UZS
 PREMIUM_3MO_PRICE = 64_000  # UZS — 3 oylik Premium
+PREMIUM_3DAY_PRICE = 9_000  # UZS — 3 kunlik Premium
 
-PLAN_PRICES = {"premium": PREMIUM_PRICE, "super": SUPER_PREMIUM_PRICE, "premium_3mo": PREMIUM_3MO_PRICE}
-PLAN_DAYS = {"premium": 30, "super": 30, "premium_3mo": 90}
+PLAN_PRICES = {"premium": PREMIUM_PRICE, "super": SUPER_PREMIUM_PRICE, "premium_3mo": PREMIUM_3MO_PRICE, "premium_3day": PREMIUM_3DAY_PRICE}
+PLAN_DAYS = {"premium": 30, "super": 30, "premium_3mo": 90, "premium_3day": 3}
 
 # ── Premium features list shown to user ─────────────────────────────────────
 PREMIUM_FEATURES_UZ = (
@@ -137,11 +138,62 @@ PREMIUM_3MO_FEATURES_RU = (
 )
 
 
+PREMIUM_3DAY_FEATURES_UZ = (
+    "💎 <b>Premium obuna — 3 kunlik</b>\n"
+    "3 kunlik obuna bilan quyidagilarni olasiz:\n\n"
+    "🪙 <b>2 barobar ko'p Kitobcha</b> 🔥\n"
+    "   Har bir hisobot, yutuq, challenge va referal uchun oladigan "
+    "Kitobchangiz ikki barobar bo'ladi.\n\n"
+    "♾️ <b>Kuniga cheksiz hisobot</b>\n"
+    "   Bir kunda istagancha hisobot yuborasiz — hammasi birlashtiriladi, "
+    "guruhda esa faqat bitta (eng so'nggi) hisobotingiz ko'rinadi.\n\n"
+    "📊 <b>Har kuni shaxsiy hisobot</b> (23:57 da)\n"
+    "   Bugun va kecha, 3 kun, hafta, oy, yil taqqoslamasi, reytingdagi "
+    "o'rningiz va rag'batlantiruvchi xat.\n\n"
+    "📋 <b>Hisobotlar tarixi</b>\n"
+    "   Qaysi kuni qaysi kitobni o'qiganingizni to'liq ko'rasiz.\n\n"
+    "📈 <b>O'sish grafigi</b>\n"
+    "   Kun / hafta / oy / yil kesimida o'sishingiz foizlarda.\n\n"
+    "🏆 <b>Challenge tarixi</b>\n"
+    "   O'tgan barcha challenge'lardagi o'rningiz va mukofotlaringiz.\n\n"
+    "💎 <b>Premium belgisi</b>\n"
+    "   Guruh va reytinglarda 💎 belgisi bilan ajralib turasiz.\n\n"
+    "✅ <b>Admin bilan to'g'ridan-to'g'ri aloqa</b>\n\n"
+    f"💳 <b>Narxi: {PREMIUM_3DAY_PRICE:,} so'm / 3 kun</b>"
+)
+
+PREMIUM_3DAY_FEATURES_RU = (
+    "💎 <b>Premium подписка — 3 дня</b>\n"
+    "За 3-дневную подписку вы получаете:\n\n"
+    "🪙 <b>В 2 раза больше Kitobcha</b> 🔥\n"
+    "   Kitobcha за каждый отчёт, достижение, challenge и реферала "
+    "удваивается.\n\n"
+    "♾️ <b>Безлимитные отчёты в день</b>\n"
+    "   Отправляйте сколько угодно отчётов в день — все объединяются, "
+    "а в группе виден только один (последний).\n\n"
+    "📊 <b>Личный отчёт каждый день</b> (в 23:57)\n"
+    "   Сегодня и вчера, 3 дня, неделя, месяц, год, место в рейтинге "
+    "и мотивирующее письмо.\n\n"
+    "📋 <b>История отчётов</b>\n"
+    "   Полностью видно, в какой день какую книгу вы читали.\n\n"
+    "📈 <b>График роста</b>\n"
+    "   Ваш рост в процентах по дням / неделям / месяцам / годам.\n\n"
+    "🏆 <b>История Challenge</b>\n"
+    "   Ваши места и награды во всех прошедших challenge.\n\n"
+    "💎 <b>Значок Premium</b>\n"
+    "   Вы выделяетесь значком 💎 в группе и рейтингах.\n\n"
+    "✅ <b>Прямая связь с администратором</b>\n\n"
+    f"💳 <b>Цена: {PREMIUM_3DAY_PRICE:,} сум / 3 дня</b>"
+)
+
+
 def premium_features_text(language="uz", plan="premium"):
     if plan == "super":
         return SUPER_PREMIUM_FEATURES_RU if language == "ru" else SUPER_PREMIUM_FEATURES_UZ
     if plan == "premium_3mo":
         return PREMIUM_3MO_FEATURES_RU if language == "ru" else PREMIUM_3MO_FEATURES_UZ
+    if plan == "premium_3day":
+        return PREMIUM_3DAY_FEATURES_RU if language == "ru" else PREMIUM_3DAY_FEATURES_UZ
     return PREMIUM_FEATURES_RU if language == "ru" else PREMIUM_FEATURES_UZ
 
 
@@ -167,17 +219,17 @@ def payment_info_text(language="uz", price=PREMIUM_PRICE):
 def premium_menu_markup(language="uz"):
     if language == "ru":
         return InlineKeyboardMarkup(row_width=1).add(
+            InlineKeyboardButton(f"💎 Premium подписка — 3 дня ({PREMIUM_3DAY_PRICE:,})", callback_data="buy_plan:premium_3day"),
             InlineKeyboardButton("💎 Premium подписка — 1 мес", callback_data="buy_plan:premium"),
             InlineKeyboardButton(f"💎 Premium подписка — 3 мес ({PREMIUM_3MO_PRICE:,})", callback_data="buy_plan:premium_3mo"),
             InlineKeyboardButton("🌟 Super Premium подписка", callback_data="buy_plan:super"),
-            InlineKeyboardButton("✅ Проверить подписку", callback_data="check_premium"),
             InlineKeyboardButton("🎁 Подарить Premium другу", callback_data="gift_premium_start"),
         )
     return InlineKeyboardMarkup(row_width=1).add(
+        InlineKeyboardButton(f"💎 Premium obuna — 3 kun ({PREMIUM_3DAY_PRICE:,})", callback_data="buy_plan:premium_3day"),
         InlineKeyboardButton("💎 Premium obuna — 1 oy", callback_data="buy_plan:premium"),
         InlineKeyboardButton(f"💎 Premium obuna — 3 oy ({PREMIUM_3MO_PRICE:,})", callback_data="buy_plan:premium_3mo"),
         InlineKeyboardButton("🌟 Super Premium obuna", callback_data="buy_plan:super"),
-        InlineKeyboardButton("✅ Obunani tekshirish", callback_data="check_premium"),
         InlineKeyboardButton("🎁 Do'stga Premium sovg'a qilish", callback_data="gift_premium_start"),
     )
 
@@ -193,38 +245,36 @@ async def premium_menu_handler(message: types.Message, state: FSMContext):
     user = await aget_user(telegram_id=message.from_user.id)
     lang = user.language if user else "uz"
 
-    # Always a plain upsell — buy/extend/gift — with no "you already have
-    # Premium" framing. Active users can still extend early or gift a friend
-    # from the same menu; a purchase here extends their remaining time.
+    text = premium_features_text(lang)
+
+    # Active users can still extend early or gift a friend from the same
+    # menu — a purchase here just extends their remaining time — but they
+    # should still see their current status at a glance.
+    if user:
+        active_payment = Payment.objects.filter(
+            user=user, status="paid", end_date__gte=timezone.localdate()
+        ).order_by("-end_date").first()
+        trial_until = user.trial_premium_until
+        is_trial_active = bool(trial_until and trial_until >= timezone.now())
+
+        if active_payment:
+            until_str = active_payment.end_date.strftime("%d.%m.%Y")
+            if lang == "ru":
+                text += f"\n\n✅ <b>Подписка активна до {until_str}.</b>"
+            else:
+                text += f"\n\n✅ <b>Obunangiz faol — {until_str} gacha.</b>"
+        elif is_trial_active:
+            until_str = timezone.localtime(trial_until).strftime("%d.%m.%Y %H:%M")
+            if lang == "ru":
+                text += f"\n\n✅ <b>Пробный Premium активен до {until_str}.</b>"
+            else:
+                text += f"\n\n✅ <b>Sinov Premium faol — {until_str} gacha.</b>"
+
     await message.answer(
-        premium_features_text(lang),
+        text,
         parse_mode="HTML",
         reply_markup=premium_menu_markup(lang)
     )
-
-
-# ── Check subscription via inline button ─────────────────────────────────────
-@dp.callback_query_handler(ChatTypeFilter(ChatType.PRIVATE), lambda c: c.data == "check_premium")
-async def check_premium_callback(call: types.CallbackQuery):
-    user = await aget_user(telegram_id=call.from_user.id)
-    lang = user.language if user else "uz"
-
-    active = Payment.objects.filter(
-        user=user, status="paid", end_date__gte=timezone.localdate()
-    ).first() if user else None
-
-    if active:
-        if lang == "ru":
-            text = f"✅ <b>Подписка активна</b> до {active.end_date.strftime('%d.%m.%Y')}"
-        else:
-            text = f"✅ <b>Obuna faol</b> — {active.end_date.strftime('%d.%m.%Y')} gacha"
-    else:
-        if lang == "ru":
-            text = "❌ <b>Активной подписки нет.</b>"
-        else:
-            text = "❌ <b>Faol obuna yo'q.</b>"
-
-    await call.answer(text, show_alert=True)
 
 
 # ── Buy: show card info ───────────────────────────────────────────────────────
