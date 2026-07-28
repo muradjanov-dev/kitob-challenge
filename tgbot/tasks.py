@@ -1694,12 +1694,51 @@ def _award_level_rewards(user: TelegramProfile, pages: int):
                 print(f"level award {code} failed for {user.id}: {e}")
 
 
+def _format_uz_number(n: int) -> str:
+    """Short Uzbek magnitude label for social-proof stats — '2 mln+',
+    '540 ming+' — rounds down so the number never overstates reality."""
+    if n >= 1_000_000:
+        return f"{n // 1_000_000} mln+"
+    if n >= 1_000:
+        return f"{n // 1_000} ming+"
+    return str(n)
+
+
+def _referral_platform_stats() -> dict:
+    """Live platform totals for the social-proof share-text variants —
+    queried fresh every call (never hardcoded) so the numbers can't go
+    stale. Kitobcha-given uses the same current-balance + shop-spent
+    approximation as the admin "Kitobcha bo'yicha reyting" report, for
+    consistency across the app."""
+    from tgbot.models import ShopPurchase as _SP
+
+    total_pages = ConfirmationReport.objects.filter(is_audio=False).aggregate(
+        s=Sum("pages_read")
+    )["s"] or 0
+    total_readers = TelegramProfile.objects.filter(is_registered=True, is_blocked=False).count()
+    balance_sum = TelegramProfile.objects.filter(is_registered=True).aggregate(
+        s=Sum("ball")
+    )["s"] or 0
+    shop_spent = _SP.objects.aggregate(s=Sum("price_at_purchase"))["s"] or 0
+    total_kitobcha = int(balance_sum) + int(shop_spent)
+
+    return {
+        "pages": _format_uz_number(int(total_pages)),
+        "readers": _format_uz_number(total_readers),
+        "kitobcha": _format_uz_number(total_kitobcha),
+    }
+
+
 def _referral_share_texts(user) -> list:
-    """20 varied, personalized invite blurbs for the '📤 Referalni ulashish'
+    """40 varied, personalized invite blurbs for the '📤 Referalni ulashish'
     share button — a different random one each time this message is (re)sent
-    so frequent posters don't spam the same line to their contacts."""
+    so frequent posters don't spam the same line to their contacts. The
+    second half leans on live platform stats (pages read, reader count,
+    Kitobcha given out) as social proof."""
     name = (user.full_name or "").strip().split(" ")[0] if user.full_name else ""
     name = name or "Kitobxon"
+    stats = _referral_platform_stats()
+    pages, readers, kitobcha = stats["pages"], stats["readers"], stats["kitobcha"]
     return [
         "📚 Kitob Challenge botiga qo'shil — birga o'qib, sovg'alar yutib olamiz! 🎁",
         f"👋 Salom! Men — {name}, har kuni kitob o'qiyapman va Kitobcha yig'yapman. Sen ham qo'shil! 📚🔥",
@@ -1721,6 +1760,26 @@ def _referral_share_texts(user) -> list:
         "🔥 Streak, reyting, mukofotlar — barchasi bitta joyda. Kitob Challenge'ga xush kelibsiz! 📚",
         "📚 Kitob o'qishni o'yinga aylantirgan bot bor — Kitob Challenge. Qo'shil, o'zing ko'r! 🎁",
         "🌟 Har kuni bir necha bet o'qi, do'stlaring bilan raqobatlash, sovg'alar yut. Boshla! 🏆",
+        f"📚 Kitob Challenge'da hozirgacha {pages} bet kitob o'qilgan! Shu katta oilaga sen ham qo'shil 🚀",
+        f"🔥 {pages} bet o'qilgan loyihaga qo'shilmoqchimisan? Kitob Challenge seni kutmoqda! 📖",
+        f"👥 {readers} ta real kitobxon Kitob Challenge'da faol o'qiyapti — sen safimizga qo'shilasanmi? 📚",
+        f"🎉 {readers} kitobxon allaqachon bizning oilamizda! Sen ham shu safga qo'shil 📖✨",
+        f"🪙 Kitob Challenge'da hozirgacha {kitobcha} Kitobcha berildi — sen hali ham kutyapsanmi? 😏 Qo'shil!",
+        f"💰 {kitobcha} Kitobcha allaqachon o'qiganlar qo'liga tegdi. Navbat sizda! 🎁",
+        f"📊 {pages} bet, {readers} kitobxon, cheksiz sovg'alar — bularning barchasi Kitob Challenge'da! Qo'shil 🚀",
+        f"😲 {pages} bet o'qilgan?! Bu raqamga sen ham o'z hissangni qo'shishni xohlaysanmi? Kitob Challenge'ga marhamat!",
+        f"🏆 {readers} kishi bilan bir safda o'qishni xohlaysanmi? Kitob Challenge'ga qo'shil, birga o'sing!",
+        f"🎁 {kitobcha} Kitobcha allaqachon tarqatildi — sen ham o'zingnikini yig'ishni boshla!",
+        f"📚 Bu loyihada {pages} bet allaqachon o'qilgan — keyingi bet sening bo'lsin! Qo'shil 🔥",
+        f"🚀 {readers} kitobxon + {pages} bet = Kitob Challenge. Sen bu formulaning bir qismisan!",
+        f"🤔 {kitobcha} Kitobcha berilgan bot bor ekan, siz hali qo'shilmagansiz-a? Vaqt keldi! 😄",
+        f"📈 Har kuni yangi rekord: hozircha {pages} bet o'qilgan. Sen ham tarixga kirasanmi?",
+        f"🌟 {readers} kishi ishonch bildirgan bot — endi navbat sizda! Kitob Challenge'ga xush kelibsiz.",
+        f"😳 {kitobcha} Kitobcha tarqatilgan loyiha bor — sen hali tashqaridamisan? Qo'shil, boshla!",
+        f"📖 {pages} bet o'qilgan kutubxona — bu Kitob Challenge! Sen ham sahifa qo'sh 📚",
+        f"🔥 {readers} kitobxon safida sen yo'qsan hali? Vaqt boy bermay qo'shil!",
+        f"🎯 {kitobcha} Kitobcha, {readers} kitobxon, {pages} bet — bularning barchasi seni kutmoqda!",
+        f"😏 Sen hali ham \"keyinroq qo'shilaman\" deyapsanmi? {kitobcha} Kitobcha allaqachon tarqatib bo'lindi — boshla!",
     ]
 
 
