@@ -35,11 +35,11 @@ async def _redirect_to_private(call: types.CallbackQuery):
     username = await sync_to_async(_get_bot_username, thread_sensitive=True)()
     if username:
         kb = InlineKeyboardMarkup().add(InlineKeyboardButton(
-            text="🏪 Botga o'tish", url=f"https://t.me/{username}?start=market",
+            text="🎪 Botga o'tish", url=f"https://t.me/{username}?start=market",
         ))
         try:
             await call.message.answer(
-                "🏪 Market'ni ochish uchun pastdagi tugmani bosing:", reply_markup=kb,
+                "🎪 Market'ni ochish uchun pastdagi tugmani bosing:", reply_markup=kb,
             )
         except Exception:
             pass
@@ -68,7 +68,7 @@ async def market_go_home(call: types.CallbackQuery):
 async def show_market_menu(message: types.Message, user):
     balance = int(user.ball or 0)
     text = (
-        "🏪 <b>Kitob Challenge Market</b>\n\n"
+        "🎪 <b>Kitob Challenge Market</b>\n\n"
         f"Balansingiz: <b>{balance} 🪙 Kitobcha</b>\n\n"
         "Kitobchalaringizni quyidagi xizmatlarga sarflashingiz mumkin — "
         "har biri haqida batafsil bilish uchun ustiga bosing:"
@@ -106,9 +106,9 @@ async def market_view_item(call: types.CallbackQuery):
         )()
         if slots <= 0:
             sold_out = True
-            text += "\n\n🚫 <b>Bugungi 5 ta joy tugadi</b> — ertaga urinib ko'ring!"
+            text += "\n\n🚫 <b>Bugungi 7 ta joy tugadi</b> — ertaga urinib ko'ring!"
         else:
-            text += f"\n\n🔥 Bugun qolgan joy: <b>{slots}/5</b>"
+            text += f"\n\n🔥 Bugun qolgan joy: <b>{slots}/7</b>"
 
     kb = InlineKeyboardMarkup(row_width=1)
     if balance >= item["price"] and not sold_out:
@@ -166,7 +166,7 @@ async def market_buy_item(call: types.CallbackQuery):
             market_service.leaderboard_sponsor_slots_left_today, thread_sensitive=True
         )()
         if slots <= 0:
-            await call.answer("Bugungi 5 ta joy allaqachon tugagan 😔", show_alert=True)
+            await call.answer("Bugungi 7 ta joy allaqachon tugagan 😔", show_alert=True)
             return
 
     ok = await sync_to_async(market_service.charge, thread_sensitive=True)(user, item["price"])
@@ -233,6 +233,6 @@ async def market_buy_item(call: types.CallbackQuery):
             # slots check above and this insert — refund immediately.
             await sync_to_async(market_service.charge, thread_sensitive=True)(user, -item["price"])
             await call.message.answer(
-                "😔 Afsuski, bugungi 5 ta joy siz tasdiqlayotgan payt tugab qoldi. "
+                "😔 Afsuski, bugungi 7 ta joy siz tasdiqlayotgan payt tugab qoldi. "
                 "Kitobchangiz qaytarildi — ertaga urinib ko'ring!"
             )

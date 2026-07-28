@@ -57,12 +57,12 @@ ITEMS = {
         "price": 300,
         "description": (
             "Keyingi \"Top kitobxonlar\" e'lonida ismingiz sponsor sifatida "
-            "ko'rsatiladi. Kuniga faqat 5 ta joy bor!"
+            "ko'rsatiladi. Kuniga faqat 7 ta joy bor!"
         ),
     },
 }
 
-LEADERBOARD_SPONSOR_DAILY_LIMIT = 5
+LEADERBOARD_SPONSOR_DAILY_LIMIT = 7
 
 
 def leaderboard_sponsor_slots_left_today() -> int:

@@ -1216,6 +1216,15 @@ async def spent_time_handler(message: types.Message, state: FSMContext):
         )
         return
 
+    # Readers reporting 100+ pages in a day must write a substantive xulosa.
+    pre_data = await state.get_data()
+    if (pre_data.get("pages_read") or 0) >= 100 and len(conclusion.split()) < 5:
+        await message.answer(
+            _("Kuniga 100+ bet o'qigan kitobxonlar kamida 5 ta so'zdan iborat xulosa yozishi kerak. Iltimos, xulosangizni to'liqroq yozing."),
+            reply_markup=back_keyboard,
+        )
+        return
+
     await state.update_data(conclusion=conclusion)
 
     user = await aget_user(message.from_user.id)
