@@ -1709,7 +1709,7 @@ def _referral_share_texts(user) -> list:
         "🎁 Kitob o'qib pul o'rniga \"Kitobcha\" yig'ish mumkinligini bilarmiding? Qo'shil, ko'r! 📚",
         "💪 O'qish odatini shakllantirish qiyinmi? Kitob Challenge yordam beradi — reyting, streak, sovg'alar! 🔥",
         "📚➡️🎁 Har bir o'qilgan bet — bir qadam mukofotga yaqinroq. Qo'shil, boshla!",
-        f"✨ {name} bilan birga o'qing — kim ko'proq bet o'qiydi, ko'proq yutadi! 🏆📖",
+        f"✨ {name} bilan birga o'qing — kim ko'proq bet o'qisa ko'proq yutadi! 🏆📖",
         "🚀 Kitob o'qish + reyting + sovg'alar = Kitob Challenge. Bugun qo'shilib ko'r! 📚",
         "📣 Do'stim, senga bir taklifim bor: birga kitob o'qiymiz, ikkalamiz ham yutib chiqamiz! 🎁",
         "🏆 Har kuni eng ko'p o'qigan kitobxonlar orasida bo'lishni xohlaysanmi? Qo'shil! 📚🔥",
