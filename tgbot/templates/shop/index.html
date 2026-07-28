@@ -416,6 +416,13 @@
       </div>
     </div>
     <div class="spacer"></div>
+    <button class="icon-btn" id="btnHome" aria-label="Saytga qaytish" style="margin-right:4px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+      </svg>
+    </button>
     <button class="icon-btn" id="btnSettings" aria-label="Sozlamalar">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round">
@@ -462,6 +469,22 @@
     // ─── Telegram WebApp bridge ──────────────────────────────
     const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
     if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+
+    // Shop is a real page navigation (not an SPA route) inside the Mini App
+    // WebView, which has no URL/back chrome of its own — without this there
+    // was no way back to the main site once here. Carry initData back the
+    // same way the site carries it forward (see site/index.html openShop()),
+    // since Telegram doesn't re-inject it on navigation.
+    function goHome() {
+      let url = "/";
+      const id = tg && tg.initData ? tg.initData : "";
+      if (id) url += "?tgWebAppData=" + encodeURIComponent(id);
+      window.location.href = url;
+    }
+    if (tg && tg.BackButton) {
+      try { tg.BackButton.show(); tg.BackButton.onClick(goHome); } catch (e) {}
+    }
+    document.getElementById("btnHome").addEventListener("click", () => { sound.play("tap"); goHome(); });
 
     // Resolve initData fresh on each call. Mobile clients (Android/iOS)
     // populate tg.initData synchronously when the SDK loads. Telegram
