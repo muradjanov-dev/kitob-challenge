@@ -1714,7 +1714,7 @@ def _referral_share_texts(user) -> list:
         "📣 Do'stim, senga bir taklifim bor: birga kitob o'qiymiz, ikkalamiz ham yutib chiqamiz! 🎁",
         "🏆 Har kuni eng ko'p o'qigan kitobxonlar orasida bo'lishni xohlaysanmi? Qo'shil! 📚🔥",
         f"📖 {name} sizni chaqiryapti: kitob o'qi, Kitobcha yig', mukofot yut. Oddiy! 🎁",
-        "🎉 Kitob Challenge — o'qish + o'yin + sovg'a, hammasi bitta botda! Qo'shil, ko'proq bilib ol.",
+        "🎉 Kitob Challenge — o'qish + o'yin + sovg'a, hammasi bitta loyihada! Qo'shil, ko'proq bilib ol.",
         "📚 Yolg'iz o'qish zerikarli, birga o'qish — qiziq! Kitob Challenge'ga xush kelibsan 🔥",
         "🎁 Bugun ro'yxatdan o't — birinchi hisobotdan boshlab Kitobcha yig'a boshlaysan!",
         f"👥 {name} allaqachon Kitob Challenge'da faol o'qiyapti. Sen ham qo'shilasanmi? 📖🚀",
