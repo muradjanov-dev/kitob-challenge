@@ -33,7 +33,11 @@ ITEMS = {
         "emoji": "🎁",
         "title": "Sirli quti",
         "price": 200,
-        "description": "Tasodifiy mukofot: Kitobcha, Omon qolish o'yiniga qo'shimcha jon yoki bonus streak-muzlatish.",
+        "description": (
+            "Tasodifiy mukofot: kichik yoki katta Kitobcha, hattoki MEGA yutuq, "
+            "Omon qolish o'yiniga +1/+2 qo'shimcha jon, bonus streak-muzlatish "
+            "yoki bepul Shaxsiy sertifikat — 7 xil natija bor!"
+        ),
     },
     CERTIFICATE: {
         "emoji": "📜",
@@ -68,6 +72,14 @@ def leaderboard_sponsor_slots_left_today() -> int:
     return max(0, LEADERBOARD_SPONSOR_DAILY_LIMIT - used_today)
 
 
+def log_purchase(user, item_key: str, price: int) -> None:
+    """Durable audit row for a fulfilled Market purchase — StreakFreezeCoverage/
+    LeaderboardSponsor/etc. only capture each item's live *effect*, so this is
+    the only place spend-by-item stats can be reconstructed from later."""
+    from tgbot.models import MarketPurchase
+    MarketPurchase.objects.create(user=user, item_key=item_key, price=price)
+
+
 def charge(user, price: int) -> bool:
     """Deduct `price` Kitobcha from `user` if affordable. Atomic + row-locked
     so concurrent taps can't double-spend."""
@@ -81,13 +93,26 @@ def charge(user, price: int) -> bool:
     return True
 
 
-def resolve_mystery_box(user) -> str:
+MYSTERY_PRIZES = [
+    ("kitobcha_small", 32),
+    ("kitobcha_big", 13),
+    ("kitobcha_mega", 3),
+    ("survival_life_1", 20),
+    ("survival_life_2", 5),
+    ("streak_freeze", 17),
+    ("free_certificate", 10),
+]
+
+
+def resolve_mystery_box(user):
     """Apply an immediate random prize (always something — this is meant to
-    feel generous, not disappointing) and return the user-facing result line."""
+    feel generous, not disappointing). Returns (text, wants_certificate) —
+    the bot handler sends the certificate photo itself when the flag is set,
+    since certificate delivery is a Telegram API call, not a DB write."""
     from tgbot.models import TelegramProfile
     pick = random.choices(
-        ["kitobcha_small", "kitobcha_big", "survival_life", "streak_freeze"],
-        weights=[40, 15, 25, 20],
+        [k for k, _ in MYSTERY_PRIZES],
+        weights=[w for _, w in MYSTERY_PRIZES],
         k=1,
     )[0]
     with transaction.atomic():
@@ -96,19 +121,30 @@ def resolve_mystery_box(user) -> str:
             amount = random.randint(50, 150)
             p.ball = Decimal(p.ball or 0) + Decimal(amount)
             p.save(update_fields=["ball"])
-            return f"🪙 <b>+{amount} Kitobcha</b> yutdingiz!"
+            return f"🪙 <b>+{amount} Kitobcha</b> yutdingiz!", False
         if pick == "kitobcha_big":
             amount = random.randint(250, 500)
             p.ball = Decimal(p.ball or 0) + Decimal(amount)
             p.save(update_fields=["ball"])
-            return f"🤑 KATTA YUTUQ! <b>+{amount} Kitobcha</b>!"
-        if pick == "survival_life":
+            return f"🤑 KATTA YUTUQ! <b>+{amount} Kitobcha</b>!", False
+        if pick == "kitobcha_mega":
+            amount = random.randint(800, 1500)
+            p.ball = Decimal(p.ball or 0) + Decimal(amount)
+            p.save(update_fields=["ball"])
+            return f"💥 MEGA YUTUQ!!! <b>+{amount} Kitobcha</b>!!! 🎉", False
+        if pick == "survival_life_1":
             p.bonus_survival_lives = (p.bonus_survival_lives or 0) + 1
             p.save(update_fields=["bonus_survival_lives"])
-            return "❤️ Keyingi <b>Omon qolish</b> o'yiningizga <b>+1 qo'shimcha jon</b>!"
+            return "❤️ Keyingi <b>Omon qolish</b> o'yiningizga <b>+1 qo'shimcha jon</b>!", False
+        if pick == "survival_life_2":
+            p.bonus_survival_lives = (p.bonus_survival_lives or 0) + 2
+            p.save(update_fields=["bonus_survival_lives"])
+            return "💖 OMON! Keyingi <b>Omon qolish</b> o'yiningizga <b>+2 qo'shimcha jon</b>!", False
+        if pick == "free_certificate":
+            return "📜 Sizga <b>BEPUL Shaxsiy sertifikat</b> tushdi — tayyorlanmoqda!", True
         p.streak_freeze_count = (p.streak_freeze_count or 0) + 1
         p.save(update_fields=["streak_freeze_count"])
-        return "🛡 Bonus <b>Streak muzlatish</b> tokeni yutdingiz!"
+        return "🛡 Bonus <b>Streak muzlatish</b> tokeni yutdingiz!", False
 
 
 def apply_streak_freeze_purchase(user) -> int:

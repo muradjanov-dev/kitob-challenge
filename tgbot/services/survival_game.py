@@ -276,11 +276,21 @@ def state_payload(profile) -> dict:
         _ensure_lives_resolved(g, qi)
     my = SurvivalPlayer.objects.filter(game=g, user=profile).first()
 
+    # Before joining (no SurvivalPlayer row yet), preview lives including any
+    # pending Market 'Sirli quti' bonus — otherwise the lobby shows the bare
+    # max_lives and it looks like the bonus "didn't work" until the user's
+    # first answer actually creates the row and applies it.
+    if my:
+        preview_lives = my.lives
+    else:
+        pending_bonus = min(int(getattr(profile, "bonus_survival_lives", 0) or 0), 2)
+        preview_lives = g.max_lives + pending_bonus
+
     payload = {
         "ok": True, "status": status, "game_id": g.id,
         "q_number": qi + 1, "q_total": nq, "seconds": left,
         "max_lives": g.max_lives, "jackpot": g.jackpot,
-        "your_lives": (my.lives if my else g.max_lives),
+        "your_lives": preview_lives,
         "your_correct": (my.correct_count if my else 0),
         "eliminated": (my.eliminated if my else False),
         "your_reward": (my.reward if my else 0),

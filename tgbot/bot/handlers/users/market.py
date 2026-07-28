@@ -175,6 +175,11 @@ async def market_buy_item(call: types.CallbackQuery):
         return
     await call.answer("✅ Xarid muvaffaqiyatli!")
 
+    # Logged per-branch below (not blanket here) so a Reyting sponsorligi
+    # race-loss + refund is never counted as a fulfilled purchase.
+    if key != market_service.LEADERBOARD_SPONSOR:
+        await sync_to_async(market_service.log_purchase, thread_sensitive=True)(user, key, item["price"])
+
     if key == market_service.STREAK_FREEZE:
         remaining = await sync_to_async(market_service.apply_streak_freeze_purchase, thread_sensitive=True)(user)
         await call.message.answer(
@@ -185,8 +190,14 @@ async def market_buy_item(call: types.CallbackQuery):
         )
 
     elif key == market_service.MYSTERY_BOX:
-        result = await sync_to_async(market_service.resolve_mystery_box, thread_sensitive=True)(user)
+        result, wants_certificate = await sync_to_async(
+            market_service.resolve_mystery_box, thread_sensitive=True
+        )(user)
         await call.message.answer(f"🎁 <b>Sirli quti ochildi!</b>\n\n{result}", parse_mode="HTML")
+        if wants_certificate:
+            png_bytes = await sync_to_async(market_service.generate_certificate, thread_sensitive=True)(user)
+            photo = types.InputFile(BytesIO(png_bytes), filename="sertifikat.png")
+            await call.message.answer_photo(photo, caption="📜 Sizning bepul sertifikatingiz!")
 
     elif key == market_service.CERTIFICATE:
         png_bytes = await sync_to_async(market_service.generate_certificate, thread_sensitive=True)(user)
@@ -212,6 +223,7 @@ async def market_buy_item(call: types.CallbackQuery):
     elif key == market_service.LEADERBOARD_SPONSOR:
         queued = await sync_to_async(market_service.queue_leaderboard_sponsor, thread_sensitive=True)(user)
         if queued:
+            await sync_to_async(market_service.log_purchase, thread_sensitive=True)(user, key, item["price"])
             await call.message.answer(
                 "🏷 Ajoyib! Keyingi \"Top kitobxonlar\" e'lonida ismingiz sponsor "
                 "sifatida ko'rsatiladi."

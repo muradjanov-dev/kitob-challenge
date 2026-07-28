@@ -1053,6 +1053,26 @@ class LeaderboardSponsor(BaseModel):
         return f"{self.user.full_name} — {state}"
 
 
+class MarketPurchase(BaseModel):
+    """Audit log of every fulfilled Market purchase (see tgbot/services/market.py
+    ITEMS keys) — StreakFreezeCoverage/LeaderboardSponsor/etc. only capture each
+    item's live *effect*, not a durable per-purchase record, so spend-by-item
+    stats couldn't be reconstructed after the fact. This closes that gap."""
+    user = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="market_purchases",
+    )
+    item_key = models.CharField(max_length=30, help_text="market_service.ITEMS key, e.g. 'mystery_box'.")
+    price = models.PositiveIntegerField(help_text="Kitobcha charged for this purchase.")
+
+    class Meta:
+        verbose_name = "Market Purchase"
+        verbose_name_plural = "Market Purchases"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.user.full_name} — {self.item_key} ({self.price} 🪙)"
+
+
 class ReaderTitleAnnouncement(BaseModel):
     """Snapshot of one "Kitobxon nominatsiyalari" broadcast. Stores the winners
     so a single 🎉 Tabriklash button (shared across every copy of the message)

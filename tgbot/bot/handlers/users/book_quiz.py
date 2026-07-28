@@ -57,8 +57,16 @@ def _process_answer(user_id: int, round_id: int, chosen_idx: int) -> str:
             newly = award_new_achievements(profile)
             ach_note = ""
             if newly:
-                names = ", ".join(f"{a['emoji']} {a['title_uz']}" for a in newly)
-                ach_note = f"\n\n🏆 Yangi yutuq: {names}!"
+                # Bug fix: this used to list the unlocked achievements without
+                # ever crediting their Kitobcha — only tasks.check_user_achievements
+                # did that. Award here too (×2 for premium, via update_ball).
+                names = []
+                for a in newly:
+                    pts = a.get("points", 0)
+                    aw = profile.update_ball(True, pts) if pts else 0
+                    prem_note = " 💎×2" if aw > pts else ""
+                    names.append(f"{a['emoji']} {a['title_uz']} (+{aw} 🪙{prem_note})" if aw else f"{a['emoji']} {a['title_uz']}")
+                ach_note = "\n\n🏆 Yangi yutuq: " + ", ".join(names) + "!"
         except Exception:
             ach_note = ""
 

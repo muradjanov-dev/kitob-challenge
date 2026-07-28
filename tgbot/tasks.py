@@ -474,7 +474,7 @@ def _build_top_readers_message(start_date, end_date, period_label, limit=20):
     message += f"\n📊 Jami: <b>{total_stat}</b>"
     sponsor = _consume_leaderboard_sponsor()
     if sponsor:
-        message += f"\n\n🏷 <i>Ushbu reyting {escape(sponsor.full_name or 'Kitobxon')} tomonidan taqdim etildi!</i>"
+        message += f"\n\n🏷 <i>Ushbu reyting homiysi: {escape(sponsor.full_name or 'Kitobxon')}</i>"
     return message
 
 
