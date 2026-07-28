@@ -38,6 +38,46 @@ def _user_lang(user) -> str:
     return (user.language if user else None) or "uz"
 
 
+@sync_to_async
+def _project_stats_snapshot():
+    """Live counters for the new-user stats teaser — queried fresh each time
+    (cheap aggregate queries) so the numbers never go stale as the project grows."""
+    from django.db.models import Sum
+    from tgbot.models import TelegramProfile, ConfirmationReport, GlobalBook
+
+    readers = TelegramProfile.objects.filter(is_registered=True, is_blocked=False).count()
+    pages = ConfirmationReport.objects.filter(is_audio=False).aggregate(s=Sum("pages_read"))["s"] or 0
+    library_books = GlobalBook.objects.count()
+    # Rough "book equivalent" for impact — 250 pages/book is a common average.
+    book_equiv = pages // 250
+    return {"readers": readers, "pages": pages, "library_books": library_books, "book_equiv": book_equiv}
+
+
+async def _project_stats_teaser(lang: str) -> str:
+    s = await _project_stats_snapshot()
+    if lang == "ru":
+        return (
+            "📈 <b>Kitob Challenge сегодня:</b>\n\n"
+            f"👥 <b>{s['readers']:,}+</b> активных читателей\n"
+            f"📖 <b>{s['pages']:,}+</b> страниц прочитано — это примерно "
+            f"<b>{s['book_equiv']:,}+</b> книг!\n"
+            f"📚 <b>{s['library_books']:,}+</b> книг в нашей библиотеке\n"
+            "🎮 Каждый день — новые игры и соревнования\n\n"
+            "И это только начало... 😉\n"
+            "Отправьте свой первый отчёт — и увидите всё сами! 👇"
+        )
+    return (
+        "📈 <b>Kitob Challenge bugungi kunda:</b>\n\n"
+        f"👥 <b>{s['readers']:,}+</b> faol kitobxon\n"
+        f"📖 <b>{s['pages']:,}+</b> bet o'qilgan — bu taxminan "
+        f"<b>{s['book_equiv']:,}+</b> ta kitobga teng!\n"
+        f"📚 Kutubxonamizda <b>{s['library_books']:,}+</b> kitob mavjud\n"
+        "🎮 Har kuni yangi o'yinlar va musobaqalar bo'lib turadi\n\n"
+        "Va bu — hali boshlanishi... 😉\n"
+        "Birinchi hisobotingizni yuboring — qolganini o'zingiz ko'rasiz! 👇"
+    )
+
+
 @dp.message_handler(
     CommandStart(),
     ChatTypeFilter((ChatType.GROUP, ChatType.SUPERGROUP)),
@@ -380,6 +420,15 @@ async def age_pick(call: types.CallbackQuery, state: FSMContext):
         await call.message.answer(welcome_text, parse_mode="HTML", reply_markup=welcome_kb)
     except Exception as e:
         print(f"welcome message failed for {call.from_user.id}: {e}")
+
+    # Brief "look how big this already is" stats teaser, computed live so it
+    # never goes stale — ends on intrigue rather than the full feature list
+    # (that follows right after via _show_how_it_works).
+    try:
+        stats_text = await _project_stats_teaser(lang)
+        await call.message.answer(stats_text, parse_mode="HTML")
+    except Exception as e:
+        print(f"stats teaser failed for {call.from_user.id}: {e}")
 
     # Auto-send the full, detailed "how it works" guide to every new user.
     try:

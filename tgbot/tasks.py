@@ -2187,8 +2187,14 @@ def send_daily_personal_report():
     prev_year_s = _dt.date(today.year - 1, 1, 1)
     prev_year_e = _dt.date(today.year - 1, 12, 31)
 
+    # Includes trial-Premium users (see TelegramProfile.has_active_premium) —
+    # otherwise someone inside their 3-hour daily-giveaway trial window gets
+    # the free-tier teaser report instead of the full Premium one they're
+    # currently entitled to.
     premium_user_ids = set(
         _Pay.objects.filter(status="paid", end_date__gte=today).values_list("user_id", flat=True)
+    ) | set(
+        TelegramProfile.objects.filter(trial_premium_until__gte=timezone.now()).values_list("id", flat=True)
     )
 
     # Today's live-book reporters, ranked by pages (blocked excluded)
@@ -4336,12 +4342,15 @@ def recompute_optimal_send_hours():
 @shared_task
 def send_premium_upsell():
     """
-    Weekly task (Wednesday 20:00 Tashkent) — send a personalised Premium
-    upsell message to free users who score >= 40 on the conversion predictor.
+    Every 2 days (see src/celery_app.py schedule) — send a personalised
+    Premium upsell message to free users who score >= 40 on the conversion
+    predictor.
 
     Each message references the user's own strongest reading signal
-    (streak length, avg pages, total reports, long conclusions) so it
-    reads like an observation, not a broadcast ad.
+    (streak length, avg pages, total reports, long conclusions, current
+    Kitobcha balance) so it reads like an observation, not a broadcast ad —
+    format_upsell_message also rotates the phrasing randomly so a
+    persistent free user doesn't see an identical message every time.
 
     Only the top 200 scoring free users are contacted per run to keep the
     volume manageable and avoid spamming low-signal users.
@@ -4360,6 +4369,9 @@ def send_premium_upsell():
     print(f"[premium_upsell] Sending to {len(candidates)} candidates...")
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    reply_markup = json.dumps({"inline_keyboard": [[
+        {"text": "💎 Premium olish", "callback_data": "menu:premium"},
+    ]]})
     sent = skipped = failed = 0
 
     for result in candidates:
@@ -4371,6 +4383,7 @@ def send_premium_upsell():
                     "chat_id": result.telegram_id,
                     "text": text,
                     "parse_mode": "HTML",
+                    "reply_markup": reply_markup,
                 },
                 timeout=5,
             )
@@ -4386,6 +4399,98 @@ def send_premium_upsell():
         _time.sleep(0.05)
 
     print(f"[premium_upsell] done. sent={sent} skipped={skipped} failed={failed}")
+
+
+def _premium_expiry_reminder_text(name: str, language: str) -> str:
+    """Funny, retention-focused nudge — randomized so a user renewing more
+    than once doesn't see the same line twice in a row."""
+    if language == "ru":
+        variants = [
+            f"😱 <b>{name}</b>, через 3 дня ваш Premium исчезнет — как Золушка в полночь, "
+            f"только вместо кареты вы теряете 2× Kitobcha.",
+            f"⏳ <b>{name}</b>, обратный отсчёт начался: 3 дня до конца Premium. "
+            f"AI-отчёт по субботам будет по вам скучать.",
+            f"🥲 <b>{name}</b>, ваш Premium уходит через 3 дня — тихо, без прощания, "
+            f"как сосед, который переезжает ночью.",
+            f"🔔 Напоминание от будущего вас: <b>{name}</b>, продлите Premium сейчас, "
+            f"чтобы не терять 2× Kitobcha за каждый отчёт с этой субботы.",
+            f"📉 <b>{name}</b>, через 3 дня графики роста, история отчётов и 2× награды "
+            f"снова станут для вас заблокированными. Пока не поздно — продлите!",
+        ]
+    else:
+        variants = [
+            f"😱 <b>{name}</b>, 3 kundan keyin Premiumingiz g'oyib bo'ladi — soat 12 dagi "
+            f"Zolushka kabi, faqat karetangiz emas, 2× Kitobchangiz yo'qoladi.",
+            f"⏳ <b>{name}</b>, hisob boshlandi: Premiumga 3 kun qoldi. Shanba kunlari "
+            f"keladigan AI hisobot sizni sog'inib qoladi.",
+            f"🥲 <b>{name}</b>, Premiumingiz 3 kundan keyin jimgina ketadi — xayrlashmasdan, "
+            f"tunda ko'chib ketayotgan qo'shni kabi.",
+            f"🔔 Kelajakdagi o'zingizdan eslatma: <b>{name}</b>, hozir uzaytiring — shanbadan "
+            f"boshlab har bir hisobot uchun 2× Kitobchani yo'qotmang.",
+            f"📉 <b>{name}</b>, 3 kundan so'ng o'sish grafigi, hisobotlar tarixi va 2× "
+            f"mukofotlar yana qulflanadi. Hali kech emas — uzaytiring!",
+            f"🚨 <b>{name}</b>, Premiumingiz 3 kunlik marraga yetdi — bu marafonni "
+            f"tugatib qo'ymang, bir tugma bosish qoldi.",
+            f"💔 <b>{name}</b>, 3 kundan keyin Premium sizni tark etadi. Ajralishni "
+            f"to'xtatishning yagona yo'li bor: uzaytirish tugmasi.",
+        ]
+    return random.choice(variants)
+
+
+@shared_task
+def send_premium_expiry_reminders():
+    """Daily (19:00 Tashkent) — DM every paying user whose CURRENT Premium
+    (their latest paid Payment.end_date, since renewals write a new row
+    rather than editing the old one — see Payment.grant_or_extend) lapses in
+    exactly 3 days. A funny, retention-focused nudge with a one-tap renew
+    button, since losing 2x Kitobcha / AI report / growth charts is a real
+    downgrade most users won't notice coming until it's already gone."""
+    import datetime as _dt
+    from django.db.models import Max
+    from tgbot.models import Payment as _Pay
+
+    today = timezone.localdate()
+    target = today + _dt.timedelta(days=3)
+
+    latest_ends = (
+        _Pay.objects.filter(status="paid")
+        .values("user_id")
+        .annotate(latest_end=Max("end_date"))
+    )
+    user_ids = [row["user_id"] for row in latest_ends if row["latest_end"] == target]
+    if not user_ids:
+        print("[premium_expiry_reminder] No users expiring in 3 days.")
+        return
+
+    users = TelegramProfile.objects.filter(
+        id__in=user_ids, is_registered=True, is_blocked=False,
+    )
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    reply_markup = json.dumps({"inline_keyboard": [[
+        {"text": "🔥 Premiumni uzaytirish", "callback_data": "menu:premium"},
+    ]]})
+    sent = failed = 0
+    for user in users:
+        text = _premium_expiry_reminder_text(user.full_name or "Kitobxon", user.language or "uz")
+        try:
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": user.telegram_id, "text": text,
+                    "parse_mode": "HTML", "reply_markup": reply_markup,
+                },
+                timeout=5,
+            )
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+        except Exception as e:
+            print(f"[premium_expiry_reminder] send failed uid={user.id}: {e}")
+            failed += 1
+
+    print(f"[premium_expiry_reminder] done. sent={sent} failed={failed}")
 
 
 # ── Daily trial Premium giveaway — 10 random users get 3 free hours ──────────

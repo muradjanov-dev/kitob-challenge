@@ -98,6 +98,42 @@ def get_recommendations(user_id: int, top_n: int = 3) -> list[Recommendation]:
     ]
 
 
+def get_popular_fallback(user_id: int, top_n: int = 3) -> list[Recommendation]:
+    """Fallback for users with too little history for personalized CF
+    (< MIN_USER_BOOKS distinct books): the N most-read books overall (by
+    distinct reader count), excluding anything the user has already read.
+    `because` is set to "" since there's no personal anchor book — callers
+    should render these as "popular among readers" rather than "because you
+    read X"."""
+    from tgbot.models import ConfirmationReport
+
+    user_books: set[str] = set(
+        ConfirmationReport.objects
+        .filter(user_id=user_id, is_audio=False)
+        .exclude(book__isnull=True).exclude(book="")
+        .values_list("book", flat=True).distinct()
+    )
+
+    rows = (
+        ConfirmationReport.objects
+        .filter(is_audio=False)
+        .exclude(book__isnull=True).exclude(book="")
+        .values("book")
+        .annotate(readers=Count("user_id", distinct=True))
+        .order_by("-readers")
+    )
+
+    out = []
+    for row in rows:
+        title = row["book"]
+        if title in user_books:
+            continue
+        out.append(Recommendation(title=title, score=0.0, because=""))
+        if len(out) >= top_n:
+            break
+    return out
+
+
 def build_similarity_index(force: bool = False) -> dict[str, list[tuple[str, float]]]:
     """
     Build and cache the book-book Jaccard similarity index.

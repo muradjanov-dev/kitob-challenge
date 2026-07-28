@@ -1,6 +1,7 @@
 from __future__ import absolute_import, unicode_literals
 import os
 import environ
+from datetime import timedelta
 
 from celery import Celery
 from celery.schedules import crontab
@@ -226,7 +227,14 @@ app.conf.beat_schedule = {
     # and is far from the Saturday AI report so Premium feels distinct.
     'send-premium-upsell': {
         'task': 'tgbot.tasks.send_premium_upsell',
-        'schedule': crontab(hour=20, minute=0, day_of_week=3),  # Wednesday
+        'schedule': timedelta(days=2),  # every 2 days, not pinned to a weekday
+    },
+
+    # 3 days before a paying user's Premium lapses — funny, retention-focused
+    # nudge to renew before they lose the 2x-Kitobcha/AI-report perks.
+    'send-premium-expiry-reminders': {
+        'task': 'tgbot.tasks.send_premium_expiry_reminders',
+        'schedule': crontab(hour=19, minute=0),
     },
 
     # Daily trial Premium giveaway — 12:00 Tashkent. Randomly grants 10 users a
