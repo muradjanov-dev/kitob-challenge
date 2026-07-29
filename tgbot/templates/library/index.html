@@ -1222,17 +1222,32 @@ function _pdfRenderPage(num, dir) {
   _pdfRendering = true;
   pdfLoading.classList.remove('hidden');
   _pdfDoc.getPage(num).then(page => {
-    const wrapW = pdfWrap.clientWidth - 24;
     const baseViewport = page.getViewport({ scale: 1 });
-    const fitScale = Math.min(2.2, Math.max(0.5, wrapW / baseViewport.width));
-    const viewport = page.getViewport({ scale: fitScale * _pdfZoom });
+    let viewport;
+    if (_magMode) {
+      // Reading mode: fit the page WIDTH to the 16:9 window, then blow it up
+      // by the chosen preset -- height overflows the window on purpose, and
+      // _magClampPan()/drag reveal the rest by panning vertically only.
+      const wrapW = pdfWrap.clientWidth;
+      const fitScale = wrapW / baseViewport.width;
+      viewport = page.getViewport({ scale: fitScale * _magZoomPreset });
+    } else {
+      const wrapW = pdfWrap.clientWidth - 24;
+      const fitScale = Math.min(2.2, Math.max(0.5, wrapW / baseViewport.width));
+      viewport = page.getViewport({ scale: fitScale * _pdfZoom });
+    }
     pdfCanvas.width = viewport.width;
     pdfCanvas.height = viewport.height;
     const task = page.render({ canvasContext: pdfCtx, viewport });
     task.promise.then(() => {
       _pdfRendering = false;
       pdfLoading.classList.add('hidden');
-      if (dir) _pdfPlayFlip(dir);
+      if (_magMode) {
+        _magPanY = 0; // new page always starts at the top
+        _magApplyPan();
+      } else if (dir) {
+        _pdfPlayFlip(dir);
+      }
       if (_pdfPendingPage !== null) {
         const next = _pdfPendingPage;
         _pdfPendingPage = null;
@@ -1295,6 +1310,73 @@ function _pdfSetZoom(z) {
 pdfZoomIn.addEventListener('click', () => _pdfSetZoom(_pdfZoom + 0.2));
 pdfZoomOut.addEventListener('click', () => _pdfSetZoom(_pdfZoom - 0.2));
 
+// ── Reading (magnifier) mode: fixed 16:9 window, big preset zoom, vertical
+// pan only -- built because free pinch-zoom + 2-axis scroll on a tall
+// portrait page was awkward to read comfortably at high zoom. ──────────────
+const magToggle   = document.getElementById('magToggle');
+const magControls = document.getElementById('magControls');
+const magUpBtn    = document.getElementById('magUp');
+const magDownBtn  = document.getElementById('magDown');
+const magPresetBtns = document.querySelectorAll('.mag-preset-btn');
+
+let _magMode = false;
+let _magZoomPreset = 2;
+let _magPanY = 0;
+
+function _magApplyPan() {
+  const maxPan = Math.max(0, pdfCanvas.height - pdfWrap.clientHeight);
+  _magPanY = Math.min(maxPan, Math.max(0, _magPanY));
+  pdfCanvas.style.transform = `translate(-50%, ${-_magPanY}px)`;
+  magUpBtn.disabled = _magPanY <= 0;
+  magDownBtn.disabled = _magPanY >= maxPan;
+}
+
+function _magSetPreset(z) {
+  _magZoomPreset = z;
+  magPresetBtns.forEach(b => b.classList.toggle('active', +b.dataset.z === z));
+  if (_pdfDoc) _pdfQueueRender(_pdfPage, 0);
+}
+magPresetBtns.forEach(btn => {
+  btn.addEventListener('click', () => _magSetPreset(+btn.dataset.z));
+});
+
+function _magToggle() {
+  _magMode = !_magMode;
+  magToggle.classList.toggle('active', _magMode);
+  magControls.classList.toggle('show', _magMode);
+  pdfWrap.classList.toggle('mag-mode', _magMode);
+  pdfCanvas.style.transform = '';
+  _magPanY = 0;
+  if (_magMode) _magSetPreset(_magZoomPreset);
+  else if (_pdfDoc) _pdfQueueRender(_pdfPage, 0);
+}
+magToggle.addEventListener('click', _magToggle);
+
+const MAG_NUDGE = 140; // px per ▲▼ tap
+magUpBtn.addEventListener('click', () => { _magPanY -= MAG_NUDGE; _magApplyPan(); });
+magDownBtn.addEventListener('click', () => { _magPanY += MAG_NUDGE; _magApplyPan(); });
+
+// Drag (touch or mouse) to pan vertically while in reading mode.
+let _magDragY = null, _magDragStartPan = 0;
+pdfWrap.addEventListener('pointerdown', (e) => {
+  if (!_magMode) return;
+  _magDragY = e.clientY;
+  _magDragStartPan = _magPanY;
+  try { pdfWrap.setPointerCapture(e.pointerId); } catch (err) {}
+});
+pdfWrap.addEventListener('pointermove', (e) => {
+  if (!_magMode || _magDragY === null) return;
+  _magPanY = _magDragStartPan - (e.clientY - _magDragY);
+  _magApplyPan();
+});
+function _magEndDrag() {
+  if (_magDragY === null) return;
+  _magDragY = null;
+  _pdfPing();
+}
+pdfWrap.addEventListener('pointerup', _magEndDrag);
+pdfWrap.addEventListener('pointercancel', _magEndDrag);
+
 // Pinch-to-zoom: live CSS-transform preview while pinching (cheap), then a
 // crisp pdf.js re-render at the final zoom once fingers lift. A one-finger
 // horizontal drag turns the page instead (mutually exclusive with pinch).
@@ -1304,6 +1386,7 @@ function _pdfTouchDist(t) {
   return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
 }
 pdfWrap.addEventListener('touchstart', (e) => {
+  if (_magMode) return; // reading mode owns touch via the pointerdown/move/up drag-pan handlers below
   if (e.touches.length === 2) {
     _pdfSwiping = false;
     _pdfPinchDist = _pdfTouchDist(e.touches);
@@ -1315,6 +1398,7 @@ pdfWrap.addEventListener('touchstart', (e) => {
   }
 }, { passive: true });
 pdfWrap.addEventListener('touchmove', (e) => {
+  if (_magMode) return;
   if (e.touches.length === 2 && _pdfPinchDist) {
     _pdfSwiping = false;
     const factor = _pdfTouchDist(e.touches) / _pdfPinchDist;
@@ -1322,6 +1406,7 @@ pdfWrap.addEventListener('touchmove', (e) => {
   }
 }, { passive: true });
 pdfWrap.addEventListener('touchend', (e) => {
+  if (_magMode) return;
   if (_pdfPinchDist) {
     const factor = parseFloat((pdfCanvas.style.transform.match(/scale\(([\d.]+)\)/) || [1, 1])[1]);
     pdfCanvas.style.transform = '';
@@ -1341,7 +1426,7 @@ pdfWrap.addEventListener('touchend', (e) => {
 }, { passive: true });
 // Desktop: Ctrl/Cmd + wheel to zoom
 pdfWrap.addEventListener('wheel', (e) => {
-  if (!e.ctrlKey && !e.metaKey) return;
+  if (_magMode || (!e.ctrlKey && !e.metaKey)) return;
   e.preventDefault();
   _pdfSetZoom(_pdfZoom + (e.deltaY < 0 ? 0.15 : -0.15));
 }, { passive: false });
@@ -1354,6 +1439,7 @@ function _pdfOpenDoc(startPage) {
   document.body.style.overflow = 'hidden';
 
   _pdfDoc = null; _pdfPage = 1; _pdfNumPages = 0; _pdfZoom = 1;
+  if (_magMode) _magToggle(); // start each book in the normal full-page view
   _pdfSetLabel();
   pdfLoading.textContent = 'Yuklanmoqda…';
   pdfLoading.classList.remove('hidden');
