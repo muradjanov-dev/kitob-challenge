@@ -6,7 +6,6 @@ import random
 
 from aiogram import types
 from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters.builtin import ChatTypeFilter
 from aiogram.types import ChatType, InlineKeyboardMarkup, InlineKeyboardButton
 from asgiref.sync import sync_to_async
 from django.core.cache import cache
@@ -547,6 +546,11 @@ async def _send_question_poll(chat_id: int, session_id: int, q_idx: int):
         },
         timeout=time_limit + 90,
     )
+    cache.set(
+        _poll_msg_cache_key(session_id),
+        {"chat_id": chat_id, "message_id": poll_msg.message_id},
+        timeout=time_limit + 90,
+    )
 
     _cancel_timer(session_id)
     task = asyncio.create_task(_poll_advance_after_close(chat_id, session_id, q_idx, time_limit))
@@ -592,8 +596,17 @@ async def on_poll_answer(poll_answer: types.PollAnswer):
     already, is_correct, correct_text, hint, participant, session = await _record_answer(
         session_id, user.id, question_id, option_id
     )
-    if already or not session or session.is_group:
-        return  # group polls aren't wired up yet — this handler is solo-only for now
+    if already or not session or session.status == "finished":
+        # "finished" covers /stop being sent between the vote landing on
+        # Telegram's side and this handler running — a straggling vote must
+        # not resurrect progression on an already-stopped session.
+        return
+
+    if session.is_group:
+        # Group progression is timer-driven (everyone gets the full
+        # open_period to answer) — see _group_poll_advance_after_close.
+        # Just recording the answer above is all this handler needs to do.
+        return
 
     _cancel_timer(session_id)
     await asyncio.sleep(POLL_REVEAL_PAUSE)
@@ -609,8 +622,139 @@ async def on_poll_answer(poll_answer: types.PollAnswer):
         await _send_question_poll(chat_id, session_id, next_idx)
 
 
-# ─── Send a question (DM, legacy inline-keyboard — group flow's helpers still
-# reference _answer_kb, so this file stays; see notes above) ───────────────────
+# ─── Send a question — native Poll (group) ─────────────────────────────────────
+#
+# Phase 2 of the native-poll migration, following solo's proven phase 1.
+# Unlike solo, progression is timer-driven rather than per-answer (everyone in
+# the group gets the full open_period to vote), and — since Telegram's own
+# per-voter reveal is private to each user — we still post a group-visible
+# "🏅 Bilganlar" line after the poll closes, reusing the same idea the old
+# _group_question_timer used, just without the manual 50%/80% edits.
+
+GROUP_POLL_POST_REVEAL_PAUSE = 1.5
+
+
+async def _send_group_question_poll(chat_id: int, session_id: int, q_idx: int):
+    @sync_to_async
+    def _load():
+        session = QuizSession.objects.select_related("quiz").filter(id=session_id).first()
+        if not session:
+            return None, None, None, 0, 0
+        q_ids = json.loads(session.question_order)
+        if q_idx >= len(q_ids):
+            return session, None, None, len(q_ids), 0
+        question = QuizQuestion.objects.prefetch_related("options").filter(id=q_ids[q_idx]).first()
+        if not question:
+            return None, None, None, len(q_ids), 0
+        opts = list(question.options.all())
+        if session.quiz.shuffle:
+            random.shuffle(opts)
+        return session, question, opts, len(q_ids), session.quiz.time_per_question
+
+    session, question, opts, total, time_limit = await _load()
+    if not session or not question:
+        return
+
+    correct_idx = next((i for i, o in enumerate(opts) if o.is_correct), 0)
+    poll_question = f"❓ {q_idx + 1}/{total}  {question.text}"[:300]
+
+    poll_msg = await bot.send_poll(
+        chat_id=chat_id,
+        question=poll_question,
+        options=[o.text[:100] for o in opts],
+        type="quiz",
+        correct_option_id=correct_idx,
+        is_anonymous=False,
+        explanation=(question.hint[:200] if question.hint else None),
+        open_period=max(5, min(600, time_limit)),
+    )
+
+    cache.set(
+        f"{POLL_CACHE_PREFIX}{poll_msg.poll.id}",
+        {
+            "session_id": session_id,
+            "question_id": question.id,
+            "option_ids": [o.id for o in opts],
+            "chat_id": chat_id,
+            "q_idx": q_idx,
+        },
+        timeout=time_limit + 90,
+    )
+    cache.set(
+        _poll_msg_cache_key(session_id),
+        {"chat_id": chat_id, "message_id": poll_msg.message_id},
+        timeout=time_limit + 90,
+    )
+    await sync_to_async(QuizSession.objects.filter(id=session_id).update)(
+        current_question_idx=q_idx,
+    )
+
+    _cancel_timer(session_id)
+    task = asyncio.create_task(
+        _group_poll_advance_after_close(chat_id, session_id, q_idx, question.id, question.hint, time_limit)
+    )
+    _active_timers[session_id] = task
+
+
+async def _group_poll_advance_after_close(
+    chat_id: int, session_id: int, q_idx: int, question_id: int, hint: str, time_limit: int,
+):
+    """Telegram auto-closes the poll after open_period. We then post who got
+    it right (group members can't see each other's native reveal) and move on."""
+    try:
+        await asyncio.sleep(time_limit + 1)
+
+        @sync_to_async
+        def _winners():
+            return list(
+                QuizUserAnswer.objects.filter(
+                    participant__session_id=session_id,
+                    question_id=question_id,
+                    is_correct=True,
+                ).values_list("participant__user__full_name", flat=True)
+            )
+
+        winners = await _winners()
+        winners_line = ", ".join(sorted(w or "Kitobxon" for w in winners)) if winners else "hech kim"
+        reveal_text = f"🏅 <b>Bilganlar:</b> {winners_line}"
+        if hint:
+            reveal_text += f"\n💡 <i>{hint}</i>"
+        try:
+            await bot.send_message(chat_id=chat_id, text=reveal_text, parse_mode="HTML")
+        except Exception:
+            pass
+
+        await asyncio.sleep(GROUP_POLL_POST_REVEAL_PAUSE)
+        await _group_poll_advance(chat_id, session_id, q_idx)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        _active_timers.pop(session_id, None)
+
+
+async def _group_poll_advance(chat_id: int, session_id: int, q_idx: int):
+    @sync_to_async
+    def _next():
+        session = QuizSession.objects.filter(id=session_id).first()
+        if not session or session.status != "active":
+            return None, 0
+        if session.current_question_idx != q_idx:
+            return None, 0
+        q_ids = json.loads(session.question_order)
+        next_idx = q_idx + 1
+        return session, next_idx if next_idx < len(q_ids) else -1
+
+    session, next_idx = await _next()
+    if not session:
+        return
+    if next_idx == -1:
+        await _finish_group_session(session_id, chat_id)
+    else:
+        await _send_group_question_poll(chat_id, session_id, next_idx)
+
+
+# ─── Send a question (DM, legacy inline-keyboard — kept unused as an instant
+# rollback path for both solo and group; see notes above each poll section) ────
 
 async def _send_question(chat_id: int, session_id: int, q_idx: int):
     @sync_to_async
@@ -1062,30 +1206,39 @@ async def _finish_group_session(session_id: int, chat_id: int):
     )
 
 
-# ─── /stop — creator or admin only ─────────────────────────────────────────────
+# ─── /stop — creator or admin (group), or the player themself (solo) ──────────
 
-@dp.message_handler(ChatTypeFilter((ChatType.GROUP, ChatType.SUPERGROUP)), commands=["stop"], state="*")
-async def stop_group_quiz(message: types.Message, state: FSMContext = None):
-    """Ends the group's current waiting/active quiz session early. Restricted
-    to the session's creator or a bot admin — same permission check as
-    group_start's 'Boshlash' button — so random group members can't cut off
-    someone else's quiz."""
+def _poll_msg_cache_key(session_id: int) -> str:
+    return f"quizpollmsg:{session_id}"
+
+
+@dp.message_handler(commands=["stop"], state="*")
+async def stop_quiz(message: types.Message, state: FSMContext = None):
+    """Ends the current chat's waiting/active quiz session early — works in
+    both a group (Vizov) and a private chat (solo play). In a group, only the
+    session's creator or a bot admin may stop it (same check as group_start's
+    'Boshlash' button); in a private chat the session's chat_id is always the
+    player's own telegram_id, so no separate permission check is needed —
+    only they could ever be running a solo session there. Also force-closes
+    the currently open native poll (if any) so it stops accepting votes."""
     user = await aget_user(message.from_user.id)
     if not user:
         return
+
+    is_group_chat = message.chat.type in (ChatType.GROUP, ChatType.SUPERGROUP)
 
     @sync_to_async
     def _find_and_stop():
         session = (
             QuizSession.objects.select_related("quiz")
-            .filter(chat_id=message.chat.id, is_group=True)
+            .filter(chat_id=message.chat.id, is_group=is_group_chat)
             .exclude(status="finished")
             .order_by("-created_at")
             .first()
         )
         if not session:
             return None, None, [], 0
-        if session.creator_id != user.id and not getattr(user, "is_admin", False):
+        if is_group_chat and session.creator_id != user.id and not getattr(user, "is_admin", False):
             return session, "forbidden", [], 0
 
         was_active = session.status == "active"
@@ -1099,13 +1252,24 @@ async def stop_group_quiz(message: types.Message, state: FSMContext = None):
 
     session, outcome, participants, total = await _find_and_stop()
     if session is None:
-        await message.answer("🔍 Bu guruhda faol quiz topilmadi.")
+        msg = "🔍 Bu guruhda faol quiz topilmadi." if is_group_chat else "🔍 Sizda hozir faol quiz yo'q."
+        await message.answer(msg)
         return
     if outcome == "forbidden":
         await message.answer("⛔ Faqat quizni boshlagan odam yoki admin uni to'xtata oladi.")
         return
 
     _cancel_timer(session.id)
+
+    # Force-close the visible poll too — without this, the message on screen
+    # keeps its countdown ring and would still accept a vote even though our
+    # own session bookkeeping has already moved on.
+    poll_loc = cache.get(_poll_msg_cache_key(session.id))
+    if poll_loc:
+        try:
+            await bot.stop_poll(chat_id=poll_loc["chat_id"], message_id=poll_loc["message_id"])
+        except Exception:
+            pass
 
     if not participants:
         await message.answer(f"🛑 <b>{session.quiz.title}</b> to'xtatildi.", parse_mode="HTML")
