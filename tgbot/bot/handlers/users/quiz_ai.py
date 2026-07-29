@@ -1,6 +1,7 @@
 import os
 import json
 import base64
+import asyncio
 from django.core.cache import cache
 
 from aiogram import types
@@ -11,7 +12,7 @@ from openai import AsyncOpenAI
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.states.main import AIQuizCreateState
 from tgbot.bot.utils import aget_user
-from tgbot.models import Quiz, QuizQuestion, QuizOption, Payment
+from tgbot.models import Quiz, QuizQuestion, QuizOption, Payment, TelegramProfile
 from tgbot.bot.handlers.users.quiz_admin import _quiz_view_kb, _quiz_view_text
 from django.utils import timezone
 
@@ -76,10 +77,66 @@ def _sample_book_text(pages: list[str], budget: int = 80000) -> str:
     return beginning + sep + middle + sep + end
 
 
+# Playful, rotating "what's happening" phrases shown while the AI works —
+# purely cosmetic (edits the same "please wait" message every couple
+# seconds), so the wait feels alive instead of one static line sitting there.
+_LOADING_PHRASES = [
+    "🧠 AI kitobni diqqat bilan o'qiyapti",
+    "🔍 Eng qiziqarli voqealarni titkilayapti",
+    "🤔 Qaysi savol qiziqroq bo'lishini o'ylayapti",
+    "✍️ Savollarni yozib chiqyapti",
+    "🎭 Aldash uchun variantlar o'ylab topyapti (uchtasi yolg'on, bittasi rost 😏)",
+    "☕ Bir chashka choy ichib, hammasini qayta tekshiryapti",
+    "🎯 Deyarli tayyor — sabringiz uchun rahmat",
+]
+
+
+async def _animate_loading(msg: types.Message):
+    """Cycles _LOADING_PHRASES on `msg` every ~2.5s until cancelled. Wrap the
+    generation work in try/finally and cancel this task there — see the
+    _question_timer pattern in quiz_play.py for the same idea."""
+    i = 0
+    try:
+        while True:
+            await asyncio.sleep(2.5)
+            phrase = _LOADING_PHRASES[i % len(_LOADING_PHRASES)]
+            dots = "." * ((i % 3) + 1)
+            try:
+                await msg.edit_text(f"{phrase}{dots}")
+            except Exception:
+                pass
+            i += 1
+    except asyncio.CancelledError:
+        pass
+
+
+# Telegram's own limits (sendPoll: question ≤300 chars, each option ≤100,
+# quiz explanation/hint ≤200) — keeping AI output inside these now means a
+# future move to native Telegram quiz-polls won't need re-generating
+# anything. _clip() below is the defensive backstop if the model ignores this.
+MAX_QUESTION_CHARS = 300
+MAX_OPTION_CHARS = 100
+MAX_HINT_CHARS = 200
+
+
+def _clip(text: str, limit: int) -> str:
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
+
 # Shared language/content rules appended to every generation prompt.
-_PROMPT_RULES = """
+_PROMPT_RULES = f"""
 Make sure options are up to 4 items. correct_index is 0-indexed.
 Do not wrap JSON in markdown block. Just pure JSON.
+
+STRICT LENGTH LIMITS (Telegram poll limits — do not exceed, ever):
+- Each question's "text": maximum {MAX_QUESTION_CHARS} characters.
+- Each item in "options": maximum {MAX_OPTION_CHARS} characters.
+- Each "hint": maximum {MAX_HINT_CHARS} characters.
+Write concisely so nothing needs to be cut — a short, sharp question is better
+than a long one that gets truncated.
 
 CRITICAL LANGUAGE REQUIREMENT (HIGHEST PRIORITY):
 Generate the ENTIRE JSON response (title, description, question text, options, and hints)
@@ -247,7 +304,8 @@ async def process_ai_input(message: types.Message, state: FSMContext):
             return
 
     msg = await message.answer("⏳ AI ma'lumotni tahlil qilib, quiz generatsiya qilmoqda... Iltimos kuting.")
-    
+    anim_task = asyncio.create_task(_animate_loading(msg))
+
     try:
         prompt = f"""You are an AI that creates quizzes. You will receive text or an image.
 Extract the main concepts and create exactly {q_count} multiple choice questions.
@@ -360,21 +418,21 @@ Return ONLY valid JSON in the following format:
             for i, q_data in enumerate(ai_data.get("questions", [])):
                 question = QuizQuestion.objects.create(
                     quiz=q,
-                    text=q_data["text"],
-                    hint=q_data.get("hint", ""),
+                    text=_clip(q_data["text"], MAX_QUESTION_CHARS),
+                    hint=_clip(q_data.get("hint", ""), MAX_HINT_CHARS),
                     order=i
                 )
                 for j, opt_text in enumerate(q_data["options"]):
                     QuizOption.objects.create(
                         question=question,
-                        text=opt_text,
+                        text=_clip(opt_text, MAX_OPTION_CHARS),
                         is_correct=(j == q_data.get("correct_index", 0)),
                         order=j
                     )
             return q
 
         quiz = await create_quiz_from_ai(data)
-        
+
         # Increment usage counter
         if today_count == 0:
             cache.set(cache_key, 1, timeout=86400) # Reset after 24 hours
@@ -382,15 +440,36 @@ Return ONLY valid JSON in the following format:
             cache.incr(cache_key)
 
         await msg.delete()
-        
+
         text = await _quiz_view_text(quiz)
         await message.answer(
             f"✅ <b>AI Quiz yaratildi!</b>\n"
             f"Quyidagi menyu orqali savollar, vaqt va matnlarni bemalol tahrirlashingiz mumkin.\n\n"
-            + text,
+            + text
+            + "\n\n<i>💡 Bu testni faqat shu yerda emas — istalgan boshqa guruhda ham "
+              "\"📤 Guruhga ulashish\" tugmasi orqali ishlatishingiz mumkin!</i>",
             parse_mode="HTML",
             reply_markup=_quiz_view_kb(quiz)
         )
+
+        # If neither Premium nor an active trial let them in, this must have
+        # been their one free lifetime try (see offer_ai_quiz_start's gate) —
+        # burn it and pitch Premium for next time.
+        is_premium_now = await sync_to_async(
+            Payment.objects.filter(user=user, status="paid", end_date__gte=timezone.localdate()).exists
+        )()
+        has_trial_now = bool(user.trial_ai_quiz_until and user.trial_ai_quiz_until >= timezone.now())
+        if not is_premium_now and not has_trial_now and not user.free_ai_quiz_used:
+            await sync_to_async(
+                lambda: TelegramProfile.objects.filter(id=user.id).update(free_ai_quiz_used=True)
+            )()
+            await message.answer(
+                "🎉 Bepul sinovingizdan foydalandingiz!\n\n"
+                "💎 <b>Premium</b>'ga o'ting — AI yordamida cheklovsiz quiz tuzing, "
+                "×2 Kitobcha va boshqa imkoniyatlarni oching. Asosiy menyu → 💎 Premium.",
+                parse_mode="HTML",
+            )
+
         await state.finish()
 
     except json.JSONDecodeError as e:
@@ -411,3 +490,5 @@ Return ONLY valid JSON in the following format:
             "yoki admin bilan bog'laning."
         )
         await state.finish()
+    finally:
+        anim_task.cancel()

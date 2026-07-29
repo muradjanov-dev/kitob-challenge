@@ -228,6 +228,12 @@ class TelegramProfile(BaseModel):
                   "quizzes for a 1-hour window — see tasks.grant_daily_ai_quiz_trial "
                   "and quiz_admin.py's 'ai' action gate.",
     )
+    free_ai_quiz_used = models.BooleanField(
+        default=False,
+        help_text="Every non-Premium user gets exactly ONE free lifetime AI quiz "
+                  "generation (separate from the daily trial-window giveaway) — set "
+                  "True the moment they use it. See quiz_admin.py's 'ai' action gate.",
+    )
     optimal_send_hour = models.PositiveSmallIntegerField(
         null=True,
         blank=True,

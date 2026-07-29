@@ -33,11 +33,17 @@ def _solo_preview_kb(quiz) -> InlineKeyboardMarkup:
 
 def _preview_text(quiz, q_count: int) -> str:
     shuffle_line = "🔀 Savollar va variantlar aralashtirilib beriladi." if quiz.shuffle else ""
+    creator_name = getattr(quiz.creator, "full_name", None) if quiz.creator_id else None
+    credit_line = (
+        f"\n\n<i>✍️ Kitob Challenge kitobxoni — {creator_name} tomonidan tuzilgan</i>"
+        if creator_name else ""
+    )
     return (
         f"📝 <b>{quiz.title}</b>\n\n"
         f"{quiz.description or ''}\n\n"
         f"❓ {q_count} ta savol · ⏱ {quiz.time_per_question} son/savol\n"
         f"{shuffle_line}"
+        f"{credit_line}"
     )
 
 # session_id -> running countdown task
@@ -260,7 +266,7 @@ async def start_solo_quiz(message: types.Message, quiz_code: str):
 
     @sync_to_async
     def _load():
-        quiz = Quiz.objects.prefetch_related("questions").filter(link_code=quiz_code).first()
+        quiz = Quiz.objects.select_related("creator").prefetch_related("questions").filter(link_code=quiz_code).first()
         if not quiz:
             return None, 0
         return quiz, quiz.questions.count()
@@ -287,7 +293,7 @@ async def quiz_preview(call: types.CallbackQuery, state: FSMContext):
 
     @sync_to_async
     def _load():
-        q = Quiz.objects.prefetch_related("questions").filter(id=quiz_id).first()
+        q = Quiz.objects.select_related("creator").prefetch_related("questions").filter(id=quiz_id).first()
         if not q:
             return None, 0
         return q, q.questions.count()
@@ -312,7 +318,7 @@ async def solo_start(call: types.CallbackQuery, state: FSMContext):
 
     @sync_to_async
     def _create():
-        quiz = Quiz.objects.prefetch_related("questions").filter(id=quiz_id).first()
+        quiz = Quiz.objects.select_related("creator").prefetch_related("questions").filter(id=quiz_id).first()
         if not quiz:
             return None, None
         q_ids = list(quiz.questions.values_list("id", flat=True))
@@ -515,18 +521,23 @@ async def _finish_session_solo(session_id: int, chat_id: int):
 
     @sync_to_async
     def _results():
-        session = QuizSession.objects.filter(id=session_id).first()
+        session = QuizSession.objects.select_related("quiz").filter(id=session_id).first()
         if not session:
-            return None, 0, 0
+            return None, 0, 0, 0
         QuizSession.objects.filter(id=session_id).update(status="finished")
         participant = QuizParticipant.objects.filter(
             session_id=session_id, user__telegram_id=chat_id
         ).first()
         total = len(json.loads(session.question_order))
         score = participant.score if participant else 0
-        return session, score, total
+        # Every solo play of this same Quiz (via its link_code) creates its
+        # own QuizSession — count distinct participants across ALL of them
+        # so "necha odam qatnashgan" reflects the quiz's real reach, not just
+        # this one session.
+        player_count = QuizParticipant.objects.filter(session__quiz_id=session.quiz_id).count()
+        return session, score, total, player_count
 
-    session, score, total = await _results()
+    session, score, total, player_count = await _results()
     if not session:
         return
 
@@ -542,6 +553,9 @@ async def _finish_session_solo(session_id: int, chat_id: int):
 
     bot_link = f"https://t.me/{BOT_USERNAME}"
     bar = _progress_bar(pct)
+    players_line = (
+        f"👥 Bu quizni jami <b>{player_count}</b> kishi yechgan\n\n" if player_count > 1 else "\n"
+    )
     await bot.send_message(
         chat_id=chat_id,
         text=(
@@ -550,6 +564,7 @@ async def _finish_session_solo(session_id: int, chat_id: int):
             f"<code>{bar}</code>  <b>{pct}%</b>\n"
             f"✅ To'g'ri javoblar: <b>{score}/{total}</b>\n\n"
             f"<i>{blurb}</i>\n\n"
+            f"{players_line}"
             f"<blockquote>🚀 Yana quiz ishlang yoki o'zingiz tuzing:\n"
             f"👉 <a href=\"{bot_link}\">Kitob Challenge bot</a>\n\n"
             f"💎 <b>Premium</b> — AI yordamida quiz tuzish, kengaytirilgan "
@@ -584,7 +599,7 @@ async def start_group_quiz(message: types.Message, quiz_code: str):
 
     @sync_to_async
     def _spawn():
-        quiz = Quiz.objects.prefetch_related("questions").filter(link_code=quiz_code).first()
+        quiz = Quiz.objects.select_related("creator").prefetch_related("questions").filter(link_code=quiz_code).first()
         if not quiz:
             return None, None, 0
         q_ids = list(quiz.questions.values_list("id", flat=True))
@@ -614,14 +629,20 @@ async def start_group_quiz(message: types.Message, quiz_code: str):
     kb.row(InlineKeyboardButton(text="✋ Qo'shilaman", callback_data=f"qjoin:{session.id}"))
     kb.row(InlineKeyboardButton(text="▶️ Boshlash", callback_data=f"qstart:{session.id}"))
 
+    creator_name = getattr(quiz.creator, "full_name", None) if quiz.creator_id else None
+    credit_line = f"<i>✍️ Kitob Challenge kitobxoni — {creator_name} tomonidan tuzilgan</i>\n\n" if creator_name else ""
+
     sent = await message.answer(
-        f"🎮 <b>Guruh Quizi: {quiz.title}</b>\n\n"
-        f"{quiz.description or ''}\n\n"
-        f"❓ {q_count} ta savol · ⏱ {quiz.time_per_question} son/savol\n\n"
-        f"Qatnashish uchun <b>Qo'shilaman</b> tugmasini bosing. "
-        f"Yaratuvchi tayyor bo'lganda <b>Boshlash</b>ni bossin.\n\n"
-        f"<i>Eslatma: o'yin davomida har kim istalgan vaqtda ham qo'shilishi mumkin "
-        f"— birinchi savol tugmasini bosish kifoya.</i>",
+        f"🎮 <b>GURUH QUIZI</b>\n"
+        f"━━━━━━━━━━━━━━━━━\n\n"
+        f"📖 <b>{quiz.title}</b>\n"
+        f"{quiz.description + chr(10) + chr(10) if quiz.description else ''}"
+        f"❓ {q_count} ta savol  ·  ⏱ {quiz.time_per_question} son/savol\n\n"
+        f"{credit_line}"
+        f"<blockquote>✋ Qatnashish uchun <b>Qo'shilaman</b>ni bosing.\n"
+        f"Yaratuvchi tayyor bo'lganda <b>▶️ Boshlash</b>ni bossin.\n\n"
+        f"O'yin davomida ham istalgan vaqtda qo'shilishingiz mumkin — "
+        f"birinchi javob tugmasini bosish kifoya.</blockquote>",
         parse_mode="HTML",
         reply_markup=kb,
     )

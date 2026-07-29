@@ -164,6 +164,19 @@ async def do_start(message: types.Message, state: FSMContext):
         await show_market_menu(message, user)
         return
 
+    # AI quiz deep link: /start aiquiz — from the AI-quiz-upgrade broadcast's
+    # inline button, lands the user straight in AI quiz creation (same gate
+    # as the "🤖 AI yordamida Quiz yaratish" button: Premium, trial window,
+    # or their one free lifetime try).
+    if args == "aiquiz" and already_registered:
+        if user and not user.is_registered:
+            user.is_registered = True
+            await sync_to_async(user.save)(update_fields=["is_registered"])
+        await state.finish()
+        from tgbot.bot.handlers.users.quiz_admin import offer_ai_quiz_start
+        await offer_ai_quiz_start(message, user, state)
+        return
+
     # Kitob Zanjiri deep link: /start zanjir — from the group announcement
     # button. Opens the live game Mini App (web_app buttons are only allowed in
     # private chats, so we hand it off here in the DM).

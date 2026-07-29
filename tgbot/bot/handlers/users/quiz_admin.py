@@ -42,11 +42,68 @@ async def _can_manage_quizzes(user) -> bool:
 
 
 def _visible_quizzes(user):
-    """Quizzes shown in 'Mening quizlarim': admins see ALL quizzes, regular
-    Premium users see only the ones they created."""
-    if _is_admin(user):
-        return Quiz.objects.all()
+    """Quizzes shown in 'Mening quizlarim': everyone — admins included —
+    sees only the ones they personally created. (Admins can still edit/
+    manage any quiz via _can_edit_quiz; this only affects the list view.)"""
     return Quiz.objects.filter(creator=user)
+
+
+async def offer_ai_quiz_start(target_message, user, state: FSMContext):
+    """Shared entry point for AI quiz creation — used by the '🤖 AI yordamida
+    Quiz yaratish' button (quiz_admin callback) and the /start aiquiz deep
+    link (start.py). Access: active Premium, an active trial window (see
+    tasks.grant_daily_ai_quiz_trial), or — once ever — every non-Premium
+    user's free lifetime try (TelegramProfile.free_ai_quiz_used)."""
+    from django.utils import timezone
+    from tgbot.models import Payment
+    from tgbot.bot.states.main import AIQuizCreateState
+
+    is_premium = await sync_to_async(
+        Payment.objects.filter(user=user, status="paid", end_date__gte=timezone.localdate()).exists
+    )()
+    has_trial = bool(user.trial_ai_quiz_until and user.trial_ai_quiz_until >= timezone.now())
+    has_free_try = not user.free_ai_quiz_used
+
+    if not is_premium and not has_trial and not has_free_try:
+        await target_message.answer(
+            "⭐ <b>Bepul sinovingiz allaqachon ishlatilgan!</b>\n\n"
+            "AI yordamida yana quiz tuzish uchun 💎 Premium kerak — cheklovsiz "
+            "foydalaning va boshqa imkoniyatlarni ham oching.",
+            parse_mode="HTML",
+        )
+        return
+
+    await state.finish()
+
+    kb = InlineKeyboardMarkup(row_width=5)
+    kb.add(
+        InlineKeyboardButton("5", callback_data="aiqz_q:5"),
+        InlineKeyboardButton("10", callback_data="aiqz_q:10"),
+        InlineKeyboardButton("15", callback_data="aiqz_q:15"),
+        InlineKeyboardButton("20", callback_data="aiqz_q:20"),
+        InlineKeyboardButton("25", callback_data="aiqz_q:25"),
+    )
+    intro = "🤖 <b>AI yordamida Quiz yaratish</b>\n\n"
+    if not is_premium and not has_trial and has_free_try:
+        intro += (
+            "🎁 Bu — sizning <b>bepul sinovingiz</b>! Keyingi safar 💎 Premium kerak bo'ladi.\n\n"
+        )
+    intro += "Nechta savol bo'lishini xohlaysiz? Quyidagi tugmalardan birini tanlang:"
+    await target_message.answer(intro, parse_mode="HTML", reply_markup=kb)
+    await AIQuizCreateState.question_count.set()
+
+
+@dp.callback_query_handler(lambda c: c.data == "aiquiz_start", state="*")
+async def aiquiz_start_button(call: types.CallbackQuery, state: FSMContext):
+    """DM-only entry point for the AI-quiz-upgrade broadcast's inline button
+    (private chat, so callback_data works — the group copy of that broadcast
+    uses a url deep link to /start aiquiz instead)."""
+    await call.answer()
+    user = await aget_user(call.from_user.id)
+    if not user:
+        await call.message.answer("Avval /start bosing.")
+        return
+    await offer_ai_quiz_start(call.message, user, state)
 
 
 def _can_edit_quiz(quiz, user) -> bool:
@@ -213,42 +270,8 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
 
     # AI quiz — start creation
     elif action == "ai":
-        from django.utils import timezone
-        from tgbot.models import Payment
-        from tgbot.bot.states.main import AIQuizCreateState
-        # NOTE: do NOT re-import InlineKeyboardMarkup/InlineKeyboardButton here.
-        # A nested `from ... import` is a local assignment, which makes Python
-        # treat those names as locals for the entire enclosing function. Any
-        # OTHER branch (e.g. action == "del") that uses them before this branch
-        # runs then crashes with UnboundLocalError. They're already imported
-        # at module top.
-
-        is_premium = await sync_to_async(
-            Payment.objects.filter(user=user, status="paid", end_date__gte=timezone.localdate()).exists
-        )()
-        has_trial = bool(user.trial_ai_quiz_until and user.trial_ai_quiz_until >= timezone.now())
-        if not is_premium and not has_trial:
-            await call.answer("Bu funksiya faqat Premium foydalanuvchilar uchun! ⭐", show_alert=True)
-            return
-            
         await call.answer()
-        await state.finish()
-        
-        kb = InlineKeyboardMarkup(row_width=5)
-        kb.add(
-            InlineKeyboardButton("5", callback_data="aiqz_q:5"),
-            InlineKeyboardButton("10", callback_data="aiqz_q:10"),
-            InlineKeyboardButton("15", callback_data="aiqz_q:15"),
-            InlineKeyboardButton("20", callback_data="aiqz_q:20"),
-            InlineKeyboardButton("25", callback_data="aiqz_q:25"),
-        )
-        await call.message.answer(
-            "🤖 <b>AI yordamida Quiz yaratish</b>\n\n"
-            "Nechta savol bo'lishini xohlaysiz? Quyidagi tugmalardan birini tanlang:",
-            parse_mode="HTML",
-            reply_markup=kb
-        )
-        await AIQuizCreateState.question_count.set()
+        await offer_ai_quiz_start(call.message, user, state)
 
     # View
     elif action == "v" and len(parts) > 2:
@@ -866,10 +889,11 @@ async def _launch_vizov(msg, quiz_id: int, start_dt, creator_tg_id: int):
     )
 
     await msg.answer(
-        f"✅ Vizov yaratildi!\n\n"
-        f"<b>{quiz.title}</b> — barcha foydalanuvchilarga taklif yuborilmoqda...\n\n"
+        f"✅ <b>Vizov yaratildi!</b>\n\n"
+        f"📖 <b>{quiz.title}</b>\n"
+        f"📤 Barcha foydalanuvchilarga taklif yuborilmoqda...\n\n"
         f"⏰ {time_label.replace('<b>', '').replace('</b>', '')}\n\n"
-        f"Siz ham ishtirok etishingiz mumkin 👇",
+        f"Siz ham quyidagi tugma orqali qatnashishingiz mumkin 👇",
         parse_mode="HTML",
         reply_markup=join_kb,
     )

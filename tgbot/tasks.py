@@ -2068,12 +2068,14 @@ def broadcast_vizov_invite(session_id, quiz_title, quiz_desc, q_count, time_secs
     import json as _j
 
     text = (
-        f"🏆 <b>JONLI QUIZ — Vizov!</b>\n\n"
-        f"📝 <b>{quiz_title}</b>\n"
-        f"{quiz_desc + chr(10) if quiz_desc else ''}"
-        f"❓ {q_count} ta savol · ⏱ {time_secs} son/savol\n\n"
+        f"🏆 <b>JONLI QUIZ BOSHLANMOQDA!</b>\n"
+        f"━━━━━━━━━━━━━━━━━\n\n"
+        f"📖 <b>{quiz_title}</b>\n"
+        f"{quiz_desc + chr(10) + chr(10) if quiz_desc else chr(10)}"
+        f"❓ {q_count} ta savol  ·  ⏱ {time_secs} son/savol\n"
         f"⏰ {time_label.replace('<b>', '').replace('</b>', '')}\n\n"
-        f"Qatnashish uchun quyidagi tugmani bosing 👇"
+        f"<blockquote>🎮 Bilimingizni sinab ko'ring, boshqa kitobxonlar "
+        f"bilan bellashing — qatnashish uchun pastdagi tugmani bosing! 👇</blockquote>"
     )
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     kb = _j.dumps({
@@ -4898,10 +4900,18 @@ def send_admin_daily_report():
     pending_purchases = _SP.objects.filter(status=_SP.STATUS_PENDING).count()
     purchases_today = _SP.objects.filter(created_at__date=today).count()
 
-    # ── Quiz ─────────────────────────────────────────────────────────────────
+    # ── Viktorina (twice-daily "guess the book" — separate from the Quiz
+    # system below) ─────────────────────────────────────────────────────────
     from tgbot.models import BookQuizAnswer as _BQA
     quiz_answers_today = _BQA.objects.filter(created_at__date=today).count()
     quiz_correct_today = _BQA.objects.filter(created_at__date=today, is_correct=True).count()
+
+    # ── Quiz (user/AI-created custom quizzes — Kitob Quiz bo'limi) ───────────
+    from tgbot.models import Quiz as _Q, QuizUserAnswer as _QUA
+    quiz_takers_today = _QUA.objects.filter(
+        answered_at__date=today
+    ).values("participant__user_id").distinct().count()
+    quizzes_created_today = _Q.objects.filter(created_at__date=today).count()
 
     # ── Kitobcha ledger (only tracks changes since the ledger shipped) ─────────
     kitobcha_earned_today = _KL.objects.filter(
@@ -4936,6 +4946,10 @@ def send_admin_daily_report():
         f"🧠 <b>Viktorina:</b>\n"
         f"  Bugun javoblar: <b>{quiz_answers_today}</b> "
         f"(to'g'ri: {quiz_correct_today})\n\n"
+
+        f"🎯 <b>Quiz testlar:</b>\n"
+        f"  Bugun yechganlar: <b>{quiz_takers_today}</b> kishi\n"
+        f"  Bugun yaratilgan testlar: <b>{quizzes_created_today}</b>\n\n"
 
         f"🪙 <b>Kitobcha:</b>\n"
         f"  Bugun qabul qilindi: <b>+{kitobcha_earned_today:,}</b>\n"
