@@ -2,13 +2,12 @@
 (tgbot/bot/handlers/users/report.py). Same Telegram WebApp initData auth
 pattern as shop_views.py / library_views.py / cabinet_views.py.
 
-Deliberately a simplified single-book port: the bot flow also supports
-selecting multiple books in one report, combined audio+text entries, and
-editing a Premium user's group message in place across same-day resubmits.
-Those stay bot-only for now -- the web form covers the common case (one
-book, one report a day) so accountability the pinned-progress economy is
-already built on doesn't fork into two different data shapes.
-"""
+Supports the same shape as the bot: one or more books in a single report
+(picked from the user's own BooksToRead, or typed as brand-new), and a
+mixed paper+audio submission in one go. Still one report a day for
+non-Premium (Premium's in-place group-message editing across same-day
+resubmits stays bot-only for now -- the web form always posts a fresh
+group message)."""
 import hashlib
 import hmac
 import json
@@ -17,11 +16,12 @@ from urllib.parse import parse_qsl
 
 import requests
 from django.conf import settings
+from django.db.models import F
 from django.db.models.functions import TruncDate
 from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from tgbot.bot.consts import (
     BOYS_GROUP_ID, GIRLS_GROUP_ID,
@@ -31,7 +31,9 @@ from tgbot.bot.consts import (
     E_BOYS_THREAD_ID, E_GIRLS_THREAD_ID,
 )
 from tgbot.bot.handlers.users.report import MOTIVATIONS, PREMIUM_CTAS, PREMIUM_CTA_CHANCE, _pick_praise
-from tgbot.models import BookReport, ConfirmationReport, GlobalBook, TelegramProfile, normalize_uzbek_text
+from tgbot.models import (
+    BookReport, BooksToRead, ConfirmationReport, GlobalBook, TelegramProfile, normalize_uzbek_text,
+)
 
 BOT_TOKEN = settings.API_TOKEN
 
@@ -103,6 +105,73 @@ def _resolve_or_create_book(title: str, global_book_id, is_audio: bool):
     return gbook
 
 
+@require_GET
+def api_my_report_books(request: HttpRequest) -> JsonResponse:
+    """Same book list + % complete the bot's send_book_selection_menu shows,
+    for the report form's dropdown -- active books first, then not-started,
+    then already-finished (mirrors get_user_books' sort_order)."""
+    init_data = _read_init_data(request)
+    profile, err = _resolve_profile(init_data)
+    if err:
+        return JsonResponse({"ok": False, "error": err}, status=403)
+
+    from django.db.models import Case, When, IntegerField, Value
+
+    books = (
+        BooksToRead.objects.filter(user=profile)
+        .annotate(
+            sort_order=Case(
+                When(current_page=0, then=Value(1)),
+                When(total_pages__gt=0, current_page__gte=F("total_pages"), then=Value(2)),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
+        )
+        .order_by("sort_order", "-created_at")[:100]
+    )
+    return JsonResponse({
+        "ok": True,
+        "books": [
+            {
+                "id": b.id,
+                "title": b.title,
+                "is_audio": b.is_audio,
+                "percent": int((b.current_page / b.total_pages) * 100) if b.total_pages else 0,
+            }
+            for b in books
+        ],
+    })
+
+
+def _entry_book_obj(profile, entry):
+    """Resolve one report entry to (BooksToRead row, is_audio, amount, label)."""
+    amount = int(entry.get("amount"))
+    if amount <= 0:
+        raise ValueError("invalid_amount")
+
+    book_to_read_id = entry.get("book_to_read_id")
+    if book_to_read_id:
+        book_obj = BooksToRead.objects.filter(id=book_to_read_id, user=profile).first()
+        if not book_obj:
+            raise ValueError("book_not_found")
+        return book_obj, book_obj.is_audio, amount
+
+    title = (entry.get("book_title") or "").strip()
+    if not title:
+        raise ValueError("book_title required")
+    if len(title) > 255:
+        raise ValueError("book_title_too_long")
+    is_audio = bool(entry.get("is_audio"))
+    gbook = _resolve_or_create_book(title, entry.get("global_book_id"), is_audio)
+    book_obj = BooksToRead.objects.filter(user=profile, global_book=gbook, is_audio=is_audio).first()
+    if not book_obj:
+        book_obj = BooksToRead.objects.create(
+            user=profile, global_book=gbook, title=gbook.title if gbook else title,
+            is_audio=is_audio, total_pages=0, current_page=0,
+        )
+    return book_obj, is_audio, amount
+
+
 @csrf_exempt
 @require_POST
 def api_submit_report(request: HttpRequest) -> JsonResponse:
@@ -119,22 +188,18 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
     if profile.is_blocked:
         return JsonResponse({"ok": False, "error": "blocked"}, status=403)
 
-    book_title = (body.get("book_title") or "").strip()
-    if not book_title:
-        return JsonResponse({"ok": False, "error": "book_title required"}, status=400)
-    if len(book_title) > 255:
-        return JsonResponse({"ok": False, "error": "book_title_too_long"}, status=400)
+    entries = body.get("entries")
+    if not isinstance(entries, list) or not entries:
+        return JsonResponse({"ok": False, "error": "entries required"}, status=400)
+    if len(entries) > 20:
+        return JsonResponse({"ok": False, "error": "too_many_entries"}, status=400)
 
-    global_book_id = body.get("global_book_id")
-    is_audio = bool(body.get("is_audio"))
     conclusion = (body.get("conclusion") or "").strip() or None
 
     try:
-        amount = int(body.get("amount"))
-    except (TypeError, ValueError):
-        return JsonResponse({"ok": False, "error": "invalid_amount"}, status=400)
-    if amount <= 0:
-        return JsonResponse({"ok": False, "error": "invalid_amount"}, status=400)
+        resolved = [_entry_book_obj(profile, e) for e in entries]
+    except ValueError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
 
     is_premium = profile.has_active_premium()
     today = timezone.localdate()
@@ -145,55 +210,63 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
     reading_day = _compute_reading_day(profile, today)
     now = timezone.now()
 
-    pages_read = 0 if is_audio else amount
-    minutes_listened = amount if is_audio else None
+    text_entries = [(b, a) for b, is_a, a in resolved if not is_a]
+    audio_entries = [(b, a) for b, is_a, a in resolved if is_a]
 
-    report = ConfirmationReport.objects.create(
-        user=profile, pages_read=pages_read, date=now, conclusion=conclusion,
-        book=book_title[:255], is_audio=is_audio, minutes_listened=minutes_listened,
-    )
-
-    # Attach/advance the matching BooksToRead row the same way the bot does,
-    # so this shows up correctly in "mening kitoblarim" and the reader.
-    gbook = _resolve_or_create_book(book_title, global_book_id, is_audio)
-    from tgbot.models import BooksToRead
-    book_obj = BooksToRead.objects.filter(user=profile, global_book=gbook, is_audio=is_audio).first()
-    if not book_obj:
-        book_obj = BooksToRead.objects.create(
-            user=profile, global_book=gbook, title=gbook.title if gbook else book_title,
-            is_audio=is_audio, total_pages=0, current_page=0,
+    reports = []
+    if text_entries:
+        total_pages = sum(a for _, a in text_entries)
+        r = ConfirmationReport.objects.create(
+            user=profile, pages_read=total_pages, date=now, conclusion=conclusion,
+            book=text_entries[0][0].title[:255], is_audio=False,
         )
-    book_obj.current_page += amount
-    if book_obj.total_pages > 0 and book_obj.current_page > book_obj.total_pages:
-        book_obj.current_page = book_obj.total_pages
-    book_obj.save(update_fields=["current_page", "updated_at"])
-    report.books.set([book_obj.id])
+        r.books.set([b.id for b, _ in text_entries])
+        reports.append(r)
+    if audio_entries:
+        total_minutes = sum(a for _, a in audio_entries)
+        r = ConfirmationReport.objects.create(
+            user=profile, pages_read=0, date=now, conclusion=conclusion,
+            book=audio_entries[0][0].title[:255], is_audio=True, minutes_listened=total_minutes,
+        )
+        r.books.set([b.id for b, _ in audio_entries])
+        reports.append(r)
 
-    BookReport.objects.create(
-        user=profile, global_book=gbook, reading_day=reading_day,
-        book=book_obj.title, pages_read=amount,
-    )
+    # Advance each book's own progress and log a per-book BookReport row --
+    # same per-book granularity as the bot's book_reports loop.
+    lines = []
+    for book_obj, is_audio, amount in resolved:
+        book_obj.current_page += amount
+        if book_obj.total_pages > 0 and book_obj.current_page > book_obj.total_pages:
+            book_obj.current_page = book_obj.total_pages
+        book_obj.save(update_fields=["current_page", "updated_at"])
+        BookReport.objects.create(
+            user=profile, global_book=book_obj.global_book, reading_day=reading_day,
+            book=book_obj.title, pages_read=amount,
+        )
+        unit = "daqiqa" if is_audio else "bet"
+        icon = "🎧" if is_audio else "📖"
+        lines.append(f"{icon} {book_obj.title}: {amount} {unit}")
 
-    # ── Group post (same gender/page-tier routing as the bot; simplified to
-    # a single book/report, no Premium in-place-edit aggregation). ──
-    unit = "daqiqa" if is_audio else "bet"
-    icon = "🎧" if is_audio else "📖"
+    # ── Group post (same gender/page-tier routing as the bot; posts a fresh
+    # message even for a Premium user's Nth report today -- no in-place
+    # group-message editing/aggregation on the web form yet). ──
     prem_badge = "💎 " if is_premium else ""
     motivation = random.choice(MOTIVATIONS)
     conclusion_block = (
         f"<b>💡 Olingan xulosa:</b>\n<blockquote expandable>{conclusion}</blockquote>"
         if conclusion else ""
     )
+    books_block = "<b>O'qilgan kitoblar:</b>\n\n" + "\n".join(lines)
     report_message = (
         f"<b><a href='tg://user?id={profile.telegram_id}'>{prem_badge}{profile.full_name}</a></b>:\n\n"
-        f"📊#kun - {reading_day}  ({report.date.strftime('%Y-%m-%d')})\n\n"
-        f"<b>O'qilgan kitoblar:</b>\n\n{icon} {book_title} ({amount} {unit})\n\n"
+        f"📊#kun - {reading_day}  ({now.strftime('%Y-%m-%d')})\n\n"
+        f"{books_block}\n\n"
         f"{conclusion_block}\n\n"
         f"<b>{motivation}</b>"
         f"\n\n<i>🌌 Parallel olam orqali yuborildi</i>"
     )
 
-    routing_pages = pages_read
+    routing_pages = sum(a for _, a in text_entries)
     if profile.gender == "male":
         target_chat_id = BOYS_GROUP_ID
         target_thread_id = (
@@ -226,7 +299,7 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
             pass
 
     if group_message_id:
-        ConfirmationReport.objects.filter(id=report.id).update(
+        ConfirmationReport.objects.filter(id__in=[r.id for r in reports]).update(
             group_chat_id=target_chat_id, group_message_id=group_message_id,
             group_thread_id=target_thread_id, reading_day=reading_day,
         )
@@ -239,7 +312,7 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
     )
     awarded = 0
     premium_cta = None
-    if todays_first_id == report.id:
+    if todays_first_id in {r.id for r in reports}:
         awarded = profile.update_ball(True, 25)
         if awarded == 25 and random.random() < PREMIUM_CTA_CHANCE:
             premium_cta = random.choice(PREMIUM_CTAS)
@@ -260,8 +333,12 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
             from asgiref.sync import async_to_sync
             from tgbot.services.referral import ReferralService
             async_to_sync(ReferralService.process_referral)(profile, code)
-        except Exception:
-            pass
+        except Exception as e:
+            # Match report.py's bot-side path: the code is already cleared by
+            # now (prevents double-counting on concurrent triggers), so a
+            # failure here silently loses the referral with zero trace unless
+            # logged -- this was previously a bare `except Exception: pass`.
+            print(f"deferred referral processing failed (web report) for profile {profile.id}: {e}")
 
     return JsonResponse({
         "ok": True,

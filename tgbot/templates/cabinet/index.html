@@ -118,6 +118,35 @@
     .rf-submit:disabled { opacity: .5; cursor: default; }
     .rf-msg { margin-top: 8px; font-size: 12px; text-align: center; color: var(--text-dim); min-height: 15px; }
     .rf-msg.error { color: #f87171; }
+
+    .rf-entry {
+      border: 1px solid var(--card-border); border-radius: 12px; padding: 12px; margin-bottom: 10px;
+      background: rgba(255,255,255,.015); position: relative;
+    }
+    .rf-entry-top { display: flex; gap: 8px; align-items: flex-start; }
+    .rf-entry-top .rf-input { margin-bottom: 8px; }
+    select.rf-input {
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e6b450'><path d='M6 9l6 6 6-6'/></svg>");
+      background-repeat: no-repeat; background-position: right 10px center; background-size: 16px;
+      padding-right: 32px;
+    }
+    select.rf-input option { background: var(--bg-1); color: var(--text); }
+    .rf-remove-btn {
+      flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--card-border);
+      background: rgba(255,255,255,.03); color: var(--text-faint); font-size: 13px; cursor: pointer;
+      transition: all .18s var(--ease-bounce);
+    }
+    .rf-remove-btn:hover { color: #f87171; border-color: rgba(248,113,113,.35); background: rgba(248,113,113,.08); }
+    .rf-add-btn {
+      width: 100%; padding: 10px; margin-bottom: 12px; border-radius: 10px;
+      border: 1px dashed var(--card-border); background: transparent; color: var(--accent);
+      font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer;
+      transition: all .18s var(--ease-bounce);
+    }
+    .rf-add-btn:hover { border-color: rgba(230,180,80,.4); background: rgba(230,180,80,.06); }
+    .rf-entry .rf-type { margin-bottom: 8px; }
+    .rf-entry .rf-type-btn { padding: 7px 6px; font-size: 11.5px; }
     #reportDone { text-align: center; padding: 6px 0; }
     .rf-done-icon { font-size: 30px; margin-bottom: 6px; }
     .rf-done-text { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
@@ -190,12 +219,8 @@
     <div class="sec-title">Bugungi hisobot</div>
     <div class="report-card" id="reportCard">
       <div id="reportForm">
-        <div class="rf-type">
-          <button type="button" class="rf-type-btn active" id="rfTypePage" data-audio="0">📖 Kitob (bet)</button>
-          <button type="button" class="rf-type-btn" id="rfTypeAudio" data-audio="1">🎧 Audio (daqiqa)</button>
-        </div>
-        <input type="text" id="rfTitle" class="rf-input" placeholder="Kitob nomi" maxlength="255" />
-        <input type="number" id="rfAmount" class="rf-input" placeholder="Necha bet o'qidingiz?" min="1" />
+        <div id="rfEntries"></div>
+        <button type="button" class="rf-add-btn" id="rfAddEntry">➕ Yana kitob qo'shish</button>
         <textarea id="rfConclusion" class="rf-input rf-textarea" placeholder="Bugungi xulosangiz (ixtiyoriy)" maxlength="2000"></textarea>
         <button type="button" class="rf-submit" id="rfSubmit">Hisobotni yuborish</button>
         <div class="rf-msg" id="rfMsg"></div>
@@ -342,41 +367,125 @@
         empty.style.display = 'block';
       });
 
-    // ── Daily report form ──────────────────────────────────────────
-    let rfIsAudio = false;
-    const rfTypePage = document.getElementById('rfTypePage');
-    const rfTypeAudio = document.getElementById('rfTypeAudio');
-    const rfAmount = document.getElementById('rfAmount');
-    const rfTitle = document.getElementById('rfTitle');
+    // ── Daily report form: one or more books, each its own type/amount ──
+    let rfEntryCount = 0;
+    let rfMyBooks = [];
+    const rfEntries = document.getElementById('rfEntries');
+    const rfAddEntry = document.getElementById('rfAddEntry');
     const rfConclusion = document.getElementById('rfConclusion');
     const rfSubmit = document.getElementById('rfSubmit');
     const rfMsg = document.getElementById('rfMsg');
 
-    function rfSetType(audio) {
-      rfIsAudio = audio;
-      rfTypePage.classList.toggle('active', !audio);
-      rfTypeAudio.classList.toggle('active', audio);
-      rfAmount.placeholder = audio ? 'Necha daqiqa tingladingiz?' : 'Necha bet o\'qidingiz?';
+    function _rfEsc(s) {
+      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
-    rfTypePage.addEventListener('click', () => rfSetType(false));
-    rfTypeAudio.addEventListener('click', () => rfSetType(true));
+
+    function rfBookOptions() {
+      return rfMyBooks.map(b =>
+        `<option value="${b.id}">${b.is_audio ? '🎧' : '📖'} ${_rfEsc(b.title)} — ${b.percent}%</option>`
+      ).join('');
+    }
+
+    function rfAddEntryRow() {
+      const idx = rfEntryCount++;
+      const div = document.createElement('div');
+      div.className = 'rf-entry';
+      div.dataset.idx = idx;
+      div.innerHTML = `
+        <div class="rf-entry-top">
+          <select class="rf-input rf-book-select">
+            <option value="new">➕ Yangi kitob</option>
+            ${rfBookOptions()}
+          </select>
+          <button type="button" class="rf-remove-btn">✕</button>
+        </div>
+        <div class="rf-new-book">
+          <div class="rf-type">
+            <button type="button" class="rf-type-btn active" data-audio="0">📖 Kitob</button>
+            <button type="button" class="rf-type-btn" data-audio="1">🎧 Audio</button>
+          </div>
+          <input type="text" class="rf-input rf-new-title" placeholder="Kitob nomi" maxlength="255" />
+        </div>
+        <input type="number" class="rf-input rf-amount" placeholder="Necha bet o'qidingiz?" min="1" />
+      `;
+      rfEntries.appendChild(div);
+
+      const select = div.querySelector('.rf-book-select');
+      const newBookBox = div.querySelector('.rf-new-book');
+      const amountInput = div.querySelector('.rf-amount');
+      const typeBtns = div.querySelectorAll('.rf-type-btn');
+
+      function syncPlaceholder() {
+        let isAudio;
+        if (select.value === 'new') {
+          isAudio = div.querySelector('.rf-type-btn.active').dataset.audio === '1';
+        } else {
+          const book = rfMyBooks.find(b => String(b.id) === select.value);
+          isAudio = !!(book && book.is_audio);
+        }
+        amountInput.placeholder = isAudio ? "Necha daqiqa tingladingiz?" : "Necha bet o'qidingiz?";
+      }
+      select.addEventListener('change', () => {
+        newBookBox.style.display = select.value === 'new' ? 'block' : 'none';
+        syncPlaceholder();
+      });
+      typeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          typeBtns.forEach(b => b.classList.toggle('active', b === btn));
+          syncPlaceholder();
+        });
+      });
+      div.querySelector('.rf-remove-btn').addEventListener('click', () => {
+        if (rfEntries.children.length <= 1) return; // always keep at least one entry
+        div.remove();
+      });
+      syncPlaceholder();
+    }
+
+    rfAddEntry.addEventListener('click', () => rfAddEntryRow());
+
+    fetch('/kabinet/api/report/books/', { headers: { 'X-Telegram-Init-Data': initData } })
+      .then(r => r.json())
+      .then(d => { if (d.ok) rfMyBooks = d.books; })
+      .catch(() => {})
+      .finally(() => rfAddEntryRow());
+
+    function rfCollectEntries() {
+      const rows = Array.from(rfEntries.querySelectorAll('.rf-entry'));
+      const entries = [];
+      for (const row of rows) {
+        const select = row.querySelector('.rf-book-select');
+        const amount = parseInt(row.querySelector('.rf-amount').value, 10);
+        if (!amount || amount <= 0) throw new Error("Har bir kitob uchun to'g'ri miqdor kiriting.");
+        if (select.value === 'new') {
+          const title = row.querySelector('.rf-new-title').value.trim();
+          if (!title) throw new Error('Kitob nomini kiriting.');
+          const isAudio = row.querySelector('.rf-type-btn.active').dataset.audio === '1';
+          entries.push({ book_title: title, is_audio: isAudio, amount });
+        } else {
+          entries.push({ book_to_read_id: parseInt(select.value, 10), amount });
+        }
+      }
+      return entries;
+    }
 
     rfSubmit.addEventListener('click', () => {
-      const title = rfTitle.value.trim();
-      const amount = parseInt(rfAmount.value, 10);
       rfMsg.classList.remove('error');
-      if (!title) { rfMsg.textContent = 'Kitob nomini kiriting.'; rfMsg.classList.add('error'); return; }
-      if (!amount || amount <= 0) { rfMsg.textContent = 'Miqdorni to\'g\'ri kiriting.'; rfMsg.classList.add('error'); return; }
+      let entries;
+      try {
+        entries = rfCollectEntries();
+      } catch (e) {
+        rfMsg.textContent = e.message;
+        rfMsg.classList.add('error');
+        return;
+      }
 
       rfSubmit.disabled = true;
       rfMsg.textContent = 'Yuborilmoqda…';
       fetch('/kabinet/api/report/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          initData, book_title: title, is_audio: rfIsAudio,
-          amount, conclusion: rfConclusion.value.trim(),
-        }),
+        body: JSON.stringify({ initData, entries, conclusion: rfConclusion.value.trim() }),
       })
         .then(r => r.json().then(data => ({ status: r.status, data })))
         .then(({ status, data }) => {
