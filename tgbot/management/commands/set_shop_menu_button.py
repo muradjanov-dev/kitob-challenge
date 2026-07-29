@@ -27,8 +27,8 @@ class Command(BaseCommand):
             help="Revert to Telegram's default Menu button.",
         )
         parser.add_argument(
-            "--label", default="🌐 Sayt",
-            help="Button label (max 14 chars per Telegram). Default: 🌐 Sayt.",
+            "--label", default="Parallel olam",
+            help="Button label (max 14 chars per Telegram). Default: Parallel olam.",
         )
         parser.add_argument(
             "--all-chats", dest="all_chats", action="store_true",
@@ -36,7 +36,7 @@ class Command(BaseCommand):
                  "Use this once the shop is rolled out broadly.",
         )
 
-    def handle(self, *args, reset=False, label="🌐 Sayt", all_chats=False, **opts):
+    def handle(self, *args, reset=False, label="Parallel olam", all_chats=False, **opts):
         url = f"https://api.telegram.org/bot{settings.API_TOKEN}/setChatMenuButton"
         # Opens the landing site (which contains the Do'kon section), not the
         # shop directly — the shop now lives inside the site.
