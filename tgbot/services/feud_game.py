@@ -172,6 +172,11 @@ def finalize(game_id: int) -> dict | None:
         winners.append({
             "rank": i + 1, "user_id": s.user_id, "telegram_id": s.user.telegram_id,
             "name": s.user.full_name or "Kitobxon", "points": s.points, "reward": applied,
+            # True when Premium's 2x multiplier bumped this reward above the
+            # tier it was actually assigned -- lets the results message flag
+            # e.g. a Premium 2nd place earning more than a non-Premium 1st,
+            # instead of that just looking like an unexplained inconsistency.
+            "boosted": applied != reward,
         })
     g.rewarded = True
     g.save(update_fields=["rewarded", "updated_at"])
