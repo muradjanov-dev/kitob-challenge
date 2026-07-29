@@ -870,5 +870,80 @@
 
     loadProducts();
   </script>
+
+  <style>
+    body { padding-bottom: 78px !important; }
+    .site-tabbar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 250;
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+      background: rgba(15,20,18,.90); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border-top: 1px solid rgba(255,255,255,.08);
+      font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .stb-tab {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 6px 4px; border-radius: 12px; text-decoration: none; color: rgba(255,255,255,.55);
+      transition: color .18s ease, background .18s ease, transform .22s cubic-bezier(.34,1.56,.64,1);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .stb-tab:active { transform: scale(.92); }
+    .stb-tab.active { color: #e6b450; background: rgba(230,180,80,.14); }
+    .stb-icon { font-size: 19px; line-height: 1; }
+    .stb-label { font-size: 9px; font-weight: 700; letter-spacing: .2px; white-space: nowrap; }
+    .stb-balance {
+      display: none; align-items: center; gap: 4px; padding: 7px 11px; flex-shrink: 0;
+      background: rgba(230,180,80,.14); border: 1px solid rgba(230,180,80,.32); border-radius: 100px;
+      color: #e6b450; font-size: 12.5px; font-weight: 800; font-variant-numeric: tabular-nums;
+    }
+  </style>
+  <nav class="site-tabbar">
+    <a href="/" class="stb-tab" data-tab="home">
+      <span class="stb-icon">🏠</span><span class="stb-label">Bosh sahifa</span>
+    </a>
+    <a href="/kutubxona/" class="stb-tab" data-tab="library">
+      <span class="stb-icon">📚</span><span class="stb-label">Kutubxona</span>
+    </a>
+    <a href="/shop/" class="stb-tab active" data-tab="shop">
+      <span class="stb-icon">🛒</span><span class="stb-label">Do'kon</span>
+    </a>
+    <div class="stb-balance" id="stbBalance">
+      <span>🪙</span><span id="stbBalanceVal">0</span>
+    </div>
+  </nav>
+  <script>
+  (function() {
+    const tabs = ['/', '/kutubxona/', '/shop/'];
+    const activeIdx = 2;
+
+    const tg = window.Telegram && window.Telegram.WebApp;
+    const initData = tg && tg.initData ? tg.initData : '';
+    if (initData) {
+      fetch('/shop/api/me/', { headers: { 'X-Telegram-Init-Data': initData } })
+        .then(r => r.json())
+        .then(d => {
+          if (d.ok) {
+            document.getElementById('stbBalanceVal').textContent = d.balance;
+            document.getElementById('stbBalance').style.display = 'flex';
+          }
+        }).catch(() => {});
+    }
+
+    let sx = 0, sy = 0;
+    document.body.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    }, { passive: true });
+    document.body.addEventListener('touchend', (e) => {
+      if (!sx) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sx, dy = t.clientY - sy;
+      sx = 0;
+      if (Math.abs(dx) < 90 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      const next = dx < 0 ? activeIdx + 1 : activeIdx - 1;
+      if (next >= 0 && next < tabs.length) window.location.href = tabs[next];
+    }, { passive: true });
+  })();
+  </script>
 </body>
 </html>
