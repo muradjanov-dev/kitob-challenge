@@ -269,6 +269,11 @@ async def premium_menu_handler(message: types.Message, state: FSMContext):
                 text += f"\n\n✅ <b>Пробный Premium активен до {until_str}.</b>"
             else:
                 text += f"\n\n✅ <b>Sinov Premium faol — {until_str} gacha.</b>"
+        else:
+            if lang == "ru":
+                text += "\n\n❌ <b>Подписка не активна.</b>"
+            else:
+                text += "\n\n❌ <b>Obunangiz faol emas.</b>"
 
     await message.answer(
         text,
