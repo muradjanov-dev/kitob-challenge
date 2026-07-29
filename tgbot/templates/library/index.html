@@ -813,7 +813,7 @@
     if (Math.abs(dx) < 90 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
     const reader = document.getElementById('pdfReader');
     if (reader && reader.classList.contains('open')) return;
-    if (e.target.closest('.shelf-books-row, #pdfCanvasWrap, .srch-grid, #cmtList')) return;
+    if (e.target.closest('.shelf-books-row, #pdfCanvasWrap, .srch-grid, .continue-row, #cmtList')) return;
     const next = dx < 0 ? activeIdx + 1 : activeIdx - 1;
     if (next >= 0 && next < tabs.length) window.location.href = tabs[next];
   }, { passive: true });
