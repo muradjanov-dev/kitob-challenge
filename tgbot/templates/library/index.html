@@ -450,27 +450,72 @@
     }
     .pdf-hd-close:hover { background: rgba(255,255,255,.22); transform: translateY(-1px); }
     .pdf-hd-close:active { transform: scale(.94); transition-duration: .1s; }
+    .mag-toggle-btn {
+      background: rgba(255,255,255,.12); border: none; border-radius: 8px;
+      color: var(--bg); padding: 7px 12px; font-size: 12px; font-weight: 700;
+      cursor: pointer; white-space: nowrap; font-family: var(--fb); flex-shrink: 0;
+      transition: background .15s ease, transform .22s var(--ease-bounce);
+    }
+    .mag-toggle-btn:hover { background: rgba(255,255,255,.22); }
+    .mag-toggle-btn:active { transform: scale(.94); transition-duration: .1s; }
+    .mag-toggle-btn.active { background: var(--accent); color: #1a1208; }
+
+    /* Reading (magnifier) mode: a fixed 16:9 window into a highly zoomed
+       page, panned vertically via drag or the ▲▼ buttons -- comfortable,
+       single-axis reading instead of free pinch-zoom + 2-way scroll. */
+    .mag-controls {
+      display: none; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 8px 16px; background: var(--wood-dk); border-bottom: 1px solid rgba(255,255,255,.1);
+      flex-shrink: 0;
+    }
+    .mag-controls.show { display: flex; }
+    .mag-presets, .mag-pan { display: flex; gap: 6px; }
+    .mag-preset-btn, .mag-pan-btn {
+      background: rgba(255,255,255,.12); border: none; border-radius: 8px;
+      color: var(--bg); padding: 6px 12px; font-size: 13px; font-weight: 700;
+      cursor: pointer; font-family: var(--fb);
+      transition: background .15s ease, transform .22s var(--ease-bounce);
+    }
+    .mag-preset-btn:hover, .mag-pan-btn:hover { background: rgba(255,255,255,.22); }
+    .mag-preset-btn:active, .mag-pan-btn:active { transform: scale(.92); transition-duration: .1s; }
+    .mag-preset-btn.active { background: var(--accent); color: #1a1208; }
+    #pdfCanvasWrap.mag-mode {
+      aspect-ratio: 16 / 9; flex: 0 0 auto; overflow: hidden; position: relative;
+      padding: 0; align-items: flex-start; touch-action: none;
+    }
+    #pdfCanvasWrap.mag-mode #pdfCanvas {
+      position: absolute; left: 50%; top: 0; max-width: none;
+      transform: translateX(-50%);
+      box-shadow: none;
+    }
+    #pdfCanvasWrap.mag-mode #pdfLoading { top: 0; }
 
     /* PDF.js paginated canvas reader */
     #pdfCanvasWrap {
       flex: 1; overflow: auto; display: flex; align-items: flex-start;
       justify-content: center; background: #1a1a1a; padding: 14px 0 90px;
       -webkit-overflow-scrolling: touch;
+      /* Vertical scroll stays native; pinch-zoom and horizontal swipe are
+         owned entirely by our own touch handlers below, so the browser's
+         built-in page-zoom gesture doesn't fight them mid-pinch. */
+      touch-action: pan-y;
     }
     #pdfCanvas {
       box-shadow: 0 4px 22px rgba(0,0,0,.5); background: #fff; max-width: 96vw; height: auto;
       transform-style: preserve-3d; will-change: transform;
     }
     @keyframes pdfFlipNext {
-      0%   { transform: perspective(1400px) rotateY(-10deg); opacity: .35; }
-      100% { transform: perspective(1400px) rotateY(0deg); opacity: 1; }
+      0%   { transform: perspective(1600px) rotateY(-78deg) scaleX(.86); opacity: .25; }
+      55%  { transform: perspective(1600px) rotateY(-14deg) scaleX(.96); opacity: .9; }
+      100% { transform: perspective(1600px) rotateY(0deg) scaleX(1); opacity: 1; }
     }
     @keyframes pdfFlipPrev {
-      0%   { transform: perspective(1400px) rotateY(10deg); opacity: .35; }
-      100% { transform: perspective(1400px) rotateY(0deg); opacity: 1; }
+      0%   { transform: perspective(1600px) rotateY(78deg) scaleX(.86); opacity: .25; }
+      55%  { transform: perspective(1600px) rotateY(14deg) scaleX(.96); opacity: .9; }
+      100% { transform: perspective(1600px) rotateY(0deg) scaleX(1); opacity: 1; }
     }
-    #pdfCanvas.flip-in-next { animation: pdfFlipNext .32s ease-out; transform-origin: left center; }
-    #pdfCanvas.flip-in-prev { animation: pdfFlipPrev .32s ease-out; transform-origin: right center; }
+    #pdfCanvas.flip-in-next { animation: pdfFlipNext .46s cubic-bezier(.22,.68,0,1); transform-origin: left center; }
+    #pdfCanvas.flip-in-prev { animation: pdfFlipPrev .46s cubic-bezier(.22,.68,0,1); transform-origin: right center; }
     @media (prefers-reduced-motion: reduce) {
       #pdfCanvas.flip-in-next, #pdfCanvas.flip-in-prev { animation: none; }
     }
@@ -507,13 +552,21 @@
     /* Reward / status toast */
     .pdf-toast {
       position: fixed; left: 50%; top: 58px; z-index: 305;
-      transform: translateX(-50%) translateY(-16px);
-      background: rgba(20,16,12,.94); color: #f5ead8; padding: 10px 18px;
+      transform: translateX(-50%) translateY(-140%);
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(20,16,12,.94); color: #f5ead8; padding: 10px 12px 10px 18px;
       border-radius: 11px; font-size: 13px; font-weight: 700; font-family: var(--fb);
-      opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
-      max-width: 88vw; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.35);
+      opacity: 0; pointer-events: none; transition: opacity .22s ease, transform .32s cubic-bezier(.34,1.4,.4,1);
+      max-width: 88vw; box-shadow: 0 6px 20px rgba(0,0,0,.35);
     }
-    .pdf-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .pdf-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+    .pdf-toast-msg { text-align: center; }
+    .pdf-toast-close {
+      flex-shrink: 0; background: rgba(255,255,255,.12); border: none; border-radius: 50%;
+      width: 20px; height: 20px; color: inherit; font-size: 11px; line-height: 1; cursor: pointer;
+      display: grid; place-items: center; transition: background .15s;
+    }
+    .pdf-toast-close:hover { background: rgba(255,255,255,.24); }
 
     /* Audio player */
     .audio-wrap { margin-top: 8px; padding: 12px; background: rgba(122,138,94,.08); border: 1.5px solid rgba(122,138,94,.22); border-radius: 12px; }
@@ -867,6 +920,18 @@
   <div class="pdf-hd">
     <button class="pdf-hd-close" id="pdfClose">✕ Yopish</button>
     <div class="pdf-hd-title" id="pdfTitle"></div>
+    <button class="mag-toggle-btn" id="magToggle" title="O'qish rejimi">🔍 O'qish rejimi</button>
+  </div>
+  <div class="mag-controls" id="magControls">
+    <div class="mag-presets">
+      <button class="mag-preset-btn" data-z="2">2×</button>
+      <button class="mag-preset-btn" data-z="3">3×</button>
+      <button class="mag-preset-btn" data-z="4">4×</button>
+    </div>
+    <div class="mag-pan">
+      <button class="mag-pan-btn" id="magUp" title="Tepaga">▲</button>
+      <button class="mag-pan-btn" id="magDown" title="Pastga">▼</button>
+    </div>
   </div>
   <div id="pdfCanvasWrap">
     <canvas id="pdfCanvas"></canvas>
@@ -883,7 +948,10 @@
     <button class="pdf-nav-btn pdf-zoom-btn" id="pdfZoomIn" title="Kattalashtirish">＋</button>
   </div>
 </div>
-<div class="pdf-toast" id="pdfToast"></div>
+<div class="pdf-toast" id="pdfToast">
+  <span class="pdf-toast-msg" id="pdfToastMsg"></span>
+  <button class="pdf-toast-close" id="pdfToastClose">✕</button>
+</div>
 
 <!-- ═══════════════ SEARCH OVERLAY ═══════════════ -->
 <div id="searchOverlay">
@@ -1116,6 +1184,7 @@ const pdfNextBtn  = document.getElementById('pdfNext');
 const pdfZoomIn   = document.getElementById('pdfZoomIn');
 const pdfZoomOut  = document.getElementById('pdfZoomOut');
 const pdfToast    = document.getElementById('pdfToast');
+const pdfToastMsg = document.getElementById('pdfToastMsg');
 
 let _pdfDoc = null, _pdfPage = 1, _pdfNumPages = 0;
 let _pdfRendering = false, _pdfPendingPage = null;
@@ -1130,12 +1199,17 @@ function _pdfSetLabel() {
   pdfNextBtn.disabled = !_pdfNumPages || _pdfPage >= _pdfNumPages;
 }
 
-function _pdfToast(msg) {
-  pdfToast.textContent = msg;
+function _pdfToastHide() {
+  pdfToast.classList.remove('show');
+  clearTimeout(_pdfToastTimer);
+}
+function _pdfToast(msg, duration = 1400) {
+  pdfToastMsg.textContent = msg;
   pdfToast.classList.add('show');
   clearTimeout(_pdfToastTimer);
-  _pdfToastTimer = setTimeout(() => pdfToast.classList.remove('show'), 2800);
+  _pdfToastTimer = setTimeout(_pdfToastHide, duration);
 }
+document.getElementById('pdfToastClose').addEventListener('click', _pdfToastHide);
 
 function _pdfPlayFlip(dir) {
   pdfCanvas.classList.remove('flip-in-next', 'flip-in-prev');
@@ -1206,7 +1280,7 @@ function _pdfPing() {
       }),
     }).then(r => r.json()).then(data => {
       if (data.finished) {
-        _pdfToast(`🎉 Kitob tugatildi! Jami ${data.total_granted} kitobcha ishladingiz`);
+        _pdfToast(`🎉 Kitob tugatildi! Jami ${data.total_granted} kitobcha ishladingiz`, 4000);
       } else if (data.granted_now > 0) {
         _pdfToast(`+${data.granted_now} kitobcha 🪙`);
       }
@@ -1222,30 +1296,47 @@ pdfZoomIn.addEventListener('click', () => _pdfSetZoom(_pdfZoom + 0.2));
 pdfZoomOut.addEventListener('click', () => _pdfSetZoom(_pdfZoom - 0.2));
 
 // Pinch-to-zoom: live CSS-transform preview while pinching (cheap), then a
-// crisp pdf.js re-render at the final zoom once fingers lift.
+// crisp pdf.js re-render at the final zoom once fingers lift. A one-finger
+// horizontal drag turns the page instead (mutually exclusive with pinch).
 let _pdfPinchDist = null, _pdfPinchStartZoom = 1;
+let _pdfSwiping = false, _pdfSwipeX = 0, _pdfSwipeY = 0;
 function _pdfTouchDist(t) {
   return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
 }
 pdfWrap.addEventListener('touchstart', (e) => {
   if (e.touches.length === 2) {
+    _pdfSwiping = false;
     _pdfPinchDist = _pdfTouchDist(e.touches);
     _pdfPinchStartZoom = _pdfZoom;
+  } else if (e.touches.length === 1) {
+    _pdfSwiping = true;
+    _pdfSwipeX = e.touches[0].clientX;
+    _pdfSwipeY = e.touches[0].clientY;
   }
 }, { passive: true });
 pdfWrap.addEventListener('touchmove', (e) => {
   if (e.touches.length === 2 && _pdfPinchDist) {
+    _pdfSwiping = false;
     const factor = _pdfTouchDist(e.touches) / _pdfPinchDist;
     pdfCanvas.style.transform = `scale(${Math.min(3, Math.max(0.5, factor))})`;
   }
 }, { passive: true });
-pdfWrap.addEventListener('touchend', () => {
+pdfWrap.addEventListener('touchend', (e) => {
   if (_pdfPinchDist) {
     const factor = parseFloat((pdfCanvas.style.transform.match(/scale\(([\d.]+)\)/) || [1, 1])[1]);
     pdfCanvas.style.transform = '';
     _pdfPinchDist = null;
     _pdfSetZoom(_pdfPinchStartZoom * (factor || 1));
     _pdfPing();
+    return;
+  }
+  if (_pdfSwiping) {
+    _pdfSwiping = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - _pdfSwipeX, dy = t.clientY - _pdfSwipeY;
+    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+      _pdfTurn(dx < 0 ? 1 : -1);
+    }
   }
 }, { passive: true });
 // Desktop: Ctrl/Cmd + wheel to zoom
@@ -1305,7 +1396,7 @@ function openPdfReader() {
         alert("Kitobni ochib bo'lmadi. Birozdan so'ng qayta urinib ko'ring.");
         return;
       }
-      if (data.charged) _pdfToast(`📖 O'qish boshlandi — mas'uliyat uchun ${BOOK_START_FEE} kitobcha yechildi`);
+      if (data.charged) _pdfToast(`📖 O'qish boshlandi — mas'uliyat uchun ${BOOK_START_FEE} kitobcha yechildi`, 2600);
       _pdfOpenDoc(data.current_page || 1);
     })
     .catch(() => alert("Internetga ulanishda muammo. Qayta urinib ko'ring."));

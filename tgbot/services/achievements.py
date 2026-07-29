@@ -48,8 +48,6 @@ class Stats(TypedDict):
     perfect_months: int
     combo_days: int
     distinct_authors: int
-    comeback: bool
-    phoenix: bool
     wisdom_best_streak: int
 
 
@@ -111,8 +109,6 @@ def compute_user_stats(user: TelegramProfile) -> Stats:
         ).exclude(global_book__author="")
         .values_list("global_book__author", flat=True).distinct().count()
     )
-    comeback = _gap_then_streak(report_dates, min_gap_days=14, min_streak=7)
-    phoenix = _gap_then_streak(report_dates, min_gap_days=30, min_streak=14)
     wisdom_best_streak = WisdomScore.objects.filter(user=user).aggregate(m=Max("best_streak"))["m"] or 0
 
     return {
@@ -136,8 +132,6 @@ def compute_user_stats(user: TelegramProfile) -> Stats:
         "perfect_months": perfect_months,
         "combo_days": combo_days,
         "distinct_authors": distinct_authors,
-        "comeback": comeback,
-        "phoenix": phoenix,
         "wisdom_best_streak": wisdom_best_streak,
     }
 
@@ -191,26 +185,6 @@ def _combo_days_count(user: TelegramProfile) -> int:
         .annotate(_d=TruncDate("date")).values_list("_d", flat=True)
     )
     return len(page_dates & audio_dates)
-
-
-def _gap_then_streak(dates: list, min_gap_days: int, min_streak: int) -> bool:
-    """True if the user ever had a break of >= min_gap_days with no report,
-    immediately followed by a fresh run of >= min_streak consecutive days."""
-    if len(dates) < min_streak:
-        return False
-    run_start = 0
-    run_len = 1
-    for i in range(1, len(dates)):
-        if (dates[i] - dates[i - 1]).days == 1:
-            run_len += 1
-        else:
-            run_start = i
-            run_len = 1
-        if run_len >= min_streak and run_start > 0:
-            gap_before = (dates[run_start] - dates[run_start - 1]).days
-            if gap_before >= min_gap_days:
-                return True
-    return False
 
 
 def _max_consecutive_days(user: TelegramProfile) -> int:
