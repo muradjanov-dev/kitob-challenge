@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Mening Kabinetim — Kitob Challenge</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg-0: #0f1714; --bg-1: #14201b; --bg-2: #1b2a23;
+      --card: rgba(243,234,217,0.045); --card-border: rgba(243,234,217,0.10);
+      --text: #f3ead9; --text-dim: rgba(243,234,217,0.62); --text-faint: rgba(243,234,217,0.40);
+      --accent: #e6b450; --accent-2: #c8922e;
+      --green: #1f6b4c; --green-2: #2a8a63;
+      --radius: 18px; --radius-sm: 12px;
+      --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+      --ease-bounce: cubic-bezier(.34, 1.56, .64, 1);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; min-height: 100vh; }
+    body {
+      background:
+        radial-gradient(1100px 600px at 12% -10%, rgba(31,107,76,0.30), transparent 70%),
+        radial-gradient(900px 700px at 110% 10%, rgba(230,180,80,0.14), transparent 65%),
+        linear-gradient(180deg, var(--bg-0), var(--bg-1) 60%, var(--bg-0));
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding-bottom: 100px;
+      overscroll-behavior-y: contain;
+    }
+
+    .topbar {
+      position: sticky; top: 0; z-index: 20;
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+      background: linear-gradient(180deg, rgba(15,23,20,0.85), rgba(15,23,20,0.55));
+      border-bottom: 1px solid var(--card-border);
+      padding: 16px 18px; display: flex; align-items: center; gap: 12px;
+    }
+    .topbar .avatar {
+      width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--green), var(--green-2));
+      display: grid; place-items: center; font-size: 19px;
+      box-shadow: 0 8px 22px rgba(31,107,76,0.4);
+    }
+    .topbar .name { font-family: var(--serif); font-size: 17px; line-height: 1.2; }
+    .topbar .prem { font-size: 11px; color: var(--accent); font-weight: 700; margin-top: 2px; }
+
+    .balance-wrap { padding: 16px 16px 0; }
+    .balance {
+      display: flex; align-items: center; gap: 12px;
+      background: linear-gradient(135deg, rgba(230,180,80,0.16), rgba(31,107,76,0.14));
+      border: 1px solid rgba(230,180,80,0.30);
+      padding: 16px 18px; border-radius: var(--radius);
+    }
+    .balance .coin {
+      width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+      background: radial-gradient(circle at 30% 30%, #fff5cc, var(--accent) 55%, #b87b1d);
+      box-shadow: inset 0 0 0 2px rgba(0,0,0,0.05), 0 6px 20px rgba(255,209,102,0.32);
+    }
+    .balance .label { font-size: 11px; color: var(--text-dim); letter-spacing: .5px; text-transform: uppercase; }
+    .balance .value { font-family: var(--serif); font-size: 27px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+    .balance .value .unit { font-size: 12px; color: var(--text-dim); font-weight: 600; margin-left: 6px; }
+
+    .sec-title {
+      padding: 24px 18px 10px; font-size: 12px; color: var(--text-faint);
+      text-transform: uppercase; letter-spacing: 1.4px;
+    }
+    .stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; padding: 0 16px; }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius-sm);
+      padding: 14px 15px; transition: transform .18s ease, border-color .18s ease;
+    }
+    .stat-card:hover { transform: translateY(-2px); border-color: rgba(255,209,102,0.3); }
+    .stat-icon { font-size: 20px; margin-bottom: 6px; }
+    .stat-val { font-family: var(--serif); font-size: 21px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+    .stat-label { font-size: 11px; color: var(--text-dim); margin-top: 3px; line-height: 1.35; }
+
+    .rank-card {
+      margin: 0 16px; padding: 16px 18px; background: var(--card); border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+    }
+    .rank-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .rank-bar { flex: 1; height: 8px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; display: flex; }
+    .rank-bar-behind { background: var(--green-2); height: 100%; }
+    .rank-bar-ahead { background: rgba(255,255,255,.14); height: 100%; }
+    .rank-legend { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-dim); }
+    .rank-legend b { color: var(--text); }
+    .overtake { margin-top: 10px; font-size: 12.5px; color: var(--accent); font-weight: 700; }
+
+    .prem-teaser {
+      margin: 16px; padding: 14px 16px; border-radius: var(--radius-sm);
+      background: rgba(230,180,80,0.08); border: 1px dashed rgba(230,180,80,0.35);
+      font-size: 12.5px; color: var(--text-dim); text-align: center;
+    }
+
+    .empty-state {
+      display: none; text-align: center; padding: 60px 24px; color: var(--text-faint); font-size: 13px;
+    }
+    .empty-state a { color: var(--accent); font-weight: 700; text-decoration: none; }
+    .loading { text-align: center; padding: 60px 24px; color: var(--text-faint); font-size: 13px; }
+
+    /* Shared bottom tab-bar (identical across site/library/shop/cabinet) */
+    body { padding-bottom: 78px; }
+    .site-tabbar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 250;
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+      background: rgba(15,20,18,.90); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    .stb-tab {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 6px 4px; border-radius: 12px; text-decoration: none; color: rgba(255,255,255,.55);
+      transition: color .18s ease, background .18s ease, transform .22s var(--ease-bounce);
+    }
+    .stb-tab:active { transform: scale(.92); }
+    .stb-tab.active { color: var(--accent); background: rgba(230,180,80,.14); }
+    .stb-icon { font-size: 19px; line-height: 1; }
+    .stb-label { font-size: 9px; font-weight: 700; letter-spacing: .2px; white-space: nowrap; }
+    .stb-balance {
+      display: none; align-items: center; gap: 4px; padding: 7px 11px; flex-shrink: 0;
+      background: rgba(230,180,80,.14); border: 1px solid rgba(230,180,80,.32); border-radius: 100px;
+      color: var(--accent); font-size: 12.5px; font-weight: 800; font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="avatar">👤</div>
+    <div>
+      <div class="name" id="cabName">Kitobxon</div>
+      <div class="prem" id="cabPrem" style="display:none">💎 Premium a'zo</div>
+    </div>
+  </div>
+
+  <div id="cabLoading" class="loading">Yuklanmoqda…</div>
+  <div id="cabEmpty" class="empty-state">
+    Ma'lumotlaringizni ko'rish uchun botni Telegram ichida oching:<br />
+    <a href="https://t.me/kitob_challange_bot" target="_blank" rel="noopener">@kitob_challange_bot</a>
+  </div>
+
+  <div id="cabBody" style="display:none">
+    <div class="balance-wrap">
+      <div class="balance">
+        <div class="coin"></div>
+        <div>
+          <div class="label">Kitobcha balansi</div>
+          <div class="value"><span id="cabBalance">0</span><span class="unit">Kitobcha</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-title">O'qish statistikasi</div>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📚</div>
+        <div class="stat-val" id="cabBooks">0</div>
+        <div class="stat-label">Tugallangan kitoblar</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📄</div>
+        <div class="stat-val" id="cabPages">0</div>
+        <div class="stat-label">Jami o'qilgan sahifalar</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⚡️</div>
+        <div class="stat-val" id="cabAvg">0</div>
+        <div class="stat-label">O'rtacha kunlik o'qish (bet)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🧩</div>
+        <div class="stat-val" id="cabQuiz">—</div>
+        <div class="stat-label" id="cabQuizLabel">Viktorinada topilgan iqtiboslar</div>
+      </div>
+    </div>
+
+    <div class="sec-title" id="cabHabitsTitle" style="display:none">Odatlaringiz</div>
+    <div class="stat-grid" id="cabHabits" style="display:none">
+      <div class="stat-card">
+        <div class="stat-icon">📅</div>
+        <div class="stat-val" id="cabDay" style="font-size:15px">—</div>
+        <div class="stat-label">Eng faol kuningiz</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏰</div>
+        <div class="stat-val" id="cabHour" style="font-size:15px">—</div>
+        <div class="stat-label">Sevimli o'qish vaqtingiz</div>
+      </div>
+    </div>
+
+    <div class="sec-title" id="cabRankTitle" style="display:none">Reyting</div>
+    <div class="rank-card" id="cabRankCard" style="display:none">
+      <div class="rank-row">
+        <div class="rank-bar">
+          <div class="rank-bar-behind" id="cabRankBar" style="width:0%"></div>
+          <div class="rank-bar-ahead" style="flex:1"></div>
+        </div>
+      </div>
+      <div class="rank-legend">
+        <span>📈 Sizdan orqada: <b id="cabPctAhead">0%</b></span>
+        <span>📉 Sizdan oldinda: <b id="cabPctBehind">0%</b></span>
+      </div>
+      <div class="overtake" id="cabOvertake" style="display:none"></div>
+    </div>
+  </div>
+
+<nav class="site-tabbar">
+  <a href="/" class="stb-tab" data-tab="home">
+    <span class="stb-icon">🏠</span><span class="stb-label">Bosh sahifa</span>
+  </a>
+  <a href="/kutubxona/" class="stb-tab" data-tab="library">
+    <span class="stb-icon">📚</span><span class="stb-label">Kutubxona</span>
+  </a>
+  <a href="/shop/" class="stb-tab" data-tab="shop">
+    <span class="stb-icon">🛒</span><span class="stb-label">Do'kon</span>
+  </a>
+  <a href="/kabinet/" class="stb-tab active" data-tab="cabinet">
+    <span class="stb-icon">👤</span><span class="stb-label">Kabinet</span>
+  </a>
+  <div class="stb-balance" id="stbBalance">
+    <span>🪙</span><span id="stbBalanceVal">0</span>
+  </div>
+</nav>
+
+<script>
+(function() {
+  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+  const initData = tg && tg.initData ? tg.initData : '';
+
+  const loading = document.getElementById('cabLoading');
+  const empty = document.getElementById('cabEmpty');
+  const body = document.getElementById('cabBody');
+
+  if (!initData) {
+    loading.style.display = 'none';
+    empty.style.display = 'block';
+  } else {
+    fetch('/kabinet/api/me/', { headers: { 'X-Telegram-Init-Data': initData } })
+      .then(r => r.json())
+      .then(d => {
+        loading.style.display = 'none';
+        if (!d.ok) { empty.style.display = 'block'; return; }
+        body.style.display = 'block';
+
+        document.getElementById('cabName').textContent = d.full_name;
+        document.getElementById('cabBalance').textContent = d.balance;
+        document.getElementById('stbBalanceVal').textContent = d.balance;
+        document.getElementById('stbBalance').style.display = 'flex';
+        document.getElementById('cabBooks').textContent = d.completed_books;
+        document.getElementById('cabPages').textContent = d.total_pages_read;
+        document.getElementById('cabAvg').textContent = d.avg_pages_per_day;
+
+        if (d.is_premium) {
+          document.getElementById('cabPrem').style.display = 'block';
+        }
+        if (d.quiz_correct_count !== null) {
+          document.getElementById('cabQuiz').textContent = d.quiz_correct_count;
+        } else {
+          document.getElementById('cabQuiz').textContent = '💎';
+          document.getElementById('cabQuizLabel').textContent = "Viktorina statistikasi — Premiumda ko'rinadi";
+        }
+
+        if (d.most_active_day || d.active_hour) {
+          document.getElementById('cabHabitsTitle').style.display = 'block';
+          document.getElementById('cabHabits').style.display = 'grid';
+          if (d.most_active_day) document.getElementById('cabDay').textContent = d.most_active_day;
+          if (d.active_hour) document.getElementById('cabHour').textContent = d.active_hour;
+        }
+
+        if (d.pct_ahead !== null && d.pct_behind !== null) {
+          document.getElementById('cabRankTitle').style.display = 'block';
+          document.getElementById('cabRankCard').style.display = 'block';
+          document.getElementById('cabRankBar').style.width = d.pct_ahead + '%';
+          document.getElementById('cabPctAhead').textContent = d.pct_ahead + '%';
+          document.getElementById('cabPctBehind').textContent = d.pct_behind + '%';
+          if (d.pages_to_overtake) {
+            const ov = document.getElementById('cabOvertake');
+            ov.style.display = 'block';
+            ov.textContent = `🎯 Yana ${d.pages_to_overtake} bet o'qisangiz, keyingi kitobxondan o'tib ketasiz!`;
+          }
+        }
+      })
+      .catch(() => {
+        loading.style.display = 'none';
+        empty.style.display = 'block';
+      });
+  }
+
+  // Shared tab-bar swipe + keyboard nav (identical to the other 3 pages).
+  const tabs = ['/', '/kutubxona/', '/shop/', '/kabinet/'];
+  const activeIdx = 3;
+
+  let sx = 0, sy = 0;
+  document.body.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+  }, { passive: true });
+  document.body.addEventListener('touchend', (e) => {
+    if (!sx) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dy = t.clientY - sy;
+    sx = 0;
+    if (Math.abs(dx) < 90 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const next = dx < 0 ? activeIdx + 1 : activeIdx - 1;
+    if (next >= 0 && next < tabs.length) window.location.href = tabs[next];
+  }, { passive: true });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    const next = e.key === 'ArrowLeft' ? activeIdx - 1 : activeIdx + 1;
+    if (next >= 0 && next < tabs.length) window.location.href = tabs[next];
+  });
+})();
+</script>
+</body>
+</html>

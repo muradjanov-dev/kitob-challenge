@@ -8,6 +8,7 @@ Add-book wizard:
 List view (paginated, 10 per page) with per-book edit/delete actions.
 Each field can be edited individually after the book is created.
 """
+import difflib
 import io
 import re
 
@@ -124,6 +125,21 @@ async def libadm_add_start(call: types.CallbackQuery, state: FSMContext):
     )
 
 
+@sync_to_async
+def _find_similar_titles(title: str, limit: int = 5, threshold: float = 0.55) -> list[str]:
+    """Fuzzy (non-strict, case-insensitive) nearest-title lookup so admins get
+    warned about likely duplicates like the ~150 that had piled up in the
+    catalog under slightly different spellings before a big cleanup pass."""
+    norm_new = title.strip().lower()
+    ranked = []
+    for existing in GlobalBook.objects.values_list("title", flat=True):
+        ratio = difflib.SequenceMatcher(None, norm_new, existing.strip().lower()).ratio()
+        if ratio >= threshold:
+            ranked.append((ratio, existing))
+    ranked.sort(key=lambda x: -x[0])
+    return [t for _, t in ranked[:limit]]
+
+
 @dp.message_handler(state=LibraryBookCreateState.title, content_types=types.ContentTypes.TEXT)
 async def libadm_get_title(message: types.Message, state: FSMContext):
     title = (message.text or "").strip()
@@ -140,6 +156,16 @@ async def libadm_get_title(message: types.Message, state: FSMContext):
             parse_mode="HTML",
         )
         return
+
+    similar = await _find_similar_titles(title)
+    if similar:
+        lines = "\n".join(f"• {_esc(t)}" for t in similar)
+        await message.answer(
+            f"🔎 <b>E'tibor bering</b> — kutubxonada shunga o'xshash nomlar bor:\n\n{lines}\n\n"
+            "Agar bu chindan boshqa kitob bo'lsa, xotirjam davom eting — bu shunchaki eslatma.",
+            parse_mode="HTML",
+        )
+
     await state.update_data(title=title)
     await LibraryBookCreateState.author.set()
     await message.answer(

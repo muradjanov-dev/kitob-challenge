@@ -1817,7 +1817,7 @@ def _send_and_pin_progress(user) -> int:
     text = _progress_bar_text(pages)
 
     buttons = [[{
-        "text": "✨ Sayt",
+        "text": "🌌 Parallel olam",
         "web_app": {"url": f"{_settings.WEB_DOMAIN}/"},
     }]]
 
