@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"></script>
   <style>
     :root {
       --bg:       #f5ead8;
@@ -423,7 +424,40 @@
       cursor: pointer; transition: background .15s; white-space: nowrap; font-family: var(--fb);
     }
     .pdf-hd-close:hover { background: rgba(255,255,255,.22); }
-    #pdfFrame { flex: 1; border: none; }
+
+    /* PDF.js paginated canvas reader */
+    #pdfCanvasWrap {
+      flex: 1; overflow: auto; display: flex; align-items: flex-start;
+      justify-content: center; background: #1a1a1a; padding: 14px 0 90px;
+      -webkit-overflow-scrolling: touch;
+    }
+    #pdfCanvas { box-shadow: 0 4px 22px rgba(0,0,0,.5); background: #fff; max-width: 96vw; height: auto; }
+    #pdfLoading {
+      position: absolute; inset: 0; top: 45px; display: flex; align-items: center;
+      justify-content: center; color: rgba(255,255,255,.6); font-size: 13px; font-family: var(--fb);
+      pointer-events: none;
+    }
+    #pdfLoading.hidden { display: none; }
+    .pdf-nav {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 301;
+      display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom));
+      background: var(--wood-dk); border-top: 1px solid rgba(255,255,255,.1);
+    }
+    .pdf-nav-btn {
+      background: rgba(255,255,255,.14); border: none; border-radius: 9px;
+      color: var(--bg); width: 42px; height: 38px; font-size: 17px; font-weight: 700;
+      cursor: pointer; transition: background .15s, opacity .15s; flex-shrink: 0;
+    }
+    .pdf-nav-btn:hover:not(:disabled) { background: rgba(255,255,255,.24); }
+    .pdf-nav-btn:disabled { opacity: .35; cursor: default; }
+    .pdf-nav-mid { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+    .pdf-nav-page {
+      font-size: 12px; font-weight: 700; color: var(--bg); text-align: center;
+      font-family: var(--fb); font-variant-numeric: tabular-nums;
+    }
+    .pdf-nav-bar { height: 4px; border-radius: 2px; background: rgba(255,255,255,.15); overflow: hidden; }
+    .pdf-nav-bar-fill { height: 100%; background: var(--accent); width: 0%; transition: width .2s; }
 
     /* Audio player */
     .audio-wrap { margin-top: 8px; padding: 12px; background: rgba(122,138,94,.08); border: 1.5px solid rgba(122,138,94,.22); border-radius: 12px; }
@@ -741,7 +775,18 @@
     <button class="pdf-hd-close" id="pdfClose">✕ Yopish</button>
     <div class="pdf-hd-title" id="pdfTitle"></div>
   </div>
-  <iframe id="pdfFrame" title="PDF o'quvchi"></iframe>
+  <div id="pdfCanvasWrap">
+    <canvas id="pdfCanvas"></canvas>
+    <div id="pdfLoading">Yuklanmoqda…</div>
+  </div>
+  <div class="pdf-nav">
+    <button class="pdf-nav-btn" id="pdfPrev">‹</button>
+    <div class="pdf-nav-mid">
+      <div class="pdf-nav-page" id="pdfPageLabel">– / –</div>
+      <div class="pdf-nav-bar"><div class="pdf-nav-bar-fill" id="pdfProgressFill"></div></div>
+    </div>
+    <button class="pdf-nav-btn" id="pdfNext">›</button>
+  </div>
 </div>
 
 <!-- ═══════════════ SEARCH OVERLAY ═══════════════ -->
@@ -952,20 +997,126 @@ let _currentBookId = null;
 let _currentPdfUrl   = null;
 let _currentAudioUrl = null;
 
-// ── PDF Reader ───────────────────────────────────────────────────
+// ── PDF Reader (pdf.js, page-by-page, progress synced per user) ───
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js';
+}
+
+const pdfCanvas   = document.getElementById('pdfCanvas');
+const pdfCtx      = pdfCanvas.getContext('2d');
+const pdfLoading  = document.getElementById('pdfLoading');
+const pdfPageLbl  = document.getElementById('pdfPageLabel');
+const pdfFill     = document.getElementById('pdfProgressFill');
+const pdfPrevBtn  = document.getElementById('pdfPrev');
+const pdfNextBtn  = document.getElementById('pdfNext');
+
+let _pdfDoc = null, _pdfPage = 1, _pdfNumPages = 0;
+let _pdfRendering = false, _pdfPendingPage = null;
+let _pdfSaveTimer = null;
+
+function _pdfSetLabel() {
+  pdfPageLbl.textContent = _pdfNumPages ? `${_pdfPage} / ${_pdfNumPages}` : '– / –';
+  pdfFill.style.width = _pdfNumPages ? `${Math.round(_pdfPage / _pdfNumPages * 100)}%` : '0%';
+  pdfPrevBtn.disabled = _pdfPage <= 1;
+  pdfNextBtn.disabled = !_pdfNumPages || _pdfPage >= _pdfNumPages;
+}
+
+function _pdfRenderPage(num) {
+  if (!_pdfDoc) return;
+  _pdfRendering = true;
+  pdfLoading.classList.remove('hidden');
+  _pdfDoc.getPage(num).then(page => {
+    const wrapW = document.getElementById('pdfCanvasWrap').clientWidth - 24;
+    const baseViewport = page.getViewport({ scale: 1 });
+    const scale = Math.min(2.2, Math.max(0.5, wrapW / baseViewport.width));
+    const viewport = page.getViewport({ scale });
+    pdfCanvas.width = viewport.width;
+    pdfCanvas.height = viewport.height;
+    const task = page.render({ canvasContext: pdfCtx, viewport });
+    task.promise.then(() => {
+      _pdfRendering = false;
+      pdfLoading.classList.add('hidden');
+      if (_pdfPendingPage !== null) {
+        const next = _pdfPendingPage;
+        _pdfPendingPage = null;
+        _pdfRenderPage(next);
+      }
+    });
+  });
+  _pdfPage = num;
+  _pdfSetLabel();
+  document.getElementById('pdfCanvasWrap').scrollTop = 0;
+  _pdfQueueSave();
+}
+
+function _pdfQueueRender(num) {
+  if (num < 1 || (_pdfNumPages && num > _pdfNumPages)) return;
+  if (_pdfRendering) { _pdfPendingPage = num; return; }
+  _pdfRenderPage(num);
+}
+
+function _pdfQueueSave() {
+  if (!_initData || !_currentBookId) return;
+  clearTimeout(_pdfSaveTimer);
+  _pdfSaveTimer = setTimeout(() => {
+    fetch('/kutubxona/api/progress/save/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        initData: _initData,
+        book_id: _currentBookId,
+        current_page: _pdfPage,
+        total_pages: _pdfNumPages,
+      }),
+    }).catch(() => {});
+  }, 500);
+}
+
 function openPdfReader() {
-  if (!_currentPdfUrl) return;
+  if (!_currentPdfUrl || !window.pdfjsLib) return;
   document.getElementById('pdfTitle').textContent = detailTitle.textContent;
-  document.getElementById('pdfFrame').src = _currentPdfUrl;
   document.getElementById('pdfReader').classList.add('open');
   document.body.style.overflow = 'hidden';
+
+  _pdfDoc = null; _pdfPage = 1; _pdfNumPages = 0;
+  _pdfSetLabel();
+  pdfLoading.classList.remove('hidden');
+
+  const bookId = _currentBookId;
+  const restore = _initData
+    ? fetch(`/kutubxona/api/progress/?book_id=${bookId}&initData=${encodeURIComponent(_initData)}`)
+        .then(r => r.json()).catch(() => ({}))
+    : Promise.resolve({});
+
+  Promise.all([pdfjsLib.getDocument(_currentPdfUrl).promise, restore]).then(([doc, progress]) => {
+    _pdfDoc = doc;
+    _pdfNumPages = doc.numPages;
+    const saved = progress && progress.current_page > 0 && progress.current_page <= _pdfNumPages
+      ? progress.current_page : 1;
+    _pdfQueueRender(saved);
+  }).catch(() => {
+    pdfLoading.textContent = 'PDF ochilmadi';
+  });
 }
+
 function closePdfReader() {
   document.getElementById('pdfReader').classList.remove('open');
-  document.getElementById('pdfFrame').src = '';
   document.body.style.overflow = '';
+  clearTimeout(_pdfSaveTimer);
+  _pdfDoc = null;
+  pdfCtx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
+  pdfLoading.textContent = 'Yuklanmoqda…';
 }
 document.getElementById('pdfClose').addEventListener('click', closePdfReader);
+pdfPrevBtn.addEventListener('click', () => _pdfQueueRender(_pdfPage - 1));
+pdfNextBtn.addEventListener('click', () => _pdfQueueRender(_pdfPage + 1));
+document.addEventListener('keydown', (e) => {
+  if (!document.getElementById('pdfReader').classList.contains('open')) return;
+  if (e.key === 'ArrowLeft') _pdfQueueRender(_pdfPage - 1);
+  if (e.key === 'ArrowRight') _pdfQueueRender(_pdfPage + 1);
+  if (e.key === 'Escape') closePdfReader();
+});
 
 // ── Audio Player ─────────────────────────────────────────────────
 function toggleAudio() {

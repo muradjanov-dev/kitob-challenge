@@ -130,6 +130,8 @@ def library_view(request: HttpRequest):
 
     books_qs = (
         GlobalBook.objects
+        .exclude(pdf_file='')
+        .exclude(pdf_file__isnull=True)
         .annotate(
             readers_count=Count(
                 'user_books',
@@ -188,7 +190,7 @@ def library_view(request: HttpRequest):
         'books': all_books,
         'shelves': shelves,
         'books_json': books_json,
-        'total_books': GlobalBook.objects.count(),
+        'total_books': len(all_books),
         'total_readers': total_readers,
         'total_finished': total_finished,
         'query': request.GET.get('q', ''),

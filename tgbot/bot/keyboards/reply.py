@@ -180,52 +180,38 @@ back_keyboard = ReplyKeyboardMarkup(
 admin_keyboard = InlineKeyboardMarkup(row_width=2)
 admin_keyboard.row(
     InlineKeyboardButton(text="👨‍👩‍👦‍👦 Foydalanuvchilar ro'yxati", callback_data="admin:all_users"),
-)
-admin_keyboard.row(
     InlineKeyboardButton(text="🔍 Foydalanuvchi qidirish", callback_data="admin:user_search"),
 )
 admin_keyboard.row(
     InlineKeyboardButton(text="📊 Statistikani ko'rish", callback_data="admin:stats"),
-)
-admin_keyboard.row(
     InlineKeyboardButton(text="✉️ Habar yuborish", callback_data="admin:notify"),
+)
+admin_keyboard.row(
     InlineKeyboardButton(text="📋 Eslatmalar", callback_data="admin:reminders"),
-)
-admin_keyboard.row(
     InlineKeyboardButton(text="📊 So'rovnoma", callback_data="admin:poll_new"),
-    InlineKeyboardButton(text="📊 So'rovnoma natijalari", callback_data="admin:poll_results"),
 )
 admin_keyboard.row(
+    InlineKeyboardButton(text="📊 So'rovnoma natijalari", callback_data="admin:poll_results"),
     InlineKeyboardButton(text="📊 Loyiha so'rovnomasi (500 🪙)", callback_data="admin:project_survey"),
 )
 admin_keyboard.row(
     InlineKeyboardButton(text="🏆 Top kitobxonlar (broadcast)", callback_data="admin:top_readers"),
-)
-admin_keyboard.row(
     InlineKeyboardButton(text="🏅 Kitobxon nominatsiyalari", callback_data="admin:reader_titles"),
 )
 admin_keyboard.row(
     InlineKeyboardButton(text="🎁 Sovg'a: 24h Premium (hammaga)", callback_data="admin:founder_gift"),
-)
-admin_keyboard.row(
     InlineKeyboardButton(text="🪙 Kitobcha reytingi", callback_data="admin:kitobcha_top"),
 )
 admin_keyboard.row(
     InlineKeyboardButton(text="📝 Quizlar", callback_data="admin:quizzes"),
-)
-admin_keyboard.row(
     InlineKeyboardButton(text="🧩 Viktorina yuborish", callback_data="admin:book_quiz"),
 )
 admin_keyboard.row(
     InlineKeyboardButton(text="🎮 Barcha o'yinlar (14 ta)", callback_data="admin:games_menu"),
-)
-admin_keyboard.row(
     InlineKeyboardButton(text="🧪 O'yinlarni jimgina sinash", callback_data="admin:games_test_menu"),
 )
 admin_keyboard.row(
     InlineKeyboardButton(text="🛒 Do'kon boshqaruvi", callback_data="admin:shop"),
-)
-admin_keyboard.row(
     InlineKeyboardButton(text="📚 Kutubxona boshqaruvi", callback_data="admin:library"),
 )
 

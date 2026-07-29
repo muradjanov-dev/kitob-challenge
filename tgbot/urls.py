@@ -3,7 +3,10 @@ from .views import home, telegram, library_view
 from src.settings import WEBHOOK_PATH
 from tgbot.views import health_check_celery, health_check_redis
 from tgbot.shop_views import shop_index, api_products, api_me, api_buy
-from tgbot.library_views import api_comments, api_add_comment, api_delete_comment, api_my_books, api_recent_comments
+from tgbot.library_views import (
+    api_comments, api_add_comment, api_delete_comment, api_my_books, api_recent_comments,
+    api_get_progress, api_save_progress,
+)
 from tgbot.game_views import (
     chain_index, api_chain_state, api_chain_submit,
     feud_index, api_feud_state, api_feud_submit,
@@ -24,6 +27,8 @@ urlpatterns = [
     path('kutubxona/api/comment/delete/', api_delete_comment, name='library-api-delete-comment'),
     path('kutubxona/api/my-books/', api_my_books, name='library-api-my-books'),
     path('kutubxona/api/comments/recent/', api_recent_comments, name='library-api-recent-comments'),
+    path('kutubxona/api/progress/', api_get_progress, name='library-api-get-progress'),
+    path('kutubxona/api/progress/save/', api_save_progress, name='library-api-save-progress'),
     path(WEBHOOK_PATH, telegram, name='webhook'),
     path("health-check/redis/", health_check_redis, name="health-check-redis"),
     path("health-check/celery/", health_check_celery, name="health-check-celery"),

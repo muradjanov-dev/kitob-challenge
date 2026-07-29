@@ -174,9 +174,78 @@ def api_my_books(request: HttpRequest):
     book_ids = list(
         BooksToRead.objects
         .filter(user=profile, total_pages__gt=0)
-        .values_list("book_id", flat=True)
+        .values_list("global_book_id", flat=True)
     )
     return JsonResponse({"book_ids": book_ids})
+
+
+# ── GET /kutubxona/api/progress/?book_id=N ────────────────────────────────
+
+@require_GET
+def api_get_progress(request: HttpRequest):
+    init_data = _read_init_data(request)
+    profile, err = _resolve_profile(init_data)
+    if err:
+        return JsonResponse({"error": err}, status=403)
+
+    book_id = request.GET.get("book_id")
+    if not book_id or not book_id.isdigit():
+        return JsonResponse({"error": "book_id required"}, status=400)
+
+    record = BooksToRead.objects.filter(user=profile, global_book_id=int(book_id)).first()
+    return JsonResponse({
+        "current_page": record.current_page if record else 0,
+        "total_pages": record.total_pages if record else 0,
+    })
+
+
+# ── POST /kutubxona/api/progress/ ─────────────────────────────────────────
+
+@csrf_exempt
+@require_POST
+def api_save_progress(request: HttpRequest):
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "invalid_json"}, status=400)
+
+    init_data = body.get("initData") or _read_init_data(request)
+    profile, err = _resolve_profile(init_data)
+    if err:
+        return JsonResponse({"error": err}, status=403)
+
+    book_id = body.get("book_id")
+    if not book_id:
+        return JsonResponse({"error": "book_id required"}, status=400)
+    try:
+        current_page = int(body.get("current_page"))
+        total_pages = int(body.get("total_pages"))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "invalid_pages"}, status=400)
+    if current_page < 0 or total_pages < 0:
+        return JsonResponse({"error": "invalid_pages"}, status=400)
+
+    book = GlobalBook.objects.filter(id=book_id).first()
+    if not book:
+        return JsonResponse({"error": "not_found"}, status=404)
+
+    # No unique_together on (user, global_book) historically, so a couple of
+    # accounts may already carry more than one row for the same book -- take
+    # the first instead of update_or_create() to avoid MultipleObjectsReturned.
+    record = BooksToRead.objects.filter(user=profile, global_book=book).first()
+    if record:
+        record.title = book.title
+        record.is_audio = False
+        record.current_page = current_page
+        record.total_pages = total_pages
+        record.save(update_fields=["title", "is_audio", "current_page", "total_pages", "updated_at"])
+    else:
+        record = BooksToRead.objects.create(
+            user=profile, global_book=book, title=book.title,
+            is_audio=False, current_page=current_page, total_pages=total_pages,
+        )
+
+    return JsonResponse({"ok": True, "current_page": record.current_page, "total_pages": record.total_pages})
 
 
 # ── GET /kutubxona/api/comments/recent/ ───────────────────────────────────────
