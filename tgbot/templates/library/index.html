@@ -461,8 +461,9 @@
     .mag-toggle-btn.active { background: var(--accent); color: #1a1208; }
 
     /* Reading (magnifier) mode: a fixed 16:9 window into a highly zoomed
-       page, panned vertically via drag or the ▲▼ buttons -- comfortable,
-       single-axis reading instead of free pinch-zoom + 2-way scroll. */
+       page, panned via drag (both axes) or the ▲▼ buttons for vertical --
+       comfortable reading at high zoom without free pinch-zoom's fiddliness,
+       while still reaching every part of the page (nothing stays cropped). */
     .mag-controls {
       display: none; align-items: center; justify-content: space-between; gap: 10px;
       padding: 8px 16px; background: var(--wood-dk); border-bottom: 1px solid rgba(255,255,255,.1);
@@ -1256,7 +1257,7 @@ function _pdfRenderPage(num, dir) {
       _pdfRendering = false;
       pdfLoading.classList.add('hidden');
       if (_magMode) {
-        _magPanY = 0; // new page always starts at the top
+        _magPanY = 0; _magPanX = 0; // new page always starts at the top, centered
         _magApplyPan();
       } else if (dir) {
         _pdfPlayFlip(dir);
@@ -1323,9 +1324,9 @@ function _pdfSetZoom(z) {
 pdfZoomIn.addEventListener('click', () => _pdfSetZoom(_pdfZoom + 0.2));
 pdfZoomOut.addEventListener('click', () => _pdfSetZoom(_pdfZoom - 0.2));
 
-// ── Reading (magnifier) mode: fixed 16:9 window, big preset zoom, vertical
-// pan only -- built because free pinch-zoom + 2-axis scroll on a tall
-// portrait page was awkward to read comfortably at high zoom. ──────────────
+// ── Reading (magnifier) mode: fixed 16:9 window, big preset zoom, drag to
+// pan (vertical is primary, via drag or ▲▼; horizontal drag also works so
+// wide pages at high zoom never leave text stuck off-screen). ─────────────
 const magToggle   = document.getElementById('magToggle');
 const magControls = document.getElementById('magControls');
 const magUpBtn    = document.getElementById('magUp');
@@ -1334,14 +1335,20 @@ const magPresetBtns = document.querySelectorAll('.mag-preset-btn');
 
 let _magMode = false;
 let _magZoomPreset = 2;
-let _magPanY = 0;
+let _magPanY = 0, _magPanX = 0;
 
 function _magApplyPan() {
-  const maxPan = Math.max(0, pdfCanvas.height - pdfWrap.clientHeight);
-  _magPanY = Math.min(maxPan, Math.max(0, _magPanY));
-  pdfCanvas.style.transform = `translate(-50%, ${-_magPanY}px)`;
+  const maxPanY = Math.max(0, pdfCanvas.height - pdfWrap.clientHeight);
+  // Canvas is horizontally centered at baseline (left:50% + translateX(-50%)),
+  // so it overflows the window equally on both sides -- pan range is half
+  // that overflow in each direction so every part of the width is reachable
+  // (nothing permanently cropped, unlike the centered-only version before).
+  const maxPanX = Math.max(0, pdfCanvas.width - pdfWrap.clientWidth) / 2;
+  _magPanY = Math.min(maxPanY, Math.max(0, _magPanY));
+  _magPanX = Math.min(maxPanX, Math.max(-maxPanX, _magPanX));
+  pdfCanvas.style.transform = `translate(calc(-50% + ${_magPanX}px), ${-_magPanY}px)`;
   magUpBtn.disabled = _magPanY <= 0;
-  magDownBtn.disabled = _magPanY >= maxPan;
+  magDownBtn.disabled = _magPanY >= maxPanY;
 }
 
 function _magSetPreset(z) {
@@ -1360,6 +1367,7 @@ function _magToggle() {
   pdfWrap.classList.toggle('mag-mode', _magMode);
   pdfCanvas.style.transform = '';
   _magPanY = 0;
+  _magPanX = 0;
   if (_magMode) _magSetPreset(_magZoomPreset);
   else if (_pdfDoc) _pdfQueueRender(_pdfPage, 0);
 }
@@ -1369,21 +1377,28 @@ const MAG_NUDGE = 140; // px per ▲▼ tap
 magUpBtn.addEventListener('click', () => { _magPanY -= MAG_NUDGE; _magApplyPan(); });
 magDownBtn.addEventListener('click', () => { _magPanY += MAG_NUDGE; _magApplyPan(); });
 
-// Drag (touch or mouse) to pan vertically while in reading mode.
-let _magDragY = null, _magDragStartPan = 0;
+// Drag (touch or mouse) to pan while in reading mode -- both axes, so a
+// wider-than-window zoomed page never leaves text permanently cropped off
+// to the sides; only vertical has dedicated ▲▼ buttons since that's the
+// primary reading direction, but horizontal drag always works too.
+let _magDragX = null, _magDragY = null, _magDragStartPanX = 0, _magDragStartPanY = 0;
 pdfWrap.addEventListener('pointerdown', (e) => {
   if (!_magMode) return;
+  _magDragX = e.clientX;
   _magDragY = e.clientY;
-  _magDragStartPan = _magPanY;
+  _magDragStartPanX = _magPanX;
+  _magDragStartPanY = _magPanY;
   try { pdfWrap.setPointerCapture(e.pointerId); } catch (err) {}
 });
 pdfWrap.addEventListener('pointermove', (e) => {
   if (!_magMode || _magDragY === null) return;
-  _magPanY = _magDragStartPan - (e.clientY - _magDragY);
+  _magPanX = _magDragStartPanX + (e.clientX - _magDragX);
+  _magPanY = _magDragStartPanY - (e.clientY - _magDragY);
   _magApplyPan();
 });
 function _magEndDrag() {
   if (_magDragY === null) return;
+  _magDragX = null;
   _magDragY = null;
   _pdfPing();
 }
