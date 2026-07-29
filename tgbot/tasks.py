@@ -5552,7 +5552,10 @@ def games_finalize_tick():
             for i, w in enumerate(winners[:5]):
                 m = medals[i] if i < 3 else f"{i + 1}."
                 rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
-                lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{rew}")
+                # Flag Premium's 2x boost so e.g. a Premium 2nd place earning
+                # more Kitobcha than a non-Premium 1st doesn't read as a bug.
+                badge = " 💎" if w.get("boosted") else ""
+                lines.append(f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko{rew}")
             lines.append("\n🎁 Qatnashgan hammaga <b>+30 🪙</b>!")
         else:
             lines.append("Bu safar hech kim qatnashmadi 😔")
@@ -5587,7 +5590,8 @@ def games_finalize_tick():
                  f"\n⚔️ Qatnashchilar: <b>{summary.get('players', 0)}</b> · "
                  f"Hissa qo'shganlar: <b>{summary.get('contributors', 0)}</b>"]
         for i, w in enumerate(winners[:5]):
-            lines.append(f"{i + 1}. {escape(w['name'])} — {w['correct']} ✓ (+{w['reward']} 🪙)")
+            badge = " 💎" if w.get("boosted") else ""
+            lines.append(f"{i + 1}. {escape(w['name'])}{badge} — {w['correct']} ✓ (+{w['reward']} 🪙)")
         text = "\n".join(lines)
         for gid, tid in _game_targets():
             try:
@@ -5618,7 +5622,8 @@ def games_finalize_tick():
             for i, w in enumerate(winners[:5]):
                 m = medals[i] if i < 3 else f"{i + 1}."
                 rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
-                lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{rew}")
+                badge = " 💎" if w.get("boosted") else ""
+                lines.append(f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko{rew}")
         else:
             lines.append("Bu safar hech kim ochko olmadi 😔")
         text = "\n".join(lines)

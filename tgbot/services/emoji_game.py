@@ -166,6 +166,7 @@ def finalize(game_id: int) -> dict | None:
         winners.append({
             "rank": i + 1, "user_id": s.user_id, "telegram_id": s.user.telegram_id,
             "name": s.user.full_name or "Kitobxon", "points": s.points, "reward": applied,
+            "boosted": applied != reward,
         })
     g.rewarded = True
     g.save(update_fields=["rewarded", "updated_at"])
