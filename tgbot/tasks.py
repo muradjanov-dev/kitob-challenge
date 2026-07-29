@@ -1165,12 +1165,18 @@ def _group_chat_ids():
 
 
 def _category_targets(boys_thread_id, girls_thread_id):
-    """(chat_id, thread_id) pairs for the boys + girls groups for one forum-topic
-    category (announcements/games/leaderboard). `GENERAL_GROUP_ID` is the same
-    chat as the girls group (see its definition above), so there's no separate
-    "general" target here — just these two. A None thread_id falls back to
-    the group's default topic, same as before this routing existed."""
+    """(chat_id, thread_id) pairs for one forum-topic category (announcements/
+    games/leaderboard): the boys + girls groups, plus any group where the bot
+    has been made admin (auto-registered via my_chat_member — see
+    tgbot/bot/handlers/groups/auto_register.py and the BroadcastGroup model).
+    `GENERAL_GROUP_ID` is the same chat as the girls group (see its definition
+    above), so there's no separate "general" target here — just these two
+    fixed slots. A None thread_id falls back to the group's default topic;
+    auto-registered groups always get None since we don't know their topic
+    layout."""
     import os as _os
+    from tgbot.models import BroadcastGroup
+
     out = []
     boys = _os.environ.get("BOYS_GROUP_ID", "").strip()
     if boys:
@@ -1178,6 +1184,14 @@ def _category_targets(boys_thread_id, girls_thread_id):
     girls = _os.environ.get("GIRLS_GROUP_ID", "").strip()
     if girls:
         out.append((girls, girls_thread_id))
+
+    known = {boys, girls}
+    extra = (
+        BroadcastGroup.objects.filter(is_active=True)
+        .exclude(chat_id__in=known)
+        .values_list("chat_id", flat=True)
+    )
+    out.extend((chat_id, None) for chat_id in extra)
     return out
 
 

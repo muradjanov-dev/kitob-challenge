@@ -333,6 +333,32 @@ class RequiredGroup(BaseModel):
         db_table = "required_groups"
 
 
+class BroadcastGroup(BaseModel):
+    """Any group where the bot has been made an admin — auto-registered by
+    the my_chat_member handler (see tgbot/bot/handlers/groups/auto_register.py),
+    no manual chat_id wiring needed. Quiz/games/leaderboard/announcement
+    broadcasts (tasks.py _category_targets) post here in addition to the
+    env-configured BOYS_GROUP_ID/GIRLS_GROUP_ID, always to the group's main
+    feed (no forum-topic routing, since we don't know a new group's topic
+    layout). Deliberately separate from the legacy `Group` model, which is
+    unrelated (an old, currently-empty user-facing "pick your group" list —
+    see migration 0046_delete_groups_data) and must not be reused here."""
+    chat_id = models.CharField(max_length=255, unique=True, db_index=True)
+    title = models.CharField(max_length=255, blank=True, default="")
+    is_active = models.BooleanField(
+        default=True,
+        help_text="False once the bot loses admin rights or is removed — stops broadcasts without deleting history.",
+    )
+
+    def __str__(self):
+        return f"{self.title or self.chat_id} ({'active' if self.is_active else 'inactive'})"
+
+    class Meta:
+        verbose_name = _("Broadcast Group")
+        verbose_name_plural = _("Broadcast Groups")
+        db_table = "broadcast_groups"
+
+
 class TelegramButton(BaseModel):
     bot = models.ForeignKey(
         TelegramBot,
