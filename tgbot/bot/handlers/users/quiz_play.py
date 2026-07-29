@@ -6,7 +6,8 @@ import random
 
 from aiogram import types
 from aiogram.dispatcher import FSMContext
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.dispatcher.filters.builtin import ChatTypeFilter
+from aiogram.types import ChatType, InlineKeyboardMarkup, InlineKeyboardButton
 from asgiref.sync import sync_to_async
 from django.db.models import F
 
@@ -920,3 +921,61 @@ async def _finish_group_session(session_id: int, chat_id: int):
         parse_mode="HTML",
         disable_web_page_preview=True,
     )
+
+
+# ─── /stop — creator or admin only ─────────────────────────────────────────────
+
+@dp.message_handler(ChatTypeFilter((ChatType.GROUP, ChatType.SUPERGROUP)), commands=["stop"], state="*")
+async def stop_group_quiz(message: types.Message, state: FSMContext = None):
+    """Ends the group's current waiting/active quiz session early. Restricted
+    to the session's creator or a bot admin — same permission check as
+    group_start's 'Boshlash' button — so random group members can't cut off
+    someone else's quiz."""
+    user = await aget_user(message.from_user.id)
+    if not user:
+        return
+
+    @sync_to_async
+    def _find_and_stop():
+        session = (
+            QuizSession.objects.select_related("quiz")
+            .filter(chat_id=message.chat.id, is_group=True)
+            .exclude(status="finished")
+            .order_by("-created_at")
+            .first()
+        )
+        if not session:
+            return None, None, [], 0
+        if session.creator_id != user.id and not getattr(user, "is_admin", False):
+            return session, "forbidden", [], 0
+
+        was_active = session.status == "active"
+        participants = list(
+            QuizParticipant.objects.filter(session_id=session.id)
+            .select_related("user").order_by("-score", "joined_at")
+        ) if was_active else []
+        total = len(json.loads(session.question_order))
+        QuizSession.objects.filter(id=session.id).update(status="finished")
+        return session, "stopped", participants, total
+
+    session, outcome, participants, total = await _find_and_stop()
+    if session is None:
+        await message.answer("🔍 Bu guruhda faol quiz topilmadi.")
+        return
+    if outcome == "forbidden":
+        await message.answer("⛔ Faqat quizni boshlagan odam yoki admin uni to'xtata oladi.")
+        return
+
+    _cancel_timer(session.id)
+
+    if not participants:
+        await message.answer(f"🛑 <b>{session.quiz.title}</b> to'xtatildi.", parse_mode="HTML")
+        return
+
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    lines = [f"🛑 <b>{session.quiz.title}</b> to'xtatildi.", "", "📊 Shu paytgacha natijalar:", ""]
+    for i, p in enumerate(participants, 1):
+        marker = medals.get(i, f"<code>{i:>2}.</code>")
+        name = p.user.full_name or "Kitobxon"
+        lines.append(f"{marker} <b>{name}</b> — {p.score}/{total}")
+    await message.answer("\n".join(lines), parse_mode="HTML")
