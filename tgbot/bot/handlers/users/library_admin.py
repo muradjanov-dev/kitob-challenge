@@ -158,13 +158,23 @@ async def libadm_get_title(message: types.Message, state: FSMContext):
     if len(title) > 255:
         await message.answer("Nom 255 belgidan oshmasligi kerak. Qaytadan.")
         return
-    exists = await sync_to_async(GlobalBook.objects.filter(title__iexact=title).exists)()
-    if exists:
+    existing = await sync_to_async(GlobalBook.objects.filter(title__iexact=title).first)()
+    if existing:
+        has_content = bool(existing.pdf_file)
+        if has_content:
+            await message.answer(
+                f"⚠️ <b>{_esc(title)}</b> nomli kitob allaqachon mavjud.\n\nBoshqa nom kiriting yoki /bekor.",
+                parse_mode="HTML",
+            )
+            return
+        # Bulk-imported placeholder row (title only, no file) -- reuse it
+        # instead of blocking or creating a second row for the same title.
+        await state.update_data(reuse_book_id=existing.id)
         await message.answer(
-            f"⚠️ <b>{_esc(title)}</b> nomli kitob allaqachon mavjud.\n\nBoshqa nom kiriting yoki /bekor.",
+            f"ℹ️ <b>{_esc(title)}</b> nomi kutubxonada allaqachon bor edi, lekin faylsiz "
+            "(bo'sh yozuv). Endi shu yozuvga ma'lumot va fayl qo'shiladi — davom eting.",
             parse_mode="HTML",
         )
-        return
 
     similar = await _find_similar_titles(title)
     if similar:
@@ -428,7 +438,17 @@ async def libadm_cancel_add(call: types.CallbackQuery, state: FSMContext):
 
 
 @sync_to_async
-def _create_book_sync(title, author, description, language, is_premium_only):
+def _create_book_sync(title, author, description, language, is_premium_only, reuse_book_id=None):
+    if reuse_book_id:
+        book = GlobalBook.objects.filter(id=reuse_book_id).first()
+        if book:
+            book.title = title
+            book.author = author or ""
+            book.description = description or ""
+            book.language = language or "uz"
+            book.is_premium_only = is_premium_only
+            book.save()
+            return book
     return GlobalBook.objects.create(
         title=title,
         author=author or "",
@@ -466,7 +486,8 @@ async def libadm_save(call: types.CallbackQuery, state: FSMContext):
         return
 
     await call.answer("Saqlanmoqda…")
-    book = await _create_book_sync(title, author, description, language, is_premium_only)
+    reuse_book_id = data.get("reuse_book_id")
+    book = await _create_book_sync(title, author, description, language, is_premium_only, reuse_book_id)
     ts = int(timezone.now().timestamp())
 
     if cover_file_id:
