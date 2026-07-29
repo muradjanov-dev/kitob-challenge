@@ -182,12 +182,26 @@ def api_my_books(request: HttpRequest):
     if err:
         return JsonResponse({"error": err}, status=403)
 
-    book_ids = list(
+    started = list(
         BooksToRead.objects
-        .filter(user=profile, total_pages__gt=0)
-        .values_list("global_book_id", flat=True)
+        .filter(user=profile, total_pages__gt=0, global_book_id__isnull=False)
+        .values("global_book_id", "current_page", "total_pages")
+        .order_by("-updated_at")
     )
-    return JsonResponse({"book_ids": book_ids})
+    book_ids = [r["global_book_id"] for r in started]
+    # In progress = has a real page position, hasn't reached the end --
+    # feeds the "davom eting" continue-reading carousel on the shelf page.
+    in_progress = [
+        {
+            "id": r["global_book_id"],
+            "current_page": r["current_page"],
+            "total_pages": r["total_pages"],
+            "pct": round(r["current_page"] * 100 / r["total_pages"]),
+        }
+        for r in started
+        if 0 < r["current_page"] < r["total_pages"]
+    ]
+    return JsonResponse({"book_ids": book_ids, "in_progress": in_progress})
 
 
 def _get_reading_record(profile, book):
