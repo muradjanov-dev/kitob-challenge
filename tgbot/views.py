@@ -133,21 +133,25 @@ def library_view(request: HttpRequest):
         .exclude(pdf_file='')
         .exclude(pdf_file__isnull=True)
         .annotate(
-            # "Started" = anyone with a reading record for this book, any
-            # progress at all (self-report or the web reader).
+            # "Started"/"finished" must only reflect real web-reader activity
+            # (fee_charged=True -- i.e. actually opened via kutubxona/'s PDF
+            # reader), never the bot's free-text self-report flow. That flow
+            # resolves book titles by fuzzy/normalized match against this same
+            # GlobalBook table, so a brand-new upload can inherit years of
+            # unrelated BooksToRead rows (arbitrary total_pages a user typed
+            # in, long since "finished" by honor-system standards) that have
+            # nothing to do with this actual PDF's real page count.
             started_count=Count(
                 'user_books',
-                filter=Q(user_books__total_pages__gt=0),
+                filter=Q(user_books__total_pages__gt=0, user_books__fee_charged=True),
                 distinct=True,
             ),
-            # "Finished" = actually reached the last page -- was previously
-            # (and wrongly) just current_page>=1, which counted anyone who'd
-            # read a single page as "finished".
             finished_count=Count(
                 'user_books',
                 filter=Q(
                     user_books__total_pages__gt=0,
                     user_books__current_page__gte=F('user_books__total_pages'),
+                    user_books__fee_charged=True,
                 ),
                 distinct=True,
             ),

@@ -883,7 +883,7 @@
       font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     .stb-tab {
-      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+      flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
       padding: 6px 4px; border-radius: 12px; text-decoration: none; color: rgba(255,255,255,.55);
       transition: color .18s ease, background .18s ease, transform .22s cubic-bezier(.34,1.56,.64,1);
       -webkit-tap-highlight-color: transparent;
@@ -891,7 +891,10 @@
     .stb-tab:active { transform: scale(.92); }
     .stb-tab.active { color: #e6b450; background: rgba(230,180,80,.14); }
     .stb-icon { font-size: 19px; line-height: 1; }
-    .stb-label { font-size: 9px; font-weight: 700; letter-spacing: .2px; white-space: nowrap; }
+    .stb-label {
+      font-size: 9px; font-weight: 700; letter-spacing: .2px; white-space: nowrap;
+      max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+    }
     .stb-balance {
       display: none; align-items: center; gap: 4px; padding: 7px 11px; flex-shrink: 0;
       background: rgba(230,180,80,.14); border: 1px solid rgba(230,180,80,.32); border-radius: 100px;

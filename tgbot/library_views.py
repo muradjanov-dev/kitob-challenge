@@ -286,6 +286,43 @@ def api_start_reading(request: HttpRequest):
 # ── GET /kutubxona/api/progress/?book_id=N ────────────────────────────────
 
 @require_GET
+def api_premium_access(request: HttpRequest):
+    """A premium-only book's pdf/audio URL is never sent in the public page
+    JSON (books_json in views.py doesn't know who's viewing). Premium/Extra-
+    Premium readers fetch the real file URL here instead, once initData
+    proves who they are."""
+    init_data = _read_init_data(request)
+    profile, err = _resolve_profile(init_data)
+    if err:
+        return JsonResponse({"ok": False, "error": err}, status=403)
+
+    book_id = request.GET.get("book_id")
+    if not book_id or not book_id.isdigit():
+        return JsonResponse({"ok": False, "error": "book_id required"}, status=400)
+
+    book = GlobalBook.objects.filter(id=book_id).first()
+    if not book:
+        return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+
+    if not book.is_premium_only:
+        # Not actually gated -- the public JSON already carries this one.
+        return JsonResponse({
+            "ok": True,
+            "pdf": book.pdf_file.url if book.pdf_file else None,
+            "audio": book.audio_file.url if book.audio_file else None,
+        })
+
+    if not profile.has_active_premium():
+        return JsonResponse({"ok": False, "error": "premium_required"}, status=403)
+
+    return JsonResponse({
+        "ok": True,
+        "pdf": book.pdf_file.url if book.pdf_file else None,
+        "audio": book.audio_file.url if book.audio_file else None,
+    })
+
+
+@require_GET
 def api_get_progress(request: HttpRequest):
     init_data = _read_init_data(request)
     profile, err = _resolve_profile(init_data)
