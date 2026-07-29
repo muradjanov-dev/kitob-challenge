@@ -419,6 +419,11 @@
     .da-audio { background: rgba(122,138,94,.1); color: var(--accent2); border-color: rgba(122,138,94,.28); }
     .da-lock  { background: rgba(198,113,57,.08); color: #a05a2e; border-color: rgba(198,113,57,.26); cursor: default; }
     .da-lock:hover  { transform: none; box-shadow: none; }
+    .da-note {
+      flex-basis: 100%; font-size: 11px; line-height: 1.4; color: var(--text-faint);
+      text-align: center; padding: 0 4px;
+    }
+    .da-note b { color: var(--accent); font-weight: 800; }
     .da-pdf:hover,.da-audio:hover { filter: brightness(1.12); }
 
     /* PDF Reader */
@@ -1300,7 +1305,7 @@ function openPdfReader() {
         alert("Kitobni ochib bo'lmadi. Birozdan so'ng qayta urinib ko'ring.");
         return;
       }
-      if (data.charged) _pdfToast(`📖 O'qish boshlandi — ${BOOK_START_FEE} kitobcha yechildi`);
+      if (data.charged) _pdfToast(`📖 O'qish boshlandi — mas'uliyat uchun ${BOOK_START_FEE} kitobcha yechildi`);
       _pdfOpenDoc(data.current_page || 1);
     })
     .catch(() => alert("Internetga ulanishda muammo. Qayta urinib ko'ring."));
@@ -1376,6 +1381,9 @@ function openDetail(id) {
     } else {
       if (b.pdf)   actions += `<button class="da-btn da-pdf"   onclick="openPdfReader()">📖 Kitobni o'qish</button>`;
       if (b.audio) actions += `<button class="da-btn da-audio" onclick="toggleAudio()">🎧 Audio tinglash</button>`;
+      if (b.pdf) {
+        actions += `<div class="da-note">🪙 Mas'uliyat uchun bir martalik <b>${BOOK_START_FEE} Kitobcha</b> yechiladi — har o'qilgan bet uchun qaytariladi</div>`;
+      }
     }
   }
   detailActions.innerHTML = actions;
