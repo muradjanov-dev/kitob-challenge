@@ -699,7 +699,11 @@ async def _menu_achievements(call, user, state: FSMContext):
         if it["unlocked"]:
             lines_unlocked.append(f"{it['emoji']} <b>{title}</b>")
         else:
-            lines_locked.append(f"🔒 {it['emoji']} <i>{title}</i>")
+            hint = it.get("hint_ru") if lang == "ru" else it.get("hint_uz")
+            line = f"🔒 {it['emoji']} <i>{title}</i>"
+            if hint:
+                line += f"\n     <i>↳ {hint}</i>"
+            lines_locked.append(line)
 
     body_parts = []
     if lines_unlocked:

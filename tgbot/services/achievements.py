@@ -286,9 +286,9 @@ ACHIEVEMENTS_RAW = [
     {"code": "st_100", "emoji": "🦾",   "title_uz": "100 kunlik streak — temir iroda", "title_ru": "100 дней — железная воля", "cond": _at_least("max_streak", 100), "points": 1000},
 
     # — Long conclusions —
-    {"code": "wr_1",  "emoji": "✍️", "title_uz": "Mazmunli xulosa",          "title_ru": "Содержательный вывод",  "cond": _at_least("long_conclusions", 1),  "points": 20},
-    {"code": "wr_5",  "emoji": "📝", "title_uz": "Yozuvchi",                  "title_ru": "Писатель",              "cond": _at_least("long_conclusions", 5),  "points": 75},
-    {"code": "wr_20", "emoji": "🖋", "title_uz": "Mualif — yigirma xulosa",   "title_ru": "Автор — двадцать выводов","cond": _at_least("long_conclusions", 20), "points": 250},
+    {"code": "wr_1",  "emoji": "✍️", "title_uz": "Mazmunli xulosa",          "title_ru": "Содержательный вывод",  "hint_uz": "Kamida 200 belgidan iborat mazmunli xulosa yozing.", "hint_ru": "Напишите содержательный вывод не менее 200 символов.", "cond": _at_least("long_conclusions", 1),  "points": 20},
+    {"code": "wr_5",  "emoji": "📝", "title_uz": "Yozuvchi",                  "title_ru": "Писатель",              "hint_uz": "Kamida 200 belgidan iborat 5 ta xulosa yozing.", "hint_ru": "Напишите 5 выводов не менее 200 символов каждый.", "cond": _at_least("long_conclusions", 5),  "points": 75},
+    {"code": "wr_20", "emoji": "🖋", "title_uz": "Mualif — yigirma xulosa",   "title_ru": "Автор — двадцать выводов","hint_uz": "Kamida 200 belgidan iborat 20 ta xulosa yozing.", "hint_ru": "Напишите 20 выводов не менее 200 символов каждый.", "cond": _at_least("long_conclusions", 20), "points": 250},
 
     # — Referrals —
     {"code": "rf_1",  "emoji": "👥", "title_uz": "Birinchi do'st",           "title_ru": "Первый друг",           "cond": _at_least("referrals", 1),  "points": 50},
@@ -301,12 +301,12 @@ ACHIEVEMENTS_RAW = [
     {"code": "spd_100", "emoji": "🛸", "title_uz": "Raketa (100+ bet/kun)",         "title_ru": "Ракета (100+ стр/день)",       "cond": lambda s: s.get("avg_pages", 0) >= 100 and s.get("reports", 0) >= 5, "points": 500},
 
     # — Contact admin —
-    {"code": "ca_1",  "emoji": "💬",   "title_uz": "Birinchi murojaat",          "title_ru": "Первое обращение",          "cond": _at_least("contact_messages", 1),  "points": 15},
-    {"code": "ca_3",  "emoji": "📞",   "title_uz": "Uch murojaat",               "title_ru": "Три обращения",             "cond": _at_least("contact_messages", 3),  "points": 35},
-    {"code": "ca_5",  "emoji": "📬",   "title_uz": "Faol muloqot",               "title_ru": "Активное общение",          "cond": _at_least("contact_messages", 5),  "points": 60},
-    {"code": "ca_10", "emoji": "🗨",   "title_uz": "O'n murojaat",               "title_ru": "Десять обращений",          "cond": _at_least("contact_messages", 10), "points": 120},
-    {"code": "ca_20", "emoji": "🔊",   "title_uz": "Aktiv muloqotchi",           "title_ru": "Активный собеседник",       "cond": _at_least("contact_messages", 20), "points": 250},
-    {"code": "ca_30", "emoji": "🤝",   "title_uz": "Bot do'sti — 30 murojaat",   "title_ru": "Друг бота — 30 обращений", "cond": _at_least("contact_messages", 30), "points": 400},
+    {"code": "ca_1",  "emoji": "💬",   "title_uz": "Birinchi murojaat",          "title_ru": "Первое обращение",          "hint_uz": "«📞 Admin bilan bog'lanish» orqali murojaat yuboring.", "hint_ru": "Напишите администратору через «📞 Admin bilan bog'lanish».", "cond": _at_least("contact_messages", 1),  "points": 15},
+    {"code": "ca_3",  "emoji": "📞",   "title_uz": "Uch murojaat",               "title_ru": "Три обращения",             "hint_uz": "Admin bilan bog'lanish orqali 3 marta murojaat yuboring.", "hint_ru": "Напишите администратору 3 раза.", "cond": _at_least("contact_messages", 3),  "points": 35},
+    {"code": "ca_5",  "emoji": "📬",   "title_uz": "Faol muloqot",               "title_ru": "Активное общение",          "hint_uz": "Admin bilan bog'lanish orqali 5 marta murojaat yuboring.", "hint_ru": "Напишите администратору 5 раз.", "cond": _at_least("contact_messages", 5),  "points": 60},
+    {"code": "ca_10", "emoji": "🗨",   "title_uz": "O'n murojaat",               "title_ru": "Десять обращений",          "hint_uz": "Admin bilan bog'lanish orqali 10 marta murojaat yuboring.", "hint_ru": "Напишите администратору 10 раз.", "cond": _at_least("contact_messages", 10), "points": 120},
+    {"code": "ca_20", "emoji": "🔊",   "title_uz": "Aktiv muloqotchi",           "title_ru": "Активный собеседник",       "hint_uz": "Admin bilan bog'lanish orqali 20 marta murojaat yuboring.", "hint_ru": "Напишите администратору 20 раз.", "cond": _at_least("contact_messages", 20), "points": 250},
+    {"code": "ca_30", "emoji": "🤝",   "title_uz": "Bot do'sti — 30 murojaat",   "title_ru": "Друг бота — 30 обращений", "hint_uz": "Admin bilan bog'lanish orqali 30 marta murojaat yuboring.", "hint_ru": "Напишите администратору 30 раз.", "cond": _at_least("contact_messages", 30), "points": 400},
 
     # ── NEW ACHIEVEMENTS ──────────────────────────────────────────────────────
 
@@ -333,9 +333,9 @@ ACHIEVEMENTS_RAW = [
     {"code": "bk_50", "emoji": "🧿", "title_uz": "Ellik kitob — afsonaviy",      "title_ru": "Пятьдесят книг — легенда", "cond": _at_least("books_finished", 50), "points": 2000},
 
     # — Extra long conclusion milestones —
-    {"code": "wr_10",  "emoji": "🖊",  "title_uz": "O'n xulosa",                 "title_ru": "Десять выводов",            "cond": _at_least("long_conclusions", 10),  "points": 150},
-    {"code": "wr_50",  "emoji": "📜",  "title_uz": "Ellik xulosa — tarixchi",    "title_ru": "Пятьдесят выводов",         "cond": _at_least("long_conclusions", 50),  "points": 500},
-    {"code": "wr_100", "emoji": "🏺",  "title_uz": "Yuz xulosa — faylasuf",      "title_ru": "Сто выводов — философ",     "cond": _at_least("long_conclusions", 100), "points": 1000},
+    {"code": "wr_10",  "emoji": "🖊",  "title_uz": "O'n xulosa",                 "title_ru": "Десять выводов",            "hint_uz": "Kamida 200 belgidan iborat 10 ta xulosa yozing.", "hint_ru": "Напишите 10 выводов не менее 200 символов каждый.", "cond": _at_least("long_conclusions", 10),  "points": 150},
+    {"code": "wr_50",  "emoji": "📜",  "title_uz": "Ellik xulosa — tarixchi",    "title_ru": "Пятьдесят выводов",         "hint_uz": "Kamida 200 belgidan iborat 50 ta xulosa yozing.", "hint_ru": "Напишите 50 выводов не менее 200 символов каждый.", "cond": _at_least("long_conclusions", 50),  "points": 500},
+    {"code": "wr_100", "emoji": "🏺",  "title_uz": "Yuz xulosa — faylasuf",      "title_ru": "Сто выводов — философ",     "hint_uz": "Kamida 200 belgidan iborat 100 ta xulosa yozing.", "hint_ru": "Напишите 100 выводов не менее 200 символов каждый.", "cond": _at_least("long_conclusions", 100), "points": 1000},
 
     # — Extra referral milestones —
     {"code": "rf_3",   "emoji": "🌱", "title_uz": "Uch do'st",                   "title_ru": "Три друга",                 "cond": _at_least("referrals", 3),   "points": 100},
@@ -352,68 +352,68 @@ ACHIEVEMENTS_RAW = [
     {"code": "day_100", "emoji": "🏃", "title_uz": "Kunlik marafon (100+ bet)",  "title_ru": "Дневной марафон (100+ стр)", "cond": _at_least("max_day_pages", 100), "points": 250},
 
     # — Quiz milestones —
-    {"code": "qz_1",  "emoji": "🧩", "title_uz": "Birinchi quiz",               "title_ru": "Первый квиз",               "cond": _at_least("quizzes_played", 1),  "points": 25},
-    {"code": "qz_5",  "emoji": "🎮", "title_uz": "Beshta quiz",                 "title_ru": "Пять квизов",               "cond": _at_least("quizzes_played", 5),  "points": 100},
-    {"code": "qz_10", "emoji": "🏆", "title_uz": "O'n quiz — chempion",         "title_ru": "Десять квизов — чемпион",   "cond": _at_least("quizzes_played", 10), "points": 250},
+    {"code": "qz_1",  "emoji": "🧩", "title_uz": "Birinchi quiz",               "title_ru": "Первый квиз",               "hint_uz": "«📝 Kitob Quiz» bo'limida (yakka yoki guruhda) quiz o'ynang.", "hint_ru": "Сыграйте в квиз в разделе «📝 Kitob Quiz».", "cond": _at_least("quizzes_played", 1),  "points": 25},
+    {"code": "qz_5",  "emoji": "🎮", "title_uz": "Beshta quiz",                 "title_ru": "Пять квизов",               "hint_uz": "«📝 Kitob Quiz» bo'limida 5 marta quiz o'ynang.", "hint_ru": "Сыграйте в квиз в разделе «📝 Kitob Quiz» 5 раз.", "cond": _at_least("quizzes_played", 5),  "points": 100},
+    {"code": "qz_10", "emoji": "🏆", "title_uz": "O'n quiz — chempion",         "title_ru": "Десять квизов — чемпион",   "hint_uz": "«📝 Kitob Quiz» bo'limida 10 marta quiz o'ynang.", "hint_ru": "Сыграйте в квиз в разделе «📝 Kitob Quiz» 10 раз.", "cond": _at_least("quizzes_played", 10), "points": 250},
 
     # — Viktorina correct-answer milestones —
-    {"code": "vq_1",   "emoji": "🧩", "title_uz": "Viktorinachi",                "title_ru": "Викторинщик",               "cond": _at_least("quiz_correct", 1),   "points": 30},
-    {"code": "vq_10",  "emoji": "🔍", "title_uz": "Iqtibos izlovchi",            "title_ru": "Искатель цитат",            "cond": _at_least("quiz_correct", 10),  "points": 100},
-    {"code": "vq_25",  "emoji": "📚", "title_uz": "Kitob bilimdon",              "title_ru": "Книжный знаток",            "cond": _at_least("quiz_correct", 25),  "points": 250},
-    {"code": "vq_50",  "emoji": "🏆", "title_uz": "Viktorina chempioni",         "title_ru": "Чемпион викторины",         "cond": _at_least("quiz_correct", 50),  "points": 500},
-    {"code": "vq_100", "emoji": "🌟", "title_uz": "Viktorina ustasi — 100 ta",   "title_ru": "Мастер викторины — 100",    "cond": _at_least("quiz_correct", 100), "points": 1000},
+    {"code": "vq_1",   "emoji": "🧩", "title_uz": "Viktorinachi",                "title_ru": "Викторинщик",               "hint_uz": "Kunlik «Kitob Viktorina»da (guruhda, kuniga 2 marta) to'g'ri javob bering.", "hint_ru": "Ответьте правильно в ежедневной «Kitob Viktorina» (в группе).", "cond": _at_least("quiz_correct", 1),   "points": 30},
+    {"code": "vq_10",  "emoji": "🔍", "title_uz": "Iqtibos izlovchi",            "title_ru": "Искатель цитат",            "hint_uz": "Kunlik «Kitob Viktorina»da 10 marta to'g'ri javob bering.", "hint_ru": "Ответьте правильно в «Kitob Viktorina» 10 раз.", "cond": _at_least("quiz_correct", 10),  "points": 100},
+    {"code": "vq_25",  "emoji": "📚", "title_uz": "Kitob bilimdon",              "title_ru": "Книжный знаток",            "hint_uz": "Kunlik «Kitob Viktorina»da 25 marta to'g'ri javob bering.", "hint_ru": "Ответьте правильно в «Kitob Viktorina» 25 раз.", "cond": _at_least("quiz_correct", 25),  "points": 250},
+    {"code": "vq_50",  "emoji": "🏆", "title_uz": "Viktorina chempioni",         "title_ru": "Чемпион викторины",         "hint_uz": "Kunlik «Kitob Viktorina»da 50 marta to'g'ri javob bering.", "hint_ru": "Ответьте правильно в «Kitob Viktorina» 50 раз.", "cond": _at_least("quiz_correct", 50),  "points": 500},
+    {"code": "vq_100", "emoji": "🌟", "title_uz": "Viktorina ustasi — 100 ta",   "title_ru": "Мастер викторины — 100",    "hint_uz": "Kunlik «Kitob Viktorina»da 100 marta to'g'ri javob bering.", "hint_ru": "Ответьте правильно в «Kitob Viktorina» 100 раз.", "cond": _at_least("quiz_correct", 100), "points": 1000},
 
     # ── NEW ACHIEVEMENTS ROUND 2 — 30 entries, new behavioral dimensions ──────
 
     # — Live games participation —
-    {"code": "lg_1",   "emoji": "🎲", "title_uz": "Birinchi jonli o'yin",          "title_ru": "Первая live-игра",           "cond": _at_least("live_games_played", 1),   "points": 20},
-    {"code": "lg_10",  "emoji": "🕹", "title_uz": "O'n jonli o'yin",               "title_ru": "Десять live-игр",            "cond": _at_least("live_games_played", 10),  "points": 100},
-    {"code": "lg_50",  "emoji": "🎰", "title_uz": "Ellik jonli o'yin — faol o'yinchi", "title_ru": "Пятьдесят live-игр",     "cond": _at_least("live_games_played", 50),  "points": 350},
-    {"code": "lg_200", "emoji": "🎳", "title_uz": "Ikki yuz jonli o'yin — afsonaviy o'yinchi", "title_ru": "Двести live-игр — легенда", "cond": _at_least("live_games_played", 200), "points": 800},
+    {"code": "lg_1",   "emoji": "🎲", "title_uz": "Birinchi jonli o'yin",          "title_ru": "Первая live-игра",           "hint_uz": "Har kuni 10:00/22:00dagi jonli o'yinlardan (Zanjiri, Ko'pchilik va h.k.) biriga qatnashing.", "hint_ru": "Поучаствуйте в одной из live-игр (10:00/22:00).", "cond": _at_least("live_games_played", 1),   "points": 20},
+    {"code": "lg_10",  "emoji": "🕹", "title_uz": "O'n jonli o'yin",               "title_ru": "Десять live-игр",            "hint_uz": "Jonli o'yinlarda jami 10 marta qatnashing (istalgan turdagi).", "hint_ru": "Поучаствуйте в live-играх 10 раз.", "cond": _at_least("live_games_played", 10),  "points": 100},
+    {"code": "lg_50",  "emoji": "🎰", "title_uz": "Ellik jonli o'yin — faol o'yinchi", "title_ru": "Пятьдесят live-игр",     "hint_uz": "Jonli o'yinlarda jami 50 marta qatnashing.", "hint_ru": "Поучаствуйте в live-играх 50 раз.", "cond": _at_least("live_games_played", 50),  "points": 350},
+    {"code": "lg_200", "emoji": "🎳", "title_uz": "Ikki yuz jonli o'yin — afsonaviy o'yinchi", "title_ru": "Двести live-игр — легенда", "hint_uz": "Jonli o'yinlarda jami 200 marta qatnashing.", "hint_ru": "Поучаствуйте в live-играх 200 раз.", "cond": _at_least("live_games_played", 200), "points": 800},
 
     # — Live game wins (top-3 / jackpot reward, not mere participation) —
-    {"code": "lgw_1",  "emoji": "🥉", "title_uz": "Birinchi g'alaba",              "title_ru": "Первая победа",              "cond": _at_least("live_games_won", 1),   "points": 50},
-    {"code": "lgw_5",  "emoji": "🥈", "title_uz": "Besh g'alaba",                  "title_ru": "Пять побед",                 "cond": _at_least("live_games_won", 5),   "points": 200},
-    {"code": "lgw_20", "emoji": "🥇", "title_uz": "Yigirma g'alaba — chempion",    "title_ru": "Двадцать побед — чемпион",   "cond": _at_least("live_games_won", 20),  "points": 700},
-    {"code": "lgw_50", "emoji": "👑", "title_uz": "Ellik g'alaba — yengilmas",     "title_ru": "Пятьдесят побед — непобедим","cond": _at_least("live_games_won", 50),  "points": 1500},
+    {"code": "lgw_1",  "emoji": "🥉", "title_uz": "Birinchi g'alaba",              "title_ru": "Первая победа",              "hint_uz": "Jonli o'yinda birinchi 3 o'rin yoki katta mukofot (100+ Kitobcha) yutib oling.", "hint_ru": "Займите топ-3 или выиграйте крупный приз (100+ Kitobcha) в live-игре.", "cond": _at_least("live_games_won", 1),   "points": 50},
+    {"code": "lgw_5",  "emoji": "🥈", "title_uz": "Besh g'alaba",                  "title_ru": "Пять побед",                 "hint_uz": "Jonli o'yinlarda 5 marta g'olib bo'ling.", "hint_ru": "Победите в live-играх 5 раз.", "cond": _at_least("live_games_won", 5),   "points": 200},
+    {"code": "lgw_20", "emoji": "🥇", "title_uz": "Yigirma g'alaba — chempion",    "title_ru": "Двадцать побед — чемпион",   "hint_uz": "Jonli o'yinlarda 20 marta g'olib bo'ling.", "hint_ru": "Победите в live-играх 20 раз.", "cond": _at_least("live_games_won", 20),  "points": 700},
+    {"code": "lgw_50", "emoji": "👑", "title_uz": "Ellik g'alaba — yengilmas",     "title_ru": "Пятьдесят побед — непобедим","hint_uz": "Jonli o'yinlarda 50 marta g'olib bo'ling.", "hint_ru": "Победите в live-играх 50 раз.", "cond": _at_least("live_games_won", 50),  "points": 1500},
 
     # — Shop purchases —
-    {"code": "shop_1",  "emoji": "🛍", "title_uz": "Birinchi xarid",               "title_ru": "Первая покупка",             "cond": _at_least("shop_purchases", 1),  "points": 20},
-    {"code": "shop_5",  "emoji": "🛒", "title_uz": "Besh xarid — doimiy mijoz",    "title_ru": "Пять покупок — постоянный клиент", "cond": _at_least("shop_purchases", 5),  "points": 150},
-    {"code": "shop_15", "emoji": "🏪", "title_uz": "O'n besh xarid — VIP mijoz",   "title_ru": "Пятнадцать покупок — VIP",   "cond": _at_least("shop_purchases", 15), "points": 500},
+    {"code": "shop_1",  "emoji": "🛍", "title_uz": "Birinchi xarid",               "title_ru": "Первая покупка",             "hint_uz": "🏪 Do'kondan biror mahsulot sotib oling.", "hint_ru": "Совершите покупку в магазине 🏪.", "cond": _at_least("shop_purchases", 1),  "points": 20},
+    {"code": "shop_5",  "emoji": "🛒", "title_uz": "Besh xarid — doimiy mijoz",    "title_ru": "Пять покупок — постоянный клиент", "hint_uz": "🏪 Do'kondan 5 marta xarid qiling.", "hint_ru": "Совершите 5 покупок в магазине.", "cond": _at_least("shop_purchases", 5),  "points": 150},
+    {"code": "shop_15", "emoji": "🏪", "title_uz": "O'n besh xarid — VIP mijoz",   "title_ru": "Пятнадцать покупок — VIP",   "hint_uz": "🏪 Do'kondan 15 marta xarid qiling.", "hint_ru": "Совершите 15 покупок в магазине.", "cond": _at_least("shop_purchases", 15), "points": 500},
 
     # — Premium loyalty (count of paid Payment rows) —
-    {"code": "prem_1", "emoji": "⭐", "title_uz": "Premium a'zo",                  "title_ru": "Premium-участник",           "cond": _at_least("premium_payments", 1), "points": 100},
-    {"code": "prem_3", "emoji": "🌠", "title_uz": "Sodiq Premium a'zo",            "title_ru": "Верный Premium-участник",    "cond": _at_least("premium_payments", 3), "points": 400},
-    {"code": "prem_6", "emoji": "💫", "title_uz": "Premium faxriysi",              "title_ru": "Ветеран Premium",            "cond": _at_least("premium_payments", 6), "points": 900},
+    {"code": "prem_1", "emoji": "⭐", "title_uz": "Premium a'zo",                  "title_ru": "Premium-участник",           "hint_uz": "💎 Premium obuna sotib oling.", "hint_ru": "Оформите 💎 Premium подписку.", "cond": _at_least("premium_payments", 1), "points": 100},
+    {"code": "prem_3", "emoji": "🌠", "title_uz": "Sodiq Premium a'zo",            "title_ru": "Верный Premium-участник",    "hint_uz": "💎 Premium obunani jami 3 marta sotib oling/uzaytiring.", "hint_ru": "Оформите/продлите 💎 Premium 3 раза.", "cond": _at_least("premium_payments", 3), "points": 400},
+    {"code": "prem_6", "emoji": "💫", "title_uz": "Premium faxriysi",              "title_ru": "Ветеран Premium",            "hint_uz": "💎 Premium obunani jami 6 marta sotib oling/uzaytiring.", "hint_ru": "Оформите/продлите 💎 Premium 6 раз.", "cond": _at_least("premium_payments", 6), "points": 900},
 
     # — Anniversary —
     {"code": "anniv_1", "emoji": "🎂", "title_uz": "Bir yillik a'zo",              "title_ru": "Год с нами",                 "cond": _at_least("account_age_days", 365), "points": 200},
     {"code": "anniv_2", "emoji": "🎉", "title_uz": "Ikki yillik a'zo — faxriy kitobxon", "title_ru": "Два года — почётный читатель", "cond": _at_least("account_age_days", 730), "points": 500},
 
     # — Perfect month (report every single day of a calendar month) —
-    {"code": "pm_1", "emoji": "🗓", "title_uz": "Mukammal oy",                    "title_ru": "Идеальный месяц",            "cond": _at_least("perfect_months", 1), "points": 300},
-    {"code": "pm_3", "emoji": "📅", "title_uz": "Uch mukammal oy — barqaror",     "title_ru": "Три идеальных месяца",       "cond": _at_least("perfect_months", 3), "points": 800},
+    {"code": "pm_1", "emoji": "🗓", "title_uz": "Mukammal oy",                    "title_ru": "Идеальный месяц",            "hint_uz": "Bir oyning HAR BIR kunida hisobot yuboring (bironta kun ham o'tkazib yubormang).", "hint_ru": "Отправляйте отчёт КАЖДЫЙ день одного месяца без пропусков.", "cond": _at_least("perfect_months", 1), "points": 300},
+    {"code": "pm_3", "emoji": "📅", "title_uz": "Uch mukammal oy — barqaror",     "title_ru": "Три идеальных месяца",       "hint_uz": "3 ta oyning har birida, har kuni hisobot yuboring.", "hint_ru": "Отправляйте отчёт каждый день в течение 3 месяцев.", "cond": _at_least("perfect_months", 3), "points": 800},
 
     # — Combo days: both a page report and an audio report the same day —
-    {"code": "combo_5",  "emoji": "🎧", "title_uz": "Ikki tomonlama kitobxon",     "title_ru": "Читатель на два фронта",     "cond": _at_least("combo_days", 5),  "points": 80},
-    {"code": "combo_20", "emoji": "🎼", "title_uz": "Gibrid o'quvchi ustasi",      "title_ru": "Мастер гибридного чтения",   "cond": _at_least("combo_days", 20), "points": 300},
-    {"code": "combo_50", "emoji": "🎹", "title_uz": "Yuz foiz gibrid — afsonaviy", "title_ru": "Гибрид на все сто — легенда","cond": _at_least("combo_days", 50), "points": 900},
+    {"code": "combo_5",  "emoji": "🎧", "title_uz": "Ikki tomonlama kitobxon",     "title_ru": "Читатель на два фронта",     "hint_uz": "Bitta kunda HAM bet o'qib, HAM audiokitob eshitib, ikkalasidan ham hisobot yuboring — buni 5 marta qiling.", "hint_ru": "В один день отправьте и отчёт о страницах, и об аудио — 5 раз.", "cond": _at_least("combo_days", 5),  "points": 80},
+    {"code": "combo_20", "emoji": "🎼", "title_uz": "Gibrid o'quvchi ustasi",      "title_ru": "Мастер гибридного чтения",   "hint_uz": "Bitta kunda ham bet, ham audio hisobot yuborishni 20 marta qiling.", "hint_ru": "Совмещайте отчёт о страницах и аудио в один день — 20 раз.", "cond": _at_least("combo_days", 20), "points": 300},
+    {"code": "combo_50", "emoji": "🎹", "title_uz": "Yuz foiz gibrid — afsonaviy", "title_ru": "Гибрид на все сто — легенда","hint_uz": "Bitta kunda ham bet, ham audio hisobot yuborishni 50 marta qiling.", "hint_ru": "Совмещайте отчёт о страницах и аудио в один день — 50 раз.", "cond": _at_least("combo_days", 50), "points": 900},
 
     # — Distinct authors among finished books (reading breadth) —
-    {"code": "auth_5",  "emoji": "📗", "title_uz": "Besh muallif",                "title_ru": "Пять авторов",               "cond": _at_least("distinct_authors", 5),  "points": 60},
-    {"code": "auth_15", "emoji": "📘", "title_uz": "O'n besh muallif — ufqi keng", "title_ru": "Пятнадцать авторов",        "cond": _at_least("distinct_authors", 15), "points": 250},
-    {"code": "auth_30", "emoji": "📙", "title_uz": "O'ttiz muallif — bilimdon",   "title_ru": "Тридцать авторов — знаток",  "cond": _at_least("distinct_authors", 30), "points": 600},
-    {"code": "auth_50", "emoji": "📕", "title_uz": "Ellik muallif — universal kitobxon", "title_ru": "Пятьдесят авторов — универсал", "cond": _at_least("distinct_authors", 50), "points": 1200},
+    {"code": "auth_5",  "emoji": "📗", "title_uz": "Besh muallif",                "title_ru": "Пять авторов",               "hint_uz": "Turli 5 ta mualliflardan kitob tugating (kutubxonadagi kitoblar asosida hisoblanadi).", "hint_ru": "Завершите книги 5 разных авторов (из библиотеки).", "cond": _at_least("distinct_authors", 5),  "points": 60},
+    {"code": "auth_15", "emoji": "📘", "title_uz": "O'n besh muallif — ufqi keng", "title_ru": "Пятнадцать авторов",        "hint_uz": "Turli 15 ta mualliflardan kitob tugating.", "hint_ru": "Завершите книги 15 разных авторов.", "cond": _at_least("distinct_authors", 15), "points": 250},
+    {"code": "auth_30", "emoji": "📙", "title_uz": "O'ttiz muallif — bilimdon",   "title_ru": "Тридцать авторов — знаток",  "hint_uz": "Turli 30 ta mualliflardan kitob tugating.", "hint_ru": "Завершите книги 30 разных авторов.", "cond": _at_least("distinct_authors", 30), "points": 600},
+    {"code": "auth_50", "emoji": "📕", "title_uz": "Ellik muallif — universal kitobxon", "title_ru": "Пятьдесят авторов — универсал", "hint_uz": "Turli 50 ta mualliflardan kitob tugating.", "hint_ru": "Завершите книги 50 разных авторов.", "cond": _at_least("distinct_authors", 50), "points": 1200},
 
     # — Comeback: a long silent gap followed by a fresh streak —
-    {"code": "cmb_1", "emoji": "🌅", "title_uz": "Qaytgan qahramon",              "title_ru": "Вернувшийся герой",          "cond": lambda s: s.get("comeback", False), "points": 150},
-    {"code": "cmb_2", "emoji": "🔥", "title_uz": "Feniks — qayta tug'ilish",      "title_ru": "Феникс — возрождение",       "cond": lambda s: s.get("phoenix", False),  "points": 400},
+    {"code": "cmb_1", "emoji": "🌅", "title_uz": "Qaytgan qahramon",              "title_ru": "Вернувшийся герой",          "hint_uz": "Kamida 14 kun uzilishdan so'ng, qayta 7 kun ketma-ket hisobot bering.", "hint_ru": "После перерыва от 14 дней читайте 7 дней подряд.", "cond": lambda s: s.get("comeback", False), "points": 150},
+    {"code": "cmb_2", "emoji": "🔥", "title_uz": "Feniks — qayta tug'ilish",      "title_ru": "Феникс — возрождение",       "hint_uz": "Kamida 30 kun uzilishdan so'ng, qayta 14 kun ketma-ket hisobot bering.", "hint_ru": "После перерыва от 30 дней читайте 14 дней подряд.", "cond": lambda s: s.get("phoenix", False),  "points": 400},
 
     # — Hikmat Xazinasi consecutive-correct streak (personal best) —
-    {"code": "wst_3",  "emoji": "🧠", "title_uz": "Hikmat seriyasi — 3",          "title_ru": "Серия мудрости — 3",         "cond": _at_least("wisdom_best_streak", 3),  "points": 50},
-    {"code": "wst_10", "emoji": "🦉", "title_uz": "Hikmat seriyasi — 10, dono",   "title_ru": "Серия мудрости — 10",        "cond": _at_least("wisdom_best_streak", 10), "points": 300},
-    {"code": "wst_20", "emoji": "🔮", "title_uz": "Hikmat seriyasi — 20, ustoz",  "title_ru": "Серия мудрости — 20",        "cond": _at_least("wisdom_best_streak", 20), "points": 900},
+    {"code": "wst_3",  "emoji": "🧠", "title_uz": "Hikmat seriyasi — 3",          "title_ru": "Серия мудрости — 3",         "hint_uz": "☪️ Hikmat Xazinasi jonli o'yinida ketma-ket 3 marta to'g'ri javob bering.", "hint_ru": "В игре «Hikmat Xazinasi» ответьте правильно 3 раза подряд.", "cond": _at_least("wisdom_best_streak", 3),  "points": 50},
+    {"code": "wst_10", "emoji": "🦉", "title_uz": "Hikmat seriyasi — 10, dono",   "title_ru": "Серия мудрости — 10",        "hint_uz": "☪️ Hikmat Xazinasi jonli o'yinida ketma-ket 10 marta to'g'ri javob bering.", "hint_ru": "В игре «Hikmat Xazinasi» ответьте правильно 10 раз подряд.", "cond": _at_least("wisdom_best_streak", 10), "points": 300},
+    {"code": "wst_20", "emoji": "🔮", "title_uz": "Hikmat seriyasi — 20, ustoz",  "title_ru": "Серия мудрости — 20",        "hint_uz": "☪️ Hikmat Xazinasi jonli o'yinida ketma-ket 20 marta to'g'ri javob bering.", "hint_ru": "В игре «Hikmat Xazinasi» ответьте правильно 20 раз подряд.", "cond": _at_least("wisdom_best_streak", 20), "points": 900},
 ]
 
 
@@ -495,6 +495,8 @@ def list_user_achievements(user: TelegramProfile):
             "emoji": ach["emoji"],
             "title_uz": ach["title_uz"],
             "title_ru": ach["title_ru"],
+            "hint_uz": ach.get("hint_uz"),
+            "hint_ru": ach.get("hint_ru"),
             "unlocked": ach["code"] in awarded_codes,
         })
     return out
