@@ -1,0 +1,100 @@
+<!-- Shared classical background-music player: quiet random Beethoven / Bach /
+     Mozart on loop across all site pages, with a mute toggle the user's
+     choice is remembered (localStorage) so it carries between pages. -->
+<audio id="kcBgAudio" preload="none"></audio>
+<button id="kcMusicToggle" type="button" aria-label="Musiqani yoqish/o'chirish" title="Fon musiqasi">
+  <span id="kcMusicIcon">🔊</span>
+</button>
+<style>
+  #kcMusicToggle {
+    position: fixed; right: 14px; bottom: 94px; z-index: 260;
+    width: 42px; height: 42px; border-radius: 50%; border: 1px solid rgba(230,180,80,.35);
+    background: rgba(15,20,18,.90); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: #e6b450; font-size: 18px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 20px rgba(0,0,0,.28); -webkit-tap-highlight-color: transparent;
+    transition: transform .15s ease, opacity .2s ease;
+  }
+  #kcMusicToggle:active { transform: scale(.90); }
+  #kcMusicToggle.kc-muted { opacity: .55; color: rgba(243,234,217,.55); }
+</style>
+<script>
+(function () {
+  var TRACKS = [
+    { src: "/static/audio/classical/beethoven-moonlight.mp3", label: "Beethoven — Moonlight Sonata" },
+    { src: "/static/audio/classical/beethoven-fur-elise.mp3", label: "Beethoven — Für Elise" },
+    { src: "/static/audio/classical/bach-air-on-g-string.mp3", label: "Bach — Air on the G String" },
+    { src: "/static/audio/classical/bach-prelude-c-major.mp3", label: "Bach — Prelude in C Major" },
+    { src: "/static/audio/classical/mozart-eine-kleine-nachtmusik.mp3", label: "Mozart — Eine kleine Nachtmusik" },
+    { src: "/static/audio/classical/mozart-piano-sonata-11.mp3", label: "Mozart — Eine kleine Nachtmusik (Rondo)" }
+  ];
+  var MUTE_KEY = "kc_music_muted";
+  var VOLUME = 0.14;
+
+  var audio = document.getElementById("kcBgAudio");
+  var btn = document.getElementById("kcMusicToggle");
+  var icon = document.getElementById("kcMusicIcon");
+  if (!audio || !btn) return;
+
+  var muted = localStorage.getItem(MUTE_KEY) === "1";
+  var lastIndex = -1;
+
+  function pickTrack() {
+    if (TRACKS.length === 1) return 0;
+    var i;
+    do { i = Math.floor(Math.random() * TRACKS.length); } while (i === lastIndex);
+    lastIndex = i;
+    return i;
+  }
+
+  function loadRandomTrack() {
+    audio.src = TRACKS[pickTrack()].src;
+    audio.volume = VOLUME;
+  }
+
+  function updateIcon() {
+    icon.textContent = muted ? "🔇" : "🔊";
+    btn.classList.toggle("kc-muted", muted);
+  }
+
+  function tryPlay() {
+    if (muted) return;
+    var p = audio.play();
+    if (p && p.catch) {
+      p.catch(function () {
+        // Autoplay blocked — resume on the user's first interaction with the page.
+        var resume = function () {
+          if (!muted) audio.play().catch(function () {});
+          document.removeEventListener("pointerdown", resume);
+          document.removeEventListener("keydown", resume);
+        };
+        document.addEventListener("pointerdown", resume, { once: true });
+        document.addEventListener("keydown", resume, { once: true });
+      });
+    }
+  }
+
+  audio.addEventListener("ended", function () {
+    loadRandomTrack();
+    if (!muted) audio.play().catch(function () {});
+  });
+
+  btn.addEventListener("click", function () {
+    muted = !muted;
+    localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
+    updateIcon();
+    if (muted) {
+      audio.pause();
+    } else {
+      if (!audio.src) loadRandomTrack();
+      tryPlay();
+    }
+  });
+
+  updateIcon();
+  if (!muted) {
+    loadRandomTrack();
+    tryPlay();
+  }
+})();
+</script>
