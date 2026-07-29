@@ -420,7 +420,7 @@ async def vizov_join(call: types.CallbackQuery, state: FSMContext):
                 )
             except Exception:
                 pass
-            await _send_group_question(session.chat_id, session.id, 0)
+            await _send_group_question_poll(session.chat_id, session.id, 0)
 
 
 # ─── Answer a question ─────────────────────────────────────────────────────────
@@ -479,14 +479,12 @@ async def answer_question(call: types.CallbackQuery, state: FSMContext):
 # ─── Send a question — native Poll (solo) ──────────────────────────────────────
 #
 # Phase 1 of the native-poll migration (see NATIVE_POLL_MIGRATION_PROMPT.md):
-# SOLO play only, since it's the lowest-risk surface (single user, DM chat).
-# Group play still uses the inline-keyboard flow below (_send_group_question /
-# _group_question_timer / answer_question), completely untouched — kept as
-# the safe, proven path until the poll approach has been verified in
-# production. The old DM inline-keyboard path (_send_question,
-# _question_timer) is also left in place, unused, as an instant rollback:
-# just point solo_start/_advance_after_timeout back at _send_question if the
-# poll flow needs to be reverted.
+# SOLO play. Group play was migrated in phase 2 (_send_group_question_poll,
+# below) and is now the live path too. The old inline-keyboard flows
+# (_send_question / _question_timer for solo, _send_group_question /
+# _group_question_timer / answer_question for group) are left in place,
+# unused, as an instant rollback: just point solo_start/vizov_join's
+# auto-start back at them if the poll flow needs to be reverted.
 #
 # Telegram draws its own countdown ring for `open_period` and reveals
 # correct/incorrect to the voter natively (quiz-type poll) — no server-side
@@ -629,7 +627,7 @@ async def on_poll_answer(poll_answer: types.PollAnswer):
 # Unlike solo, progression is timer-driven rather than per-answer (everyone in
 # the group gets the full open_period to vote), and — since Telegram's own
 # per-voter reveal is private to each user — we still post a group-visible
-# "🏅 Bilganlar" line after the poll closes, reusing the same idea the old
+# "🏅 To'g'ri topganlar" line after the poll closes, reusing the same idea the old
 # _group_question_timer used, just without the manual 50%/80% edits.
 
 GROUP_POLL_POST_REVEAL_PAUSE = 1.5
@@ -717,7 +715,7 @@ async def _group_poll_advance_after_close(
 
         winners = await _winners()
         winners_line = ", ".join(sorted(w or "Kitobxon" for w in winners)) if winners else "hech kim"
-        reveal_text = f"🏅 <b>Bilganlar:</b> {winners_line}"
+        reveal_text = f"🏅 <b>To'g'ri topganlar:</b> {winners_line}"
         if hint:
             reveal_text += f"\n💡 <i>{hint}</i>"
         try:
@@ -1038,7 +1036,7 @@ async def _group_question_timer(
             f"━━━━━━━━━━━━━━━━━\n\n"
             f"<b>{q_text}</b>\n\n"
             f"🎉 To'g'ri javob:  <b>{correct_text}</b>\n"
-            f"🏅 Bilganlar:  {winners_line}"
+            f"🏅 To'g'ri topganlar:  {winners_line}"
         )
         if hint_text:
             reveal_text += f"\n\n💡 <i>{hint_text}</i>"
