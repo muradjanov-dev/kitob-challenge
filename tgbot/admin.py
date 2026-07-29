@@ -506,11 +506,11 @@ class LeaderboardSponsorAdmin(admin.ModelAdmin):
 @admin.register(models.ReferralBoom)
 class ReferralBoomAdmin(admin.ModelAdmin):
     list_display = (
-        'title', 'is_active', 'is_queued', 'start_at', 'end_at',
+        'title', 'image', 'planned_days', 'is_active', 'is_queued', 'start_at', 'end_at',
         'tier1_reward', 'tier1_cap', 'tier2_reward', 'total_reminders',
     )
     list_filter = ('is_active', 'is_queued')
-    actions = ('queue_next_rotation', 'launch_now', 'finalize_now')
+    actions = ('queue_next_rotation', 'launch_now', 'launch_default_now', 'finalize_now')
 
     @admin.action(description="📌 Keyingi navbatga BOOM qo'yish (rotatsiya)")
     def queue_next_rotation(self, request, queryset):
@@ -522,8 +522,24 @@ class ReferralBoomAdmin(admin.ModelAdmin):
             messages.SUCCESS,
         )
 
-    @admin.action(description="🚀 Hozir e'lon qilish (yangi BOOM)")
+    @admin.action(description="🚀 Tanlangan BOOM'ni hozir e'lon qilish (shu qatordagi sarlavha/rasm/mukofot bilan)")
     def launch_now(self, request, queryset):
+        from tgbot.tasks import launch_referral_boom
+        boom = queryset.first()
+        if not boom:
+            self.message_user(request, "Avval bitta BOOM qatorini belgilang.", messages.WARNING)
+            return
+        if queryset.count() > 1:
+            self.message_user(
+                request,
+                "Faqat bittasi ishga tushirildi — birdaniga bir nechta BOOM'ni e'lon qilib bo'lmaydi.",
+                messages.WARNING,
+            )
+        boom_id = launch_referral_boom(boom_id=boom.id)
+        self.message_user(request, f"Referal BOOM e'lon qilindi — id={boom_id}", messages.SUCCESS)
+
+    @admin.action(description="🚀 Standart (3 kunlik) BOOM'ni hozir e'lon qilish (yangi qator yaratadi)")
+    def launch_default_now(self, request, queryset):
         from tgbot.tasks import launch_referral_boom
         boom_id = launch_referral_boom()
         self.message_user(request, f"Referal BOOM e'lon qilindi — id={boom_id}", messages.SUCCESS)

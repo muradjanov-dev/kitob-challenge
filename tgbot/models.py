@@ -1194,8 +1194,19 @@ class ReaderTitleAnnouncement(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 class ReferralBoom(BaseModel):
     title = models.CharField(max_length=200, default="3 Kunlik Referal BOOM")
-    start_at = models.DateTimeField(verbose_name=_("Start"))
-    end_at = models.DateTimeField(verbose_name=_("End"))
+    image = models.ImageField(
+        upload_to="referral_boom/", blank=True, null=True,
+        help_text="Optional banner sent with the welcome DM when someone joins "
+                  "(sendPhoto + caption instead of a plain text message).",
+    )
+    planned_days = models.PositiveIntegerField(
+        default=3,
+        help_text="Duration once launched via the '🚀 Hozir e'lon qilish' admin "
+                  "action on this row (start_at/end_at below are placeholders "
+                  "until then).",
+    )
+    start_at = models.DateTimeField(verbose_name=_("Start"), default=timezone.now)
+    end_at = models.DateTimeField(verbose_name=_("End"), default=timezone.now)
     tier1_reward = models.PositiveIntegerField(
         default=150, help_text="Kitobcha per referral for the first tier1_cap referrals.",
     )

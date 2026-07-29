@@ -14,7 +14,10 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
 
-from tgbot.models import BookQuizAnswer, BookReport, BooksToRead, ConfirmationReport, TelegramProfile
+from tgbot.models import (
+    BookQuizAnswer, BookReport, BooksToRead, ConfirmationReport,
+    ReferralBoom, ReferralBoomParticipant, TelegramProfile,
+)
 
 
 def _verify_init_data(init_data: str) -> dict | None:
@@ -145,6 +148,27 @@ def api_cabinet_me(request: HttpRequest) -> JsonResponse:
     if is_premium:
         quiz_correct_count = BookQuizAnswer.objects.filter(user=profile, is_correct=True).count()
 
+    # Active Referral BOOM / competition (e.g. "Yaxshilik ulashuvchi 1.0"):
+    # only meaningful while one is live and the user has joined it -- null
+    # otherwise so the UI can hide the section entirely.
+    active_boom = None
+    boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
+    if boom:
+        participant = ReferralBoomParticipant.objects.filter(boom=boom, user=profile).first()
+        if participant:
+            rank = ReferralBoomParticipant.objects.filter(
+                boom=boom, referrals_count__gt=participant.referrals_count,
+            ).count() + 1
+            total_participants = ReferralBoomParticipant.objects.filter(boom=boom).count()
+            active_boom = {
+                "title": boom.title,
+                "referrals_count": participant.referrals_count,
+                "kitobcha_earned": participant.kitobcha_earned,
+                "rank": rank,
+                "total_participants": total_participants,
+                "ends_at": boom.end_at.isoformat(),
+            }
+
     return JsonResponse({
         "ok": True,
         "full_name": profile.full_name or "Kitobxon",
@@ -161,4 +185,5 @@ def api_cabinet_me(request: HttpRequest) -> JsonResponse:
         "pct_behind": pct_behind,
         "pages_to_overtake": pages_to_overtake,
         "quiz_correct_count": quiz_correct_count,
+        "active_boom": active_boom,
     })

@@ -75,6 +75,9 @@ def humanize_left(end_at) -> str:
 # ── Welcome / rules DM (sent exactly once on join) ───────────────────────────
 def build_welcome_text(full_name: str, boom, referral_link: str) -> str:
     name = full_name or "Kitobxon"
+    # Was hardcoded to "3 kun" -- wrong for any boom of a different length
+    # (e.g. a 7-day standalone event). Derive it from the actual window.
+    days = max(1, round((boom.end_at - boom.start_at).total_seconds() / 86400))
     return (
         f"🎉 <b>Tabriklaymiz, {name}!</b>\n"
         f"Siz <b>{boom.title}</b> ga qo'shildingiz! 🚀\n\n"
@@ -84,13 +87,46 @@ def build_welcome_text(full_name: str, boom, referral_link: str) -> str:
         f"• <b>{boom.tier1_cap} tadan</b> ko'p do'st taklif qilsangiz — "
         f"har biri uchun <b>{boom.tier2_reward} Kitobcha</b>! 🤯\n"
         f"• Do'stingiz ro'yxatdan o'tib, birinchi hisobotini yuborgach taklif hisoblanadi.\n"
-        f"• Bu BOOM faqat <b>3 kun</b> davom etadi — vaqt ketmoqda! ⏳\n\n"
+        f"• Bu musobaqa faqat <b>{days} kun</b> davom etadi — vaqt ketmoqda! ⏳\n\n"
         f"🔗 <b>Sizning shaxsiy havolangiz:</b>\n{referral_link}\n\n"
         f"📲 Havolani do'stlaringizga, guruhlaringizga tashlang.\n"
         f"🛍 Yiqqan Kitobchalaringizga <b>Kitob Challenge do'koni</b>dan "
         f"qimmatbaho sovg'alar oling — qancha ko'p Kitobcha, shuncha zo'r sovg'a!\n\n"
         f"Omad! G'alaba siznikidir 💪🔥"
     )
+
+
+# ── Creative, varied share-button texts (competition-flavored, distinct from
+# tasks.py's evergreen _referral_share_texts pool) ───────────────────────────
+def boom_share_texts(full_name: str, boom_title: str) -> list:
+    """~20 varied, punchy invite blurbs for the boom's own share button --
+    urgency/competition framed (time-limited, ranking, tiered reward), unlike
+    the general always-on referral share pool. A different random one each
+    time the button is (re)built so repeat shares don't look copy-pasted."""
+    name = (full_name or "").strip().split(" ")[0] if full_name else ""
+    name = name or "Kitobxon"
+    return [
+        f"🔥 {name} bilan birga «{boom_title}» musobaqasida qatnashamizmi? Bir necha kun qoldi, qo'shil!",
+        f"🏆 {boom_title} boshlandi — do'stlarni taklif qilib, reytingda ko'tarilaylik! Sen ham qo'shil 👇",
+        f"⏳ Vaqt kam qoldi! {boom_title} musobaqasida men allaqachon qatnashyapman — sen ham qo'shil, birga g'alaba qilamiz!",
+        f"👋 {name} seni «{boom_title}» musobaqasiga taklif qilyapti — o'qish + do'stlik + sovg'alar, hammasi bitta joyda!",
+        f"🚀 Kitob Challenge'da yangi musobaqa — «{boom_title}»! Qo'shil, birga reytingda ko'tarilamiz.",
+        f"🎯 {boom_title}: kim ko'proq do'st taklif qilsa, shuncha ko'p Kitobcha yutadi. Men boshladim — sen-chi?",
+        f"💥 Musobaqa qizidi! «{boom_title}»ga qo'shilib, {name} bilan bellashamizmi?",
+        f"📣 Do'stim, {boom_title} musobaqasi ketyapti — bir necha kunda tugaydi. Hoziroq qo'shil!",
+        f"🎁 {boom_title} davomida qo'shilganlar sovg'alarga yaqinroq. {name} allaqachon ichida — sen ham kir!",
+        f"😏 {name}dan chaqiriq: «{boom_title}» musobaqasida meni yenga olasanmi? Qo'shil, sinab ko'r!",
+        f"🏁 Marra yaqin — «{boom_title}» tugashiga sanoqli kun qoldi. Sen ham safga qo'shil!",
+        f"🌟 Kitob Challenge'dagi eng qizg'in musobaqa — «{boom_title}». {name} bilan birga qatnashamiz!",
+        f"🤝 {name} bilan birga o'qib, birga taklif qilib, «{boom_title}»da ko'proq yutamiz. Qo'shil!",
+        f"📈 Reytingda yuqoriga chiqishni xohlaysanmi? «{boom_title}» musobaqasi aynan shu imkoniyat!",
+        f"🎉 {boom_title} — Kitob Challenge'ning eng qiziqarli musobaqasi hozir davom etmoqda. Sen ham bo'l!",
+        f"💪 {name} musobaqada faol — sen ortda qolma! «{boom_title}»ga hoziroq qo'shil.",
+        f"🔗 Bitta havola — «{boom_title}» musobaqasiga kirish darvozasi. {name} seni kutmoqda!",
+        f"⚡️ Tezroq qo'shilsang, ko'proq vaqting bor! «{boom_title}» hali davom etyapti.",
+        f"🥇 Kim g'olib bo'ladi? «{boom_title}»da {name} bilan raqobatlashib ko'r!",
+        f"📚 O'qish qiziqarli, lekin musobaqa — battar qiziqarli! «{boom_title}»ga {name} bilan qo'shil.",
+    ]
 
 
 # ── Per-referral payout DM (sent each time a boom referral lands) ─────────────

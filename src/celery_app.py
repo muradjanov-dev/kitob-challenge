@@ -97,6 +97,13 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.boom_reminder_tick',
         'schedule': crontab(minute='*/5'),
     },
+    'boom-daily-standings': {
+        # No-ops if no boom is active. 22:00 -- end-of-day, but clear of the
+        # 23:5x cluster (daily_challenge_check, personal report, streak
+        # freezes) so this doesn't bunch up with those DMs.
+        'task': 'tgbot.tasks.boom_daily_standings',
+        'schedule': crontab(hour=22, minute=0),
+    },
     'recompute-optimal-send-hours': {
         'task': 'tgbot.tasks.recompute_optimal_send_hours',
         'schedule': crontab(hour=3, minute=0, day_of_week=0),
