@@ -4245,20 +4245,19 @@ def refresh_quiz_boards(quiz_round):
     board. Called after each answer. Best-effort: ignores rate-limit / unchanged
     errors so a busy round never breaks answering.
 
-    Deliberately omits `reply_markup` — the A/B/C/D keyboard is fully
-    determined by quiz_round.options/id, which never change after posting,
-    so re-sending an identical keyboard on every single answer serves no
-    purpose. It was also the likely cause of "the button doesn't respond on
-    the first tap" reports: Telegram's client has to re-render the keyboard
-    on every edit that includes reply_markup, and a tap landing in that
-    window can get swallowed. Omitting the param leaves Telegram's existing
-    keyboard untouched, so only the text (the results board) is edited."""
-    from tgbot.services.book_quiz import build_quiz_text_with_board
+    IMPORTANT: `reply_markup` MUST be re-sent on every edit. editMessageText
+    does NOT preserve a previous keyboard when the param is omitted — Telegram
+    clears it — a prior attempt at "just don't touch it" briefly shipped and
+    removed the A/B/C/D buttons from every posted quiz entirely (worse than
+    the double-tap issue it was meant to fix). See on-going investigation for
+    the actual double-tap cause; do not remove reply_markup again."""
+    from tgbot.services.book_quiz import build_quiz_text_with_board, quiz_keyboard
 
     msgs = quiz_round.group_messages or []
     if not msgs:
         return
     text = build_quiz_text_with_board(quiz_round)
+    keyboard = quiz_keyboard(quiz_round)
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText"
     for m in msgs:
         try:
@@ -4267,7 +4266,7 @@ def refresh_quiz_boards(quiz_round):
                 data={
                     "chat_id": m["chat_id"], "message_id": m["message_id"],
                     "text": text, "parse_mode": "HTML",
-                    "disable_web_page_preview": "true",
+                    "reply_markup": keyboard, "disable_web_page_preview": "true",
                 },
                 timeout=8,
             )
