@@ -1079,6 +1079,13 @@ async def _group_advance(chat_id: int, session_id: int, q_idx: int):
         await _send_group_question(chat_id, session_id, next_idx)
 
 
+# Minimal Kitobcha reward for group quiz participation — by finishing rank
+# (ties broken by join order, same as the medals already shown). Premium
+# users get the usual 2x via TelegramProfile.update_ball().
+_GROUP_QUIZ_RANK_REWARDS = {1: 20, 2: 10, 3: 5}
+_GROUP_QUIZ_DEFAULT_REWARD = 1
+
+
 async def _finish_group_session(session_id: int, chat_id: int):
     _cancel_timer(session_id)
 
@@ -1086,7 +1093,7 @@ async def _finish_group_session(session_id: int, chat_id: int):
     def _results():
         session = QuizSession.objects.select_related("quiz").filter(id=session_id).first()
         if not session:
-            return None, [], 0
+            return None, [], 0, {}
         QuizSession.objects.filter(id=session_id).update(status="finished")
         participants = list(
             QuizParticipant.objects.filter(session_id=session_id)
@@ -1094,9 +1101,15 @@ async def _finish_group_session(session_id: int, chat_id: int):
             .order_by("-score", "joined_at")
         )
         total = len(json.loads(session.question_order))
-        return session, participants, total
 
-    session, participants, total = await _results()
+        awarded_map = {}
+        for i, p in enumerate(participants, 1):
+            amount = _GROUP_QUIZ_RANK_REWARDS.get(i, _GROUP_QUIZ_DEFAULT_REWARD)
+            awarded_map[p.id] = p.user.update_ball(True, amount)
+
+        return session, participants, total, awarded_map
+
+    session, participants, total, awarded_map = await _results()
     if not session:
         return
 
@@ -1127,7 +1140,8 @@ async def _finish_group_session(session_id: int, chat_id: int):
         marker = medals.get(i, f"<code>{i:>2}.</code>")
         pct = int((p.score or 0) * 100 / total) if total else 0
         name = p.user.full_name or "Kitobxon"
-        lines.append(f"{marker} <b>{name}</b> — {p.score}/{total} ({pct}%)")
+        awarded = awarded_map.get(p.id, 0)
+        lines.append(f"{marker} <b>{name}</b> — {p.score}/{total} ({pct}%)  🪙+{awarded}")
     lines.append("")
     lines.append(f"👥 Jami ishtirokchilar: <b>{len(participants)}</b>")
     lines.append("")
