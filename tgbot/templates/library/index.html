@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     :root {
       --bg:       #f5ead8;
@@ -1000,7 +1000,7 @@ let _currentAudioUrl = null;
 // ── PDF Reader (pdf.js, page-by-page, progress synced per user) ───
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js';
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
 const pdfCanvas   = document.getElementById('pdfCanvas');
@@ -1074,7 +1074,11 @@ function _pdfQueueSave() {
 }
 
 function openPdfReader() {
-  if (!_currentPdfUrl || !window.pdfjsLib) return;
+  if (!_currentPdfUrl) return;
+  if (!window.pdfjsLib) {
+    alert("Kitob hozircha yuklanmadi. Sahifani yangilab, qayta urinib ko'ring.");
+    return;
+  }
   document.getElementById('pdfTitle').textContent = detailTitle.textContent;
   document.getElementById('pdfReader').classList.add('open');
   document.body.style.overflow = 'hidden';

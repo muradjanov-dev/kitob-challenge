@@ -84,7 +84,9 @@ def _premium_kb() -> InlineKeyboardMarkup:
 # Entry point — called from admin_panel.py admin_inline_router
 # ──────────────────────────────────────────────────────────────────────────
 async def library_admin_menu(message: types.Message, user):
-    total = await sync_to_async(GlobalBook.objects.count)()
+    total = await sync_to_async(
+        GlobalBook.objects.exclude(pdf_file="").exclude(pdf_file__isnull=True).count
+    )()
     await message.answer(
         f"📚 <b>Kutubxona boshqaruvi</b>\n\n"
         f"Hozirda <b>{total}</b> ta kitob mavjud.\n\n"
@@ -455,7 +457,10 @@ async def libadm_save(call: types.CallbackQuery, state: FSMContext):
 # ──────────────────────────────────────────────────────────────────────────
 @sync_to_async
 def _list_books_sync(page: int):
-    qs = GlobalBook.objects.order_by("title")
+    # Hide the ~1400 placeholder rows that only have a title (bulk-imported,
+    # no pdf_file) -- they clutter the list and aren't meant to be managed
+    # here. They still exist in the DB; this is a display filter only.
+    qs = GlobalBook.objects.exclude(pdf_file="").exclude(pdf_file__isnull=True).order_by("title")
     total = qs.count()
     offset = (page - 1) * _BOOKS_PER_PAGE
     rows = list(qs.values("id", "title", "author")[offset: offset + _BOOKS_PER_PAGE])
