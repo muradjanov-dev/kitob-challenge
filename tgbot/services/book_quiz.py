@@ -190,12 +190,16 @@ def build_results_block(quiz_round) -> str:
     wrong = [a for a in answers if not a.is_correct]
 
     def _names(lst, cap=25):
+        # Plain bold text, not tg://user?id= mention links — a message with
+        # many hidden per-user mention links (up to 50 here as answers pile
+        # up) is exactly the pattern that triggered Telegram's spam filter to
+        # silently strip the "Top Kitobxonlar" leaderboard in the past (see
+        # feedback_keep_group_leaderboards memory / commit 91d2c1c).
         out = []
         for a in lst[:cap]:
             u = a.user
             nm = _escape((u.full_name if u and u.full_name else "Kitobxon"))
-            tid = u.telegram_id if u else 0
-            out.append(f"<a href='tg://user?id={tid}'>{nm}</a>")
+            out.append(f"<b>{nm}</b>")
         s = ", ".join(out)
         extra = len(lst) - cap
         if extra > 0:
