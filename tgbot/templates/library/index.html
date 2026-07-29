@@ -501,10 +501,13 @@
     .mag-toggle-btn:active { transform: scale(.94); transition-duration: .1s; }
     .mag-toggle-btn.active { background: var(--accent); color: #1a1208; }
 
-    /* Reading (magnifier) mode: a fixed 16:9 window into a highly zoomed
-       page, panned via drag (both axes) or the ▲▼ buttons for vertical --
-       comfortable reading at high zoom without free pinch-zoom's fiddliness,
-       while still reaching every part of the page (nothing stays cropped). */
+    /* Reading (magnifier) mode: a landscape window showing exactly 1/Nth of
+       the page's height at a time (N = the 2x/3x/4x preset), full page WIDTH
+       always fitted with zero horizontal cropping -- panned vertically via
+       drag, tap-to-jump, or the ▲▼ buttons. Window height is computed in JS
+       from the actual rendered page (see _pdfRenderPage/_magSetPreset), not
+       a fixed CSS aspect-ratio, since "full width, no cropping" and "always
+       exactly 16:9" can't both hold for an arbitrary page shape. */
     .mag-controls {
       display: none; align-items: center; justify-content: space-between; gap: 10px;
       padding: 8px 16px; background: var(--wood-dk); border-bottom: 1px solid rgba(255,255,255,.1);
@@ -522,12 +525,12 @@
     .mag-preset-btn:active, .mag-pan-btn:active { transform: scale(.92); transition-duration: .1s; }
     .mag-preset-btn.active { background: var(--accent); color: #1a1208; }
     #pdfCanvasWrap.mag-mode {
-      aspect-ratio: 16 / 9; flex: 0 0 auto; overflow: hidden; position: relative;
+      flex: 0 0 auto; overflow: hidden; position: relative;
       padding: 0; align-items: flex-start; touch-action: none;
+      /* height is set inline by JS once the page's real size is known */
     }
     #pdfCanvasWrap.mag-mode #pdfCanvas {
-      position: absolute; left: 50%; top: 0; max-width: none;
-      transform: translateX(-50%);
+      position: absolute; left: 0; top: 0; max-width: none;
       box-shadow: none;
     }
     #pdfCanvasWrap.mag-mode #pdfLoading { top: 0; }
@@ -1326,12 +1329,14 @@ function _pdfRenderPage(num, dir) {
     const baseViewport = page.getViewport({ scale: 1 });
     let viewport;
     if (_magMode) {
-      // Reading mode: fit the page WIDTH to the 16:9 window, then blow it up
-      // by the chosen preset -- height overflows the window on purpose, and
-      // _magClampPan()/drag reveal the rest by panning vertically only.
+      // Reading mode: ALWAYS fit the page width exactly to the window --
+      // never scaled up -- so no word is ever cropped off the side. The
+      // zoom preset instead controls the window's HEIGHT (set after render,
+      // once we know the page's real rendered height): showing 1/Nth of the
+      // page per screen is what makes it feel "zoomed in", not a wider render.
       const wrapW = pdfWrap.clientWidth;
       const fitScale = wrapW / baseViewport.width;
-      viewport = page.getViewport({ scale: fitScale * _magZoomPreset });
+      viewport = page.getViewport({ scale: fitScale });
     } else {
       const wrapW = pdfWrap.clientWidth - 24;
       const fitScale = Math.min(2.2, Math.max(0.5, wrapW / baseViewport.width));
@@ -1357,7 +1362,13 @@ function _pdfRenderPage(num, dir) {
       _pdfRendering = false;
       pdfLoading.classList.add('hidden');
       if (_magMode) {
-        _magPanY = 0; _magPanX = 0; // new page always starts at the top, centered
+        // viewport.height is the full page's CSS-px height at the width-fit
+        // scale -- dividing by the preset gives the window a height equal to
+        // exactly one "band" (1/2, 1/3, or 1/4 of the page), which is what
+        // makes it feel zoomed in without ever touching the width.
+        _magPageHeightCss = viewport.height;
+        pdfWrap.style.height = Math.round(_magPageHeightCss / _magZoomPreset) + 'px';
+        _magPanY = 0; // new page always starts at the top band
         _magApplyPan();
       } else if (dir) {
         _pdfPlayFlip(dir);
@@ -1424,9 +1435,9 @@ function _pdfSetZoom(z) {
 pdfZoomIn.addEventListener('click', () => _pdfSetZoom(_pdfZoom + 0.2));
 pdfZoomOut.addEventListener('click', () => _pdfSetZoom(_pdfZoom - 0.2));
 
-// ── Reading (magnifier) mode: fixed 16:9 window, big preset zoom, drag to
-// pan (vertical is primary, via drag or ▲▼; horizontal drag also works so
-// wide pages at high zoom never leave text stuck off-screen). ─────────────
+// ── Reading (magnifier) mode: full page width always fitted (zero
+// horizontal cropping, ever), window height = 1/Nth of the page per the
+// 2x/3x/4x preset. Pan vertically via drag, tap-to-jump-a-band, or ▲▼. ────
 const magToggle   = document.getElementById('magToggle');
 const magControls = document.getElementById('magControls');
 const magUpBtn    = document.getElementById('magUp');
@@ -1435,18 +1446,13 @@ const magPresetBtns = document.querySelectorAll('.mag-preset-btn');
 
 let _magMode = false;
 let _magZoomPreset = 2;
-let _magPanY = 0, _magPanX = 0;
+let _magPanY = 0;
+let _magPageHeightCss = 0; // full rendered page height, CSS px, set by _pdfRenderPage
 
 function _magApplyPan() {
-  const maxPanY = Math.max(0, pdfCanvas.height - pdfWrap.clientHeight);
-  // Canvas is horizontally centered at baseline (left:50% + translateX(-50%)),
-  // so it overflows the window equally on both sides -- pan range is half
-  // that overflow in each direction so every part of the width is reachable
-  // (nothing permanently cropped, unlike the centered-only version before).
-  const maxPanX = Math.max(0, pdfCanvas.width - pdfWrap.clientWidth) / 2;
+  const maxPanY = Math.max(0, _magPageHeightCss - pdfWrap.clientHeight);
   _magPanY = Math.min(maxPanY, Math.max(0, _magPanY));
-  _magPanX = Math.min(maxPanX, Math.max(-maxPanX, _magPanX));
-  pdfCanvas.style.transform = `translate(calc(-50% + ${_magPanX}px), ${-_magPanY}px)`;
+  pdfCanvas.style.transform = `translateY(${-_magPanY}px)`;
   magUpBtn.disabled = _magPanY <= 0;
   magDownBtn.disabled = _magPanY >= maxPanY;
 }
@@ -1466,44 +1472,53 @@ function _magToggle() {
   magControls.classList.toggle('show', _magMode);
   pdfWrap.classList.toggle('mag-mode', _magMode);
   pdfCanvas.style.transform = '';
+  pdfWrap.style.height = '';
   _magPanY = 0;
-  _magPanX = 0;
   if (_magMode) _magSetPreset(_magZoomPreset);
   else if (_pdfDoc) _pdfQueueRender(_pdfPage, 0);
 }
 magToggle.addEventListener('click', _magToggle);
 
-const MAG_NUDGE = 140; // px per ▲▼ tap
-magUpBtn.addEventListener('click', () => { _magPanY -= MAG_NUDGE; _magApplyPan(); });
-magDownBtn.addEventListener('click', () => { _magPanY += MAG_NUDGE; _magApplyPan(); });
+// One full band (= the current window height) per ▲▼ tap -- lines up with
+// tap-to-jump below so all three ways of moving agree on what "one step" means.
+magUpBtn.addEventListener('click', () => { _magPanY -= pdfWrap.clientHeight; _magApplyPan(); });
+magDownBtn.addEventListener('click', () => { _magPanY += pdfWrap.clientHeight; _magApplyPan(); });
 
-// Drag (touch or mouse) to pan while in reading mode -- both axes, so a
-// wider-than-window zoomed page never leaves text permanently cropped off
-// to the sides; only vertical has dedicated ▲▼ buttons since that's the
-// primary reading direction, but horizontal drag always works too.
-let _magDragX = null, _magDragY = null, _magDragStartPanX = 0, _magDragStartPanY = 0;
+// Drag to pan (fine control) -- vertical only, since width always exactly
+// fits the window, there's nothing to reveal sideways. A drag that barely
+// moved is instead treated as a TAP: tapping the upper/lower half of the
+// window jumps one whole band up/down, so "tapping where you want to read"
+// works too, not just dragging.
+const MAG_TAP_SLOP = 12; // px of movement below which a release counts as a tap
+let _magDragY = null, _magDragStartPanY = 0, _magMoved = false;
 pdfWrap.addEventListener('pointerdown', (e) => {
   if (!_magMode) return;
-  _magDragX = e.clientX;
   _magDragY = e.clientY;
-  _magDragStartPanX = _magPanX;
   _magDragStartPanY = _magPanY;
+  _magMoved = false;
   try { pdfWrap.setPointerCapture(e.pointerId); } catch (err) {}
 });
 pdfWrap.addEventListener('pointermove', (e) => {
   if (!_magMode || _magDragY === null) return;
-  _magPanX = _magDragStartPanX + (e.clientX - _magDragX);
-  _magPanY = _magDragStartPanY - (e.clientY - _magDragY);
+  const dy = e.clientY - _magDragY;
+  if (Math.abs(dy) > MAG_TAP_SLOP) _magMoved = true;
+  _magPanY = _magDragStartPanY - dy;
   _magApplyPan();
 });
-function _magEndDrag() {
+function _magEndDrag(e) {
   if (_magDragY === null) return;
-  _magDragX = null;
+  if (!_magMoved) {
+    // Tap: jump one band toward wherever inside the window was tapped.
+    const rect = pdfWrap.getBoundingClientRect();
+    const tapFrac = (e.clientY - rect.top) / rect.height;
+    _magPanY += (tapFrac < 0.5 ? -1 : 1) * pdfWrap.clientHeight;
+    _magApplyPan();
+  }
   _magDragY = null;
   _pdfPing();
 }
 pdfWrap.addEventListener('pointerup', _magEndDrag);
-pdfWrap.addEventListener('pointercancel', _magEndDrag);
+pdfWrap.addEventListener('pointercancel', () => { _magDragY = null; });
 
 // Pinch-to-zoom: live CSS-transform preview while pinching (cheap), then a
 // crisp pdf.js re-render at the final zoom once fingers lift. A one-finger
@@ -1527,8 +1542,18 @@ pdfWrap.addEventListener('touchstart', (e) => {
 }, { passive: true });
 pdfWrap.addEventListener('touchmove', (e) => {
   if (_magMode) return;
-  if (e.touches.length === 2 && _pdfPinchDist) {
+  if (e.touches.length === 2) {
     _pdfSwiping = false;
+    if (_pdfPinchDist === null) {
+      // Second finger landed a beat after the first (very common -- real
+      // pinch gestures rarely start both fingers on the exact same touch
+      // event), so touchstart only ever saw one finger and set up a swipe.
+      // Start the pinch baseline now instead of letting it fall through to
+      // a swipe-triggered page turn on release.
+      _pdfPinchDist = _pdfTouchDist(e.touches);
+      _pdfPinchStartZoom = _pdfZoom;
+      return;
+    }
     const factor = _pdfTouchDist(e.touches) / _pdfPinchDist;
     pdfCanvas.style.transform = `scale(${Math.min(3, Math.max(0.5, factor))})`;
   }
