@@ -18,6 +18,7 @@ from tgbot.game_views import (
     detective_index, api_detective_state, api_detective_submit,
     survival_index, api_survival_state, api_survival_submit,
     quiz_index, api_quiz_state, api_quiz_submit,
+    api_games_status,
 )
 
 
@@ -95,4 +96,6 @@ urlpatterns = [
     path("teskari-viktorina/", quiz_index, {"flavor": "reverse"}, name="quiz-reverse"),
     path("teskari-viktorina/api/state/", api_quiz_state, {"flavor": "reverse"}, name="quiz-reverse-api-state"),
     path("teskari-viktorina/api/submit/", api_quiz_submit, {"flavor": "reverse"}, name="quiz-reverse-api-submit"),
+
+    path("api/games/status/", api_games_status, name="games-api-status"),
 ]

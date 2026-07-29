@@ -160,6 +160,15 @@
     .quiz-opt:hover { border-color: var(--green-2); background: rgba(31,107,76,0.08); }
     .quiz-opt.correct { border-color: var(--green-2); background: rgba(31,107,76,0.14); color: var(--green); font-weight: 700; }
     .coin-dot { width: 36px; height: 36px; border-radius: 50%; display: inline-block; background: radial-gradient(circle at 30% 30%, #fff5cc, var(--accent-2) 55%, #b87b1d); box-shadow: 0 4px 12px rgba(200,146,46,0.30); }
+    .live-dot {
+      width: 9px; height: 9px; border-radius: 50%; background: #ff4d4d; flex-shrink: 0;
+      box-shadow: 0 0 0 rgba(255,77,77,.5); animation: liveDotPulse 1.6s ease-out infinite;
+    }
+    @keyframes liveDotPulse {
+      0%   { box-shadow: 0 0 0 0 rgba(255,77,77,.55); }
+      70%  { box-shadow: 0 0 0 8px rgba(255,77,77,0); }
+      100% { box-shadow: 0 0 0 0 rgba(255,77,77,0); }
+    }
 
     /* Premium */
     .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 760px; margin: 0 auto; }
@@ -366,6 +375,40 @@
           <div class="quiz-opt correct">B · O'tkan kunlar ✓</div>
           <div class="quiz-opt">C · Qaytalardasan, bolaligim</div>
           <div class="quiz-opt">D · Mehrobdan chayon</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- JONLI O'YINLAR -->
+  <section id="oyinlar">
+    <div class="wrap">
+      <div class="spotlight reveal">
+        <div>
+          <span class="sec-label" style="text-align:left">Jonli o'yinlar</span>
+          <h2>Har kuni 10:00 va 22:00 — 3 tadan jonli o'yin</h2>
+          <p>Kitob Zanjiri, Bilim Qal'asi, Viktorinalar va boshqalar — har kuni ikki marta, ketma-ket 3 tadan jonli o'tkaziladi. Qatnashish — 25 Kitobcha, g'oliblarga sovg'alar.</p>
+          <a href="https://t.me/kitob_challange_bot" class="btn btn-primary" target="_blank" rel="noopener">O'yinlarga qatnashish</a>
+        </div>
+        <div class="quiz-card" id="gamesWidget">
+          <div id="gamesLoading" style="font-size:13px;color:var(--text-faint);text-align:center;padding:10px 0;">Yuklanmoqda…</div>
+          <div id="gamesActive" style="display:none">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <span class="live-dot"></span>
+              <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;">Hozir jonli</div>
+            </div>
+            <div class="serif" style="font-size:19px;margin-bottom:6px;" id="gamesActiveTitle"></div>
+            <div style="font-size:12.5px;color:var(--text-dim);margin-bottom:12px;" id="gamesActiveMeta"></div>
+            <a href="#" class="btn btn-primary" id="gamesActiveLink" style="display:inline-block;font-size:13px;padding:9px 18px;">Qo'shilish</a>
+          </div>
+          <div id="gamesCountdown" style="display:none">
+            <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Keyingi o'yinlargacha</div>
+            <div class="serif" style="font-size:30px;font-variant-numeric:tabular-nums;" id="gamesCountdownVal">--:--:--</div>
+          </div>
+          <div id="gamesLastResult" style="display:none;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+            <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Oxirgi o'yin natijasi</div>
+            <div class="quiz-opt" id="gamesLastLine"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -584,6 +627,82 @@
       if (hint) hint.addEventListener("click", openShop);
       const zbtn = document.getElementById("zanjirBtn");
       if (zbtn) zbtn.addEventListener("click", function (e) { e.preventDefault(); openGame(); });
+    })();
+
+    // ─── Live games widget: countdown to next slot / what's live now / last
+    // slot's turnout. Pure public schedule info, no auth needed. ───────────
+    (function () {
+      let countdownTimer = null;
+
+      function fmtCountdown(ms) {
+        const s = Math.max(0, Math.floor(ms / 1000));
+        const h = String(Math.floor(s / 3600)).padStart(2, "0");
+        const m = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+        const sec = String(s % 60).padStart(2, "0");
+        return `${h}:${m}:${sec}`;
+      }
+
+      function startCountdown(targetIso) {
+        const target = new Date(targetIso).getTime();
+        const el = document.getElementById("gamesCountdownVal");
+        clearInterval(countdownTimer);
+        function tick() {
+          const diff = target - Date.now();
+          if (diff <= 0) {
+            clearInterval(countdownTimer);
+            loadGamesStatus(); // slot just started -- refresh to show "hozir jonli"
+            return;
+          }
+          el.textContent = fmtCountdown(diff);
+        }
+        tick();
+        countdownTimer = setInterval(tick, 1000);
+      }
+
+      function loadGamesStatus() {
+        fetch("/api/games/status/")
+          .then(r => r.json())
+          .then(d => {
+            if (!d.ok) return;
+            document.getElementById("gamesLoading").style.display = "none";
+
+            if (d.active) {
+              document.getElementById("gamesActive").style.display = "block";
+              document.getElementById("gamesCountdown").style.display = "none";
+              document.getElementById("gamesActiveTitle").textContent = d.active.label;
+              document.getElementById("gamesActiveMeta").textContent =
+                `${d.active.index}/${d.active.total} — ${d.active.slot === "morning" ? "ertalabki" : "kechqurungi"} seriya`;
+              const link = document.getElementById("gamesActiveLink");
+              if (d.active.url) {
+                link.onclick = function (e) {
+                  e.preventDefault();
+                  let url = d.active.url;
+                  const id = tg && tg.initData ? tg.initData : "";
+                  if (id) url += "?tgWebAppData=" + encodeURIComponent(id);
+                  window.location.href = url;
+                };
+              }
+            } else {
+              document.getElementById("gamesActive").style.display = "none";
+              document.getElementById("gamesCountdown").style.display = "block";
+              if (d.next_slot_at) startCountdown(d.next_slot_at);
+            }
+
+            if (d.last_result && d.last_result.last_game_label) {
+              const box = document.getElementById("gamesLastResult");
+              box.style.display = "block";
+              const n = d.last_result.last_game_participants;
+              const line = n !== null && n !== undefined
+                ? `${d.last_result.last_game_label} — ${n} ishtirokchi`
+                : d.last_result.last_game_label;
+              document.getElementById("gamesLastLine").textContent = line;
+            }
+          })
+          .catch(() => {
+            document.getElementById("gamesLoading").textContent = "Yuklab bo'lmadi.";
+          });
+      }
+      loadGamesStatus();
     })();
 
     // Mobile nav

@@ -283,3 +283,105 @@ def api_quiz_submit(request: HttpRequest, flavor: str) -> JsonResponse:
     if not g:
         return JsonResponse({"ok": False, "error": "not_live"})
     return JsonResponse(quiz_game.submit_answer(g.id, request.tg_profile, choice))
+
+
+# ── Homepage "live games" widget: countdown + what's on right now + last
+# slot's turnout. Public (no initData needed) -- pure schedule/status info,
+# same data anyone sees posted in the groups. ──────────────────────────────
+
+_GAME_LABELS_URLS = {
+    "chain": ("Kitob Zanjiri", "/zanjir/"),
+    "feud": ("Ko'pchilik nima dedi?", "/kopchilik/"),
+    "castle": ("Bilim Qal'asi", "/qala/"),
+    "emoji": ("Emoji Kitob", "/emoji/"),
+    "wisdom": ("Hikmatlar", "/hikmat/"),
+    "detective": ("Detektiv", "/detektiv/"),
+    "survival": ("Omon qolish", "/omon-qolish/"),
+    "twofacts": ("Ikki haqiqat, bir yolg'on", "/ikki-haqiqat/"),
+    "impostor": ("Kim yolg'onchi?", "/kim-yolgonchi/"),
+    "connection": ("Yashirin bog'lanish", "/bog-lanish/"),
+    "teams": ("Jamoa Jangi", "/jamoa-jangi/"),
+    "timeline": ("Vaqt Mashinasi", "/vaqt-mashinasi/"),
+    "matchbook": ("Muallif-Asar Moslashtirish", "/muallif-asar/"),
+    "reverse": ("Teskari Viktorina", "/teskari-viktorina/"),
+}
+_QUIZ_FLAVOR_SET = set(_QUIZ_FLAVORS)
+
+
+def _game_participant_count(game_type: str, game_id: int) -> int:
+    from tgbot.models import (
+        ChainScore, FeudScore, CastleHit, EmojiScore,
+        WisdomScore, DetectiveScore, SurvivalPlayer, QuizScore,
+    )
+    model_by_type = {
+        "chain": ChainScore, "feud": FeudScore, "emoji": EmojiScore,
+        "wisdom": WisdomScore, "detective": DetectiveScore, "survival": SurvivalPlayer,
+    }
+    if game_type == "castle":
+        return CastleHit.objects.filter(game_id=game_id).values("user_id").distinct().count()
+    if game_type in _QUIZ_FLAVOR_SET:
+        return QuizScore.objects.filter(game_id=game_id).count()
+    model = model_by_type.get(game_type)
+    return model.objects.filter(game_id=game_id).count() if model else 0
+
+
+def _next_slot_at():
+    """Next occurrence of 10:00 or 22:00 Tashkent time, as an aware datetime."""
+    import datetime as _dt
+    from django.utils import timezone as _tz
+
+    now = _tz.localtime()
+    for hour in (10, 22):
+        candidate = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+        if candidate > now:
+            return candidate
+    # Both today's slots have passed -- tomorrow's 10:00.
+    tomorrow = now.date() + _dt.timedelta(days=1)
+    return _tz.make_aware(_dt.datetime.combine(tomorrow, _dt.time(10, 0)))
+
+
+@require_GET
+def api_games_status(request: HttpRequest) -> JsonResponse:
+    from tgbot.models import GameSequence
+
+    active = None
+    seq = GameSequence.objects.filter(completed=False).order_by("-date", "-slot").first()
+    if seq and seq.current_game_type:
+        label, url = _GAME_LABELS_URLS.get(seq.current_game_type, (seq.current_game_type, None))
+        active = {
+            "slot": seq.slot,
+            "game_type": seq.current_game_type,
+            "label": label,
+            "url": url,
+            "index": seq.current_index + 1,
+            "total": len(seq.game_types),
+        }
+
+    last_result = None
+    last_seq = GameSequence.objects.filter(completed=True).order_by("-date", "-slot").first()
+    if last_seq:
+        games = []
+        for gt in last_seq.game_types:
+            label, url = _GAME_LABELS_URLS.get(gt, (gt, None))
+            # current_game_id only reliably points at the *last* game once the
+            # sequence is fully completed (it's overwritten as each one starts),
+            # so this is only meaningful for the final entry of game_types --
+            # earlier ones just get a label with no participant count.
+            games.append({"type": gt, "label": label, "url": url})
+        last_result = {
+            "slot": last_seq.slot,
+            "date": last_seq.date.isoformat(),
+            "games": games,
+            "last_game_participants": (
+                _game_participant_count(last_seq.current_game_type, last_seq.current_game_id)
+                if last_seq.current_game_type and last_seq.current_game_id else None
+            ),
+            "last_game_label": games[-1]["label"] if games else None,
+        }
+
+    return JsonResponse({
+        "ok": True,
+        "next_slot_at": _next_slot_at().isoformat(),
+        "active": active,
+        "last_result": last_result,
+    })
