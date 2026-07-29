@@ -2,15 +2,16 @@ import io
 import json
 import os
 import zipfile
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import requests
 from django.contrib import admin, messages
 from django.contrib.auth.models import User, Group
 from django.core import serializers
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import path, reverse
+from django.utils import timezone
 
 from . import models
 from tgbot.tasks import weekly_report_for_general, run_total_pages, \
@@ -737,3 +738,87 @@ class GameSequenceAdmin(admin.ModelAdmin):
                      'current_game_type', 'current_game_id', 'completed')
     list_filter = ('slot', 'completed')
     readonly_fields = ('created_at', 'updated_at')
+
+
+################################################################################
+#                          SAYT STATISTIKASI (ANALYTICS)                       #
+################################################################################
+
+SECTION_LABELS = {
+    "site": "Bosh sahifa", "library": "Kutubxona", "shop": "Do'kon",
+    "cabinet": "Kabinet", "chain": "Zanjiri (o'yin)", "feud": "Ko'pchilik (o'yin)",
+    "castle": "Qal'a (o'yin)", "emoji": "Emoji (o'yin)", "wisdom": "Hikmat (o'yin)",
+    "detective": "Detektiv (o'yin)", "survival": "Omon qolish (o'yin)",
+    "quiz-twofacts": "Ikki haqiqat", "quiz-impostor": "Kim yolg'onchi",
+    "quiz-connection": "Bog'lanish", "quiz-teams": "Jamoa jangi",
+    "quiz-timeline": "Vaqt mashinasi", "quiz-matchbook": "Muallif-asar",
+    "quiz-reverse": "Teskari viktorina",
+}
+
+
+@admin.register(models.SiteEvent)
+class SiteEventAdmin(admin.ModelAdmin):
+    """Raw event log doubles as the Statistika dashboard: `changelist_view`
+    injects section/button aggregates above the standard filterable table."""
+    change_list_template = "admin/tgbot/siteevent/change_list.html"
+    list_display = ("id", "created_at", "event_type", "section", "label", "user")
+    list_filter = ("event_type", "section", "created_at")
+    search_fields = ("section", "label", "user__full_name", "user__username")
+    date_hierarchy = "created_at"
+
+    RANGE_CHOICES = {
+        "today": ("Bugun", 1),
+        "7d": ("So'nggi 7 kun", 7),
+        "30d": ("So'nggi 30 kun", 30),
+        "all": ("Hammasi", None),
+    }
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        range_key = request.GET.get("range", "7d")
+        if range_key not in self.RANGE_CHOICES:
+            range_key = "7d"
+        _, days = self.RANGE_CHOICES[range_key]
+
+        qs = models.SiteEvent.objects.all()
+        if days is not None:
+            qs = qs.filter(created_at__gte=timezone.now() - timedelta(days=days))
+
+        top_sections = list(
+            qs.values("section")
+              .annotate(
+                  views=Count("id", filter=Q(event_type=models.SiteEvent.TYPE_PAGEVIEW)),
+                  click_count=Count("id", filter=Q(event_type=models.SiteEvent.TYPE_CLICK)),
+                  users=Count("user", distinct=True),
+              )
+              .order_by("-views", "-click_count")[:30]
+        )
+        for row in top_sections:
+            row["display"] = SECTION_LABELS.get(row["section"], row["section"])
+
+        top_buttons = list(
+            qs.filter(event_type=models.SiteEvent.TYPE_CLICK)
+              .exclude(label="")
+              .values("section", "label")
+              .annotate(clicks=Count("id"))
+              .order_by("-clicks")[:30]
+        )
+        for row in top_buttons:
+            row["display"] = SECTION_LABELS.get(row["section"], row["section"])
+
+        extra_context.update({
+            "range_key": range_key,
+            "range_choices": self.RANGE_CHOICES,
+            "total_pageviews": qs.filter(event_type=models.SiteEvent.TYPE_PAGEVIEW).count(),
+            "total_clicks": qs.filter(event_type=models.SiteEvent.TYPE_CLICK).count(),
+            "total_users": qs.exclude(user__isnull=True).values("user").distinct().count(),
+            "top_sections": top_sections,
+            "top_buttons": top_buttons,
+        })
+        return super().changelist_view(request, extra_context=extra_context)

@@ -9,6 +9,7 @@ from tgbot.library_views import (
 )
 from tgbot.cabinet_views import cabinet_index, api_cabinet_me
 from tgbot.report_views import api_submit_report, api_my_report_books
+from tgbot.analytics_views import api_track_event
 from tgbot.game_views import (
     chain_index, api_chain_state, api_chain_submit,
     feud_index, api_feud_state, api_feud_submit,
@@ -100,4 +101,6 @@ urlpatterns = [
     path("teskari-viktorina/api/submit/", api_quiz_submit, {"flavor": "reverse"}, name="quiz-reverse-api-submit"),
 
     path("api/games/status/", api_games_status, name="games-api-status"),
+
+    path("api/track/event/", api_track_event, name="track-event"),
 ]

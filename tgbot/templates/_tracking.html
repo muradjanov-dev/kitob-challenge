@@ -1,0 +1,44 @@
+<script>
+(function(){
+  var SECTION = "{{ section|escapejs }}";
+  if (!SECTION) return;
+
+  function send(payload){
+    try {
+      var initData = (window.Telegram && Telegram.WebApp && Telegram.WebApp.initData) || "";
+      var data = JSON.stringify(Object.assign({
+        section: SECTION,
+        path: location.pathname,
+        initData: initData
+      }, payload));
+      if (navigator.sendBeacon) {
+        var ok = navigator.sendBeacon("/api/track/event/", new Blob([data], {type: "application/json"}));
+        if (ok) return;
+      }
+      fetch("/api/track/event/", {
+        method: "POST", body: data, keepalive: true,
+        headers: {"Content-Type": "application/json"},
+      }).catch(function(){});
+    } catch (e) {}
+  }
+
+  send({event_type: "pageview"});
+
+  function labelFor(el){
+    var tracked = el.getAttribute("data-track");
+    if (tracked) return tracked.slice(0, 120);
+    var aria = el.getAttribute("aria-label");
+    if (aria) return aria.slice(0, 120);
+    var text = (el.innerText || el.textContent || "").trim().replace(/\s+/g, " ");
+    if (text) return text.slice(0, 120);
+    if (el.id) return "#" + el.id;
+    return el.tagName.toLowerCase();
+  }
+
+  document.addEventListener("click", function(e){
+    var el = e.target.closest("button, a, [role='button'], [data-track]");
+    if (!el) return;
+    send({event_type: "click", label: labelFor(el)});
+  }, true);
+})();
+</script>

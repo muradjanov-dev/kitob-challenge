@@ -1961,3 +1961,34 @@ class GameSequence(BaseModel):
 
     def __str__(self):
         return f"{self.date} {self.slot} — {self.game_types} (#{self.current_index})"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+class SiteEvent(BaseModel):
+    """Mini App usage analytics: one row per page view or button click,
+    fed by the tracking beacon included on every site/*, game/* etc. page.
+    Kept intentionally simple (flat table) since the only consumer is the
+    admin Statistika dashboard's aggregate queries."""
+    TYPE_PAGEVIEW = "pageview"
+    TYPE_CLICK = "click"
+    TYPE_CHOICES = [(TYPE_PAGEVIEW, "Sahifa ko'rish"), (TYPE_CLICK, "Tugma bosish")]
+
+    event_type = models.CharField(max_length=10, choices=TYPE_CHOICES, db_index=True)
+    section = models.CharField(max_length=32, db_index=True, help_text="e.g. 'site', 'library', 'quiz-impostor'.")
+    label = models.CharField(max_length=120, blank=True, default="", help_text="Button text/id — empty for pageviews.")
+    path = models.CharField(max_length=255, blank=True, default="")
+    user = models.ForeignKey(
+        TelegramProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name="site_events",
+    )
+
+    class Meta:
+        db_table = "site_events"
+        verbose_name = "Sayt Statistikasi — Hodisa"
+        verbose_name_plural = "Sayt Statistikasi — Hodisalar"
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["event_type", "section", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.event_type}:{self.section} {self.label}"[:60]

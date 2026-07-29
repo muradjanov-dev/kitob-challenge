@@ -1,0 +1,65 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block result_list %}
+<div id="site-stats-dashboard" style="margin-bottom:24px;">
+  <h2>📊 Sayt Statistikasi</h2>
+
+  <div style="margin-bottom:14px;">
+    {% for key, val in range_choices.items %}
+      <a href="?range={{ key }}"
+         style="margin-right:14px;{% if key == range_key %}font-weight:bold;text-decoration:underline;{% endif %}">{{ val.0 }}</a>
+    {% endfor %}
+  </div>
+
+  <div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
+    <div class="module" style="padding:10px 18px;">👁 Sahifa ko'rishlar<br><strong style="font-size:22px;">{{ total_pageviews }}</strong></div>
+    <div class="module" style="padding:10px 18px;">🖱 Tugma bosishlar<br><strong style="font-size:22px;">{{ total_clicks }}</strong></div>
+    <div class="module" style="padding:10px 18px;">👤 Faol foydalanuvchilar<br><strong style="font-size:22px;">{{ total_users }}</strong></div>
+  </div>
+
+  <div style="display:flex;gap:30px;flex-wrap:wrap;margin-bottom:10px;">
+    <div style="flex:1;min-width:340px;">
+      <h3>Eng faol bo'limlar</h3>
+      <table>
+        <thead>
+          <tr><th>Bo'lim</th><th>Ko'rishlar</th><th>Bosishlar</th><th>Foydalanuvchilar</th></tr>
+        </thead>
+        <tbody>
+        {% for row in top_sections %}
+          <tr>
+            <td>{{ row.display }}</td>
+            <td>{{ row.views }}</td>
+            <td>{{ row.click_count }}</td>
+            <td>{{ row.users }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4">Ma'lumot yo'q</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="flex:1;min-width:340px;">
+      <h3>Eng ko'p bosilgan tugmalar</h3>
+      <table>
+        <thead>
+          <tr><th>Bo'lim</th><th>Tugma</th><th>Bosishlar</th></tr>
+        </thead>
+        <tbody>
+        {% for row in top_buttons %}
+          <tr>
+            <td>{{ row.display }}</td>
+            <td>{{ row.label }}</td>
+            <td>{{ row.clicks }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3">Ma'lumot yo'q</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{{ block.super }}
+{% endblock %}

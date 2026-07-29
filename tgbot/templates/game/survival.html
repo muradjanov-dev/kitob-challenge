@@ -175,5 +175,6 @@
     setInterval(function(){if(localSeconds>0){localSeconds--;$('timer').textContent=fmt(localSeconds);}},1000);
     poll();setInterval(poll,1500);
   </script>
+{% include "_tracking.html" with section="survival" %}
 </body>
 </html>
