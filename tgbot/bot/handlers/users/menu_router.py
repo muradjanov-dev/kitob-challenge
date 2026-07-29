@@ -1888,6 +1888,10 @@ async def _menu_quiz(call, user, _state: FSMContext):
         kb.add(InlineKeyboardButton(
             text="📋 Mening quizlarim", callback_data="qz:ls",
         ))
+    if is_admin:
+        kb.add(InlineKeyboardButton(
+            text="🗂 Barcha quizlar (Admin)", callback_data="qz:all",
+        ))
 
     if not quizzes:
         if can_create:

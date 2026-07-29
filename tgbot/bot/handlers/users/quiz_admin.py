@@ -10,7 +10,7 @@ from asgiref.sync import sync_to_async
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.utils import aget_user
 from tgbot.bot.states.main import QuizCreateState, QuizEditState, QuizBattleState
-from tgbot.models import Quiz, QuizQuestion, QuizOption, QuizSession, TelegramProfile
+from tgbot.models import Quiz, QuizQuestion, QuizOption, QuizSession, QuizParticipant, TelegramProfile
 
 BOT_USERNAME = os.environ.get("BOT_USERNAME", "kitob_challange_bot")
 
@@ -127,7 +127,7 @@ def _quiz_list_kb(quizzes) -> InlineKeyboardMarkup:
     return kb
 
 
-def _quiz_view_kb(quiz) -> InlineKeyboardMarkup:
+def _quiz_view_kb(quiz, back: str = "ls") -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup(row_width=2)
     shuffle_label = "🔀 Shuffle: ✅" if quiz.shuffle else "🔀 Shuffle: ❌"
     kb.row(
@@ -143,7 +143,25 @@ def _quiz_view_kb(quiz) -> InlineKeyboardMarkup:
         url=f"https://t.me/{BOT_USERNAME}?startgroup=quiz_{quiz.link_code}",
     ))
     kb.row(InlineKeyboardButton(text="🗑 O'chirish", callback_data=f"qz:del:{quiz.id}"))
-    kb.row(InlineKeyboardButton(text="« Orqaga", callback_data="qz:ls"))
+    kb.row(InlineKeyboardButton(text="« Orqaga", callback_data=f"qz:{back}"))
+    return kb
+
+
+def _all_quizzes_kb(quizzes, page: int, has_more: bool) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardMarkup(row_width=1)
+    for q in quizzes:
+        creator_label = q.creator.full_name or q.creator.username or str(q.creator.telegram_id)
+        kb.add(InlineKeyboardButton(
+            text=f"📝 {q.title} — {creator_label} ({q.q_count} savol, {q.solved_count} marta yechilgan)",
+            callback_data=f"qz:v:{q.id}:all",
+        ))
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton(text="« Oldingi", callback_data=f"qz:allp:{page - 1}"))
+    if has_more:
+        nav_row.append(InlineKeyboardButton(text="Keyingi »", callback_data=f"qz:allp:{page + 1}"))
+    if nav_row:
+        kb.row(*nav_row)
     return kb
 
 
@@ -159,10 +177,10 @@ def _quiz_edit_kb(quiz_id: int) -> InlineKeyboardMarkup:
     return kb
 
 
-async def _quiz_view_text(quiz) -> str:
+async def _quiz_view_text(quiz, show_admin_info: bool = False) -> str:
     q_count = await sync_to_async(quiz.questions.count)()
     link = _quiz_link(quiz.link_code)
-    return (
+    text = (
         f"📝 <b>{quiz.title}</b>\n\n"
         f"📖 {quiz.description or '—'}\n\n"
         f"❓ Savollar: <b>{q_count}</b>\n"
@@ -170,6 +188,25 @@ async def _quiz_view_text(quiz) -> str:
         f"🔀 Shuffle: {'✅' if quiz.shuffle else '❌'}\n\n"
         f"🔗 Link:\n<code>{link}</code>"
     )
+    if show_admin_info:
+        @sync_to_async
+        def _stats():
+            creator = quiz.creator
+            creator_label = creator.full_name or creator.username or str(creator.telegram_id)
+            solved = QuizSession.objects.filter(quiz=quiz, status="finished").count()
+            participants = QuizParticipant.objects.filter(
+                session__quiz=quiz
+            ).values("user_id").distinct().count()
+            return creator_label, solved, participants
+
+        creator_label, solved, participants = await _stats()
+        text += (
+            f"\n\n👤 Muallif: <b>{creator_label}</b>\n"
+            f"📅 Yaratilgan: <b>{quiz.created_at.strftime('%Y-%m-%d %H:%M')}</b>\n"
+            f"✅ Necha marta yechilgan: <b>{solved}</b>\n"
+            f"👥 Qatnashganlar: <b>{participants}</b>"
+        )
+    return text
 
 
 async def _safe_edit_or_send(call, text, reply_markup=None):
@@ -276,17 +313,55 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
     # View
     elif action == "v" and len(parts) > 2:
         await call.answer()
-        quiz = await sync_to_async(Quiz.objects.filter(id=parts[2]).first)()
+        quiz = await sync_to_async(Quiz.objects.select_related("creator").filter(id=parts[2]).first)()
         if not _can_edit_quiz(quiz, user):
             await call.answer("Topilmadi", show_alert=True)
             return
-        text = await _quiz_view_text(quiz)
+        back = parts[3] if len(parts) > 3 else "ls"
+        text = await _quiz_view_text(quiz, show_admin_info=(back == "all"))
         try:
             await call.message.edit_text(text, parse_mode="HTML",
-                                          reply_markup=_quiz_view_kb(quiz))
+                                          reply_markup=_quiz_view_kb(quiz, back))
         except Exception:
             await call.message.answer(text, parse_mode="HTML",
-                                       reply_markup=_quiz_view_kb(quiz))
+                                       reply_markup=_quiz_view_kb(quiz, back))
+
+    # All quizzes on the platform — site-admin only, not the creator-scoped list.
+    elif action in ("all", "allp"):
+        if not _is_admin(user):
+            await call.answer("Barcha quizlarni ko'rish faqat adminlar uchun.", show_alert=True)
+            return
+        await call.answer()
+        page = int(parts[2]) if action == "allp" and len(parts) > 2 else 0
+        page_size = 10
+
+        @sync_to_async
+        def _load_all(page):
+            from django.db.models import Count, Q
+            qs = (
+                Quiz.objects.select_related("creator")
+                .annotate(
+                    q_count=Count("questions", distinct=True),
+                    solved_count=Count(
+                        "sessions", filter=Q(sessions__status="finished"), distinct=True,
+                    ),
+                )
+                .order_by("-created_at")
+            )
+            total = qs.count()
+            items = list(qs[page * page_size: page * page_size + page_size])
+            return items, total
+
+        quizzes, total = await _load_all(page)
+        has_more = (page + 1) * page_size < total
+        if not quizzes:
+            await _safe_edit_or_send(call, "📭 Hozircha hech qanday quiz yaratilmagan.")
+            return
+        await _safe_edit_or_send(
+            call,
+            f"🗂 <b>Barcha quizlar</b> ({total} ta)\n\nSahifa {page + 1}:",
+            _all_quizzes_kb(quizzes, page, has_more),
+        )
 
     # Edit menu
     elif action == "e" and len(parts) > 2:

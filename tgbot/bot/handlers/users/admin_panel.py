@@ -1462,7 +1462,7 @@ async def show_global_statistics(message: types.Message):
     from django.db.models import Sum, Count, F
     from django.db.models.functions import TruncDate
     from django.utils import timezone
-    from tgbot.models import ConfirmationReport, BooksToRead
+    from tgbot.models import ConfirmationReport, BooksToRead, Quiz, QuizSession, QuizParticipant
 
     today = timezone.localdate()
 
@@ -1493,6 +1493,10 @@ async def show_global_statistics(message: types.Message):
     )
     in_progress_count = in_progress.count()
 
+    total_quizzes = Quiz.objects.count()
+    total_quiz_solved = QuizSession.objects.filter(status="finished").count()
+    total_quiz_participants = QuizParticipant.objects.values("user_id").distinct().count()
+
     lines = [
         "📊 <b>Umumiy statistika</b>",
         "",
@@ -1502,6 +1506,11 @@ async def show_global_statistics(message: types.Message):
         f"📚 Jami hisobotlar: <b>{total_book_reports}</b>",
         f"📈 Hammavaqt o'qilgan jami betlar: <b>{total_pages_alltime}</b>",
         f"📕 Hozir o'qilayotgan kitoblar: <b>{in_progress_count}</b>",
+        "",
+        "📝 <b>Kitob Quiz statistikasi</b>",
+        f"🗂 Jami yaratilgan quizlar: <b>{total_quizzes}</b>",
+        f"✅ Jami yechilgan (marta): <b>{total_quiz_solved}</b>",
+        f"👥 Qatnashgan odamlar: <b>{total_quiz_participants}</b>",
     ]
     if titles:
         lines.append("")
