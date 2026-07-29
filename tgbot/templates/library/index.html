@@ -1236,9 +1236,22 @@ function _pdfRenderPage(num, dir) {
       const fitScale = Math.min(2.2, Math.max(0.5, wrapW / baseViewport.width));
       viewport = page.getViewport({ scale: fitScale * _pdfZoom });
     }
-    pdfCanvas.width = viewport.width;
-    pdfCanvas.height = viewport.height;
-    const task = page.render({ canvasContext: pdfCtx, viewport });
+    // Render at the screen's real pixel density, not just CSS pixels --
+    // without this, text on any Retina/high-DPI phone comes out visibly
+    // soft because the canvas bitmap has fewer physical pixels than the
+    // screen showing it. Capped at 2x so a high-DPR phone at max zoom in
+    // reading mode doesn't blow up canvas memory/render time.
+    const outputScale = Math.min(window.devicePixelRatio || 1, 2);
+    pdfCanvas.width = Math.floor(viewport.width * outputScale);
+    pdfCanvas.height = Math.floor(viewport.height * outputScale);
+    pdfCanvas.style.width = Math.floor(viewport.width) + 'px';
+    // Deliberately NOT setting style.height explicitly: leaving the CSS
+    // `height: auto` rule in control means the displayed height keeps
+    // tracking the canvas's real width/height ratio even in the edge case
+    // where `max-width: 96vw` ends up clamping style.width down -- an
+    // explicit pixel height here would go stale and skew the page.
+    const renderTransform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+    const task = page.render({ canvasContext: pdfCtx, viewport, transform: renderTransform });
     task.promise.then(() => {
       _pdfRendering = false;
       pdfLoading.classList.add('hidden');
