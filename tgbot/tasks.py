@@ -2262,6 +2262,26 @@ def send_daily_personal_report():
     prev_year_s = _dt.date(today.year - 1, 1, 1)
     prev_year_e = _dt.date(today.year - 1, 12, 31)
 
+    # Bugun kutubxonaga qo'shilgan (haqiqiy PDF bilan) yangi kitoblar --
+    # bo'sh bo'lsa hech narsa qo'shilmaydi, faqat mavjud bo'lsa ko'rinadi.
+    from tgbot.models import GlobalBook as _GB
+    new_books_qs = (
+        _GB.objects.filter(created_at__date=today)
+        .exclude(pdf_file="").exclude(pdf_file__isnull=True)
+        .order_by("title")
+    )
+    new_books_block = ""
+    _new_books_count = new_books_qs.count()
+    if _new_books_count:
+        _titles = list(new_books_qs.values_list("title", flat=True)[:10])
+        _lines = "\n".join(f"• {escape(t)}" for t in _titles)
+        _extra = _new_books_count - len(_titles)
+        _extra_line = f"\n…va yana {_extra} ta" if _extra > 0 else ""
+        new_books_block = (
+            f"\n\n🆕 <b>Bugun kutubxonaga qo'shilgan yangi kitoblar:</b>\n{_lines}{_extra_line}\n"
+            f"🌌 Parallel olam → Kutubxona bo'limida o'qing!"
+        )
+
     # Includes trial-Premium users (see TelegramProfile.has_active_premium) —
     # otherwise someone inside their 3-hour daily-giveaway trial window gets
     # the free-tier teaser report instead of the full Premium one they're
@@ -2393,6 +2413,7 @@ def send_daily_personal_report():
                     f"<i>Premium obuna: menyudan 💎 Premium tugmasini bosing!</i>"
                 )
 
+            text += new_books_block
             resp = requests.post(
                 url,
                 data={"chat_id": user.telegram_id, "text": text, "parse_mode": "HTML"},
@@ -2469,6 +2490,7 @@ def send_daily_personal_report():
                         f"📚 <b>Jami eshitilgan:</b> {total_min} daqiqa\n\n"
                         f"<i>💎 Premium olib to'liq tahlil va taqqoslama oling — menyudan 💎 Premium.</i>"
                     )
+                text += new_books_block
                 resp = requests.post(
                     url,
                     data={"chat_id": user.telegram_id, "text": text, "parse_mode": "HTML"},
