@@ -131,6 +131,14 @@ _PROMPT_RULES = f"""
 Make sure options are up to 4 items. correct_index is 0-indexed.
 Do not wrap JSON in markdown block. Just pure JSON.
 
+TITLE / DESCRIPTION RULE:
+- "title" MUST be ONLY the book's name, exactly as found in the source text (its
+  title page, cover, or first mentions) — nothing added, no "quiz", "test",
+  "viktorina", or similar wording. If you genuinely cannot find a book name in
+  the text, use a short topic name instead (still no "quiz"/"test" wording).
+- "description" is a short (one sentence) description of what the quiz covers —
+  this is where any "quiz about..." framing belongs, NOT in the title.
+
 STRICT LENGTH LIMITS (Telegram poll limits — do not exceed, ever):
 - Each question's "text": maximum {MAX_QUESTION_CHARS} characters.
 - Each item in "options": maximum {MAX_OPTION_CHARS} characters.
@@ -311,8 +319,8 @@ async def process_ai_input(message: types.Message, state: FSMContext):
 Extract the main concepts and create exactly {q_count} multiple choice questions.
 Return ONLY valid JSON in the following format:
 {{
-  "title": "Quiz Title based on text",
-  "description": "Short description",
+  "title": "ONLY the book's name (exactly as it appears in the source text) — nothing else, no 'quiz' or 'test' wording added",
+  "description": "A short (1 sentence) description of what the quiz covers",
   "time_per_question": {t_limit},
   "questions": [
     {{
