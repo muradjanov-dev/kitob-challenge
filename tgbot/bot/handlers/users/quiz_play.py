@@ -396,9 +396,10 @@ async def vizov_join(call: types.CallbackQuery, state: FSMContext):
     except Exception:
         pass
 
-    # Auto-start group quizzes the moment the 2nd participant joins — the
-    # creator no longer needs to tap Boshlash. Vizov DM-broadcast sessions
-    # (is_group=False) keep the original 'wait for scheduled start' behavior.
+    # Auto-start group quizzes the moment the 2nd participant taps Boshlash
+    # (this handler doubles as both join and start). Vizov DM-broadcast
+    # sessions (is_group=False) keep the original 'wait for scheduled start'
+    # behavior.
     if session.is_group and count >= 2:
         @sync_to_async
         def _flip_to_active():
@@ -865,9 +866,9 @@ async def _finish_session_solo(session_id: int, chat_id: int):
 #   1. User taps "📤 Guruhga ulashish" → Telegram add-to-group picker →
 #      bot lands in the chosen group and receives /start quiz_<code>.
 #   2. We create a QuizSession(is_group=True, status="waiting") and post a
-#      Join + Boshlash message.
-#   3. Creator taps Boshlash → status flips to "active"; questions are sent to
-#      the group chat one by one with an asyncio timer.
+#      Join message.
+#   3. The moment the 2nd member taps Qo'shilaman, status flips to "active"
+#      and questions are sent to the group chat one by one with an asyncio timer.
 #   4. Each answer is recorded in QuizUserAnswer (auto-join on first tap).
 #      Per-user feedback is a short toast — the correct answer is revealed
 #      only when the timer expires so wrong answerers can't leak it.
@@ -909,9 +910,8 @@ async def start_group_quiz(message: types.Message, quiz_code: str):
         await message.answer("❌ Bu quizda savollar yo'q.")
         return
 
-    kb = InlineKeyboardMarkup(row_width=2)
-    kb.row(InlineKeyboardButton(text="✋ Qo'shilaman", callback_data=f"qjoin:{session.id}"))
-    kb.row(InlineKeyboardButton(text="▶️ Boshlash", callback_data=f"qstart:{session.id}"))
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.row(InlineKeyboardButton(text="▶️ Boshlash", callback_data=f"qjoin:{session.id}"))
 
     creator_name = getattr(quiz.creator, "full_name", None) if quiz.creator_id else None
     credit_line = f"<i>✍️ Kitob Challenge kitobxoni — {creator_name} tomonidan tuzilgan</i>\n\n" if creator_name else ""
@@ -923,8 +923,8 @@ async def start_group_quiz(message: types.Message, quiz_code: str):
         f"{quiz.description + chr(10) + chr(10) if quiz.description else ''}"
         f"❓ {q_count} ta savol  ·  ⏱ {quiz.time_per_question} son/savol\n\n"
         f"{credit_line}"
-        f"<blockquote>✋ Qatnashish uchun <b>Qo'shilaman</b>ni bosing.\n"
-        f"Yaratuvchi tayyor bo'lganda <b>▶️ Boshlash</b>ni bossin.\n\n"
+        f"<blockquote>▶️ Qatnashish uchun <b>Boshlash</b>ni bosing.\n"
+        f"Kamida 2 kishi bosgach, quiz avtomatik boshlanadi!\n\n"
         f"O'yin davomida ham istalgan vaqtda qo'shilishingiz mumkin — "
         f"birinchi javob tugmasini bosish kifoya.</blockquote>",
         parse_mode="HTML",
@@ -933,63 +933,6 @@ async def start_group_quiz(message: types.Message, quiz_code: str):
     await sync_to_async(QuizSession.objects.filter(id=session.id).update)(
         join_message_id=sent.message_id,
     )
-
-
-@dp.callback_query_handler(lambda c: c.data and c.data.startswith("qstart:"), state="*")
-async def group_start(call: types.CallbackQuery, state: FSMContext):
-    user = await aget_user(call.from_user.id)
-    if not user:
-        await call.answer("Avval bot bilan /start qiling.", show_alert=True)
-        return
-
-    session_id = int(call.data.split(":")[1])
-
-    @sync_to_async
-    def _begin():
-        session = QuizSession.objects.filter(id=session_id).first()
-        if not session:
-            return None, "missing", 0
-        if not session.is_group:
-            return session, "not_group", 0
-        if session.creator_id != user.id and not getattr(user, "is_admin", False):
-            return session, "forbidden", 0
-        if session.status != "waiting":
-            return session, "already", 0
-        join_count = QuizParticipant.objects.filter(session_id=session_id).count()
-        if join_count < 2:
-            return session, "too_few", join_count
-        QuizSession.objects.filter(id=session_id).update(status="active")
-        return session, "ok", join_count
-
-    session, status, join_count = await _begin()
-    if status == "missing":
-        await call.answer("Sessiya topilmadi.", show_alert=True)
-        return
-    if status == "not_group":
-        await call.answer("Bu solo sessiya.", show_alert=True)
-        return
-    if status == "forbidden":
-        await call.answer("Faqat quiz yaratuvchisi boshlay oladi.", show_alert=True)
-        return
-    if status == "already":
-        await call.answer("Boshlangan yoki tugagan.", show_alert=True)
-        return
-    if status == "too_few":
-        await call.answer(
-            f"Quizni boshlash uchun kamida 2 ta ishtirokchi kerak.\n"
-            f"Hozircha: {join_count} ta. "
-            f"Yana {2 - join_count} kishi <b>✋ Qo'shilaman</b> bossin.",
-            show_alert=True,
-        )
-        return
-
-    await call.answer("Boshlandi! 🎮")
-    try:
-        await call.message.edit_reply_markup(reply_markup=None)
-    except Exception:
-        pass
-
-    await _send_group_question(session.chat_id, session_id, 0)
 
 
 async def _send_group_question(chat_id: int, session_id: int, q_idx: int):
@@ -1216,11 +1159,11 @@ def _poll_msg_cache_key(session_id: int) -> str:
 async def stop_quiz(message: types.Message, state: FSMContext = None):
     """Ends the current chat's waiting/active quiz session early — works in
     both a group (Vizov) and a private chat (solo play). In a group, only the
-    session's creator or a bot admin may stop it (same check as group_start's
-    'Boshlash' button); in a private chat the session's chat_id is always the
-    player's own telegram_id, so no separate permission check is needed —
-    only they could ever be running a solo session there. Also force-closes
-    the currently open native poll (if any) so it stops accepting votes."""
+    session's creator or a bot admin may stop it; in a private chat the
+    session's chat_id is always the player's own telegram_id, so no separate
+    permission check is needed — only they could ever be running a solo
+    session there. Also force-closes the currently open native poll (if any)
+    so it stops accepting votes."""
     user = await aget_user(message.from_user.id)
     if not user:
         return
