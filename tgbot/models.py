@@ -505,6 +505,31 @@ class BooksToRead(BaseModel):
     total_pages = models.PositiveIntegerField(default=1)  # for audio: total minutes
     current_page = models.PositiveIntegerField(default=0)  # for audio: minutes listened so far
 
+    # ── Web e-reader economy (kutubxona/ PDF reader) ────────────────────
+    # Charged once (BOOK_START_FEE) the first time a book is opened there.
+    fee_charged = models.BooleanField(
+        default=False, help_text="Whether the one-time start fee was already deducted.",
+    )
+    # Highest page position ever reached in the web reader -- monotonic,
+    # unlike current_page (which can move backward on re-reading, and can
+    # also be set by the bot's unrelated self-report flow).
+    max_page_reached = models.PositiveIntegerField(default=0)
+    # How many page-units have already been paid out (pre-premium-multiplier),
+    # capped to max_page_reached, throttled by validated active_seconds so a
+    # fast jump-to-the-end can't instantly farm the full per-page reward.
+    credited_pages = models.PositiveIntegerField(default=0)
+    # Cumulative validated "actually reading" seconds: only counted when the
+    # gap since the previous activity ping (a real page-turn or in-reader
+    # interaction) is <= 10 minutes -- a longer gap means the phone was set
+    # aside and that idle stretch is discarded, not counted.
+    active_seconds = models.PositiveIntegerField(default=0)
+    # Actual Kitobcha granted so far via per-page rewards for this book
+    # (post-multiplier) -- used to compute the finish top-up shortfall.
+    page_reward_total_granted = models.PositiveIntegerField(default=0)
+    # Whether the "cover the start fee if page rewards fell short" top-up
+    # was already applied, so finishing twice can't double-pay it.
+    topped_up = models.BooleanField(default=False)
+
     def __str__(self):
         return f"{self.title} - {self.user}"
 

@@ -1,4 +1,5 @@
-"""Library API — comments on GlobalBook entries.
+"""Library API — comments on GlobalBook entries, and the web e-reader's
+reading economy (start fee, per-page reward, finish top-up guarantee).
 
 Auth: Telegram WebApp initData, same pattern as shop_views.py.
 Users who haven't registered in the bot yet get a 403.
@@ -10,11 +11,21 @@ import json
 from urllib.parse import parse_qsl
 
 from django.conf import settings
+from django.db import transaction
 from django.http import HttpRequest, JsonResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from tgbot.models import BookComment, BooksToRead, GlobalBook, TelegramProfile
+from tgbot.models import BookComment, BooksToRead, GlobalBook, KitobchaLedger, TelegramProfile
+
+# ── Web e-reader economy ────────────────────────────────────────────────────
+# Starting a book costs this once; finishing pays 1 Kitobcha/page (2x
+# Premium) as pages are genuinely read, topped up to at least cover the
+# start fee if the book turned out shorter than break-even.
+BOOK_START_FEE = 375
+SECONDS_PER_PAGE = 18  # 30 min minimum for a 100-page book, scaled from there
+MAX_IDLE_GAP_SECONDS = 600  # >10 min since the last real interaction = AFK, not reading
 
 
 # ── initData auth ──────────────────────────────────────────────────────────
@@ -179,6 +190,85 @@ def api_my_books(request: HttpRequest):
     return JsonResponse({"book_ids": book_ids})
 
 
+def _get_reading_record(profile, book):
+    """No unique_together on (user, global_book) historically (and the bot's
+    own self-report flow, report.py, can create rows against the same
+    GlobalBook), so a couple of accounts may already carry more than one row
+    for the same book -- always take the first instead of update_or_create()
+    to avoid MultipleObjectsReturned."""
+    return BooksToRead.objects.filter(user=profile, global_book=book).first()
+
+
+# ── POST /kutubxona/api/start-reading/ ─────────────────────────────────────
+# Called right before the reader opens. Charges BOOK_START_FEE exactly once
+# per (user, book); repeat calls (re-opening a book already started) are free
+# and just return the saved position to resume from.
+
+@csrf_exempt
+@require_POST
+def api_start_reading(request: HttpRequest):
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "invalid_json"}, status=400)
+
+    init_data = body.get("initData") or _read_init_data(request)
+    profile, err = _resolve_profile(init_data)
+    if err:
+        return JsonResponse({"error": err}, status=403)
+
+    book_id = body.get("book_id")
+    if not book_id:
+        return JsonResponse({"error": "book_id required"}, status=400)
+    book = GlobalBook.objects.filter(id=book_id).first()
+    if not book:
+        return JsonResponse({"error": "not_found"}, status=404)
+
+    # Fast path, no lock needed: already started, nothing to charge.
+    record = _get_reading_record(profile, book)
+    if record and record.fee_charged:
+        return JsonResponse({
+            "ok": True, "charged": False,
+            "current_page": record.max_page_reached, "total_pages": record.total_pages,
+        })
+
+    with transaction.atomic():
+        p = TelegramProfile.objects.select_for_update().get(id=profile.id)
+        # Re-check under the profile lock: a concurrent duplicate tap (double
+        # click, retried request) blocks here until the first one commits,
+        # then sees fee_charged=True and must not charge a second time.
+        record = _get_reading_record(profile, book)
+        if record and record.fee_charged:
+            return JsonResponse({
+                "ok": True, "charged": False,
+                "current_page": record.max_page_reached, "total_pages": record.total_pages,
+            })
+
+        if p.ball < BOOK_START_FEE:
+            return JsonResponse({
+                "error": "insufficient_balance",
+                "balance": int(p.ball or 0),
+                "required": BOOK_START_FEE,
+            }, status=402)
+        p.ball = p.ball - BOOK_START_FEE
+        p.save(update_fields=["ball"])
+        KitobchaLedger.objects.create(user=p, delta=-BOOK_START_FEE, reason="book_start_fee")
+
+        if record:
+            record.fee_charged = True
+            record.save(update_fields=["fee_charged", "updated_at"])
+        else:
+            record = BooksToRead.objects.create(
+                user=profile, global_book=book, title=book.title,
+                is_audio=False, current_page=0, total_pages=0, fee_charged=True,
+            )
+
+    return JsonResponse({
+        "ok": True, "charged": True, "balance": int(p.ball or 0),
+        "current_page": record.max_page_reached, "total_pages": record.total_pages,
+    })
+
+
 # ── GET /kutubxona/api/progress/?book_id=N ────────────────────────────────
 
 @require_GET
@@ -193,13 +283,19 @@ def api_get_progress(request: HttpRequest):
         return JsonResponse({"error": "book_id required"}, status=400)
 
     record = BooksToRead.objects.filter(user=profile, global_book_id=int(book_id)).first()
+    # Resume from max_page_reached, not current_page -- current_page can be
+    # nudged by the bot's unrelated self-report flow (report.py), which
+    # shares this same row/table but has no idea about the web reader.
     return JsonResponse({
-        "current_page": record.current_page if record else 0,
+        "current_page": record.max_page_reached if record else 0,
         "total_pages": record.total_pages if record else 0,
     })
 
 
 # ── POST /kutubxona/api/progress/ ─────────────────────────────────────────
+# Called on every real page turn and on other in-reader interactions
+# (scroll/zoom), never on a blind timer -- see SECONDS_PER_PAGE /
+# MAX_IDLE_GAP_SECONDS docs above for why that distinction matters.
 
 @csrf_exempt
 @require_POST
@@ -229,23 +325,76 @@ def api_save_progress(request: HttpRequest):
     if not book:
         return JsonResponse({"error": "not_found"}, status=404)
 
-    # No unique_together on (user, global_book) historically, so a couple of
-    # accounts may already carry more than one row for the same book -- take
-    # the first instead of update_or_create() to avoid MultipleObjectsReturned.
-    record = BooksToRead.objects.filter(user=profile, global_book=book).first()
-    if record:
+    now = timezone.now()
+    granted_now = 0
+    finished = False
+
+    # Locked for the whole read-compute-write so two near-simultaneous pings
+    # for the same (user, book) can't both read the same credited_pages and
+    # both grant a reward for the same pages -- they serialize instead.
+    with transaction.atomic():
+        record = BooksToRead.objects.select_for_update().filter(user=profile, global_book=book).first()
+        if record:
+            gap_seconds = (now - record.updated_at).total_seconds()
+        else:
+            # Defensive fallback: start-reading wasn't called first for some
+            # reason. Create the row without charging -- no fee was taken,
+            # so this book also won't be eligible for the finish top-up.
+            record = BooksToRead.objects.create(
+                user=profile, global_book=book, title=book.title,
+                is_audio=False, current_page=0, total_pages=0,
+            )
+            gap_seconds = 0
+
+        if 0 < gap_seconds <= MAX_IDLE_GAP_SECONDS:
+            record.active_seconds += int(gap_seconds)
+        # else: either the very first ping (gap==0) or > 10 min idle -- the
+        # gap itself is simply not counted; active_seconds already earned stands.
+
         record.title = book.title
         record.is_audio = False
         record.current_page = current_page
         record.total_pages = total_pages
-        record.save(update_fields=["title", "is_audio", "current_page", "total_pages", "updated_at"])
-    else:
-        record = BooksToRead.objects.create(
-            user=profile, global_book=book, title=book.title,
-            is_audio=False, current_page=current_page, total_pages=total_pages,
-        )
+        record.max_page_reached = max(record.max_page_reached, current_page)
 
-    return JsonResponse({"ok": True, "current_page": record.current_page, "total_pages": record.total_pages})
+        if total_pages > 0:
+            pending_pages = min(record.max_page_reached, total_pages) - record.credited_pages
+            time_allowed_pages = record.active_seconds // SECONDS_PER_PAGE
+            pages_to_credit = min(pending_pages, max(0, time_allowed_pages - record.credited_pages))
+            if pages_to_credit > 0:
+                granted_now = profile.update_ball(True, pages_to_credit)
+                record.credited_pages += pages_to_credit
+                record.page_reward_total_granted += granted_now
+
+            if (
+                record.max_page_reached >= total_pages
+                and record.credited_pages >= total_pages
+                and record.fee_charged
+                and not record.topped_up
+            ):
+                shortfall = BOOK_START_FEE - record.page_reward_total_granted
+                if shortfall > 0:
+                    p = TelegramProfile.objects.select_for_update().get(id=profile.id)
+                    p.ball = p.ball + shortfall
+                    p.save(update_fields=["ball"])
+                    KitobchaLedger.objects.create(user=p, delta=shortfall, reason="book_finish_topup")
+                record.topped_up = True
+                finished = True
+
+        record.save(update_fields=[
+            "title", "is_audio", "current_page", "total_pages", "max_page_reached",
+            "active_seconds", "credited_pages", "page_reward_total_granted",
+            "topped_up", "updated_at",
+        ])
+
+    return JsonResponse({
+        "ok": True,
+        "current_page": record.current_page,
+        "total_pages": record.total_pages,
+        "granted_now": granted_now,
+        "total_granted": record.page_reward_total_granted,
+        "finished": finished,
+    })
 
 
 # ── GET /kutubxona/api/comments/recent/ ───────────────────────────────────────
