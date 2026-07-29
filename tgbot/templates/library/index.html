@@ -216,6 +216,20 @@
       display: block; position: relative; z-index: 1;
       user-select: none; word-break: break-word;
     }
+    .spine-stats {
+      position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+      display: flex; flex-direction: column; align-items: center; gap: 1px;
+      padding: 3px 1px 4px; background: linear-gradient(0deg, rgba(0,0,0,.72), rgba(0,0,0,0));
+    }
+    .spine-stats span {
+      font-size: 7.5px; font-weight: 800; font-family: var(--fb);
+      color: #fff; line-height: 1; letter-spacing: -.2px;
+      text-shadow: 0 1px 2px rgba(0,0,0,.6);
+    }
+    .ss-finished { color: #d7f0c8; }
+    .srch-stats { display: flex; gap: 10px; margin-top: 4px; }
+    .srch-stats span { font-size: 11.5px; font-weight: 700; color: var(--text-dim); }
+    .srch-stats .ss-finished { color: var(--accent2); }
 
     /* Shelf plank */
     .shelf-plank {
@@ -512,6 +526,37 @@
     .cmt-del { background: none; border: none; color: var(--text-faint); font-size: 14px; cursor: pointer; padding: 0 2px; transition: color .15s; flex-shrink: 0; }
     .cmt-del:hover { color: #8a1a1a; }
     .cmt-empty { font-size: 12.5px; color: var(--text-faint); text-align: center; padding: 10px 0; }
+
+    /* Comment carousel -- 3 rows, alternating scroll direction, once a book
+       has enough comments to fill it (sparse lists just use .cmt-list). */
+    .cmt-carousel { display: flex; flex-direction: column; gap: 7px; overflow: hidden; margin-bottom: 12px; }
+    .cmt-marquee-row {
+      overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+      mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+    }
+    .cmt-marquee-track {
+      display: flex; gap: 8px; width: max-content;
+      animation: cmtScrollLeft 32s linear infinite;
+    }
+    .cmt-marquee-row.dir-right .cmt-marquee-track { animation-name: cmtScrollRight; }
+    .cmt-marquee-row:nth-child(1) .cmt-marquee-track { animation-duration: 30s; }
+    .cmt-marquee-row:nth-child(2) .cmt-marquee-track { animation-duration: 36s; }
+    .cmt-marquee-row:nth-child(3) .cmt-marquee-track { animation-duration: 26s; }
+    .cmt-marquee-row.paused .cmt-marquee-track { animation-play-state: paused; }
+    @keyframes cmtScrollLeft  { from { transform: translateX(0); }    to { transform: translateX(-50%); } }
+    @keyframes cmtScrollRight { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+    @media (prefers-reduced-motion: reduce) {
+      .cmt-marquee-track { animation: none; }
+    }
+    .cmt-card {
+      flex-shrink: 0; width: 190px; background: rgba(198,113,57,.06);
+      border: 1px solid rgba(198,113,57,.14); border-radius: 10px; padding: 9px 11px;
+    }
+    .cmt-card .cmt-user { font-size: 11px; font-weight: 700; color: var(--accent); margin-bottom: 3px; }
+    .cmt-card .cmt-text {
+      font-size: 12px; color: var(--text); line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
     .cmt-form { display: flex; flex-direction: column; gap: 8px; }
     .cmt-form textarea {
       width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 10px;
@@ -659,6 +704,12 @@
           <img class="spine-cover" src="{{ book.cover.url }}" alt="" loading="lazy" />
           {% endif %}
           <span class="spine-title">{{ book.title }}</span>
+          {% if book.started_count or book.finished_count %}
+          <span class="spine-stats">
+            <span class="ss-started">👤{{ book.started_count }}</span>
+            <span class="ss-finished">✅{{ book.finished_count }}</span>
+          </span>
+          {% endif %}
         </div>
         {% endfor %}
       </div>
@@ -956,7 +1007,9 @@ async function loadMyShelf() {
         const color = SPINE_COLORS[b.id % SPINE_COLORS.length];
         const h     = SPINE_HEIGHTS[b.id % SPINE_HEIGHTS.length];
         const cover = b.cover ? `<img class="spine-cover" src="${b.cover}" alt="" loading="lazy"/>` : '';
-        return `<div class="book-spine" data-id="${b.id}" style="background:${color};height:${h}px" title="${_esc(b.title)}">${cover}<span class="spine-title">${_esc(b.title)}</span></div>`;
+        const stats = (b.started || b.finished)
+          ? `<span class="spine-stats"><span class="ss-started">👤${b.started}</span><span class="ss-finished">✅${b.finished}</span></span>` : '';
+        return `<div class="book-spine" data-id="${b.id}" style="background:${color};height:${h}px" title="${_esc(b.title)}">${cover}<span class="spine-title">${_esc(b.title)}</span>${stats}</div>`;
       }).join('');
       row.querySelectorAll('.book-spine').forEach(el => {
         el.addEventListener('click', () => openDetail(+el.dataset.id));
@@ -984,10 +1037,12 @@ function renderSearchResults(q) {
   srchGrid.innerHTML = results.map(b => {
     const cover = b.cover ? `<img src="${b.cover}" alt="" loading="lazy"/>` : '📖';
     const author = b.author ? `<div class="srch-author">${_esc(b.author)}</div>` : '';
+    const stats = (b.started || b.finished)
+      ? `<div class="srch-stats"><span class="ss-started">👤 ${b.started}</span><span class="ss-finished">✅ ${b.finished}</span></div>` : '';
     return `<div class="srch-card" data-id="${b.id}">
       <div class="srch-cover">${typeof cover === 'string' && cover.startsWith('<img') ? cover : `<span style="font-size:34px">${cover}</span>`}</div>
       <div class="srch-body">
-        <div class="srch-title">${_esc(b.title)}</div>${author}
+        <div class="srch-title">${_esc(b.title)}</div>${author}${stats}
       </div>
     </div>`;
   }).join('');
@@ -1308,8 +1363,8 @@ function openDetail(id) {
   let badges = '';
   if (b.lang) badges += `<span class="dbadge db-lang">${LANG_LABELS[b.lang]||b.lang}</span>`;
   if (b.premium) badges += `<span class="dbadge db-prem">💎 Faqat Premium</span>`;
-  if (b.readers)  badges += `<span class="dbadge db-read">📖 ${b.readers} o'qimoqda</span>`;
-  if (b.finished) badges += `<span class="dbadge db-done">✅ ${b.finished} tugatdi</span>`;
+  if (b.started)  badges += `<span class="dbadge db-read">👤 ${b.started} kishi boshlagan</span>`;
+  if (b.finished) badges += `<span class="dbadge db-done">✅ ${b.finished} kishi tugatgan</span>`;
   detailBadges.innerHTML = badges;
 
   detailDesc.textContent = b.desc || '';
@@ -1358,6 +1413,13 @@ const cmtList = document.getElementById('cmtList');
 const cmtSend = document.getElementById('cmtSend');
 const cmtText = document.getElementById('cmtText');
 
+function _cmtCard(c) {
+  return `<div class="cmt-card">
+    <div class="cmt-user">👤 ${_esc(c.user)}</div>
+    <div class="cmt-text">${_esc(c.text)}</div>
+  </div>`;
+}
+
 async function loadComments(bookId) {
   cmtList.innerHTML = '<div class="cmt-empty">Yuklanmoqda…</div>';
   try {
@@ -1366,7 +1428,8 @@ async function loadComments(bookId) {
     const cmts = data.comments || [];
     if (!cmts.length) {
       cmtList.innerHTML = '<div class="cmt-empty">Hali izoh yo\'q. Birinchi bo\'ling!</div>';
-    } else {
+    } else if (cmts.length < 6) {
+      // Too few to fill 3 rows nicely -- plain static list instead.
       cmtList.innerHTML = cmts.map(c => `
         <div class="cmt-item">
           <div class="cmt-row">
@@ -1377,6 +1440,23 @@ async function loadComments(bookId) {
             </div>
           </div>
         </div>`).join('');
+    } else {
+      const rows = [[], [], []];
+      cmts.forEach((c, i) => rows[i % 3].push(c));
+      const dirs = ['dir-left', 'dir-right', 'dir-left'];
+      cmtList.innerHTML = `<div class="cmt-carousel">` + rows.map((row, i) => {
+        // Duplicate the row's cards so translateX(-50%) loops seamlessly.
+        const cards = row.map(_cmtCard).join('');
+        return `<div class="cmt-marquee-row ${dirs[i]}">
+          <div class="cmt-marquee-track">${cards}${cards}</div>
+        </div>`;
+      }).join('') + `</div>`;
+      cmtList.querySelectorAll('.cmt-marquee-row').forEach(row => {
+        row.addEventListener('mouseenter', () => row.classList.add('paused'));
+        row.addEventListener('mouseleave', () => row.classList.remove('paused'));
+        row.addEventListener('touchstart', () => row.classList.add('paused'), { passive: true });
+        row.addEventListener('touchend', () => row.classList.remove('paused'), { passive: true });
+      });
     }
   } catch(e) {
     cmtList.innerHTML = '<div class="cmt-empty">Yuklashda xatolik.</div>';

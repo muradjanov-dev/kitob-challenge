@@ -125,7 +125,7 @@ def _build_landing_context():
 
 
 def library_view(request: HttpRequest):
-    from django.db.models import Count, Q
+    from django.db.models import Count, Q, F
     from tgbot.models import GlobalBook, BooksToRead
 
     books_qs = (
@@ -133,21 +133,26 @@ def library_view(request: HttpRequest):
         .exclude(pdf_file='')
         .exclude(pdf_file__isnull=True)
         .annotate(
-            readers_count=Count(
+            # "Started" = anyone with a reading record for this book, any
+            # progress at all (self-report or the web reader).
+            started_count=Count(
+                'user_books',
+                filter=Q(user_books__total_pages__gt=0),
+                distinct=True,
+            ),
+            # "Finished" = actually reached the last page -- was previously
+            # (and wrongly) just current_page>=1, which counted anyone who'd
+            # read a single page as "finished".
+            finished_count=Count(
                 'user_books',
                 filter=Q(
-                    user_books__current_page__gt=0,
                     user_books__total_pages__gt=0,
+                    user_books__current_page__gte=F('user_books__total_pages'),
                 ),
                 distinct=True,
             ),
-            finished_count=Count(
-                'user_books',
-                filter=Q(user_books__current_page__gte=1),
-                distinct=True,
-            ),
         )
-        .order_by('-readers_count', '-finished_count', 'title')
+        .order_by('-started_count', '-finished_count', 'title')
     )
 
     # Group books by language for shelf display
@@ -160,10 +165,10 @@ def library_view(request: HttpRequest):
         if group:
             shelves.append({'code': lang_code, 'label': lang_label, 'books': group})
 
-    total_readers = BooksToRead.objects.filter(current_page__gt=0).values('user').distinct().count()
+    total_readers = BooksToRead.objects.filter(total_pages__gt=0).values('user').distinct().count()
     total_finished = BooksToRead.objects.filter(
         total_pages__gt=0,
-        current_page__gte=1,
+        current_page__gte=F('total_pages'),
     ).count()
 
     import json as _json
@@ -174,7 +179,7 @@ def library_view(request: HttpRequest):
             'author': b.author or '',
             'lang': b.language,
             'premium': b.is_premium_only,
-            'readers': b.readers_count,
+            'started': b.started_count,
             'finished': b.finished_count,
             'desc': b.description or '',
             'cover': b.cover.url if b.cover else None,
