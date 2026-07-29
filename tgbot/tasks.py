@@ -1814,11 +1814,12 @@ def _send_and_pin_progress(user) -> int:
     from django.conf import settings as _settings
     from urllib.parse import quote as _urlquote
 
-    text = _progress_bar_text(pages)
+    site_url = f"{_settings.WEB_DOMAIN}/"
+    text = f'🌌 <a href="{site_url}">Parallel olam</a>\n\n' + _progress_bar_text(pages)
 
     buttons = [[{
         "text": "🌌 Parallel olam",
-        "web_app": {"url": f"{_settings.WEB_DOMAIN}/"},
+        "web_app": {"url": site_url},
     }]]
 
     bot_username = _get_bot_username()
