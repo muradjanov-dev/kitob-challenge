@@ -151,6 +151,7 @@ class LibraryBookCreateState(StatesGroup):
     language = State()
     cover = State()
     description = State()
+    file_choice = State()  # "faqat PDF" vs "PDF + Audio", asked once up front
     pdf_file = State()
     audio_file = State()
     premium = State()

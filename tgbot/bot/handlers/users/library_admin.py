@@ -2,7 +2,8 @@
 
 Add-book wizard:
   title → author (/skip) → language → cover (/skip) → description (/skip)
-        → pdf (/skip) → audio (/skip) → premium toggle → confirm
+        → file type (faqat PDF / PDF + Audio) → pdf (/skip)
+        → audio (/skip, only if "PDF + Audio" was chosen) → premium toggle → confirm
   /bekor at any step aborts.
 
 List view (paginated, 10 per page) with per-book edit/delete actions.
@@ -31,6 +32,7 @@ _CANCEL_STATES = [
     LibraryBookCreateState.language,
     LibraryBookCreateState.cover,
     LibraryBookCreateState.description,
+    LibraryBookCreateState.file_choice,
     LibraryBookCreateState.pdf_file,
     LibraryBookCreateState.audio_file,
     LibraryBookCreateState.premium,
@@ -78,6 +80,13 @@ def _premium_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton("💎 Faqat Premium", callback_data="libadm:premium:1"),
         InlineKeyboardButton("🆓 Barchaga bepul", callback_data="libadm:premium:0"),
     )
+    return kb
+
+
+def _file_choice_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton("📄 Faqat PDF", callback_data="libadm:filetype:pdf"))
+    kb.add(InlineKeyboardButton("📄🎧 PDF + Audio", callback_data="libadm:filetype:pdf_audio"))
     return kb
 
 
@@ -247,7 +256,7 @@ async def _ask_description(message: types.Message):
 @dp.message_handler(commands=["skip"], state=LibraryBookCreateState.description)
 async def libadm_skip_description(message: types.Message, state: FSMContext):
     await state.update_data(description="")
-    await _ask_pdf(message)
+    await _ask_file_choice(message)
 
 
 @dp.message_handler(state=LibraryBookCreateState.description, content_types=types.ContentTypes.TEXT)
@@ -257,23 +266,49 @@ async def libadm_get_description(message: types.Message, state: FSMContext):
         await message.answer(f"Tavsif 2000 belgidan oshmasligi kerak ({len(desc)} belgi). Qaytadan.")
         return
     await state.update_data(description=desc)
-    await _ask_pdf(message)
+    await _ask_file_choice(message)
+
+
+async def _ask_file_choice(message: types.Message):
+    await LibraryBookCreateState.file_choice.set()
+    await message.answer(
+        "6️⃣ <b>Fayl turini tanlang</b>\n\nBu kitob uchun qaysi fayllarni biriktirasiz?",
+        parse_mode="HTML",
+        reply_markup=_file_choice_kb(),
+    )
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("libadm:filetype:"), state=LibraryBookCreateState.file_choice)
+async def libadm_get_file_choice(call: types.CallbackQuery, state: FSMContext):
+    wants_audio = call.data.endswith(":pdf_audio")
+    await call.answer("📄🎧 PDF + Audio" if wants_audio else "📄 Faqat PDF")
+    await state.update_data(wants_audio=wants_audio)
+    await _ask_pdf(call.message)
 
 
 async def _ask_pdf(message: types.Message):
     await LibraryBookCreateState.pdf_file.set()
     await message.answer(
-        "6️⃣ <b>PDF faylini yuboring</b>\n\n"
+        "7️⃣ <b>PDF faylini yuboring</b>\n\n"
         "Kitobning PDF versiyasini fayl sifatida yuboring.\n"
         "O'tkazib yuborish: /skip",
         parse_mode="HTML",
     )
 
 
+async def _after_pdf(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    if data.get("wants_audio"):
+        await _ask_audio(message)
+    else:
+        await state.update_data(audio_file_id=None, audio_filename=None)
+        await _ask_premium(message)
+
+
 @dp.message_handler(commands=["skip"], state=LibraryBookCreateState.pdf_file)
 async def libadm_skip_pdf(message: types.Message, state: FSMContext):
     await state.update_data(pdf_file_id=None, pdf_filename=None)
-    await _ask_audio(message)
+    await _after_pdf(message, state)
 
 
 @dp.message_handler(state=LibraryBookCreateState.pdf_file, content_types=types.ContentTypes.DOCUMENT)
@@ -284,7 +319,7 @@ async def libadm_get_pdf(message: types.Message, state: FSMContext):
         await message.answer("Iltimos PDF fayl yuboring (yoki /skip).")
         return
     await state.update_data(pdf_file_id=doc.file_id, pdf_filename=doc.file_name or "book.pdf")
-    await _ask_audio(message)
+    await _after_pdf(message, state)
 
 
 @dp.message_handler(state=LibraryBookCreateState.pdf_file)
@@ -295,7 +330,7 @@ async def libadm_pdf_invalid(message: types.Message):
 async def _ask_audio(message: types.Message):
     await LibraryBookCreateState.audio_file.set()
     await message.answer(
-        "7️⃣ <b>Audio faylini yuboring</b>\n\n"
+        "8️⃣ <b>Audio faylini yuboring</b>\n\n"
         "MP3, M4A, OGG yoki boshqa audio formatdagi fayl.\n"
         "O'tkazib yuborish: /skip",
         parse_mode="HTML",
@@ -337,7 +372,7 @@ async def libadm_audio_invalid(message: types.Message):
 async def _ask_premium(message: types.Message):
     await LibraryBookCreateState.premium.set()
     await message.answer(
-        "8️⃣ <b>PDF/Audio kim uchun?</b>\n\n"
+        "9️⃣ <b>PDF/Audio kim uchun?</b>\n\n"
         "Bu kitobning fayllari (PDF/Audio) faqat Premium foydalanuvchilarga ko'rinadimi\n"
         "yoki hamma uchun bepulmi?",
         parse_mode="HTML",
