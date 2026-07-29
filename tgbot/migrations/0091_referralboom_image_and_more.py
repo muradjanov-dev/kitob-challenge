@@ -11,7 +11,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tgbot', '0091_siteevent'),
+        ('tgbot', '0090_bookstoread_credited_pages_bookstoread_fee_charged_and_more'),
     ]
 
     operations = [
