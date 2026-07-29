@@ -693,6 +693,15 @@
       const next = dx < 0 ? activeIdx + 1 : activeIdx - 1;
       if (next >= 0 && next < tabs.length) window.location.href = tabs[next];
     }, { passive: true });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const next = e.key === 'ArrowLeft' ? activeIdx - 1 : activeIdx + 1;
+      if (next >= 0 && next < tabs.length) window.location.href = tabs[next];
+    });
   })();
   </script>
 </body>

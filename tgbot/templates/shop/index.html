@@ -481,9 +481,10 @@
       if (id) url += "?tgWebAppData=" + encodeURIComponent(id);
       window.location.href = url;
     }
-    if (tg && tg.BackButton) {
-      try { tg.BackButton.show(); tg.BackButton.onClick(goHome); } catch (e) {}
-    }
+    // Telegram's native BackButton used to be the only way back to the main
+    // site from here; the shared bottom tab-bar (site-tabbar) now covers
+    // that, so it's left off deliberately -- it was showing as a themed
+    // pill fighting the tab-bar for the same job.
     document.getElementById("btnHome").addEventListener("click", () => { sound.play("tap"); goHome(); });
 
     // Resolve initData fresh on each call. Mobile clients (Android/iOS)
@@ -943,6 +944,15 @@
       const next = dx < 0 ? activeIdx + 1 : activeIdx - 1;
       if (next >= 0 && next < tabs.length) window.location.href = tabs[next];
     }, { passive: true });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const next = e.key === 'ArrowLeft' ? activeIdx - 1 : activeIdx + 1;
+      if (next >= 0 && next < tabs.length) window.location.href = tabs[next];
+    });
   })();
   </script>
 </body>
