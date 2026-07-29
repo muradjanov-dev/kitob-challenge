@@ -9,6 +9,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.builtin import ChatTypeFilter
 from aiogram.types import ChatType, InlineKeyboardMarkup, InlineKeyboardButton
 from asgiref.sync import sync_to_async
+from django.core.cache import cache
 from django.db.models import F
 
 from tgbot.bot.loader import dp, bot
@@ -241,6 +242,10 @@ def _try_advance_session(session_id: int, q_idx: int):
 
 
 async def _advance_after_timeout(chat_id: int, session_id: int, q_idx: int):
+    """Solo-only (group has its own _group_advance). Used both by the native-
+    poll timeout path (_poll_advance_after_close) and, if ever needed again,
+    the legacy inline-keyboard timer — hence still takes a plain chat_id/
+    session_id/q_idx rather than anything poll-specific."""
     session, next_idx = await _try_advance_session(session_id, q_idx)
     if not session:
         return
@@ -248,7 +253,7 @@ async def _advance_after_timeout(chat_id: int, session_id: int, q_idx: int):
     if next_idx >= len(q_ids):
         await _finish_session_solo(session_id, chat_id)
     else:
-        await _send_question(chat_id, session_id, next_idx)
+        await _send_question_poll(chat_id, session_id, next_idx)
 
 
 def _cancel_timer(session_id: int):
@@ -341,7 +346,7 @@ async def solo_start(call: types.CallbackQuery, state: FSMContext):
         await call.message.answer("❌ Quiz topilmadi.")
         return
 
-    await _send_question(call.message.chat.id, session.id, 0)
+    await _send_question_poll(call.message.chat.id, session.id, 0)
 
 
 # ─── Vizov join ───────────────────────────────────────────────────────────────
@@ -471,7 +476,141 @@ async def answer_question(call: types.CallbackQuery, state: FSMContext):
             await _send_question(user.telegram_id, session_id, next_idx)
 
 
-# ─── Send a question (DM) ──────────────────────────────────────────────────────
+# ─── Send a question — native Poll (solo) ──────────────────────────────────────
+#
+# Phase 1 of the native-poll migration (see NATIVE_POLL_MIGRATION_PROMPT.md):
+# SOLO play only, since it's the lowest-risk surface (single user, DM chat).
+# Group play still uses the inline-keyboard flow below (_send_group_question /
+# _group_question_timer / answer_question), completely untouched — kept as
+# the safe, proven path until the poll approach has been verified in
+# production. The old DM inline-keyboard path (_send_question,
+# _question_timer) is also left in place, unused, as an instant rollback:
+# just point solo_start/_advance_after_timeout back at _send_question if the
+# poll flow needs to be reverted.
+#
+# Telegram draws its own countdown ring for `open_period` and reveals
+# correct/incorrect to the voter natively (quiz-type poll) — no server-side
+# message edits or callback-answer toasts needed, unlike the legacy flow.
+
+POLL_CACHE_PREFIX = "quizpoll:"
+POLL_REVEAL_PAUSE = 2.5  # let Telegram's native reveal animation play before the next question
+
+
+async def _send_question_poll(chat_id: int, session_id: int, q_idx: int):
+    @sync_to_async
+    def _load():
+        session = QuizSession.objects.select_related("quiz").filter(id=session_id).first()
+        if not session:
+            return None, None, None, 0, 0
+        q_ids = json.loads(session.question_order)
+        if q_idx >= len(q_ids):
+            return None, None, None, len(q_ids), 0
+        question = QuizQuestion.objects.prefetch_related("options").filter(id=q_ids[q_idx]).first()
+        if not question:
+            # Question was deleted after the session started.
+            return None, None, None, len(q_ids), 0
+        opts = list(question.options.all())
+        if session.quiz.shuffle:
+            random.shuffle(opts)
+        return session, question, opts, len(q_ids), session.quiz.time_per_question
+
+    session, question, opts, total, time_limit = await _load()
+    if not session or not question:
+        return
+
+    correct_idx = next((i for i, o in enumerate(opts) if o.is_correct), 0)
+    # sendPoll's `question` is plain text only (no HTML/entities) — keep the
+    # progress indicator as plain characters, and hard-clip to Telegram's
+    # 300-char question limit / 100-char option limit as a defensive backstop
+    # (quiz_ai.py already enforces this at generation time).
+    poll_question = f"❓ {q_idx + 1}/{total}  {question.text}"[:300]
+
+    poll_msg = await bot.send_poll(
+        chat_id=chat_id,
+        question=poll_question,
+        options=[o.text[:100] for o in opts],
+        type="quiz",
+        correct_option_id=correct_idx,
+        is_anonymous=False,  # required — anonymous polls never fire poll_answer
+        explanation=(question.hint[:200] if question.hint else None),
+        open_period=max(5, min(600, time_limit)),
+    )
+
+    cache.set(
+        f"{POLL_CACHE_PREFIX}{poll_msg.poll.id}",
+        {
+            "session_id": session_id,
+            "question_id": question.id,
+            "option_ids": [o.id for o in opts],
+            "chat_id": chat_id,
+            "q_idx": q_idx,
+        },
+        timeout=time_limit + 90,
+    )
+
+    _cancel_timer(session_id)
+    task = asyncio.create_task(_poll_advance_after_close(chat_id, session_id, q_idx, time_limit))
+    _active_timers[session_id] = task
+
+
+async def _poll_advance_after_close(chat_id: int, session_id: int, q_idx: int, time_limit: int):
+    """Telegram closes the poll itself once `open_period` elapses — this just
+    waits a beat past that (so the native reveal has shown) then advances,
+    mirroring the old timer's role without needing any message edits."""
+    try:
+        await asyncio.sleep(time_limit + 1)
+        await _advance_after_timeout(chat_id, session_id, q_idx)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        _active_timers.pop(session_id, None)
+
+
+@dp.poll_answer_handler()
+async def on_poll_answer(poll_answer: types.PollAnswer):
+    mapping = cache.get(f"{POLL_CACHE_PREFIX}{poll_answer.poll_id}")
+    if not mapping:
+        return  # not one of ours, or the mapping expired
+    if not poll_answer.option_ids:
+        return  # user retracted their vote
+
+    session_id = mapping["session_id"]
+    question_id = mapping["question_id"]
+    option_ids = mapping["option_ids"]
+    chat_id = mapping["chat_id"]
+    q_idx = mapping["q_idx"]
+
+    chosen_idx = poll_answer.option_ids[0]
+    if chosen_idx >= len(option_ids):
+        return
+    option_id = option_ids[chosen_idx]
+
+    user = await aget_user(poll_answer.user.id)
+    if not user:
+        return
+
+    already, is_correct, correct_text, hint, participant, session = await _record_answer(
+        session_id, user.id, question_id, option_id
+    )
+    if already or not session or session.is_group:
+        return  # group polls aren't wired up yet — this handler is solo-only for now
+
+    _cancel_timer(session_id)
+    await asyncio.sleep(POLL_REVEAL_PAUSE)
+
+    q_ids = json.loads(session.question_order)
+    next_idx = q_idx + 1
+    if next_idx >= len(q_ids):
+        await _finish_session_solo(session_id, user.telegram_id)
+    else:
+        await sync_to_async(QuizSession.objects.filter(id=session_id).update)(
+            current_question_idx=next_idx
+        )
+        await _send_question_poll(chat_id, session_id, next_idx)
+
+
+# ─── Send a question (DM, legacy inline-keyboard — group flow's helpers still
+# reference _answer_kb, so this file stays; see notes above) ───────────────────
 
 async def _send_question(chat_id: int, session_id: int, q_idx: int):
     @sync_to_async
