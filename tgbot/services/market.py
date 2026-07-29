@@ -191,14 +191,21 @@ def generate_certificate(user) -> bytes:
     stats: gold-on-navy, ornamental double border with corner flourishes, a
     stat-card row, and a wax-seal-style medallion. Uses Pillow's bundled
     scalable default font (no system/TTF dependency — Pillow >= 10.1's
-    ImageFont.load_default(size=...))."""
+    ImageFont.load_default(size=...)).
+
+    Square canvas (1:1) is deliberate: users set this as their Telegram
+    profile photo, and Telegram center-crops any non-square image to a
+    square for the circular avatar -- a landscape certificate (the old
+    1400x900) lost its outer stat cards to that crop. Square means nothing
+    ever needs to be cropped."""
     from PIL import Image, ImageDraw, ImageFont
     from tgbot.services.achievements import compute_user_stats
+    import os as _os
 
     stats = compute_user_stats(user)
     full_name = user.full_name or "Kitobxon"
 
-    W, H = 1400, 900
+    W, H = 1080, 1080
     img = Image.new("RGB", (W, H), _NAVY_DARK)
     draw = ImageDraw.Draw(img, "RGBA")
 
@@ -276,7 +283,7 @@ def generate_certificate(user) -> bytes:
     ]
     n = len(stat_items)
     card_y0, card_y1 = 470, 620
-    pad_outer = 140
+    pad_outer = 90
     col_w = (W - 2 * pad_outer) / n
     for i, (num, label) in enumerate(stat_items):
         cx_ = pad_outer + col_w * i + col_w / 2
@@ -289,6 +296,17 @@ def generate_certificate(user) -> bytes:
         draw.text((cx_ - num_w / 2, card_y0), num, font=num_font, fill=_GOLD_LIGHT)
         lbl_w = draw.textbbox((0, 0), label, font=small_font)[2]
         draw.text((cx_ - lbl_w / 2, card_y0 + 70), label, font=small_font, fill=_MUTED)
+
+    # Bot link + growth hook, right-aligned in the gap between the stat row
+    # and the seal (avoids the seal's ellipse/ribbon footprint below it).
+    bot_username = _os.environ.get("BOT_USERNAME", "kitob_challange_bot")
+    link_text = f"t.me/{bot_username}"
+    hook_text = "2 000 000+ o'qilgan betlar"
+    right_edge = W - margin2 - 30
+    lw = draw.textbbox((0, 0), link_text, font=small_font)[2]
+    draw.text((right_edge - lw, 690), link_text, font=small_font, fill=_CREAM)
+    hw = draw.textbbox((0, 0), hook_text, font=tiny_font)[2]
+    draw.text((right_edge - hw, 722), hook_text, font=tiny_font, fill=_GOLD_LIGHT)
 
     # Seal / medallion, bottom-right.
     seal_cx, seal_cy, seal_r = W - 210, H - 155, 55
