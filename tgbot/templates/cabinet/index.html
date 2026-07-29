@@ -187,9 +187,22 @@
       background: rgba(230,180,80,.14); border: 1px solid rgba(230,180,80,.32); border-radius: 100px;
       color: var(--accent); font-size: 12.5px; font-weight: 800; font-variant-numeric: tabular-nums;
     }
+    /* Live swipe-to-navigate edge hint: grows from 0 as the user drags,
+       shrinks back if released early -- see swipe JS below. */
+    .swipe-edge-hint {
+      position: fixed; top: 0; bottom: 0; z-index: 260; width: 0; opacity: 0;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none; transition: width .18s ease, opacity .18s ease;
+    }
+    .swipe-edge-hint.left  { left: 0; background: linear-gradient(to right, rgba(198,113,57,.4), transparent); }
+    .swipe-edge-hint.right { right: 0; background: linear-gradient(to left, rgba(198,113,57,.4), transparent); }
+    .swipe-edge-hint .arrow { font-size: 26px; color: #fff; }
   </style>
 </head>
 <body>
+
+  <div class="swipe-edge-hint left" id="swipeHintLeft"><span class="arrow">‹</span></div>
+  <div class="swipe-edge-hint right" id="swipeHintRight"><span class="arrow">›</span></div>
 
   <div class="topbar">
     <div class="avatar">👤</div>
@@ -522,20 +535,84 @@
   const tabs = ['/', '/kutubxona/', '/shop/', '/kabinet/'];
   const activeIdx = 3;
 
-  let sx = 0, sy = 0;
+  // Live swipe-to-navigate between sections: follows the finger (edge hint
+  // grows) as you drag, lets you change your mind and drag back before
+  // releasing, and only actually navigates if released past a distance/
+  // velocity threshold -- otherwise it snaps back and nothing happens.
+  // Ignored inside anything that itself scrolls horizontally -- detected
+  // generically via scrollWidth > clientWidth on any ancestor, so no
+  // per-page class list to keep in sync -- and while the PDF reader
+  // overlay (library page only) is open.
+  const hintLeft = document.getElementById('swipeHintLeft');
+  const hintRight = document.getElementById('swipeHintRight');
+  const SWIPE_HINT_MAX = 110;
+  const SWIPE_COMMIT_FRACTION = .32;
+  const SWIPE_COMMIT_VELOCITY = .55;
+
+  function _hasHorizontalOverflow(el) {
+    let node = el;
+    while (node && node !== document.body) {
+      if (node.scrollWidth > node.clientWidth + 2) return true;
+      node = node.parentElement;
+    }
+    return false;
+  }
+
+  function _resetSwipeHints() {
+    hintLeft.style.width = '0px'; hintLeft.style.opacity = '0';
+    hintRight.style.width = '0px'; hintRight.style.opacity = '0';
+  }
+
+  let drag = null;
   document.body.addEventListener('touchstart', (e) => {
+    drag = null;
     if (e.touches.length !== 1) return;
-    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    const reader = document.getElementById('pdfReader');
+    if (reader && reader.classList.contains('open')) return;
+    if (_hasHorizontalOverflow(e.target)) return;
+    drag = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), active: false, dx: 0 };
   }, { passive: true });
-  document.body.addEventListener('touchend', (e) => {
-    if (!sx) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - sx, dy = t.clientY - sy;
-    sx = 0;
-    if (Math.abs(dx) < 90 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+
+  document.body.addEventListener('touchmove', (e) => {
+    if (!drag || e.touches.length !== 1) return;
+    const dx = e.touches[0].clientX - drag.x;
+    const dy = e.touches[0].clientY - drag.y;
+    if (!drag.active) {
+      if (Math.abs(dx) < 10) return;
+      if (Math.abs(dx) < Math.abs(dy) * 1.3) { drag = null; return; }
+      drag.active = true;
+    }
+    drag.dx = dx;
     const next = dx < 0 ? activeIdx + 1 : activeIdx - 1;
-    if (next >= 0 && next < tabs.length) window.location.href = tabs[next];
+    const canGo = next >= 0 && next < tabs.length;
+    const hint = dx < 0 ? hintRight : hintLeft;
+    const other = dx < 0 ? hintLeft : hintRight;
+    other.style.width = '0px'; other.style.opacity = '0';
+    if (canGo) {
+      const w = Math.min(SWIPE_HINT_MAX, Math.abs(dx) * .6);
+      hint.style.width = w + 'px';
+      hint.style.opacity = Math.min(1, w / SWIPE_HINT_MAX).toFixed(2);
+    }
   }, { passive: true });
+
+  document.body.addEventListener('touchend', () => {
+    if (!drag) return;
+    const { active, dx, t } = drag;
+    drag = null;
+    if (!active) return;
+    const elapsed = Math.max(1, Date.now() - t);
+    const velocity = Math.abs(dx) / elapsed;
+    const threshold = window.innerWidth * SWIPE_COMMIT_FRACTION;
+    const commit = Math.abs(dx) > threshold || velocity > SWIPE_COMMIT_VELOCITY;
+    const next = dx < 0 ? activeIdx + 1 : activeIdx - 1;
+    if (commit && next >= 0 && next < tabs.length) {
+      window.location.href = tabs[next];
+    } else {
+      _resetSwipeHints();
+    }
+  }, { passive: true });
+
+  document.body.addEventListener('touchcancel', () => { drag = null; _resetSwipeHints(); });
 
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
