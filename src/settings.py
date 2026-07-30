@@ -297,4 +297,11 @@ ADMIN_REORDER = (
             'tgbot.DailyMessage',
         )
     },
+    {
+        'app': 'tgbot',
+        'label': 'Sayt Statistikasi',
+        'models': (
+            'tgbot.SiteEvent',
+        )
+    },
 )
