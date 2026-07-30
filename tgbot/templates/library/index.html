@@ -246,12 +246,19 @@
       background: linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.04));
       border-radius: 5px 0 0 5px; pointer-events: none;
     }
-    .spine-cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .85; }
+    .spine-cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .75; }
     .spine-title {
       writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg);
-      font-size: 10.5px; font-weight: 700; font-family: var(--fb);
+      font-size: 11.5px; font-weight: 800; font-family: var(--fb);
       padding: 8px 3px; line-height: 1.15;
-      color: rgba(255,255,255,.9); text-shadow: 0 1px 3px rgba(0,0,0,.5);
+      color: #fff;
+      /* Outline effect (shadow in every direction + a soft blur) so the
+         title stays readable over any cover art color/brightness, not
+         just a single soft drop-shadow. */
+      text-shadow:
+        0 0 4px rgba(0,0,0,.9), 0 0 4px rgba(0,0,0,.9),
+        1px 0 2px rgba(0,0,0,.95), -1px 0 2px rgba(0,0,0,.95),
+        0 1px 2px rgba(0,0,0,.95), 0 -1px 2px rgba(0,0,0,.95);
       overflow: hidden; max-height: 155px;
       display: block; position: relative; z-index: 1;
       user-select: none; word-break: break-word;
@@ -762,7 +769,7 @@
       .lang-sw { display: none; }
       .shelf-hero h1 { font-size: 28px; }
       .book-spine { width: 28px; }
-      .spine-title { font-size: 9px; }
+      .spine-title { font-size: 10px; }
       .stat-cards { grid-template-columns: 1fr 1fr; }
       .car-prev,.car-next { display: none; }
     }
