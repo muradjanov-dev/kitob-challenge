@@ -57,20 +57,31 @@
     btn.classList.toggle("kc-muted", muted);
   }
 
+  var RESUME_EVENTS = ["pointerdown", "touchstart", "mousedown", "keydown"];
+  var resumeArmed = false;
+
+  function armResume() {
+    if (resumeArmed) return;
+    resumeArmed = true;
+    var resume = function () {
+      resumeArmed = false;
+      RESUME_EVENTS.forEach(function (ev) { document.removeEventListener(ev, resume); });
+      if (!muted) audio.play().catch(function () {});
+    };
+    RESUME_EVENTS.forEach(function (ev) { document.addEventListener(ev, resume, { passive: true, once: false }); });
+    // once:false + manual removeEventListener above so ANY of the 4 event
+    // types can be the one that fires first, whichever the browser sends.
+  }
+
   function tryPlay() {
     if (muted) return;
     var p = audio.play();
     if (p && p.catch) {
-      p.catch(function () {
-        // Autoplay blocked — resume on the user's first interaction with the page.
-        var resume = function () {
-          if (!muted) audio.play().catch(function () {});
-          document.removeEventListener("pointerdown", resume);
-          document.removeEventListener("keydown", resume);
-        };
-        document.addEventListener("pointerdown", resume, { once: true });
-        document.addEventListener("keydown", resume, { once: true });
-      });
+      // Autoplay blocked (typical right after a fresh page navigation) --
+      // every browser requires a genuine user gesture on *this* document
+      // before it'll allow sound, so resume on the very first tap/scroll/
+      // key the user makes here instead of waiting for the mute button.
+      p.catch(armResume);
     }
   }
 
@@ -86,7 +97,10 @@
     if (muted) {
       audio.pause();
     } else {
-      if (!audio.src) loadRandomTrack();
+      // Unmuting is also the manual "next track" control -- a direct click
+      // is always a real user gesture, so this is the one action guaranteed
+      // to work even when autoplay was blocked.
+      loadRandomTrack();
       tryPlay();
     }
   });
