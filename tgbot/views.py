@@ -235,32 +235,6 @@ def telegram(request: HttpRequest):
     return HttpResponse(status=200)
 
 
-@csrf_exempt
-def internal_broadcast_library_music(request: HttpRequest):
-    """One-off trigger for tgbot.tasks.broadcast_library_music_update, guarded
-    by the bot's own API_TOKEN as a shared secret (no separate env var to
-    provision). POST only, runs the actual send in a background thread since
-    it can run well past gunicorn's request timeout for a large user base."""
-    import os as _os
-
-    if request.method != "POST":
-        return HttpResponse(status=405)
-    secret = request.headers.get("X-Internal-Secret", "")
-    if not secret or secret != _os.environ.get("API_TOKEN", ""):
-        return HttpResponse(status=403)
-
-    from tgbot.tasks import broadcast_library_music_update
-
-    def _run():
-        try:
-            broadcast_library_music_update()
-        except Exception as e:
-            print(f"internal_broadcast_library_music failed: {e}")
-
-    threading.Thread(target=_run, daemon=True).start()
-    return HttpResponse("started", status=202)
-
-
 app = Celery("core")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 
