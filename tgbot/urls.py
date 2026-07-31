@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     home, telegram, library_view, internal_diag_blocked_users, internal_unblock_false_positives,
-    internal_diag_challenge_boom_state,
+    internal_diag_challenge_boom_state, internal_retire_challenge_and_launch_boom,
 )
 from src.settings import WEBHOOK_PATH
 from tgbot.views import health_check_celery, health_check_redis

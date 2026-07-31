@@ -365,6 +365,34 @@ def internal_unblock_false_positives(request: HttpRequest):
     return HttpResponse("started", status=202)
 
 
+@csrf_exempt
+def internal_retire_challenge_and_launch_boom(request: HttpRequest):
+    """One-off trigger for tgbot.tasks.retire_challenge_and_launch_boom.
+    POST only. WARNING: this launches the boom, which sends the full
+    announcement broadcast to every group + registered user immediately --
+    same scale as any other boom launch. Runs in a background thread since
+    it can run well past gunicorn's request timeout. Delete this view/URL
+    once used."""
+    import os as _os
+
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+        return HttpResponse(status=403)
+
+    from tgbot.tasks import retire_challenge_and_launch_boom
+
+    def _run():
+        try:
+            retire_challenge_and_launch_boom()
+        except Exception as e:
+            print(f"internal_retire_challenge_and_launch_boom failed: {e}")
+
+    threading.Thread(target=_run, daemon=True).start()
+    return HttpResponse("started", status=202)
+
+
 app = Celery("core")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 

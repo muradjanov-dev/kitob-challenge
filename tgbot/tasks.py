@@ -4003,14 +4003,19 @@ def retire_challenge_and_launch_boom(challenge_id=None, boom_days=7):
     if not challenge:
         return {"error": "no_active_challenge"}
 
+    # Only today's referrals transfer -- not the whole (possibly multi-day)
+    # challenge window -- per explicit instruction: carry over today's
+    # already-made effort, nothing earlier. The new boom then keeps
+    # accumulating referrals day by day on its own for its full 7-day run.
     transfers = []
     if challenge.condition_type == "referrals_daily":
+        today = timezone.localdate()
         participants = list(
             ChallengeParticipant.objects.filter(challenge=challenge).select_related("user")
         )
         for p in participants:
             made = UserReferal.objects.filter(
-                referrer=p.user, created_at__date__gte=challenge.start_date,
+                referrer=p.user, created_at__date=today,
             ).count()
             if made > 0:
                 transfers.append((p.user, made))

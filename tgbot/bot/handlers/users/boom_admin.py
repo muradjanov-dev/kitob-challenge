@@ -36,9 +36,13 @@ def _active_boom_exists() -> bool:
 @sync_to_async
 def _load_boom_stats():
     """Live snapshot of the current (or, if none is running, the most
-    recently finished) Yaxshilik ulashuvchi competition: participant count,
+    recently finished) Yaxshilik ulashuvchi round: participant count,
     totals, and a TOP-10 by referrals -- admin-only view, unlike the
-    personal-only daily DM participants get."""
+    personal-only daily DM participants get. Also rolls up LIFETIME totals
+    across every past round (not just this one) -- when this round ends
+    and a new one starts, the new round's participants/totals accumulate
+    into this cumulative figure rather than the picture resetting to only
+    whatever round happens to be active right now."""
     from tgbot.models import ReferralBoom, ReferralBoomParticipant
 
     boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
@@ -55,9 +59,18 @@ def _load_boom_stats():
     )
     total_referrals = sum(p.referrals_count for p in participants)
     total_kitobcha = sum(p.kitobcha_earned for p in participants)
+
+    all_participants = ReferralBoomParticipant.objects.all()
+    lifetime = {
+        "rounds": ReferralBoom.objects.count(),
+        "participants": all_participants.values("user_id").distinct().count(),
+        "referrals": sum(all_participants.values_list("referrals_count", flat=True)),
+        "kitobcha": sum(all_participants.values_list("kitobcha_earned", flat=True)),
+    }
     return {
         "boom": boom, "is_live": is_live, "participants": participants,
         "total_referrals": total_referrals, "total_kitobcha": total_kitobcha,
+        "lifetime": lifetime,
     }
 
 
@@ -96,7 +109,12 @@ async def boom_stats_menu(message: types.Message, user):
         f"🔗 Jami takliflar: <b>{data['total_referrals']}</b>",
         f"🪙 Jami tarqatilgan: <b>{data['total_kitobcha']} Kitobcha</b>",
         "",
-        "🏆 <b>TOP-10:</b>",
+        f"📈 <b>Barcha davrlar (jami):</b> {data['lifetime']['rounds']} ta davr",
+        f"👥 Jami ishtirokchilar: <b>{data['lifetime']['participants']}</b>",
+        f"🔗 Jami takliflar: <b>{data['lifetime']['referrals']}</b>",
+        f"🪙 Jami tarqatilgan: <b>{data['lifetime']['kitobcha']} Kitobcha</b>",
+        "",
+        "🏆 <b>Joriy davr TOP-10:</b>",
     ]
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
     top = [p for p in participants if p.referrals_count][:10]
