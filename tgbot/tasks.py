@@ -3839,6 +3839,85 @@ def announce_referral_boom(boom_id):
         print(f"boom announce admin notif failed: {e}")
 
 
+def broadcast_library_music_update():
+    """One-off announcement: library background music + general 'lots of new
+    stuff, go look' nudge, plus a soft teaser for the upcoming 'Yaxshilik
+    ulashish' competition. Sent to every active group and every registered,
+    non-blocked user's DM. Callable directly (used by the internal trigger
+    view) or via Celery. Returns {"groups": N, "users": N}."""
+    import time as _time
+    from django.conf import settings as _settings
+
+    site_url = f"{_settings.WEB_DOMAIN}/kutubxona/"
+    bot_username = _get_bot_username() or "kitob_challange_bot"
+
+    text_uz = (
+        "🎶 <b>Kutubxonaga yangi ruh kirdi!</b>\n\n"
+        "Endi kitob o'qiyotganingizda fonda asta Betxoven, Bax va Motsart "
+        "jaranglaydi 🎻 — xohlasangiz bir tugma bilan o'chirib qo'yasiz.\n\n"
+        "Va bu hali hammasi emas... juda ko'p yangi narsalar bor, o'zingiz "
+        "kirib ko'rganingiz ma'qul 👀\n\n"
+        "🤫 <i>Sir tut:</i> tez orada katta \"Yaxshilik ulashish\" musobaqasi "
+        "boshlanadi. Kuzatib boring!\n\n"
+        "👇 Kutubxonani hoziroq oching"
+    )
+    text_ru = (
+        "🎶 <b>В библиотеке — новая атмосфера!</b>\n\n"
+        "Теперь во время чтения тихо звучит классика — Бетховен, Бах и "
+        "Моцарт 🎻 — при желании выключаете одной кнопкой.\n\n"
+        "И это ещё не всё... появилось много нового, загляните сами 👀\n\n"
+        "🤫 <i>По секрету:</i> совсем скоро стартует большой конкурс "
+        "«Делимся добром». Следите за новостями!\n\n"
+        "👇 Откройте библиотеку прямо сейчас"
+    )
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    # web_app buttons only work in private chats (Telegram API restriction) --
+    # groups get a plain url button into the bot instead.
+    dm_keyboard = json.dumps({"inline_keyboard": [[{
+        "text": "📚 Kutubxonani ochish", "web_app": {"url": site_url},
+    }]]})
+    group_keyboard = json.dumps({"inline_keyboard": [[{
+        "text": "📚 Kutubxonani ochish", "url": f"https://t.me/{bot_username}",
+    }]]})
+
+    groups_sent = 0
+    for group_id, thread_id in _announce_targets():
+        try:
+            data = {"chat_id": group_id, "text": text_uz, "parse_mode": "HTML",
+                     "reply_markup": group_keyboard, "disable_web_page_preview": "true"}
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            resp = requests.post(url, data=data, timeout=10)
+            if resp.ok:
+                groups_sent += 1
+        except Exception as e:
+            print(f"library music announce group {group_id}: {e}")
+
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    users_sent = 0
+    for tg_id, lang in qs.values_list("telegram_id", "language").iterator():
+        text = text_ru if lang == "ru" else text_uz
+        try:
+            resp = requests.post(
+                url,
+                data={"chat_id": tg_id, "text": text, "parse_mode": "HTML",
+                      "reply_markup": dm_keyboard, "disable_web_page_preview": "true"},
+                timeout=5,
+            )
+            if resp.ok:
+                users_sent += 1
+            elif resp.status_code == 429:
+                _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
+        except Exception:
+            pass
+        _time.sleep(0.05)
+
+    print(f"broadcast_library_music_update: groups_sent={groups_sent} users_sent={users_sent}")
+    return {"groups": groups_sent, "users": users_sent}
+
+
 @shared_task
 def boom_reminder_tick():
     """Beat (every ~5 min): for each participant whose next scheduled reminder
