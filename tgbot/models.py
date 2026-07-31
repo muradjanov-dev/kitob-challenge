@@ -1998,3 +1998,35 @@ class SiteEvent(BaseModel):
 
     def __str__(self):
         return f"{self.event_type}:{self.section} {self.label}"[:60]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Admin Inbox — a user's "Adminga bog'lanish" message, broadcast to every
+# admin at once. `copies` remembers each admin's forwarded message so that
+# whoever answers first can have the button/notice cleared on everyone
+# else's copy too, preventing two admins from both replying to one question.
+# ─────────────────────────────────────────────────────────────────────────────
+class AdminInboxThread(BaseModel):
+    from_user = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="admin_inbox_threads",
+    )
+    copies = models.JSONField(
+        default=list,
+        help_text='[{"admin_id": <telegram_id>, "header_message_id": <int>, '
+                   '"content_message_id": <int>}, ...] — one entry per admin '
+                   'the message was forwarded to.',
+    )
+    answered = models.BooleanField(default=False)
+    answered_by = models.ForeignKey(
+        TelegramProfile, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="answered_inbox_threads",
+    )
+    answered_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Admin Inbox — Xabar"
+        verbose_name_plural = "Admin Inbox — Xabarlar"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"#{self.id} from {self.from_user} ({'answered' if self.answered else 'open'})"

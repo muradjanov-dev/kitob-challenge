@@ -36,6 +36,31 @@ aget_user = sync_to_async(get_user_sync, thread_sensitive=True)
 get_user = get_user_sync
 
 
+def get_admin_ids_sync():
+    """Union of DB-flagged admins (TelegramProfile.is_admin=True) and the
+    legacy ADMINS env var -- the env var used to be the ONLY admin broadcast
+    list for contact_admin.py, silently excluding anyone granted admin only
+    through the DB/admin panel (they'd never receive user messages, and
+    couldn't reply even if forwarded one by another admin)."""
+    import os
+    db_ids = set(
+        User.objects.filter(is_admin=True).values_list("telegram_id", flat=True)
+    )
+    env_raw = os.environ.get("ADMINS", "")
+    env_ids = {int(a.strip()) for a in env_raw.split(",") if a.strip().lstrip("-").isdigit()}
+    return db_ids | env_ids
+
+
+aget_admin_ids = sync_to_async(get_admin_ids_sync, thread_sensitive=True)
+
+
+def is_admin_id_sync(telegram_id):
+    return int(telegram_id) in get_admin_ids_sync()
+
+
+aget_is_admin = sync_to_async(is_admin_id_sync, thread_sensitive=True)
+
+
 def get_all_users():
     users = User.objects.all()
     return users

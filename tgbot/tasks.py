@@ -3190,9 +3190,13 @@ def announce_challenge():
     if prev:
         _finalize_challenge_results(prev.id)
 
-    # Finalize any boom left over from the previous slot (normally already
-    # finalized by boom_reminder_tick when its window closed; this is a safety net).
-    for _b in ReferralBoom.objects.filter(is_active=True):
+    # Finalize any boom left over from the previous slot whose window has
+    # actually closed (normally already finalized by boom_reminder_tick; this
+    # is a safety net). Critical: only EXPIRED booms -- a bare `is_active=True`
+    # filter here would finalize a still-running boom (e.g. a multi-day event)
+    # every time this task fires, which previously killed a live 7-day boom
+    # via the announce_first_challenge release-command tick on every deploy.
+    for _b in ReferralBoom.objects.filter(is_active=True, end_at__lt=timezone.now()):
         finalize_referral_boom(_b.id)
 
     # A currently-live boom (any length, not just the queued 3-day slot --
@@ -3661,7 +3665,7 @@ def _ensure_referral_code(user):
 def _boom_join_keyboard(boom_id):
     return json.dumps({
         "inline_keyboard": [[{
-            "text": "💥 BOOM'ga qo'shilaman!",
+            "text": "🌟 Qatnashaman!",
             "callback_data": f"join_boom:{boom_id}",
         }]]
     })
@@ -3707,7 +3711,7 @@ def launch_referral_boom(days=3, tier1_reward=150, tier1_cap=10,
         boom.save(update_fields=["start_at", "end_at", "is_active", "is_queued", "announced_at"])
     else:
         boom = ReferralBoom.objects.create(
-            title=title or "3 Kunlik Referal BOOM",
+            title=title or "Yaxshilik ulashuvchi",
             start_at=now,
             end_at=now + _dt.timedelta(days=days),
             tier1_reward=tier1_reward,
@@ -3732,7 +3736,7 @@ def queue_referral_boom(tier1_reward=150, tier1_cap=10, tier2_reward=300,
 
     now = timezone.now()
     defaults = dict(
-        title=title or "3 Kunlik Referal BOOM",
+        title=title or "Yaxshilik ulashuvchi",
         tier1_reward=tier1_reward, tier1_cap=tier1_cap, tier2_reward=tier2_reward,
         total_reminders=total_reminders,
         # Placeholder window — overwritten with real start/end when the rotation
@@ -3829,7 +3833,7 @@ def announce_referral_boom(boom_id):
                 data={
                     "chat_id": admin_gid,
                     "text": (
-                        f"🚀 <b>Referal BOOM e'lon qilindi!</b>\n\n"
+                        f"🚀 <b>Yaxshilik ulashuvchi e'lon qilindi!</b>\n\n"
                         f"💥 {boom.title}\n"
                         f"📅 {date_range}\n"
                         f"🪙 {boom.tier1_reward}/taklif (1-{boom.tier1_cap}), "
@@ -3924,6 +3928,57 @@ def broadcast_library_music_update():
     return {"groups": groups_sent, "users": users_sent}
 
 
+def unblock_and_apologize_false_positives():
+    """One-off recovery: mark_unreachable_users' "not found" trigger (fixed
+    in this same change) false-positived on a wave of mostly incomplete/
+    unregistered signups, silently locking them out via bulk .update()
+    (which bypasses django-auditlog, hence zero audit trail for the block
+    itself). Unblocks everyone currently is_blocked=True and apologizes by
+    DM where deliverable. Per-row .save() so THIS action is properly
+    audited, unlike the bug it's fixing. Returns {"unblocked": N, "notified": N}."""
+    import time as _time
+
+    text_uz = (
+        "🙏 <b>Uzr so'raymiz!</b>\n\n"
+        "Texnik nosozlik tufayli hisobingiz vaqtincha xato ravishda "
+        "cheklangan edi. Hoziroq to'liq tiklandi — botdan yana erkin "
+        "foydalanishingiz mumkin.\n\n"
+        "Noqulaylik uchun chin dildan uzr so'raymiz! 🙏"
+    )
+    text_ru = (
+        "🙏 <b>Приносим извинения!</b>\n\n"
+        "Из-за технического сбоя ваш аккаунт был по ошибке временно "
+        "ограничен. Сейчас всё полностью восстановлено — вы снова можете "
+        "свободно пользоваться ботом.\n\n"
+        "Искренне просим прощения за неудобства! 🙏"
+    )
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    unblocked = 0
+    notified = 0
+    for profile in TelegramProfile.objects.filter(is_blocked=True):
+        profile.is_blocked = False
+        profile.save(update_fields=["is_blocked"])
+        unblocked += 1
+        try:
+            text = text_ru if profile.language == "ru" else text_uz
+            resp = requests.post(
+                url,
+                data={"chat_id": profile.telegram_id, "text": text, "parse_mode": "HTML"},
+                timeout=5,
+            )
+            if resp.ok:
+                notified += 1
+            elif resp.status_code == 429:
+                _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
+        except Exception:
+            pass
+        _time.sleep(0.05)
+
+    print(f"unblock_and_apologize_false_positives: unblocked={unblocked} notified={notified}")
+    return {"unblocked": unblocked, "notified": notified}
+
+
 @shared_task
 def boom_reminder_tick():
     """Beat (every ~5 min): for each participant whose next scheduled reminder
@@ -3975,6 +4030,7 @@ def boom_reminder_tick():
             "tier1": boom.tier1_reward,
             "tier2": boom.tier2_reward,
             "cap": boom.tier1_cap,
+            "title": boom.title,
         }
         try:
             body = tmpl["text"].format(**ctx)
@@ -4046,8 +4102,7 @@ def finalize_referral_boom(boom_id):
         if p.referrals_count == 0:
             continue
         dm = (
-            f"🏁 <b>BOOM yakunlandi!</b>\n\n"
-            f"💥 {boom.title}\n"
+            f"🏁 <b>{boom.title} yakunlandi!</b>\n\n"
             f"👥 Takliflaringiz: <b>{p.referrals_count}</b> ta\n"
             f"🪙 Boomdan yig'ildingiz: <b>{p.kitobcha_earned} Kitobcha</b>\n"
             f"💰 Balans: <b>{int(p.user.ball or 0)} Kitobcha</b>\n\n"
@@ -4079,7 +4134,7 @@ def finalize_referral_boom(boom_id):
                 data={
                     "chat_id": admin_gid,
                     "text": (
-                        f"📊 <b>Referal BOOM yakunlandi: {boom.title}</b>\n\n"
+                        f"📊 <b>Yakunlandi: {boom.title}</b>\n\n"
                         f"👥 Ishtirokchilar: <b>{len(participants)}</b>\n"
                         f"🔗 Jami takliflar: <b>{total_referrals}</b>\n"
                         f"🪙 Jami tarqatilgan: <b>{total_kitobcha} Kitobcha</b>\n\n"

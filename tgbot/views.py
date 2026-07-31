@@ -290,6 +290,31 @@ def internal_diag_blocked_users(request: HttpRequest):
     }, json_dumps_params={"indent": 2, "default": str})
 
 
+@csrf_exempt
+def internal_unblock_false_positives(request: HttpRequest):
+    """One-off trigger for tgbot.tasks.unblock_and_apologize_false_positives.
+    POST only, runs in a background thread (can run well past gunicorn's
+    request timeout). Delete this view/URL once used."""
+    import os as _os
+
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+        return HttpResponse(status=403)
+
+    from tgbot.tasks import unblock_and_apologize_false_positives
+
+    def _run():
+        try:
+            unblock_and_apologize_false_positives()
+        except Exception as e:
+            print(f"internal_unblock_false_positives failed: {e}")
+
+    threading.Thread(target=_run, daemon=True).start()
+    return HttpResponse("started", status=202)
+
+
 app = Celery("core")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 

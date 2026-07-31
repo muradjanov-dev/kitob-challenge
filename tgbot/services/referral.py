@@ -1,6 +1,7 @@
 import string
 import random
 from datetime import timedelta
+from django.utils import timezone
 from asgiref.sync import sync_to_async
 from tgbot.models import UserReferal, TelegramProfile
 from tgbot.bot.loader import bot
@@ -168,9 +169,13 @@ class ReferralService:
     @staticmethod
     @sync_to_async
     def _award_boom_bonus(referrer: TelegramProfile):
-        """If a Referral BOOM is live and `referrer` is a participant, award the
-        tiered per-referral bonus. Returns a dict for the payout DM, or None."""
+        """If a Referral BOOM is live, award `referrer` the tiered per-referral
+        bonus -- EVERY referral during the boom's window counts, whether or not
+        the referrer ever tapped "join" on the announcement; join only affects
+        whether they got the welcome DM + drip reminders. Returns a dict for
+        the payout DM, or None."""
         from tgbot.models import ReferralBoom, ReferralBoomParticipant
+        from tgbot.services.referral_boom import generate_daily_reminder_schedule
         from django.db import transaction as _txn
 
         boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
@@ -178,14 +183,16 @@ class ReferralService:
             return None
 
         with _txn.atomic():
-            participant = (
+            participant, created = (
                 ReferralBoomParticipant.objects
                 .select_for_update()
-                .filter(boom=boom, user=referrer)
-                .first()
+                .get_or_create(boom=boom, user=referrer)
             )
-            if not participant:
-                return None
+            if created:
+                participant.reminder_schedule = generate_daily_reminder_schedule(
+                    timezone.now(), boom.end_at,
+                )
+                participant.save(update_fields=["reminder_schedule"])
 
             referral_number = participant.referrals_count + 1
             base_reward = boom.reward_for(referral_number)

@@ -64,13 +64,13 @@ async def join_boom_handler(call: types.CallbackQuery, state: FSMContext):
     boom, status = await _join_boom(user, boom_id)
 
     if status == "expired":
-        await call.answer("❌ Bu BOOM tugagan yoki mavjud emas.", show_alert=True)
+        await call.answer("❌ Bu musobaqa tugagan yoki mavjud emas.", show_alert=True)
         return
     if status == "already":
-        await call.answer("✅ Siz allaqachon BOOM'da qatnashyapsiz! Havolangizni ulashing 🔗", show_alert=True)
+        await call.answer(f"✅ Siz allaqachon {boom.title}'da qatnashyapsiz! Havolangizni ulashing 🔗", show_alert=True)
         return
 
-    await call.answer("🎉 BOOM'ga qo'shildingiz!", show_alert=False)
+    await call.answer(f"🎉 {boom.title}'ga qo'shildingiz!", show_alert=False)
 
     # Build the once-only welcome + rules + personal link, then DM it. If the
     # boom has an image configured, it's sent as a photo with this same text

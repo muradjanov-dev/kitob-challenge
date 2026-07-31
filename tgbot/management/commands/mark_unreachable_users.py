@@ -46,7 +46,13 @@ class Command(BaseCommand):
                     reachable += 1
                 else:
                     desc = resp.json().get("description", "").lower()
-                    if "blocked" in desc or "not found" in desc:
+                    # "not found" dropped as a trigger: it's not a reliable
+                    # signal of a permanent block -- it can also fire for a
+                    # brand-new/incomplete chat Telegram hasn't fully settled
+                    # yet, and a false positive here wrongly locks a real,
+                    # active user out of the bot. Only an explicit "blocked"
+                    # description is unambiguous.
+                    if "blocked" in desc:
                         to_block_ids.append(profile_id)
                     else:
                         other_errors += 1
@@ -78,5 +84,14 @@ class Command(BaseCommand):
             ))
             return
 
-        updated = TelegramProfile.objects.filter(id__in=to_block_ids).update(is_blocked=True)
+        # Per-row .save() instead of a bulk .update() -- bulk update bypasses
+        # Django signals entirely, so django-auditlog never sees it. That's
+        # exactly how the last false-positive block run left zero audit trail
+        # and went unnoticed. Slightly slower, but this loop already does one
+        # network call per user, so the DB cost here is negligible.
+        updated = 0
+        for profile in TelegramProfile.objects.filter(id__in=to_block_ids):
+            profile.is_blocked = True
+            profile.save(update_fields=["is_blocked"])
+            updated += 1
         self.stdout.write(self.style.SUCCESS(f"Marked {updated} profiles as is_blocked=True."))

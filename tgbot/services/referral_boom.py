@@ -170,9 +170,9 @@ def build_payout_text(boom, referral_number: int, awarded: int, total_earned: in
         tier_line = f"💎 Siz <b>2x darajadasiz</b> — har taklif <b>{boom.tier2_reward} Kitobcha</b>!"
 
     return (
-        f"💥 <b>BOOM! +{awarded} Kitobcha!</b>\n\n"
-        f"👥 Boom davomidagi takliflaringiz: <b>{referral_number}</b> ta\n"
-        f"🪙 Boomdan yig'ildi: <b>{total_earned} Kitobcha</b>\n"
+        f"🎉 <b>Tabriklaymiz! +{awarded} Kitobcha!</b>\n\n"
+        f"👥 {boom.title} davomidagi takliflaringiz: <b>{referral_number}</b> ta\n"
+        f"🪙 {boom.title}dan yig'ildi: <b>{total_earned} Kitobcha</b>\n"
         f"💰 Umumiy balans: <b>{balance} Kitobcha</b>\n\n"
         f"{tier_line}\n"
         f"🛍 Do'kondan sovg'a olishni unutmang!"
@@ -182,13 +182,13 @@ def build_payout_text(boom, referral_number: int, awarded: int, total_earned: in
 # ── The playful reminder pool ────────────────────────────────────────────────
 # Each entry has a stable `key` (so we never repeat copy for one user) and a
 # `text` template. Available format fields:
-#   {referrals} {earned} {balance} {left} {link} {tier1} {tier2} {cap}
+#   {referrals} {earned} {balance} {left} {link} {tier1} {tier2} {cap} {title}
 # Tone is deliberately all over the place — memes, FOMO, drama, jokes — so the
 # 21 nudges never feel like the same robotic system notification.
 BOOM_REMINDER_POOL = [
     {"key": "fomo_clock", "text": (
         "⏰ <i>Tik-tak, tik-tak...</i>\n"
-        "BOOM tugashiga <b>{left}</b> qoldi! Har do'st = <b>{tier1} Kitobcha</b> 💸\n"
+        "{title} tugashiga <b>{left}</b> qoldi! Har do'st = <b>{tier1} Kitobcha</b> 💸\n"
         "🔗 {link}"
     )},
     {"key": "meme_money", "text": (
@@ -202,7 +202,7 @@ BOOM_REMINDER_POOL = [
     )},
     {"key": "drama", "text": (
         "🎬 <b>Dramatik eslatma:</b>\n"
-        "Bir kuni kelib \"BOOM'da nega ko'proq qatnashmadim\" demaslik uchun —\n"
+        "Bir kuni kelib \"{title}'da nega ko'proq qatnashmadim\" demaslik uchun —\n"
         "ayni damda havola tashla! ⏳ {left} qoldi.\n🔗 {link}"
     )},
     {"key": "scoreboard", "text": (
@@ -219,7 +219,7 @@ BOOM_REMINDER_POOL = [
         "Do'st qo'shildi = <b>{tier1} Kitobcha</b> cho'ntakda 😏\n🔗 {link}"
     )},
     {"key": "book_pun", "text": (
-        "📚 Kitob \"sahifama-sahifa\", BOOM esa \"do'stma-do'st\" yutuq beradi!\n"
+        "📚 Kitob \"sahifama-sahifa\", {title} esa \"do'stma-do'st\" yutuq beradi!\n"
         "Keyingi bobni yozaylik 👇\n🔗 {link}"
     )},
     {"key": "leaderboard_tease", "text": (
@@ -231,11 +231,11 @@ BOOM_REMINDER_POOL = [
         "Balansingiz <b>{balance} Kitobcha</b> — yana to'ldiramiz 🤝\n🔗 {link}"
     )},
     {"key": "rocket", "text": (
-        "🚀 3...2...1... <b>BOOM!</b>\n"
+        "🚀 3...2...1... <b>Uchdik!</b>\n"
         "Bitta havola = <b>{tier1} Kitobcha</b>. Uchirdikmi? 🔗 {link}"
     )},
     {"key": "gentle", "text": (
-        "🌿 Shoshilmang, lekin... BOOM tugashiga <b>{left}</b> qoldi.\n"
+        "🌿 Shoshilmang, lekin... {title} tugashiga <b>{left}</b> qoldi.\n"
         "Bittagina do'st taklif qilsangiz ham yaxshi-ku 🙂\n🔗 {link}"
     )},
     {"key": "challenge_you", "text": (
@@ -252,7 +252,7 @@ BOOM_REMINDER_POOL = [
     )},
     {"key": "alarm", "text": (
         "🚨 <b>Diqqat!</b> Bu oddiy eslatma emas — bu imkoniyat!\n"
-        "BOOM <b>{left}</b> dan keyin yopiladi. 🔗 {link}"
+        "{title} <b>{left}</b> dan keyin yopiladi. 🔗 {link}"
     )},
     {"key": "proud", "text": (
         "🥹 Allaqachon <b>{referrals}</b> ta do'st va <b>{earned} Kitobcha</b>!\n"
@@ -263,7 +263,7 @@ BOOM_REMINDER_POOL = [
         "<b>{tier1} Kitobcha</b> — bittagina do'st uchun. 🔗 {link}"
     )},
     {"key": "fire", "text": (
-        "🔥🔥🔥 BOOM hali ham yonmoqda!\n"
+        "🔥🔥🔥 {title} hali ham qizg'in davom etmoqda!\n"
         "Har taklif <b>{tier1} Kitobcha</b>, {cap}+ da esa <b>{tier2}</b>! 🔗 {link}"
     )},
     {"key": "missed_call", "text": (
@@ -279,7 +279,7 @@ BOOM_REMINDER_POOL = [
         "<b>{tier1} Kitobcha</b>!\n🔗 {link}"
     )},
     {"key": "last_push", "text": (
-        "🏁 Marra yaqin! BOOM tugashiga <b>{left}</b>.\n"
+        "🏁 Marra yaqin! {title} tugashiga <b>{left}</b>.\n"
         "Oxirgi zarba — yana bir do'st! <b>{tier1} Kitobcha</b> 🔗 {link}"
     )},
     {"key": "wink", "text": (
