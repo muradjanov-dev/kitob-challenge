@@ -139,8 +139,13 @@ def report_reply_keyboard(language="uz", bajardim_label=None, is_admin=False):
     rows = [
         [KeyboardButton(text=report_text), KeyboardButton(text=done_text)],
         [KeyboardButton(text=site_text, web_app=WebAppInfo(url=f"{WEB_DOMAIN}/"))],
-        [KeyboardButton(text=home_text)],
     ]
+    # Persistent entry to this user's own boom stats + share link, while a
+    # Referral BOOM is live -- same active-boom cache main_markup() uses.
+    active_boom = _active_boom_for_menu()
+    if active_boom:
+        rows.append([KeyboardButton(text=f"🌟 {active_boom.title}")])
+    rows.append([KeyboardButton(text=home_text)])
     return ReplyKeyboardMarkup(
         keyboard=rows,
         resize_keyboard=True,

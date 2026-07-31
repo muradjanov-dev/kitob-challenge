@@ -1838,6 +1838,29 @@ def _send_and_pin_progress(user) -> int:
             "url": f"https://t.me/share/url?url={_urlquote(ref_link)}&text={share_text}",
         }])
 
+    # While a Referral BOOM is live: append its rules/rewards to the same
+    # daily pinned message (re-sent + re-pinned fresh every day of the
+    # competition, so this stays visible for the whole 7-day run without a
+    # second, separate pin competing for the slot).
+    from tgbot.models import ReferralBoom as _RB
+    active_boom = _RB.objects.filter(is_active=True).order_by("-created_at").first()
+    if active_boom:
+        days_left = max(0, (active_boom.end_at - timezone.now()).days)
+        text += (
+            f"\n\n🌟 <b>{active_boom.title} — {days_left} kun qoldi!</b>\n"
+            f"• 1—{active_boom.tier1_cap}-taklif: har biri uchun "
+            f"<b>{active_boom.tier1_reward} Kitobcha</b>\n"
+            f"• {active_boom.tier1_cap}+ taklif: har biri uchun "
+            f"<b>{active_boom.tier2_reward} Kitobcha</b> (2x tezlik!)\n"
+            f"• Hech bo'lmasa 1 ta taklif qilganlarga <b>500 Kitobcha</b> "
+            f"kafolatlanadi, 💎 Premium'da barchasi ×2!\n"
+            f"🏆 TOP-3ga: Premium obuna + kitoblar + minglab Kitobcha!"
+        )
+        buttons.append([{
+            "text": f"🌟 {active_boom.title}",
+            "callback_data": f"join_boom:{active_boom.id}",
+        }])
+
     site_button = json.dumps({"inline_keyboard": buttons})
     resp = requests.post(
         url,
@@ -4302,16 +4325,17 @@ def _boom_leaderboard_block(boom, top_n=30):
     return "\n".join(lines) if lines else "Hali hech kim taklif qilmagan — birinchi bo'ling!"
 
 
-def _broadcast_boom_update(boom, text, pin: bool = False, keyboard=None):
+def _broadcast_boom_update(boom, text, pin: bool = False, keyboard=None, no_photo: bool = False):
     """Send `text` (photo+caption if the boom has an image, plain text
     otherwise) to every announce-group AND every registered user. When `pin`
     is set, pins the message in each group (best-effort -- the bot needs
     pin rights there; silently skipped if it doesn't have them). `keyboard`
-    is a pre-built inline_keyboard JSON string (e.g. the join button)."""
+    is a pre-built inline_keyboard JSON string (e.g. the join button).
+    `no_photo` forces plain text even if the boom has an image."""
     import time as _time
     from django.conf import settings as _settings
 
-    photo_url = f"{_settings.WEB_DOMAIN}{boom.image.url}" if boom.image else None
+    photo_url = None if no_photo else (f"{_settings.WEB_DOMAIN}{boom.image.url}" if boom.image else None)
     send_method = "sendPhoto" if photo_url else "sendMessage"
     send_url = f"https://api.telegram.org/bot{BOT_TOKEN}/{send_method}"
     pin_url = f"https://api.telegram.org/bot{BOT_TOKEN}/pinChatMessage"
@@ -4424,6 +4448,50 @@ def boom_public_daily_update():
         boom, text, pin=False, keyboard=_boom_join_keyboard(boom.id),
     )
     print(f"boom_public_daily_update: boom={boom.id} groups={group_sent} users={user_sent}")
+
+
+@shared_task
+def boom_rules_announcement():
+    """One-off: full rules/mechanics explainer for the live boom, everywhere
+    -- every group + every registered user. Text-only (no photo) with the
+    join button, since the poster image was already sent separately."""
+    from tgbot.models import ReferralBoom
+
+    boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
+    if not boom:
+        print("boom_rules_announcement: no active boom")
+        return
+
+    days_left = max(0, (boom.end_at - timezone.now()).days)
+    text = (
+        f"📖 <b>{boom.title} — musobaqa shartlari</b>\n\n"
+        f"1️⃣ Shaxsiy referal havolangizni do'stlaringizga, guruhlaringizga "
+        f"tashlang.\n"
+        f"2️⃣ Do'stingiz havola orqali botga kirib ro'yxatdan o'tishi va "
+        f"birinchi hisobotini yuborishi kerak — shundagina taklif hisoblanadi.\n"
+        f"3️⃣ Har bir hisoblangan taklif uchun darhol Kitobcha olasiz:\n"
+        f"   • 1—{boom.tier1_cap}-taklif: har biri uchun <b>{boom.tier1_reward} "
+        f"Kitobcha</b>\n"
+        f"   • {boom.tier1_cap}+ taklif: har biri uchun <b>{boom.tier2_reward} "
+        f"Kitobcha</b> (2x tezlik!)\n"
+        f"   • Hech bo'lmasa <b>1 ta</b> taklif qilganlarga ham <b>500 "
+        f"Kitobcha</b> kafolatlanadi\n"
+        f"   • 💎 Premium bo'lsangiz — barcha summalar <b>×2</b>!\n\n"
+        f"🏆 <b>Musobaqa oxirida ENG KO'P do'st taklif qilgan TOP-3 "
+        f"kitobxonga:</b>\n"
+        f"🥇 1-o'rin: 1 oylik Kitob Challenge Premium + \"Iymon\" kitobi + "
+        f"<b>10.000 Kitobcha</b>!\n"
+        f"🥈 2-o'rin: \"Dunyoni tebratgan 7 buyuk\" kitobi + <b>5.000 "
+        f"Kitobcha</b>!\n"
+        f"🥉 3-o'rin: 3 oylik Kitob Challenge Premium + kitob sovg'a + "
+        f"<b>2.500 Kitobcha</b>!\n\n"
+        f"⏳ Musobaqa hali <b>{days_left} kun</b> davom etadi — hoziroq "
+        f"qo'shiling va do'stlaringizni taklif qilishni boshlang! 🚀"
+    )
+    group_sent, user_sent = _broadcast_boom_update(
+        boom, text, pin=False, keyboard=_boom_join_keyboard(boom.id), no_photo=True,
+    )
+    print(f"boom_rules_announcement: boom={boom.id} groups={group_sent} users={user_sent}")
 
 
 # ────────────────────────────────────────────────────────────────────────

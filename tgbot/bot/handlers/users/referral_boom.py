@@ -10,12 +10,14 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from asgiref.sync import sync_to_async
 from django.utils import timezone
 
+from tgbot.bot.filters import IsPrivate
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.utils import aget_user
 from tgbot.services.referral_boom import (
     generate_daily_reminder_schedule,
     build_welcome_text,
     boom_share_texts,
+    humanize_left,
 )
 
 # NB: ReferralService is imported lazily inside the handler — importing it at
@@ -66,8 +68,35 @@ async def join_boom_handler(call: types.CallbackQuery, state: FSMContext):
     if status == "expired":
         await call.answer("❌ Bu musobaqa tugagan yoki mavjud emas.", show_alert=True)
         return
+
+    from tgbot.services.referral import ReferralService
+    referral_link = await ReferralService.get_referral_link(user)
+    share_text = _urlquote(random.choice(boom_share_texts(user.full_name, boom.title)))
+    kb = InlineKeyboardMarkup().add(InlineKeyboardButton(
+        "📤 Do'stlarga ulashish",
+        url=f"https://t.me/share/url?url={_urlquote(referral_link)}&text={share_text}",
+    ))
+
     if status == "already":
-        await call.answer(f"✅ Siz allaqachon {boom.title}'da qatnashyapsiz! Havolangizni ulashing 🔗", show_alert=True)
+        # They tapped "join" again -- the toast alone doesn't show the actual
+        # link anywhere they can copy/tap, so resend it as a real message
+        # (not just the welcome DM, which only ever sends once). Body text
+        # rotates through the same ~20-variant creative pool as the share
+        # button, not a fixed line, so repeat taps don't look copy-pasted.
+        await call.answer(f"✅ Siz allaqachon {boom.title}'da qatnashyapsiz!", show_alert=False)
+        blurb = random.choice(boom_share_texts(user.full_name, boom.title))
+        try:
+            await bot.send_message(
+                chat_id=user.telegram_id,
+                text=(
+                    f"🔗 <b>Sizning shaxsiy havolangiz:</b>\n{referral_link}\n\n"
+                    f"{blurb}"
+                ),
+                parse_mode="HTML", disable_web_page_preview=True,
+                reply_markup=kb,
+            )
+        except Exception as e:
+            print(f"boom link resend failed uid={user.id}: {e}")
         return
 
     await call.answer(f"🎉 {boom.title}'ga qo'shildingiz!", show_alert=False)
@@ -77,14 +106,7 @@ async def join_boom_handler(call: types.CallbackQuery, state: FSMContext):
     # as the caption (Telegram's 1024-char caption cap — the rules copy is
     # short enough in practice to fit; a caption that somehow doesn't would
     # just fail the send, logged below, same as any other delivery error).
-    from tgbot.services.referral import ReferralService
-    referral_link = await ReferralService.get_referral_link(user)
     text = build_welcome_text(user.full_name, boom, referral_link)
-    share_text = _urlquote(random.choice(boom_share_texts(user.full_name, boom.title)))
-    kb = InlineKeyboardMarkup().add(InlineKeyboardButton(
-        "📤 Do'stlarga ulashish",
-        url=f"https://t.me/share/url?url={_urlquote(referral_link)}&text={share_text}",
-    ))
     try:
         if boom.image:
             await bot.send_photo(
@@ -100,3 +122,61 @@ async def join_boom_handler(call: types.CallbackQuery, state: FSMContext):
         await _mark_rules_sent(user, boom_id)
     except Exception as e:
         print(f"boom welcome DM failed uid={user.id}: {e}")
+
+
+@sync_to_async
+def _boom_stats_for(user):
+    """Rank + numbers for `user` in the currently-live boom (auto-enrolls
+    them as a participant with 0 referrals if they aren't one yet, so the
+    stats view always has something to show, even for someone who's never
+    referred anyone). Returns (boom, rank, total_participants, referrals,
+    kitobcha_earned) or None if no boom is live."""
+    from tgbot.models import ReferralBoom, ReferralBoomParticipant
+
+    boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
+    if not boom:
+        return None
+
+    participant, _created = ReferralBoomParticipant.objects.get_or_create(boom=boom, user=user)
+    ranked = list(
+        ReferralBoomParticipant.objects.filter(boom=boom)
+        .order_by("-referrals_count", "joined_at")
+        .values_list("user_id", flat=True)
+    )
+    rank = ranked.index(user.id) + 1 if user.id in ranked else len(ranked)
+    return boom, rank, len(ranked), participant.referrals_count, participant.kitobcha_earned
+
+
+@dp.message_handler(IsPrivate(), regexp=r"^🌟 ", state="*")
+async def boom_stats_button(message: types.Message, state: FSMContext):
+    """Persistent reply-keyboard button (report_reply_keyboard) shown while a
+    boom is live: full personal stats + the referral link + a rotating
+    share blurb, in one tap."""
+    user = await aget_user(message.from_user.id)
+    if not user or not user.is_registered:
+        return
+
+    result = await _boom_stats_for(user)
+    if not result:
+        return
+    boom, rank, total, referrals, kitobcha = result
+
+    from tgbot.services.referral import ReferralService
+    referral_link = await ReferralService.get_referral_link(user)
+    days_left_str = humanize_left(boom.end_at)
+    blurb = random.choice(boom_share_texts(user.full_name, boom.title))
+    share_text = _urlquote(blurb)
+    kb = InlineKeyboardMarkup().add(InlineKeyboardButton(
+        "📤 Do'stlarga ulashish",
+        url=f"https://t.me/share/url?url={_urlquote(referral_link)}&text={share_text}",
+    ))
+    text = (
+        f"🌟 <b>{boom.title}</b>\n\n"
+        f"📍 O'rningiz: <b>#{rank}</b> / {total}\n"
+        f"👥 Takliflaringiz: <b>{referrals}</b> ta\n"
+        f"🪙 Yig'ilgan: <b>{kitobcha} Kitobcha</b>\n"
+        f"⏳ Qolgan vaqt: <b>{days_left_str}</b>\n\n"
+        f"🔗 <b>Sizning shaxsiy havolangiz:</b>\n{referral_link}\n\n"
+        f"{blurb}"
+    )
+    await message.answer(text, parse_mode="HTML", disable_web_page_preview=True, reply_markup=kb)
