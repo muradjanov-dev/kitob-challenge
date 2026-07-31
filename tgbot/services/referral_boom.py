@@ -116,6 +116,7 @@ def build_welcome_text(full_name: str, boom, referral_link: str) -> str:
         f"• Do'stingiz ro'yxatdan o'tib, birinchi hisobotini yuborgach taklif hisoblanadi.\n"
         f"• Hech bo'lmasa <b>1 ta</b> kitobxon taklif qilganlarga ham "
         f"<b>500 Kitobcha</b> kafolatlanadi!\n"
+        f"• 💎 <b>Premium bo'lsangiz — har taklif uchun ×2 Kitobcha!</b>\n"
         f"• Bu musobaqa faqat <b>{days} kun</b> davom etadi — vaqt ketmoqda! ⏳\n\n"
         f"🏆 <b>Musobaqa oxirida ENG KO'P do'st taklif qilgan TOP-3 kitobxonga:</b>\n"
         f"🥇 1-o'rin: 1 oylik Kitob Challenge Premium + \"Iymon\" kitobi + "

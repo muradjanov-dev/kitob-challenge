@@ -3774,6 +3774,7 @@ def announce_referral_boom(boom_id):
         f"⚡️ Har taklif qilgan do'stingiz uchun <b>{boom.tier1_reward} Kitobcha</b>!\n"
         f"🤯 <b>{boom.tier1_cap} tadan</b> oshsa — har biri uchun "
         f"<b>{boom.tier2_reward} Kitobcha</b>!\n\n"
+        f"💎 <b>Premium bo'lsangiz — har taklif uchun ×2 Kitobcha!</b>\n\n"
         f"📅 <b>Muddat:</b> {date_range}\n\n"
         f"🎁 Yiqqan Kitobchalaringizga <b>Kitob Challenge do'koni</b>dan "
         f"qimmatbaho sovg'alar oling — qancha ko'p Kitobcha, shuncha zo'r sovg'a!\n\n"
