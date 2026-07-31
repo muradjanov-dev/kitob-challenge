@@ -3672,7 +3672,7 @@ def _boom_join_keyboard(boom_id):
 
 
 @shared_task
-def launch_referral_boom(days=3, tier1_reward=150, tier1_cap=10,
+def launch_referral_boom(days=7, tier1_reward=150, tier1_cap=10,
                          tier2_reward=300, total_reminders=21, title=None,
                          boom_id=None):
     """Admin entrypoint: finalize any running boom AND the currently active
@@ -4169,23 +4169,28 @@ def boom_daily_standings():
         return
 
     days_left = max(0, (boom.end_at - timezone.now()).days)
-    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-    top_lines = [
-        f"{medals.get(i, f'{i}.')} {(p.user.full_name or 'Kitobxon')[:25]} — {p.referrals_count} ta"
-        for i, p in enumerate(participants[:5], 1) if p.referrals_count
-    ]
-    top_block = "\n".join(top_lines) if top_lines else "Hali hech kim taklif qilmadi — birinchi bo'ling!"
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     sent = 0
     for rank, p in enumerate(participants, start=1):
+        # Personal only -- no other participants' names/counts, just this
+        # user's own numbers and how far the person directly above them is.
+        if rank == 1:
+            progress_line = "🏆 Siz hozircha yetakchisiz! Shu tezlikda davom eting 🔥"
+        else:
+            above = participants[rank - 2]
+            needed = max(1, above.referrals_count - p.referrals_count + 1)
+            progress_line = (
+                f"🔼 Tepadagi ishtirokchidan o'tish uchun yana <b>{needed}</b> ta "
+                f"taklif kerak!"
+            )
         text = (
             f"📊 <b>{boom.title} — kunlik statistika</b>\n\n"
             f"📍 Sizning o'rningiz: <b>#{rank}</b> / {len(participants)}\n"
             f"👥 Takliflaringiz: <b>{p.referrals_count}</b> ta\n"
             f"🪙 Yig'ilgan: <b>{p.kitobcha_earned} Kitobcha</b>\n"
             f"⏳ Qolgan vaqt: <b>{days_left} kun</b>\n\n"
-            f"🏆 <b>TOP-5:</b>\n{top_block}\n\n"
+            f"{progress_line}\n\n"
             f"Yana taklif qiling — reytingda ko'tariling! 🚀"
         )
         try:

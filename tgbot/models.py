@@ -1193,7 +1193,7 @@ class ReaderTitleAnnouncement(BaseModel):
 # This is intentionally separate from the daily-completion `Challenge` system.
 # ─────────────────────────────────────────────────────────────────────────────
 class ReferralBoom(BaseModel):
-    title = models.CharField(max_length=200, default="3 Kunlik Referal BOOM")
+    title = models.CharField(max_length=200, default="Yaxshilik ulashuvchi")
     image = models.ImageField(
         upload_to="referral_boom/", blank=True, null=True,
         help_text="Optional banner sent with the welcome DM when someone joins, "
@@ -1206,7 +1206,7 @@ class ReferralBoom(BaseModel):
                   "auto-generated announcement is used instead.",
     )
     planned_days = models.PositiveIntegerField(
-        default=3,
+        default=7,
         help_text="Duration once launched via the '🚀 Hozir e'lon qilish' admin "
                   "action on this row (start_at/end_at below are placeholders "
                   "until then).",
