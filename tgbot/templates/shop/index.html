@@ -934,6 +934,15 @@
   </nav>
   <script>
   (function() {
+    // Some mobile WebViews (Telegram's especially, around the expand()
+    // resize) only reflow a position:fixed element on the next scroll --
+    // the bottom tab bar can sit off-screen until the user scrolls once.
+    // A harmless 1px scroll-and-back forces that reflow immediately.
+    requestAnimationFrame(() => {
+      window.scrollTo(0, 1);
+      requestAnimationFrame(() => window.scrollTo(0, 0));
+    });
+
     const tabs = ['/', '/kutubxona/', '/shop/', '/kabinet/'];
     const activeIdx = 2;
 

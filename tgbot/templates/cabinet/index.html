@@ -322,6 +322,14 @@
 (function() {
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+  // Some mobile WebViews (Telegram's especially, around the expand()
+  // resize) only reflow a position:fixed element on the next scroll --
+  // the bottom tab bar can sit off-screen until the user scrolls once.
+  // A harmless 1px scroll-and-back forces that reflow immediately.
+  requestAnimationFrame(() => {
+    window.scrollTo(0, 1);
+    requestAnimationFrame(() => window.scrollTo(0, 0));
+  });
   const initData = tg && tg.initData ? tg.initData : '';
 
   const loading = document.getElementById('cabLoading');
