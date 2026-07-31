@@ -4483,8 +4483,7 @@ def boom_rules_announcement():
         f"<b>10.000 Kitobcha</b>!\n"
         f"🥈 2-o'rin: \"Dunyoni tebratgan 7 buyuk\" kitobi + <b>5.000 "
         f"Kitobcha</b>!\n"
-        f"🥉 3-o'rin: 3 oylik Kitob Challenge Premium + kitob sovg'a + "
-        f"<b>2.500 Kitobcha</b>!\n\n"
+        f"🥉 3-o'rin: 3 oylik Kitob Challenge Premium + <b>2.500 Kitobcha</b>!\n\n"
         f"⏳ Musobaqa hali <b>{days_left} kun</b> davom etadi — hoziroq "
         f"qo'shiling va do'stlaringizni taklif qilishni boshlang! 🚀"
     )
