@@ -6,7 +6,7 @@ import traceback
 from django.db import close_old_connections
 from django.shortcuts import render
 from .webhook import proceed_update_from_body
-from django.http import HttpResponse, HttpRequest
+from django.http import HttpResponse, HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
