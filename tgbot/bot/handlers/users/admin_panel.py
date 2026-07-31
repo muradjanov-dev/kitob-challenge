@@ -77,6 +77,8 @@ def _site_stats_text(range_key: str) -> str:
 
 @dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("admin:site_stats:"), state="*")
 async def admin_site_stats_cb(call: types.CallbackQuery, state: FSMContext = None):
+    from aiogram.utils.exceptions import MessageNotModified
+
     user = await aget_user(call.from_user.id)
     if not (user and user.is_admin):
         await call.answer("Siz admin emassiz!", show_alert=True)
@@ -86,6 +88,11 @@ async def admin_site_stats_cb(call: types.CallbackQuery, state: FSMContext = Non
     markup = _site_stats_kb(range_key)
     try:
         await call.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    except MessageNotModified:
+        # Same numbers as the currently shown range (e.g. all activity is
+        # still within "today" so every range looks identical) — nothing to
+        # redraw, just ack the tap instead of sending a duplicate message.
+        pass
     except Exception:
         await call.message.answer(text, parse_mode="HTML", reply_markup=markup)
     await call.answer()
