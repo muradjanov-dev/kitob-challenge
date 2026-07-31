@@ -263,7 +263,6 @@ def internal_diag_blocked_users(request: HttpRequest):
                 "object_repr": e.object_repr,
                 "action": e.action,
                 "actor": str(e.actor) if e.actor_id else None,
-                "actor_email": e.actor_email,
                 "remote_addr": e.remote_addr,
                 "timestamp": e.timestamp.isoformat(),
                 "is_blocked_change": changes.get("is_blocked"),
