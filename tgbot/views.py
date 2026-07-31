@@ -333,9 +333,18 @@ def internal_diag_challenge_boom_state(request: HttpRequest):
         }
     queued_boom = ReferralBoom.objects.filter(is_queued=True).order_by("-created_at").first()
 
+    # Any boom row at all, active/queued or not -- catches an orphaned draft
+    # created by the bot wizard whose launch_referral_boom.delay() Celery
+    # task never actually ran (celery_worker doesn't auto-redeploy on push).
+    recent_rows = list(
+        ReferralBoom.objects.order_by("-created_at")[:8]
+        .values("id", "title", "is_active", "is_queued", "created_at", "image")
+    )
+
     return JsonResponse({
         "active_challenge": challenge_data,
         "active_boom": boom_data,
+        "recent_boom_rows": recent_rows,
         "queued_boom": {"id": queued_boom.id, "title": queued_boom.title} if queued_boom else None,
     }, json_dumps_params={"indent": 2, "default": str})
 
