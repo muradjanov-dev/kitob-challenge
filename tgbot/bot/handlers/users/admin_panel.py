@@ -30,6 +30,67 @@ async def admin_commands(message: types.Message, state: FSMContext = None):
         await message.answer("Siz admin emassiz!")
 
 
+def _site_stats_kb(active_range: str) -> InlineKeyboardMarkup:
+    from tgbot.services.site_stats import RANGE_CHOICES
+    kb = InlineKeyboardMarkup(row_width=4)
+    kb.row(*[
+        InlineKeyboardButton(
+            text=("● " if key == active_range else "○ ") + label,
+            callback_data=f"admin:site_stats:{key}",
+        )
+        for key, (label, _days) in RANGE_CHOICES.items()
+    ])
+    kb.row(InlineKeyboardButton("🔙 Admin panelga qaytish", callback_data="menu:admin"))
+    return kb
+
+
+def _site_stats_text(range_key: str) -> str:
+    from tgbot.services.site_stats import compute_site_stats, RANGE_CHOICES
+    stats = compute_site_stats(range_key, top_n=15)
+    label = RANGE_CHOICES.get(range_key, RANGE_CHOICES["7d"])[0]
+
+    lines = [
+        f"🖱 <b>Sayt Statistikasi — {label}</b>\n",
+        f"👁 Sahifa ko'rishlar: <b>{stats['total_pageviews']}</b>",
+        f"🖱 Tugma bosishlar: <b>{stats['total_clicks']}</b>",
+        f"👤 Faol foydalanuvchilar: <b>{stats['total_users']}</b>\n",
+        "📊 <b>Eng faol bo'limlar:</b>",
+    ]
+    if stats["top_sections"]:
+        for i, row in enumerate(stats["top_sections"][:10], 1):
+            lines.append(
+                f"{i}. {row['display']} — {row['views']} ko'rish, "
+                f"{row['click_count']} bosish, {row['users']} kishi"
+            )
+    else:
+        lines.append("<i>Ma'lumot yo'q</i>")
+
+    lines.append("\n🔘 <b>Eng ko'p bosilgan tugmalar:</b>")
+    if stats["top_buttons"]:
+        for i, row in enumerate(stats["top_buttons"][:15], 1):
+            lines.append(f"{i}. [{row['display']}] {row['label']} — {row['clicks']} marta")
+    else:
+        lines.append("<i>Ma'lumot yo'q</i>")
+
+    return "\n".join(lines)
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("admin:site_stats:"), state="*")
+async def admin_site_stats_cb(call: types.CallbackQuery, state: FSMContext = None):
+    user = await aget_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    range_key = call.data.split(":", 2)[2]
+    text = await sync_to_async(_site_stats_text)(range_key)
+    markup = _site_stats_kb(range_key)
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    except Exception:
+        await call.message.answer(text, parse_mode="HTML", reply_markup=markup)
+    await call.answer()
+
+
 async def _launch_chain_game(target_message):
     """Start a live Kitob Zanjiri now (inline, so it works even if the
     celery_worker image is stale) and reply with a button to open the game."""

@@ -214,6 +214,9 @@ admin_keyboard.row(
     InlineKeyboardButton(text="🛒 Do'kon boshqaruvi", callback_data="admin:shop"),
     InlineKeyboardButton(text="📚 Kutubxona boshqaruvi", callback_data="admin:library"),
 )
+admin_keyboard.row(
+    InlineKeyboardButton(text="🖱 Sayt Statistikasi", callback_data="admin:site_stats:7d"),
+)
 
 # The deprecated reply-keyboard version (kept for any legacy callers).
 _admin_reply_keyboard_legacy = ReplyKeyboardMarkup(
