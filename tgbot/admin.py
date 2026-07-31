@@ -596,30 +596,6 @@ class BookQuizPromoStateAdmin(admin.ModelAdmin):
     list_display = ('launched_on', 'last_sent_on')
 
 
-@admin.register(models.BookCoverRound)
-class BookCoverRoundAdmin(admin.ModelAdmin):
-    list_display = ('id', 'book', 'is_active', 'reward', 'created_at')
-    list_filter = ('is_active',)
-    search_fields = ('book__title',)
-    readonly_fields = ('created_at', 'updated_at')
-
-    actions = ['post_cover_game_now']
-
-    @admin.action(description="Hozir yangi Kitob Muqovasi o'yinini yuborish")
-    def post_cover_game_now(self, request, queryset):
-        from tgbot.tasks import post_book_cover_game
-        post_book_cover_game.delay()
-        self.message_user(request, "Yangi Kitob Muqovasi o'yini yuborilmoqda…")
-
-
-@admin.register(models.BookCoverAnswer)
-class BookCoverAnswerAdmin(admin.ModelAdmin):
-    list_display = ('user', 'cover_round', 'chosen_index', 'is_correct', 'rewarded', 'created_at')
-    list_filter = ('is_correct', 'rewarded')
-    search_fields = ('user__full_name', 'user__telegram_id')
-    readonly_fields = ('created_at', 'updated_at')
-
-
 ################################################################################
 #                            KITOB ZANJIRI (GAME)                              #
 ################################################################################

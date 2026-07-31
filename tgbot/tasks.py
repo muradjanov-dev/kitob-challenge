@@ -4863,90 +4863,6 @@ def post_book_quiz():
     _broadcast_quiz_round(quiz_round)
 
 
-def _broadcast_cover_round(cover_round):
-    """Post an already-built Kitob Muqovasi round (blurred cover photo +
-    A/B/C/D options) to every game group."""
-    from tgbot.services.book_cover_game import (
-        build_cover_text, cover_keyboard, build_blurred_cover_bytes,
-    )
-
-    try:
-        image_bytes = build_blurred_cover_bytes(cover_round)
-    except Exception as e:
-        print(f"post_book_cover_game: failed to build blurred image for round {cover_round.id}: {e}")
-        return
-
-    text = build_cover_text(cover_round)
-    keyboard = cover_keyboard(cover_round)
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-
-    posted = []
-    for group_id, thread_id in _game_targets():
-        try:
-            data = {"chat_id": group_id, "caption": text, "parse_mode": "HTML",
-                    "reply_markup": keyboard}
-            if thread_id:
-                data["message_thread_id"] = thread_id
-            resp = requests.post(
-                url, data=data,
-                files={"photo": ("cover.jpg", image_bytes, "image/jpeg")},
-                timeout=15,
-            )
-            if resp.ok:
-                mid = resp.json().get("result", {}).get("message_id")
-                if mid:
-                    posted.append({"chat_id": str(group_id), "message_id": mid})
-        except Exception as e:
-            print(f"post_book_cover_game group {group_id}: {e}")
-
-    if posted:
-        cover_round.group_messages = posted
-        cover_round.save(update_fields=["group_messages"])
-    print(f"post_book_cover_game: round #{cover_round.id} ({cover_round.book.title}) posted to {len(posted)} group(s)")
-
-
-def refresh_cover_boards(cover_round):
-    """Edit every posted group copy of the cover game to show the live
-    right/wrong board. Photo messages use editMessageCaption, not
-    editMessageText -- same reply_markup-must-be-resent rule as
-    refresh_quiz_boards applies here (Telegram clears the keyboard if it's
-    omitted on an edit)."""
-    from tgbot.services.book_cover_game import build_cover_text_with_board, cover_keyboard
-
-    msgs = cover_round.group_messages or []
-    if not msgs:
-        return
-    text = build_cover_text_with_board(cover_round)
-    keyboard = cover_keyboard(cover_round)
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageCaption"
-    for m in msgs:
-        try:
-            requests.post(
-                url,
-                data={
-                    "chat_id": m["chat_id"], "message_id": m["message_id"],
-                    "caption": text, "parse_mode": "HTML",
-                    "reply_markup": keyboard,
-                },
-                timeout=8,
-            )
-        except Exception:
-            pass
-
-
-@shared_task
-def post_book_cover_game():
-    """Build one fresh Kitob Muqovasi round and broadcast it. Skips silently
-    when there isn't enough material (no covers, or too few decoy titles)."""
-    from tgbot.services.book_cover_game import build_cover_round
-
-    cover_round = build_cover_round()
-    if not cover_round:
-        print("post_book_cover_game: no round could be built (not enough covers/titles yet)")
-        return
-    _broadcast_cover_round(cover_round)
-
-
 @shared_task
 def send_viktorina_promo():
     """Promote the Viktorina to everyone: once a day for the first 10 days after
@@ -6001,12 +5917,18 @@ def _start_quiz_flavor(flavor):
             "Javob avval ko'rsatiladi — qaysi savolga mos kelishini toping!\n\n"
             f"💰 <b>Kirish: {ENTRY_FEES['reverse']} Kitobcha.</b>\n👇 Kiring:"
         ),
+        "cover": (
+            "🖼 <b>KITOB MUQOVASI</b>\n\n"
+            f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+            "Xiralashtirilgan muqovadan kitobni 4 variantdan tez toping!\n\n"
+            f"💰 <b>Kirish: {ENTRY_FEES['cover']} Kitobcha.</b>\n👇 Kiring:"
+        ),
     }
     deep_link_params = {
         "twofacts": "ikki-haqiqat", "impostor": "kim-yolgonchi",
         "connection": "bog-lanish", "teams": "jamoa-jangi",
         "timeline": "vaqt-mashinasi", "matchbook": "muallif-asar",
-        "reverse": "teskari-viktorina",
+        "reverse": "teskari-viktorina", "cover": "kitob-muqovasi",
     }
     _announce_game(texts[flavor], deep_link_params[flavor])
     print(f"start_quiz_{flavor}: game #{game.id}")
@@ -6048,6 +5970,11 @@ def start_quiz_reverse_game():
     return _start_quiz_flavor("reverse")
 
 
+@shared_task
+def start_quiz_cover_game():
+    return _start_quiz_flavor("cover")
+
+
 # Maps a game-type slug to the task that starts it (each returns the created
 # game instance). Shared by start_game_sequence and _advance_game_sequence to
 # run the daily 10:00/22:00 slot: 3 different types, back to back, no repeats.
@@ -6066,6 +5993,7 @@ _GAME_STARTERS = {
     "timeline": start_quiz_timeline_game,
     "matchbook": start_quiz_matchbook_game,
     "reverse": start_quiz_reverse_game,
+    "cover": start_quiz_cover_game,
 }
 
 

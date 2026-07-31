@@ -243,9 +243,9 @@ def api_survival_submit(request: HttpRequest) -> JsonResponse:
     return JsonResponse(survival_game.submit_answer(g.id, request.tg_profile, choice))
 
 
-# ── Bilim O'yini — shared engine + shared template for 4 flavors ────────────
+# ── Bilim O'yini — shared engine + shared template for 8 flavors ────────────
 _QUIZ_FLAVORS = ("twofacts", "impostor", "connection", "teams",
-                 "timeline", "matchbook", "reverse")
+                 "timeline", "matchbook", "reverse", "cover")
 
 
 def quiz_index(request: HttpRequest, flavor: str) -> HttpResponse:
@@ -304,6 +304,7 @@ _GAME_LABELS_URLS = {
     "timeline": ("Vaqt Mashinasi", "/vaqt-mashinasi/"),
     "matchbook": ("Muallif-Asar Moslashtirish", "/muallif-asar/"),
     "reverse": ("Teskari Viktorina", "/teskari-viktorina/"),
+    "cover": ("Kitob Muqovasi", "/kitob-muqovasi/"),
 }
 _QUIZ_FLAVOR_SET = set(_QUIZ_FLAVORS)
 

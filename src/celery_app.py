@@ -185,14 +185,6 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=21, minute=0),
     },
 
-    # Kitob Muqovasi — once daily (GROUP posts only): guess the book from its
-    # blurred cover. Uses library covers already on the platform, no external
-    # image sourcing. Separate time slot from the Viktorina above.
-    'book-cover-game-daily': {
-        'task': 'tgbot.tasks.post_book_cover_game',
-        'schedule': crontab(hour=17, minute=30),
-    },
-
     # Single daily inspiration — personalized hour wins; fixed 10:00 is the
     # fallback for users whose optimal_send_hour hasn't been computed yet.
     'random-inspiration-fallback': {

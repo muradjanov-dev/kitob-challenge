@@ -1,4 +1,4 @@
-"""Bilim O'yini — one shared MC-quiz engine for 7 content flavors:
+"""Bilim O'yini — one shared MC-quiz engine for 8 content flavors:
 
   twofacts   — Ikki haqiqat, bir yolg'on: 3 statements, spot the fake one.
   impostor   — Kim yolg'onchi?: 3 real book/author pairings + 1 fabricated one.
@@ -13,11 +13,17 @@
                book from 4 options.
   reverse    — Teskari Viktorina: the answer is shown first, pick which of 4
                questions it actually matches (Jeopardy-style).
+  cover      — Kitob Muqovasi: a real library book cover, blurred, pick the
+               right title from 4 options. Unlike the other flavors (static
+               authored question banks), its pool is built live from
+               GlobalBook.cover uploads and each question carries an
+               "image" URL alongside the usual q/options/correct.
 
-All seven share the same live answer/reveal-phase timing as Ko'pchilik/Emoji;
+All eight share the same live answer/reveal-phase timing as Ko'pchilik/Emoji;
 only content prep and (for "teams") scoring differ.
 """
 
+import io
 import random
 from datetime import timedelta
 
@@ -38,6 +44,7 @@ ANSWER_SECONDS = 20
 REVEAL_SECONDS = 8
 POINTS = 10
 TEAM_JACKPOT = 300
+COVER_BLUR_RADIUS = 14  # strong enough that any title text on the cover is unreadable
 
 TITLES = {
     "twofacts": "Ikki haqiqat, bir yolg'on",
@@ -47,14 +54,15 @@ TITLES = {
     "timeline": "Vaqt Mashinasi",
     "matchbook": "Muallif-Asar Moslashtirish",
     "reverse": "Teskari Viktorina",
+    "cover": "Kitob Muqovasi",
 }
 ENTRY_FEES = {
     "twofacts": 25, "impostor": 25, "connection": 25, "teams": 30,
-    "timeline": 25, "matchbook": 25, "reverse": 25,
+    "timeline": 25, "matchbook": 25, "reverse": 25, "cover": 25,
 }
 NUM_QUESTIONS = {
     "twofacts": 11, "impostor": 11, "connection": 11, "teams": 11,
-    "timeline": 11, "matchbook": 11, "reverse": 11,
+    "timeline": 11, "matchbook": 11, "reverse": 11, "cover": 10,
 }
 
 
@@ -73,7 +81,42 @@ def _raw_pool(flavor):
         return QUIZ_MATCHBOOK_QUESTIONS
     if flavor == "reverse":
         return QUIZ_REVERSE_QUESTIONS
+    if flavor == "cover":
+        return _cover_raw_pool()
     raise ValueError(f"unknown flavor {flavor}")
+
+
+def _cover_raw_pool():
+    """Every GlobalBook with a cover image, as raw {"book_id","title","book"}
+    items -- built live from library uploads, not a static authored bank
+    like every other flavor."""
+    from tgbot.models import GlobalBook
+
+    books = GlobalBook.objects.exclude(cover="").exclude(cover__isnull=True)
+    return [{"book_id": b.id, "title": b.title, "book": b} for b in books]
+
+
+def _blurred_cover_url(book) -> str:
+    """Generate a strongly-blurred JPEG from `book.cover` and save it to
+    storage, returning the full public URL. Generated fresh per question
+    (not cached) -- covers rarely change and the blur is cheap."""
+    import time as _time
+    from PIL import Image, ImageFilter
+    from django.core.files.base import ContentFile
+    from django.core.files.storage import default_storage
+    from django.conf import settings as _settings
+
+    with book.cover.open("rb") as f:
+        img = Image.open(f)
+        img = img.convert("RGB")
+        img = img.filter(ImageFilter.GaussianBlur(radius=COVER_BLUR_RADIUS))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        data = buf.getvalue()
+
+    path = f"game/cover_blur/book_{book.id}_{int(_time.time() * 1000)}.jpg"
+    saved_path = default_storage.save(path, ContentFile(data))
+    return f"{_settings.WEB_DOMAIN}{default_storage.url(saved_path)}"
 
 
 def _identity(flavor, item):
@@ -85,6 +128,8 @@ def _identity(flavor, item):
         return item["fake"]
     if flavor == "connection":
         return str(item.get("items"))
+    if flavor == "cover":
+        return item["title"]
     return item.get("q")
 
 
@@ -95,6 +140,8 @@ def _prep_one(flavor, item):
         random.shuffle(options)
         return {"q": "Qaysi biri SOXTA (haqiqiy emas)?", "options": options,
                 "correct": options.index(fake_text)}
+    if flavor == "cover":
+        return _prep_cover_question(item)
     # twofacts / connection / teams are already {"q","options","correct"}-shaped.
     opts = list(item["options"])
     correct_text = opts[item["correct"]]
@@ -105,16 +152,39 @@ def _prep_one(flavor, item):
     return out
 
 
+def _prep_cover_question(item, pool_titles=None):
+    """Build one Kitob Muqovasi question: blur `item`'s cover, pick 3 decoy
+    titles from the rest of the library, shuffle into options."""
+    from tgbot.models import GlobalBook, normalize_uzbek_text
+
+    book = item["book"]
+    if pool_titles is None:
+        pool_titles = list(GlobalBook.objects.exclude(title__exact="").values_list("title", flat=True))
+    correct_norm = normalize_uzbek_text(book.title)
+    decoy_pool = [t for t in pool_titles if normalize_uzbek_text(t) != correct_norm]
+    decoys = random.sample(decoy_pool, min(3, len(decoy_pool)))
+    options = decoys + [book.title]
+    random.shuffle(options)
+    return {
+        "q": "Bu xira muqova qaysi kitobga tegishli?",
+        "options": options,
+        "correct": options.index(book.title),
+        "image": _blurred_cover_url(book),
+    }
+
+
 def _recent_used(flavor, games_back=33):
     """Identity of each question actually used in recent games. `options[correct]`
     is the reliable identity for "impostor" since its display text is a fixed
     string ("Qaysi biri SOXTA...") — the fake statement's own text (which ends
     up at the `correct` index post-shuffle) is what actually varies. "connection"
-    uses `items` for the same reason its `q` text repeats across puzzles."""
+    uses `items` for the same reason its `q` text repeats across puzzles.
+    "cover" reuses the same static `q` for every question, so its identity is
+    the correct title too."""
     used = set()
     for g in QuizGame.objects.filter(flavor=flavor).order_by("-starts_at")[:games_back]:
         for q in (g.questions or []):
-            if flavor == "impostor":
+            if flavor == "impostor" or flavor == "cover":
                 used.add(q["options"][q["correct"]])
             elif flavor == "connection":
                 used.add(str(q.get("items")))
@@ -393,6 +463,8 @@ def state_payload(profile, flavor) -> dict:
         payload["options"] = q["options"]
         if "items" in q:
             payload["items"] = q["items"]
+        if "image" in q:
+            payload["image"] = q["image"]
         ans = QuizAnswer.objects.filter(game=g, user=profile, q_index=qi).first()
         payload["answered"] = bool(ans)
         if ans:

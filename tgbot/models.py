@@ -1324,69 +1324,6 @@ class BookQuizAnswer(BaseModel):
         return f"{self.user_id} → round {self.quiz_round_id} ({'✓' if self.is_correct else '✗'})"
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Kitob Muqovasi — daily "guess the book from its blurred cover" game. Reuses
-# GlobalBook.cover (library uploads already on the platform, no external
-# sourcing needed) and the same 4-option multiple-choice UX as the Viktorina.
-# ─────────────────────────────────────────────────────────────────────────────
-class BookCoverRound(BaseModel):
-    book = models.ForeignKey(
-        GlobalBook, on_delete=models.CASCADE, related_name="cover_game_rounds",
-    )
-    options = models.JSONField(
-        default=list, help_text="The 4 shuffled book titles shown as answers.",
-    )
-    correct_index = models.PositiveSmallIntegerField(default=0)
-    reward = models.PositiveIntegerField(
-        default=100, help_text="Kitobcha granted to each correct guesser.",
-    )
-    consolation = models.PositiveIntegerField(
-        default=5, help_text="Kitobcha granted to wrong guessers as motivation.",
-    )
-    group_messages = models.JSONField(
-        default=list,
-        help_text='Posted group copies as [{"chat_id":…, "message_id":…}], '
-                  "edited live to show the right/wrong board.",
-    )
-    is_active = models.BooleanField(
-        default=True,
-        help_text="Only the latest round accepts answers; older ones are closed.",
-    )
-
-    class Meta:
-        db_table = "book_cover_rounds"
-        verbose_name = "Kitob Muqovasi — Tur"
-        verbose_name_plural = "Kitob Muqovasi — Turlar"
-        ordering = ("-created_at",)
-
-    def __str__(self):
-        return f"Muqova #{self.id} — {self.book.title}"
-
-
-class BookCoverAnswer(BaseModel):
-    cover_round = models.ForeignKey(
-        BookCoverRound, on_delete=models.CASCADE, related_name="answers",
-    )
-    user = models.ForeignKey(
-        TelegramProfile, on_delete=models.CASCADE, related_name="book_cover_answers",
-    )
-    chosen_index = models.PositiveSmallIntegerField()
-    is_correct = models.BooleanField(default=False)
-    rewarded = models.BooleanField(
-        default=False, help_text="True once the Kitobcha reward was paid out.",
-    )
-
-    class Meta:
-        db_table = "book_cover_answers"
-        verbose_name = "Kitob Muqovasi — Javob"
-        verbose_name_plural = "Kitob Muqovasi — Javoblar"
-        unique_together = ("cover_round", "user")
-        ordering = ("-created_at",)
-
-    def __str__(self):
-        return f"{self.user_id} → round {self.cover_round_id} ({'✓' if self.is_correct else '✗'})"
-
-
 class BookQuizPromoState(SingletonModel):
     """Tracks the rollout of the Viktorina promo reminders: once a day for the
     first 10 days after launch, then only on a random subset of days."""
@@ -1943,6 +1880,7 @@ class QuizGame(BaseModel):
         ("timeline", "Vaqt Mashinasi"),
         ("matchbook", "Muallif-Asar Moslashtirish"),
         ("reverse", "Teskari Viktorina"),
+        ("cover", "Kitob Muqovasi"),
     ]
     flavor = models.CharField(max_length=12, choices=FLAVOR_CHOICES)
     title = models.CharField(max_length=120, default="Bilim O'yini")
@@ -2008,7 +1946,7 @@ class GameSequence(BaseModel):
         "chain", "feud", "castle", "emoji",
         "wisdom", "detective", "survival",
         "twofacts", "impostor", "connection", "teams",
-        "timeline", "matchbook", "reverse",
+        "timeline", "matchbook", "reverse", "cover",
     ]
 
     slot = models.CharField(max_length=10, choices=SLOT_CHOICES)

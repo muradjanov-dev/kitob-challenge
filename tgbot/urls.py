@@ -109,6 +109,10 @@ urlpatterns = [
     path("teskari-viktorina/api/state/", api_quiz_state, {"flavor": "reverse"}, name="quiz-reverse-api-state"),
     path("teskari-viktorina/api/submit/", api_quiz_submit, {"flavor": "reverse"}, name="quiz-reverse-api-submit"),
 
+    path("kitob-muqovasi/", quiz_index, {"flavor": "cover"}, name="quiz-cover"),
+    path("kitob-muqovasi/api/state/", api_quiz_state, {"flavor": "cover"}, name="quiz-cover-api-state"),
+    path("kitob-muqovasi/api/submit/", api_quiz_submit, {"flavor": "cover"}, name="quiz-cover-api-submit"),
+
     path("api/games/status/", api_games_status, name="games-api-status"),
 
     path("api/track/event/", api_track_event, name="track-event"),

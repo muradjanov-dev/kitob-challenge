@@ -22,6 +22,7 @@
     .qtext{font-size:18px;font-weight:800;line-height:1.35;margin-top:8px}
     .items{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
     .chip{background:rgba(255,255,255,.2);border-radius:8px;padding:4px 10px;font-size:12.5px;font-weight:700}
+    .qimg{max-width:100%;max-height:220px;border-radius:14px;margin-top:10px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
     .opt{display:block;width:100%;text-align:left;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:13px 14px;font-size:15px;font-weight:600;margin-bottom:9px;cursor:pointer}
     .opt:hover{border-color:var(--accent)}
     .opt.correct{background:rgba(37,194,110,.18);border-color:var(--ok);color:var(--ok);font-weight:800}
@@ -65,6 +66,7 @@
     <div class="card qcard">
       <div class="qn" id="qn">SAVOL</div>
       <div class="qtext" id="qtext">—</div>
+      <img class="qimg hidden" id="qimg" alt="">
       <div class="items hidden" id="itemsRow"></div>
     </div>
     <div class="card" id="optsCard"><div id="opts"></div><div class="toast" id="toast"></div></div>
@@ -87,7 +89,8 @@
       teams:     {emoji:'👥', title:"Jamoa Jangi", fee:30, api:'/jamoa-jangi/api/', none:"Jamoa Jangi tez orada boshlanadi — guruhni kuzating!", scheduled:"Ikki jamoaga bo'linasiz — jamoangiz ko'proq to'g'ri javob bersin!", accent:'#3d7bff', accent2:'#7ca6ff'},
       timeline:  {emoji:'🕰️', title:"Vaqt Mashinasi", fee:25, api:'/vaqt-mashinasi/api/', none:"Vaqt Mashinasi tez orada boshlanadi — guruhni kuzating!", scheduled:"Kitob yoki mutafakkir qaysi asrga tegishli ekanini toping!", accent:'#c9962c', accent2:'#ffcc4d'},
       matchbook: {emoji:'🎯', title:"Muallif-Asar Moslashtirish", fee:25, api:'/muallif-asar/api/', none:"Muallif-Asar Moslashtirish tez orada boshlanadi — guruhni kuzating!", scheduled:"Muallifga tegishli haqiqiy asarni 4 variantdan tez toping!", accent:'#2e9e5b', accent2:'#6fd88a'},
-      reverse:   {emoji:'🔄', title:"Teskari Viktorina", fee:25, api:'/teskari-viktorina/api/', none:"Teskari Viktorina tez orada boshlanadi — guruhni kuzating!", scheduled:"Javob avval ko'rsatiladi — qaysi savolga mos kelishini toping!", accent:'#6a3dbf', accent2:'#e05cc7'}
+      reverse:   {emoji:'🔄', title:"Teskari Viktorina", fee:25, api:'/teskari-viktorina/api/', none:"Teskari Viktorina tez orada boshlanadi — guruhni kuzating!", scheduled:"Javob avval ko'rsatiladi — qaysi savolga mos kelishini toping!", accent:'#6a3dbf', accent2:'#e05cc7'},
+      cover:     {emoji:'🖼', title:"Kitob Muqovasi", fee:25, api:'/kitob-muqovasi/api/', none:"Kitob Muqovasi tez orada boshlanadi — guruhni kuzating!", scheduled:"Xiralashtirilgan muqovadan kitobni 4 variantdan tez toping!", accent:'#c9962c', accent2:'#ffcc4d'}
     };
     var M = META[FLAVOR] || META.twofacts;
     document.documentElement.style.setProperty('--accent', M.accent);
@@ -146,6 +149,9 @@
           itemsRow.classList.remove('hidden');
           itemsRow.innerHTML=s.items.map(function(it){return '<span class="chip">'+esc(it)+'</span>';}).join('');
         }else{ itemsRow.classList.add('hidden'); itemsRow.innerHTML=''; }
+        var qimg=$('qimg');
+        if(s.image){ qimg.src=s.image; qimg.classList.remove('hidden'); }
+        else{ qimg.classList.add('hidden'); qimg.src=''; }
         curOpts=s.options||[];
         if(s.answered){curAnswered=true;curChoice=(s.your_choice!==undefined?s.your_choice:-1);}
         if(s.phase==='reveal'){curCorrectIdx=(s.correct_index!==undefined?s.correct_index:-1);curAnswered=true;$('timerLbl').textContent='NATIJA';}
