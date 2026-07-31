@@ -711,6 +711,11 @@
       background: rgba(15,20,18,.90); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
       border-top: 1px solid rgba(255,255,255,.08);
       font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      /* Own compositor layer -- mobile WebViews (Telegram's especially) can
+         mis-place a fixed-bottom element on first paint, only correcting on
+         the next scroll/reflow. This keeps it pinned from frame one. */
+      transform: translateZ(0); -webkit-transform: translateZ(0);
+      backface-visibility: hidden; -webkit-backface-visibility: hidden;
     }
     .stb-tab {
       flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
@@ -762,6 +767,15 @@
   </nav>
   <script>
   (function() {
+    // Some mobile WebViews (Telegram's especially, around the expand()
+    // resize) only reflow a position:fixed element on the next scroll --
+    // the bottom tab bar can sit off-screen until the user scrolls once.
+    // A harmless 1px scroll-and-back forces that reflow immediately.
+    requestAnimationFrame(() => {
+      window.scrollTo(0, 1);
+      requestAnimationFrame(() => window.scrollTo(0, 0));
+    });
+
     const tabs = ['/', '/kutubxona/', '/shop/', '/kabinet/'];
     const activeIdx = 0;
 
