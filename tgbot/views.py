@@ -235,6 +235,55 @@ def telegram(request: HttpRequest):
     return HttpResponse(status=200)
 
 
+@csrf_exempt
+def internal_diag_blocked_users(request: HttpRequest):
+    """One-off diagnostic: recent is_blocked changes on TelegramProfile via
+    django-auditlog, to find out who/what has been wrongly blocking new
+    users and when. GET, read-only. Delete once the investigation is done."""
+    import os as _os
+    from auditlog.models import LogEntry
+    from django.contrib.contenttypes.models import ContentType
+    from tgbot.models import TelegramProfile
+
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+        return HttpResponse(status=403)
+
+    ct = ContentType.objects.get_for_model(TelegramProfile)
+    entries = (
+        LogEntry.objects.filter(content_type=ct)
+        .order_by("-timestamp")[:500]
+    )
+    hits = []
+    for e in entries:
+        changes = e.changes or {}
+        if "is_blocked" in changes:
+            hits.append({
+                "object_pk": e.object_pk,
+                "object_repr": e.object_repr,
+                "action": e.action,
+                "actor": str(e.actor) if e.actor_id else None,
+                "actor_email": e.actor_email,
+                "remote_addr": e.remote_addr,
+                "timestamp": e.timestamp.isoformat(),
+                "is_blocked_change": changes.get("is_blocked"),
+            })
+        if len(hits) >= 60:
+            break
+
+    currently_blocked = TelegramProfile.objects.filter(is_blocked=True).count()
+    currently_blocked_recent = list(
+        TelegramProfile.objects.filter(is_blocked=True)
+        .order_by("-id").values("id", "telegram_id", "full_name", "is_registered")[:30]
+    )
+
+    return JsonResponse({
+        "currently_blocked_total": currently_blocked,
+        "currently_blocked_sample": currently_blocked_recent,
+        "is_blocked_audit_hits": hits,
+    }, json_dumps_params={"indent": 2, "default": str})
+
+
 app = Celery("core")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 

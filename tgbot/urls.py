@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import home, telegram, library_view
+from .views import home, telegram, library_view, internal_diag_blocked_users
 from src.settings import WEBHOOK_PATH
 from tgbot.views import health_check_celery, health_check_redis
 from tgbot.shop_views import shop_index, api_products, api_me, api_buy
@@ -36,6 +36,7 @@ urlpatterns = [
     path('kutubxona/api/start-reading/', api_start_reading, name='library-api-start-reading'),
     path('kutubxona/api/premium-access/', api_premium_access, name='library-api-premium-access'),
     path(WEBHOOK_PATH, telegram, name='webhook'),
+    path("internal/diag/blocked-users/", internal_diag_blocked_users, name="internal-diag-blocked-users"),
     path("health-check/redis/", health_check_redis, name="health-check-redis"),
     path("health-check/celery/", health_check_celery, name="health-check-celery"),
     path("shop/", shop_index, name="shop"),
