@@ -1237,6 +1237,68 @@ async def admin_user_by_number_command(message: types.Message, state: FSMContext
                          reply_markup=_user_detail_markup(target_user, is_premium))
 
 
+@dp.message_handler(IsPrivate(), commands=["kitobcha", "berish"], state="*")
+async def admin_grant_kitobcha_command(message: types.Message, state: FSMContext = None):
+    """Bosh admin uchun: istalgan userga istalgancha Kitobcha berish (yoki
+    manfiy son bilan ayirish). Foydalanish: /kitobcha <ism|username|ID> <miqdor>."""
+    from tgbot.services import market as market_service
+
+    actor = await aget_user(message.from_user.id)
+    if not (actor and actor.is_admin):
+        await message.answer("Siz admin emassiz!")
+        return
+
+    args = (message.get_args() or "").strip()
+    parts = args.rsplit(None, 1)
+    if len(parts) != 2 or not parts[1].lstrip("+-").isdigit():
+        await message.answer(
+            "Foydalanish: <code>/kitobcha &lt;ism|username|ID&gt; &lt;miqdor&gt;</code>\n"
+            "Masalan: <code>/kitobcha 123456789 500</code> yoki "
+            "<code>/kitobcha Aziz -100</code> (ayirish uchun manfiy son).",
+            parse_mode="HTML",
+        )
+        return
+    query, amount_str = parts
+    amount = int(amount_str)
+    if amount == 0:
+        await message.answer("Miqdor 0 bo'lmasligi kerak.")
+        return
+
+    results = await sync_to_async(_search_users)(query)
+    if not results:
+        await message.answer(f"❌ «{query}» bo'yicha foydalanuvchi topilmadi.")
+        return
+    if len(results) > 1:
+        from django.utils.html import escape as _escape
+        lines = [f"🔍 «{_escape(query)}» bo'yicha bir nechta mos keldi — aniqroq yozing (masalan ID orqali):\n"]
+        for u in results[:10]:
+            name = u.full_name or (("@" + u.username) if u.username else "Ism yo'q")
+            lines.append(f"• {_escape(name)} — <code>{u.telegram_id}</code>")
+        await message.answer("\n".join(lines), parse_mode="HTML")
+        return
+
+    target = results[0]
+    new_balance = await sync_to_async(
+        market_service.admin_grant_kitobcha, thread_sensitive=True
+    )(target, amount)
+
+    name = target.full_name or (("@" + target.username) if target.username else "Ism yo'q")
+    sign = "+" if amount > 0 else ""
+    await message.answer(
+        f"✅ <b>{sign}{amount} Kitobcha</b> — {name} (<code>{target.telegram_id}</code>)\n"
+        f"Yangi balans: <b>{int(new_balance)} 🪙</b>",
+        parse_mode="HTML",
+    )
+    try:
+        if amount > 0:
+            note = f"🎁 Sizga bosh admin tomonidan <b>+{amount} Kitobcha</b> berildi!"
+        else:
+            note = f"⚠️ Hisobingizdan <b>{-amount} Kitobcha</b> ayirildi."
+        await bot.send_message(target.telegram_id, note, parse_mode="HTML")
+    except Exception as e:
+        print(f"kitobcha-grant notify failed for {target.telegram_id}: {e}")
+
+
 @dp.message_handler(IsPrivate(), state=AdminUserBrowse.searching)
 async def admin_user_search_query(message: types.Message, state: FSMContext):
     actor = await aget_user(message.from_user.id)

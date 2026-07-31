@@ -8,6 +8,7 @@ group (see _is_private / _redirect_to_private) — a group announcement's
 inline button must deep-link into the bot's DM instead of firing the menu
 into the group itself.
 """
+import logging
 from io import BytesIO
 
 from aiogram import types
@@ -17,6 +18,8 @@ from asgiref.sync import sync_to_async
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.utils import aget_user
 from tgbot.services import market as market_service
+
+logger = logging.getLogger(__name__)
 
 
 def _is_private(call: types.CallbackQuery) -> bool:
@@ -195,14 +198,30 @@ async def market_buy_item(call: types.CallbackQuery):
         )(user)
         await call.message.answer(f"🎁 <b>Sirli quti ochildi!</b>\n\n{result}", parse_mode="HTML")
         if wants_certificate:
-            png_bytes = await sync_to_async(market_service.generate_certificate, thread_sensitive=True)(user)
-            photo = types.InputFile(BytesIO(png_bytes), filename="sertifikat.png")
-            await call.message.answer_photo(photo, caption="📜 Sizning bepul sertifikatingiz!")
+            try:
+                png_bytes = await sync_to_async(market_service.generate_certificate, thread_sensitive=True)(user)
+                photo = types.InputFile(BytesIO(png_bytes), filename="sertifikat.png")
+                await call.message.answer_photo(photo, caption="📜 Sizning bepul sertifikatingiz!")
+            except Exception:
+                logger.exception("mystery_box certificate generation failed for user_id=%s", user.id)
+                await call.message.answer(
+                    "⚠️ Sertifikatni tayyorlashda xatolik yuz berdi. Iltimos, birozdan so'ng "
+                    "\"📜 Shaxsiy sertifikat\" xizmatidan qayta urinib ko'ring yoki admin bilan bog'laning — "
+                    "mukofotingiz (bepul sertifikat huquqi) yo'qolmagan."
+                )
 
     elif key == market_service.CERTIFICATE:
-        png_bytes = await sync_to_async(market_service.generate_certificate, thread_sensitive=True)(user)
-        photo = types.InputFile(BytesIO(png_bytes), filename="sertifikat.png")
-        await call.message.answer_photo(photo, caption="📜 Sizning shaxsiy sertifikatingiz tayyor!")
+        try:
+            png_bytes = await sync_to_async(market_service.generate_certificate, thread_sensitive=True)(user)
+            photo = types.InputFile(BytesIO(png_bytes), filename="sertifikat.png")
+            await call.message.answer_photo(photo, caption="📜 Sizning shaxsiy sertifikatingiz tayyor!")
+        except Exception:
+            logger.exception("certificate purchase generation failed for user_id=%s", user.id)
+            await sync_to_async(market_service.charge, thread_sensitive=True)(user, -item["price"])
+            await call.message.answer(
+                "⚠️ Sertifikatni tayyorlashda xatolik yuz berdi. Kitobchangiz qaytarildi — "
+                "birozdan so'ng qayta urinib ko'ring."
+            )
 
     elif key == market_service.DAY_HERO:
         from tgbot.tasks import _announce_targets

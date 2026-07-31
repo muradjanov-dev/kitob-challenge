@@ -95,6 +95,20 @@ def charge(user, price: int) -> bool:
     return True
 
 
+def admin_grant_kitobcha(target, amount: int) -> Decimal:
+    """Flat admin-issued Kitobcha adjustment (no Premium 2x multiplier, unlike
+    update_ball) — bosh admin can hand any amount to any user from the bot's
+    /kitobcha command. Always ledgered so it shows up in daily earned/spent
+    totals same as every other balance change."""
+    from tgbot.models import TelegramProfile, KitobchaLedger
+    with transaction.atomic():
+        p = TelegramProfile.objects.select_for_update().get(id=target.id)
+        p.ball = Decimal(p.ball or 0) + Decimal(amount)
+        p.save(update_fields=["ball"])
+        KitobchaLedger.objects.create(user=p, delta=int(amount), reason="admin_grant")
+        return p.ball
+
+
 MYSTERY_PRIZES = [
     ("kitobcha_small", 32),
     ("kitobcha_big", 13),
