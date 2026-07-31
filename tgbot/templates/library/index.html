@@ -1651,11 +1651,16 @@ function _pdfRenderPage(num, dir) {
       pdfCanvas.classList.add('pdf-canvas-ready');
       if (_magMode) {
         // viewport.height is the full page's CSS-px height at the width-fit
-        // scale -- dividing by the preset gives the window a height equal to
-        // exactly one "band" (1/2, 1/3, or 1/4 of the page), which is what
-        // makes it feel zoomed in without ever touching the width.
+        // scale -- dividing by the preset gives a height equal to one "band"
+        // (1/2, 1/3, or 1/4 of the page), which is what makes it feel zoomed
+        // in without ever touching the width. Clamped to a big, consistent
+        // rectangle (45-78% of the viewport height) so the window always
+        // reads as a proper large lupa, not a thin sliver at high zoom or an
+        // oddly short one on a squat page.
         _magPageHeightCss = viewport.height;
-        pdfWrap.style.height = Math.round(_magPageHeightCss / _magZoomPreset) + 'px';
+        const rawBand = _magPageHeightCss / _magZoomPreset;
+        const minH = window.innerHeight * .45, maxH = window.innerHeight * .78;
+        pdfWrap.style.height = Math.round(Math.min(maxH, Math.max(minH, rawBand))) + 'px';
         _magPanY = 0; // new page always starts at the top band
         _magApplyPan();
       } else if (dir) {
