@@ -250,25 +250,31 @@ def internal_diag_blocked_users(request: HttpRequest):
         return HttpResponse(status=403)
 
     ct = ContentType.objects.get_for_model(TelegramProfile)
+    # action=1 is UPDATE (0=create, 2=delete) -- the CREATE flood (every new
+    # registration logs is_blocked None->False, which isn't a block event at
+    # all) was swamping a plain "most recent 500" scan. __has_key targets
+    # exactly the field we care about via the JSONField index instead.
     entries = (
-        LogEntry.objects.filter(content_type=ct)
-        .order_by("-timestamp")[:500]
+        LogEntry.objects.filter(content_type=ct, action=1, changes__has_key="is_blocked")
+        .order_by("-timestamp")[:200]
     )
-    hits = []
+    to_true = []
+    to_false = []
     for e in entries:
         changes = e.changes or {}
-        if "is_blocked" in changes:
-            hits.append({
-                "object_pk": e.object_pk,
-                "object_repr": e.object_repr,
-                "action": e.action,
-                "actor": str(e.actor) if e.actor_id else None,
-                "remote_addr": e.remote_addr,
-                "timestamp": e.timestamp.isoformat(),
-                "is_blocked_change": changes.get("is_blocked"),
-            })
-        if len(hits) >= 60:
-            break
+        old, new = changes.get("is_blocked", [None, None])
+        row = {
+            "object_pk": e.object_pk,
+            "object_repr": e.object_repr,
+            "actor": str(e.actor) if e.actor_id else None,
+            "remote_addr": e.remote_addr,
+            "timestamp": e.timestamp.isoformat(),
+            "is_blocked_change": [old, new],
+        }
+        if new == "True":
+            to_true.append(row)
+        elif new == "False":
+            to_false.append(row)
 
     currently_blocked = TelegramProfile.objects.filter(is_blocked=True).count()
     currently_blocked_recent = list(
@@ -279,7 +285,8 @@ def internal_diag_blocked_users(request: HttpRequest):
     return JsonResponse({
         "currently_blocked_total": currently_blocked,
         "currently_blocked_sample": currently_blocked_recent,
-        "is_blocked_audit_hits": hits,
+        "recent_blocked_true_events": to_true[:100],
+        "recent_blocked_false_events_(unblocks)": to_false[:20],
     }, json_dumps_params={"indent": 2, "default": str})
 
 
