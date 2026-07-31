@@ -204,7 +204,7 @@ def api_my_books(request: HttpRequest):
     return JsonResponse({"book_ids": book_ids, "in_progress": in_progress})
 
 
-def _get_reading_record(profile, book):
+def _get_reading_record(profile, book_id, for_update=False):
     """No unique_together on (user, global_book) historically (and the bot's
     own self-report flow, report.py, can create rows against the same
     GlobalBook), so a couple of accounts may already carry more than one row
@@ -215,10 +215,15 @@ def _get_reading_record(profile, book):
     Plain .first() with no ordering is non-deterministic across calls, so if
     one duplicate was already charged and another wasn't, an unordered pick
     could intermittently show the book as "not started" and charge
-    BOOK_START_FEE a second time. Preferring the charged row makes "already
-    started" permanent and deterministic regardless of which duplicate a
-    plain query would otherwise have picked."""
-    qs = BooksToRead.objects.filter(user=profile, global_book=book)
+    BOOK_START_FEE a second time -- or, in api_save_progress, silently split
+    page-reward/top-up bookkeeping across two different rows. Preferring the
+    charged row (deterministically, by id) makes "already started" durable
+    regardless of which duplicate a plain query would otherwise have picked.
+    Single source of truth for all three read/write sites in this file --
+    they must all resolve the exact same row for the same (user, book)."""
+    qs = BooksToRead.objects.filter(user=profile, global_book_id=book_id)
+    if for_update:
+        qs = qs.select_for_update()
     return qs.filter(fee_charged=True).order_by("id").first() or qs.order_by("id").first()
 
 
@@ -248,7 +253,7 @@ def api_start_reading(request: HttpRequest):
         return JsonResponse({"error": "not_found"}, status=404)
 
     # Fast path, no lock needed: already started, nothing to charge.
-    record = _get_reading_record(profile, book)
+    record = _get_reading_record(profile, book.id)
     if record and record.fee_charged:
         return JsonResponse({
             "ok": True, "charged": False,
@@ -260,7 +265,7 @@ def api_start_reading(request: HttpRequest):
         # Re-check under the profile lock: a concurrent duplicate tap (double
         # click, retried request) blocks here until the first one commits,
         # then sees fee_charged=True and must not charge a second time.
-        record = _get_reading_record(profile, book)
+        record = _get_reading_record(profile, book.id)
         if record and record.fee_charged:
             return JsonResponse({
                 "ok": True, "charged": False,
@@ -342,7 +347,7 @@ def api_get_progress(request: HttpRequest):
     if not book_id or not book_id.isdigit():
         return JsonResponse({"error": "book_id required"}, status=400)
 
-    record = BooksToRead.objects.filter(user=profile, global_book_id=int(book_id)).first()
+    record = _get_reading_record(profile, int(book_id))
     # Resume from max_page_reached, not current_page -- current_page can be
     # nudged by the bot's unrelated self-report flow (report.py), which
     # shares this same row/table but has no idea about the web reader.
@@ -393,7 +398,7 @@ def api_save_progress(request: HttpRequest):
     # for the same (user, book) can't both read the same credited_pages and
     # both grant a reward for the same pages -- they serialize instead.
     with transaction.atomic():
-        record = BooksToRead.objects.select_for_update().filter(user=profile, global_book=book).first()
+        record = _get_reading_record(profile, book.id, for_update=True)
         if record:
             gap_seconds = (now - record.updated_at).total_seconds()
         else:
