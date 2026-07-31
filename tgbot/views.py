@@ -291,6 +291,56 @@ def internal_diag_blocked_users(request: HttpRequest):
 
 
 @csrf_exempt
+def internal_diag_challenge_boom_state(request: HttpRequest):
+    """One-off diagnostic: current active Challenge (if any) + its
+    participants' progress, and current active/queued ReferralBoom state.
+    Needed before deciding how to transition off the 3-day Challenge into
+    the Yaxshilik ulashuvchi window without guessing at live data. GET,
+    read-only. Delete once the investigation is done."""
+    import os as _os
+    from tgbot.models import Challenge, ChallengeParticipant, ReferralBoom, ReferralBoomParticipant
+
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+        return HttpResponse(status=403)
+
+    challenge = Challenge.objects.filter(is_active=True).order_by("-created_at").first()
+    challenge_data = None
+    if challenge:
+        participants = list(
+            ChallengeParticipant.objects.filter(challenge=challenge)
+            .values("user_id", "days_completed", "reward_given")
+            .order_by("-days_completed")[:200]
+        )
+        challenge_data = {
+            "id": challenge.id, "title": challenge.title,
+            "condition_type": challenge.condition_type,
+            "condition_value": challenge.condition_value,
+            "start_date": challenge.start_date, "end_date": challenge.end_date,
+            "participant_count": len(participants),
+            "participants_with_progress": len([p for p in participants if p["days_completed"] > 0]),
+            "sample_participants": participants[:20],
+        }
+
+    boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
+    boom_data = None
+    if boom:
+        boom_data = {
+            "id": boom.id, "title": boom.title,
+            "start_at": boom.start_at, "end_at": boom.end_at,
+            "planned_days": boom.planned_days,
+            "participant_count": ReferralBoomParticipant.objects.filter(boom=boom).count(),
+        }
+    queued_boom = ReferralBoom.objects.filter(is_queued=True).order_by("-created_at").first()
+
+    return JsonResponse({
+        "active_challenge": challenge_data,
+        "active_boom": boom_data,
+        "queued_boom": {"id": queued_boom.id, "title": queued_boom.title} if queued_boom else None,
+    }, json_dumps_params={"indent": 2, "default": str})
+
+
+@csrf_exempt
 def internal_unblock_false_positives(request: HttpRequest):
     """One-off trigger for tgbot.tasks.unblock_and_apologize_false_positives.
     POST only, runs in a background thread (can run well past gunicorn's

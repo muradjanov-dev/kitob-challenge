@@ -4206,6 +4206,79 @@ def boom_daily_standings():
     print(f"boom_daily_standings: boom={boom.id} sent={sent}/{len(participants)}")
 
 
+@shared_task
+def boom_recovery_announcement():
+    """One-off (2026-07-31): apologize for this morning's brief interruption
+    (a deploy-time bug force-finalized the boom for ~4 hours before the fix
+    shipped) and re-announce the still-running competition with a public
+    TOP-30 leaderboard, everywhere -- every group AND every registered user.
+    Not on any schedule; call once by hand after the fix + DB recovery land."""
+    import time as _time
+    from tgbot.models import ReferralBoom, ReferralBoomParticipant
+
+    boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
+    if not boom:
+        print("boom_recovery_announcement: no active boom")
+        return
+
+    participants = list(
+        ReferralBoomParticipant.objects.filter(boom=boom, referrals_count__gt=0)
+        .select_related("user")
+        .order_by("-referrals_count", "joined_at")[:30]
+    )
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    lines = [
+        f"{medals.get(i, f'{i}.')} {(p.user.full_name or 'Kitobxon')[:28]} — <b>{p.referrals_count}</b> ta"
+        for i, p in enumerate(participants, 1)
+    ]
+    leaderboard = "\n".join(lines) if lines else "Hali hech kim taklif qilmagan — birinchi bo'ling!"
+    days_left = max(0, (boom.end_at - timezone.now()).days)
+
+    text = (
+        f"🙏 <b>Kechirasiz!</b> Bugun qisqa texnik nosozlik tufayli «{boom.title}» "
+        f"musobaqasi bir muddat to'xtab qoldi — buni darhol tuzatdik va musobaqa "
+        f"xuddi to'xtamagandek davom etmoqda. Shu vaqt ichida qilgan "
+        f"takliflaringiz ham to'liq hisobga olindi, hech narsa yo'qolmadi! 🎉\n\n"
+        f"🏆 <b>TOP-30 — musobaqa boshlangandan beri:</b>\n{leaderboard}\n\n"
+        f"⏳ Musobaqa hali <b>{days_left} kun</b> davom etadi — bu ulgurish uchun "
+        f"juda katta imkoniyat! Do'stlaringizni taklif qilishda davom eting, "
+        f"reytingda yuqoriga ko'tariling va qimmatbaho sovg'alarga ega bo'ling! 🎁"
+    )
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    group_sent = 0
+    for group_id, thread_id in _announce_targets():
+        try:
+            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                    "disable_web_page_preview": "true"}
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            requests.post(url, data=data, timeout=10)
+            group_sent += 1
+        except Exception as e:
+            print(f"boom_recovery_announcement group {group_id}: {e}")
+
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    user_sent = 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(
+                url,
+                data={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                      "disable_web_page_preview": "true"},
+                timeout=5,
+            )
+            if resp.ok:
+                user_sent += 1
+            elif resp.status_code == 429:
+                _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
+        except Exception:
+            pass
+        _time.sleep(0.05)
+
+    print(f"boom_recovery_announcement: boom={boom.id} groups={group_sent} users={user_sent}")
+
+
 # ────────────────────────────────────────────────────────────────────────
 # Reader title nominations — community "titles" across 5 categories over the
 # last 30 days. Admin-triggered broadcast to all groups + every user, with a

@@ -1234,8 +1234,8 @@ class ReferralBoom(BaseModel):
     announced_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        verbose_name = "Referral BOOM"
-        verbose_name_plural = "Referral BOOMlar"
+        verbose_name = "Yaxshilik ulashuvchi"
+        verbose_name_plural = "Yaxshilik ulashuvchilar"
         ordering = ("-created_at",)
 
     def __str__(self):
@@ -1368,8 +1368,8 @@ class ReferralBoomParticipant(BaseModel):
     )
 
     class Meta:
-        verbose_name = "Referral BOOM Qatnashchisi"
-        verbose_name_plural = "Referral BOOM Qatnashchilari"
+        verbose_name = "Yaxshilik ulashuvchi Qatnashchisi"
+        verbose_name_plural = "Yaxshilik ulashuvchi Qatnashchilari"
         unique_together = ("boom", "user")
 
     def __str__(self):

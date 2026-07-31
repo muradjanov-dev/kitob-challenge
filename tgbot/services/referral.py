@@ -196,6 +196,12 @@ class ReferralService:
 
             referral_number = participant.referrals_count + 1
             base_reward = boom.reward_for(referral_number)
+            # Promotional guarantee: whoever brings in at least 1 referral gets
+            # topped up to 500 Kitobcha for that first one specifically (the
+            # ongoing per-referral tier1 rate is lower) -- a floor, not a
+            # multiplier, so it only ever raises the first referral's payout.
+            if referral_number == 1:
+                base_reward = max(base_reward, 500)
             # update_ball applies the premium 2× multiplier consistently with the
             # rest of the economy and returns the amount actually credited.
             awarded = referrer.update_ball(True, base_reward)

@@ -512,39 +512,39 @@ class ReferralBoomAdmin(admin.ModelAdmin):
     list_filter = ('is_active', 'is_queued')
     actions = ('queue_next_rotation', 'launch_now', 'launch_default_now', 'finalize_now')
 
-    @admin.action(description="📌 Keyingi navbatga BOOM qo'yish (rotatsiya)")
+    @admin.action(description="📌 Keyingi navbatga Yaxshilik ulashuvchini qo'yish (rotatsiya)")
     def queue_next_rotation(self, request, queryset):
         from tgbot.tasks import queue_referral_boom
         boom_id = queue_referral_boom()
         self.message_user(
             request,
-            f"Referal BOOM keyingi 3-kunlik challenge navbatiga qo'yildi — id={boom_id}",
+            f"Yaxshilik ulashuvchi keyingi challenge navbatiga qo'yildi — id={boom_id}",
             messages.SUCCESS,
         )
 
-    @admin.action(description="🚀 Tanlangan BOOM'ni hozir e'lon qilish (shu qatordagi sarlavha/rasm/mukofot bilan)")
+    @admin.action(description="🚀 Tanlangan musobaqani hozir e'lon qilish (shu qatordagi sarlavha/rasm/mukofot bilan)")
     def launch_now(self, request, queryset):
         from tgbot.tasks import launch_referral_boom
         boom = queryset.first()
         if not boom:
-            self.message_user(request, "Avval bitta BOOM qatorini belgilang.", messages.WARNING)
+            self.message_user(request, "Avval bitta musobaqa qatorini belgilang.", messages.WARNING)
             return
         if queryset.count() > 1:
             self.message_user(
                 request,
-                "Faqat bittasi ishga tushirildi — birdaniga bir nechta BOOM'ni e'lon qilib bo'lmaydi.",
+                "Faqat bittasi ishga tushirildi — birdaniga bir nechta musobaqani e'lon qilib bo'lmaydi.",
                 messages.WARNING,
             )
         boom_id = launch_referral_boom(boom_id=boom.id)
-        self.message_user(request, f"Referal BOOM e'lon qilindi — id={boom_id}", messages.SUCCESS)
+        self.message_user(request, f"Yaxshilik ulashuvchi e'lon qilindi — id={boom_id}", messages.SUCCESS)
 
-    @admin.action(description="🚀 Standart (3 kunlik) BOOM'ni hozir e'lon qilish (yangi qator yaratadi)")
+    @admin.action(description="🚀 Standart (7 kunlik) musobaqani hozir e'lon qilish (yangi qator yaratadi)")
     def launch_default_now(self, request, queryset):
         from tgbot.tasks import launch_referral_boom
         boom_id = launch_referral_boom()
-        self.message_user(request, f"Referal BOOM e'lon qilindi — id={boom_id}", messages.SUCCESS)
+        self.message_user(request, f"Yaxshilik ulashuvchi e'lon qilindi — id={boom_id}", messages.SUCCESS)
 
-    @admin.action(description="🏁 Tanlangan BOOM(lar)ni yakunlash")
+    @admin.action(description="🏁 Tanlangan musobaqa(lar)ni yakunlash")
     def finalize_now(self, request, queryset):
         from tgbot.tasks import finalize_referral_boom
         for boom in queryset:

@@ -1882,6 +1882,9 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "boom":
         from tgbot.bot.handlers.users.boom_admin import boom_admin_menu
         await boom_admin_menu(call.message, user, state)
+    elif action == "boom_stats":
+        from tgbot.bot.handlers.users.boom_admin import boom_stats_menu
+        await boom_stats_menu(call.message, user)
     else:
         await msg.answer("Noma'lum amal.")
 

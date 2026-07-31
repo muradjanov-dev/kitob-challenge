@@ -1,5 +1,8 @@
 from django.urls import path
-from .views import home, telegram, library_view, internal_diag_blocked_users, internal_unblock_false_positives
+from .views import (
+    home, telegram, library_view, internal_diag_blocked_users, internal_unblock_false_positives,
+    internal_diag_challenge_boom_state,
+)
 from src.settings import WEBHOOK_PATH
 from tgbot.views import health_check_celery, health_check_redis
 from tgbot.shop_views import shop_index, api_products, api_me, api_buy
@@ -38,6 +41,7 @@ urlpatterns = [
     path(WEBHOOK_PATH, telegram, name='webhook'),
     path("internal/diag/blocked-users/", internal_diag_blocked_users, name="internal-diag-blocked-users"),
     path("internal/fix/unblock-false-positives/", internal_unblock_false_positives, name="internal-unblock-false-positives"),
+    path("internal/diag/challenge-boom-state/", internal_diag_challenge_boom_state, name="internal-diag-challenge-boom-state"),
     path("health-check/redis/", health_check_redis, name="health-check-redis"),
     path("health-check/celery/", health_check_celery, name="health-check-celery"),
     path("shop/", shop_index, name="shop"),

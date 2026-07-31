@@ -1,5 +1,4 @@
-import os
-
+from asgiref.sync import sync_to_async
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -7,7 +6,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from tgbot.bot.filters import IsPrivate
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.states.main import ContactAdminState, AdminReplyState
-from tgbot.bot.utils import aget_user
+from tgbot.bot.utils import aget_user, aget_admin_ids, aget_is_admin
 from tgbot.bot.keyboards.reply import back_keyboard
 
 
@@ -16,6 +15,84 @@ CONTACT_BUTTON_TEXTS = ["📞 Admin bilan bog'lanish", "📞 Написать а
 
 def _t(language, uz, ru):
     return ru if language == "ru" else uz
+
+
+@sync_to_async
+def _create_inbox_thread(from_user_id):
+    from tgbot.models import AdminInboxThread
+    return AdminInboxThread.objects.create(from_user_id=from_user_id).id
+
+
+@sync_to_async
+def _save_inbox_copies(thread_id, copies):
+    from tgbot.models import AdminInboxThread
+    AdminInboxThread.objects.filter(id=thread_id).update(copies=copies)
+
+
+@sync_to_async
+def _get_inbox_thread(thread_id):
+    from tgbot.models import AdminInboxThread
+    return AdminInboxThread.objects.select_related("from_user").filter(id=thread_id).first()
+
+
+@sync_to_async
+def _claim_inbox_thread(thread_id, admin_user):
+    """Atomically mark the thread answered. Returns (ok, thread) -- ok=False
+    means someone else already claimed it (or the thread vanished)."""
+    from django.db import transaction as _txn
+    from django.utils import timezone as _tz
+    from tgbot.models import AdminInboxThread
+
+    with _txn.atomic():
+        thread = (
+            AdminInboxThread.objects.select_for_update()
+            .select_related("from_user")
+            .filter(id=thread_id)
+            .first()
+        )
+        if not thread or thread.answered:
+            return False, thread
+        thread.answered = True
+        thread.answered_by = admin_user
+        thread.answered_at = _tz.now()
+        thread.save(update_fields=["answered", "answered_by", "answered_at"])
+        return True, thread
+
+
+async def _lock_out_other_admins(thread, answering_admin_id, answerer_name):
+    """Once one admin answers a broadcast inbox thread, clear the reply button
+    on every OTHER admin's copy and note who answered, so a second admin can't
+    also send a reply to the same question."""
+    sender = thread.from_user
+    if sender:
+        username_str = f"@{sender.username}" if getattr(sender, "username", None) else "—"
+        orig_header = (
+            "📩 <b>Foydalanuvchidan xabar</b>\n\n"
+            f"👤 <b>{sender.full_name or '—'}</b>\n"
+            f"🆔 <code>{sender.telegram_id}</code>\n"
+            f"📱 {username_str}"
+        )
+    else:
+        orig_header = "📩 <b>Foydalanuvchidan xabar</b>"
+
+    for copy in (thread.copies or []):
+        if copy.get("admin_id") == answering_admin_id:
+            continue
+        try:
+            await bot.edit_message_reply_markup(
+                chat_id=copy["admin_id"], message_id=copy["content_message_id"],
+                reply_markup=None,
+            )
+        except Exception:
+            pass
+        try:
+            await bot.edit_message_text(
+                chat_id=copy["admin_id"], message_id=copy["header_message_id"],
+                text=orig_header + f"\n\n✅ <i>{answerer_name} javob berdi.</i>",
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
 
 
 def _user_lang(user):
@@ -149,14 +226,11 @@ async def contact_admin_confirm_send(call: types.CallbackQuery, state: FSMContex
         return
 
     # If this is a reply to a specific admin (user tapped '✍️ Javob berish' on a
-    # message that admin sent), deliver only to them; otherwise to all admins.
+    # message that admin sent), deliver only to them -- no fan-out, no lock
+    # needed. Otherwise broadcast to every admin (DB is_admin=True ∪ legacy
+    # ADMINS env) and track the send as an AdminInboxThread so whichever admin
+    # answers first can lock the others out of replying to the same question.
     direct_admin_id = data.get("direct_admin_id")
-    if direct_admin_id:
-        admin_ids = [str(direct_admin_id)]
-    else:
-        admins_raw = os.environ.get("ADMINS", "")
-        admin_ids = [a.strip() for a in admins_raw.split(",") if a.strip()]
-
     username = call.from_user.username
     full_name = (user.full_name if user else None) or call.from_user.full_name or "—"
     username_str = f"@{username}" if username else "—"
@@ -167,26 +241,50 @@ async def contact_admin_confirm_send(call: types.CallbackQuery, state: FSMContex
         f"🆔 <code>{call.from_user.id}</code>\n"
         f"📱 {username_str}"
     )
-    reply_kb = InlineKeyboardMarkup().add(
-        InlineKeyboardButton(
-            "✉️ Javob berish",
-            callback_data=f"admin_reply:{call.from_user.id}",
-        )
-    )
 
     sent_count = 0
-    for chat_id in admin_ids:
+    if direct_admin_id:
+        reply_kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton(
+                "✉️ Javob berish", callback_data=f"admin_reply:{call.from_user.id}",
+            )
+        )
         try:
-            await bot.send_message(chat_id=chat_id, text=header, parse_mode="HTML")
+            await bot.send_message(chat_id=int(direct_admin_id), text=header, parse_mode="HTML")
             await bot.copy_message(
-                chat_id=int(chat_id),
+                chat_id=int(direct_admin_id),
                 from_chat_id=draft_chat_id,
                 message_id=draft_message_id,
                 reply_markup=reply_kb,
             )
             sent_count += 1
         except Exception as e:
-            print(f"contact_admin: forward to {chat_id} failed: {e}")
+            print(f"contact_admin: forward to {direct_admin_id} failed: {e}")
+    else:
+        admin_ids = await aget_admin_ids()
+        thread_id = await _create_inbox_thread(user.id if user else None)
+        reply_kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton("✉️ Javob berish", callback_data=f"admin_reply_t:{thread_id}")
+        )
+        copies = []
+        for admin_id in admin_ids:
+            try:
+                header_msg = await bot.send_message(chat_id=admin_id, text=header, parse_mode="HTML")
+                content_msg = await bot.copy_message(
+                    chat_id=admin_id,
+                    from_chat_id=draft_chat_id,
+                    message_id=draft_message_id,
+                    reply_markup=reply_kb,
+                )
+                copies.append({
+                    "admin_id": admin_id,
+                    "header_message_id": header_msg.message_id,
+                    "content_message_id": content_msg.message_id,
+                })
+                sent_count += 1
+            except Exception as e:
+                print(f"contact_admin: forward to {admin_id} failed: {e}")
+        await _save_inbox_copies(thread_id, copies)
 
     if sent_count > 0:
         if user:
@@ -223,10 +321,8 @@ async def contact_admin_confirm_send(call: types.CallbackQuery, state: FSMContex
 # (in their private chat with the bot), enters text, bot delivers it to
 # the original user as a private message.
 # ──────────────────────────────────────────────────────────────────────
-def _is_admin(telegram_id: int) -> bool:
-    raw = os.environ.get("ADMINS", "")
-    ids = [a.strip() for a in raw.split(",") if a.strip()]
-    return str(telegram_id) in ids
+async def _is_admin(telegram_id: int) -> bool:
+    return await aget_is_admin(telegram_id)
 
 
 @dp.callback_query_handler(
@@ -239,12 +335,57 @@ async def admin_reply_start(call: types.CallbackQuery, state: FSMContext):
     if call.message and call.message.chat.type != types.ChatType.PRIVATE:
         await call.answer()
         return
-    if not _is_admin(call.from_user.id):
+    if not await _is_admin(call.from_user.id):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return
     target_user_id = call.data.split(":", 1)[1]
     await state.finish()
     await state.update_data(reply_target_user_id=target_user_id, is_owner_reply=False)
+    await call.answer()
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await call.message.answer(
+        f"✍️ Javobingizni yozing (foydalanuvchi: <code>{target_user_id}</code>):\n"
+        f"<i>Matn, rasm, video, fayl — istalgan format</i>",
+        parse_mode="HTML",
+    )
+    await AdminReplyState.message.set()
+
+
+@dp.callback_query_handler(
+    lambda c: c.data and c.data.startswith("admin_reply_t:"),
+    state="*",
+)
+async def admin_reply_thread_start(call: types.CallbackQuery, state: FSMContext):
+    """Same as admin_reply_start, but for a message broadcast to ALL admins
+    (an AdminInboxThread) -- checks the lock before letting this admin start
+    drafting a reply, so two admins can't both begin answering the same
+    question (the actual atomic claim still happens at send-time too, this
+    is just the early, friendlier rejection)."""
+    if call.message and call.message.chat.type != types.ChatType.PRIVATE:
+        await call.answer()
+        return
+    if not await _is_admin(call.from_user.id):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    thread_id = int(call.data.split(":", 1)[1])
+    thread = await _get_inbox_thread(thread_id)
+    if not thread:
+        await call.answer("❌ Xabar topilmadi.", show_alert=True)
+        return
+    if thread.answered:
+        await call.answer("✅ Bu savolga boshqa admin allaqachon javob bergan.", show_alert=True)
+        return
+
+    target_user_id = thread.from_user.telegram_id if thread.from_user else None
+    await state.finish()
+    await state.update_data(
+        reply_target_user_id=str(target_user_id) if target_user_id else None,
+        is_owner_reply=False,
+        inbox_thread_id=thread_id,
+    )
     await call.answer()
     try:
         await call.message.edit_reply_markup(reply_markup=None)
@@ -266,7 +407,7 @@ async def owner_reply_start(call: types.CallbackQuery, state: FSMContext):
     if call.message and call.message.chat.type != types.ChatType.PRIVATE:
         await call.answer()
         return
-    if not _is_admin(call.from_user.id):
+    if not await _is_admin(call.from_user.id):
         await call.answer("Siz admin emassiz!", show_alert=True)
         return
     target_user_id = call.data.split(":", 1)[1]
@@ -307,7 +448,7 @@ async def admin_reply_preview(message: types.Message, state: FSMContext):
     """Step 1 of admin's reply: capture draft, ask for confirmation."""
     if message.chat.type != types.ChatType.PRIVATE:
         return
-    if not _is_admin(message.from_user.id):
+    if not await _is_admin(message.from_user.id):
         await state.finish()
         return
 
@@ -336,7 +477,7 @@ async def admin_reply_preview(message: types.Message, state: FSMContext):
     state=AdminReplyState.confirm,
 )
 async def admin_reply_cancel(call: types.CallbackQuery, state: FSMContext):
-    if not _is_admin(call.from_user.id):
+    if not await _is_admin(call.from_user.id):
         await call.answer()
         return
     await call.answer()
@@ -353,7 +494,7 @@ async def admin_reply_cancel(call: types.CallbackQuery, state: FSMContext):
     state=AdminReplyState.confirm,
 )
 async def admin_reply_confirm_send(call: types.CallbackQuery, state: FSMContext):
-    if not _is_admin(call.from_user.id):
+    if not await _is_admin(call.from_user.id):
         await call.answer()
         return
 
@@ -362,6 +503,7 @@ async def admin_reply_confirm_send(call: types.CallbackQuery, state: FSMContext)
     draft_chat_id = data.get("ar_draft_chat_id")
     draft_message_id = data.get("ar_draft_message_id")
     is_owner = data.get("is_owner_reply", False)
+    inbox_thread_id = data.get("inbox_thread_id")
 
     await call.answer()
     try:
@@ -373,6 +515,22 @@ async def admin_reply_confirm_send(call: types.CallbackQuery, state: FSMContext)
         await call.message.answer("❌ Javob ma'lumotlari topilmadi.")
         await state.finish()
         return
+
+    # This message came from a broadcast to all admins -- atomically claim it
+    # so a second admin who was mid-draft at the same moment can't also send
+    # a reply. The early check in admin_reply_thread_start only prevents the
+    # *common* case (starting to type after someone else already answered);
+    # this is the real guard against both admins hitting Yuborish together.
+    if inbox_thread_id:
+        admin_user = await aget_user(call.from_user.id)
+        ok, thread = await _claim_inbox_thread(inbox_thread_id, admin_user)
+        if not ok:
+            answerer = thread.answered_by.full_name if thread and thread.answered_by else "boshqa admin"
+            await call.message.answer(
+                f"❌ Kechirasiz, bu savolga {answerer} allaqachon javob bergan — sizning javobingiz yuborilmadi."
+            )
+            await state.finish()
+            return
 
     target = await aget_user(int(target_user_id))
     target_lang = (target.language if target else None) or "uz"
@@ -407,6 +565,12 @@ async def admin_reply_confirm_send(call: types.CallbackQuery, state: FSMContext)
             reply_markup=reply_back_kb,
         )
         await call.message.answer("✅ Xabar foydalanuvchiga yuborildi.")
+        if inbox_thread_id:
+            admin_user = await aget_user(call.from_user.id)
+            answerer_name = (admin_user.full_name if admin_user else None) or call.from_user.full_name or "Admin"
+            fresh_thread = await _get_inbox_thread(inbox_thread_id)
+            if fresh_thread:
+                await _lock_out_other_admins(fresh_thread, call.from_user.id, answerer_name)
     except Exception as e:
         print(f"admin_reply: send to {target_user_id} failed: {e}")
         await call.message.answer(f"❌ Yuborib bo'lmadi: {e}")

@@ -33,6 +33,88 @@ def _active_boom_exists() -> bool:
     return ReferralBoom.objects.filter(is_active=True).exists()
 
 
+@sync_to_async
+def _load_boom_stats():
+    """Live snapshot of the current (or, if none is running, the most
+    recently finished) Yaxshilik ulashuvchi competition: participant count,
+    totals, and a TOP-10 by referrals -- admin-only view, unlike the
+    personal-only daily DM participants get."""
+    from tgbot.models import ReferralBoom, ReferralBoomParticipant
+
+    boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
+    is_live = bool(boom)
+    if not boom:
+        boom = ReferralBoom.objects.order_by("-created_at").first()
+    if not boom:
+        return None
+
+    participants = list(
+        ReferralBoomParticipant.objects.filter(boom=boom)
+        .select_related("user")
+        .order_by("-referrals_count", "-kitobcha_earned", "joined_at")
+    )
+    total_referrals = sum(p.referrals_count for p in participants)
+    total_kitobcha = sum(p.kitobcha_earned for p in participants)
+    return {
+        "boom": boom, "is_live": is_live, "participants": participants,
+        "total_referrals": total_referrals, "total_kitobcha": total_kitobcha,
+    }
+
+
+async def boom_stats_menu(message: types.Message, user):
+    """Admin panel section: monitor the Yaxshilik ulashuvchi competition's
+    live standings -- participant count, total referrals/Kitobcha
+    distributed, and a TOP-10 leaderboard."""
+    data = await _load_boom_stats()
+    if not data:
+        await message.answer(
+            "🌟 <b>Yaxshilik ulashuvchi</b>\n\nHozircha hech qanday musobaqa "
+            "o'tkazilmagan.",
+            parse_mode="HTML",
+        )
+        return
+
+    boom = data["boom"]
+    participants = data["participants"]
+    now = timezone.now()
+    status = "🟢 Faol" if data["is_live"] else "⚪️ Yakunlangan"
+
+    if data["is_live"]:
+        left = boom.end_at - now
+        secs = max(0, int(left.total_seconds()))
+        time_line = f"⏳ Qolgan vaqt: <b>{secs // 86400} kun {(secs % 86400) // 3600} soat</b>"
+    else:
+        time_line = f"🏁 Yakunlangan: <b>{timezone.localtime(boom.end_at).strftime('%d.%m.%Y %H:%M')}</b>"
+
+    lines = [
+        f"🌟 <b>{_esc(boom.title)}</b> — {status}",
+        f"📅 {timezone.localtime(boom.start_at).strftime('%d.%m %H:%M')} – "
+        f"{timezone.localtime(boom.end_at).strftime('%d.%m %H:%M')}",
+        time_line,
+        "",
+        f"👥 Ishtirokchilar: <b>{len(participants)}</b>",
+        f"🔗 Jami takliflar: <b>{data['total_referrals']}</b>",
+        f"🪙 Jami tarqatilgan: <b>{data['total_kitobcha']} Kitobcha</b>",
+        "",
+        "🏆 <b>TOP-10:</b>",
+    ]
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    top = [p for p in participants if p.referrals_count][:10]
+    if top:
+        for i, p in enumerate(top, 1):
+            name = _esc(p.user.full_name or "Kitobxon")
+            lines.append(f"{medals.get(i, f'{i}.')} {name} — {p.referrals_count} ta ({p.kitobcha_earned} 🪙)")
+    else:
+        lines.append("Hali hech kim taklif qilmadi.")
+
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton("🔄 Yangilash", callback_data="admin:boom_stats"))
+    if data["is_live"]:
+        kb.add(InlineKeyboardButton("🚀 Yangi musobaqa boshlash", callback_data="admin:boom"))
+    kb.add(InlineKeyboardButton("🔙 Admin panelga qaytish", callback_data="menu:admin"))
+    await message.answer("\n".join(lines), parse_mode="HTML", reply_markup=kb)
+
+
 async def boom_admin_menu(message: types.Message, user, state: FSMContext = None):
     if await _active_boom_exists():
         await message.answer(

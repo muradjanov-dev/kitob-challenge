@@ -241,7 +241,10 @@ admin_keyboard.row(
 )
 admin_keyboard.row(
     InlineKeyboardButton(text="🖱 Sayt Statistikasi", callback_data="admin:site_stats:7d"),
-    InlineKeyboardButton(text="🌟 Yaxshilik ulashuvchi", callback_data="admin:boom"),
+    InlineKeyboardButton(text="📊 Yaxshilik ulashuvchi statistikasi", callback_data="admin:boom_stats"),
+)
+admin_keyboard.row(
+    InlineKeyboardButton(text="🚀 Musobaqa boshlash", callback_data="admin:boom"),
 )
 
 # The deprecated reply-keyboard version (kept for any legacy callers).
