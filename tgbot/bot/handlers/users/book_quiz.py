@@ -115,6 +115,17 @@ async def book_quiz_answer(call: types.CallbackQuery):
 
     text = await sync_to_async(_process_answer)(user.id, round_id, chosen_idx)
 
+    # Telegram caps callback-alert text at 200 chars -- achievement unlock
+    # notes can push this over, which made answerCallbackQuery raise
+    # Message_too_long and crash the handler entirely. The DB write above
+    # had already succeeded, so the vote was recorded but the user never
+    # saw any confirmation -- looked exactly like the tap did nothing.
+    if len(text) > 200:
+        text = text[:197] + "..."
+
     # Answer popup fires immediately — board refresh runs in background.
-    await call.answer(text, show_alert=True)
+    try:
+        await call.answer(text, show_alert=True)
+    except Exception as e:
+        print(f"book_quiz_answer: call.answer failed uid={user.id} round={round_id}: {e}")
     asyncio.get_event_loop().run_in_executor(None, _refresh_boards_bg, round_id)

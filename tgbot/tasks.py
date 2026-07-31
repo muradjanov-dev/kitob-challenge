@@ -3807,7 +3807,12 @@ def announce_referral_boom(boom_id):
     # Photo+caption when the admin attached a banner, plain text otherwise --
     # same choice the welcome DM (referral_boom.py join handler) already
     # makes, just via the HTTP API (this task is sync) instead of aiogram.
+    # Falls back to plain text if the (possibly admin-authored) copy would
+    # exceed Telegram's 1024-char caption cap -- sendPhoto fails outright
+    # (Message_too_long) past that instead of truncating.
     photo_url = f"{_settings.WEB_DOMAIN}{boom.image.url}" if boom.image else None
+    if photo_url and len(text) > 1024:
+        photo_url = None
     send_method = "sendPhoto" if photo_url else "sendMessage"
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/{send_method}"
 
@@ -4336,6 +4341,13 @@ def _broadcast_boom_update(boom, text, pin: bool = False, keyboard=None, no_phot
     from django.conf import settings as _settings
 
     photo_url = None if no_photo else (f"{_settings.WEB_DOMAIN}{boom.image.url}" if boom.image else None)
+    # Telegram caps photo captions at 1024 chars -- a growing leaderboard
+    # (up to 30 lines) can blow past that easily, and sendPhoto with an
+    # over-length caption fails outright (Message_too_long) instead of
+    # truncating, silently dropping the whole broadcast. Fall back to plain
+    # text so the full content always gets through.
+    if photo_url and len(text) > 1024:
+        photo_url = None
     send_method = "sendPhoto" if photo_url else "sendMessage"
     send_url = f"https://api.telegram.org/bot{BOT_TOKEN}/{send_method}"
     pin_url = f"https://api.telegram.org/bot{BOT_TOKEN}/pinChatMessage"

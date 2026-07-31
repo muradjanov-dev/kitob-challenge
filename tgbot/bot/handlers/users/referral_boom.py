@@ -101,24 +101,23 @@ async def join_boom_handler(call: types.CallbackQuery, state: FSMContext):
 
     await call.answer(f"🎉 {boom.title}'ga qo'shildingiz!", show_alert=False)
 
-    # Build the once-only welcome + rules + personal link, then DM it. If the
-    # boom has an image configured, it's sent as a photo with this same text
-    # as the caption (Telegram's 1024-char caption cap — the rules copy is
-    # short enough in practice to fit; a caption that somehow doesn't would
-    # just fail the send, logged below, same as any other delivery error).
+    # Build the once-only welcome + rules + personal link, then DM it. The
+    # full rules copy (rewards + TOP-3 prizes + link) regularly exceeds
+    # Telegram's 1024-char photo-caption cap, so the image (if any) is sent
+    # on its own with no caption, followed by the rules as a normal text
+    # message (4096-char cap) with the share button -- caption+text used to
+    # be combined into one send_photo call, which silently failed outright
+    # (Message_too_long) the moment the caption crossed 1024 chars, so
+    # affected users never got their rules/link DM at all.
     text = build_welcome_text(user.full_name, boom, referral_link)
     try:
         if boom.image:
-            await bot.send_photo(
-                chat_id=user.telegram_id, photo=types.InputFile(boom.image.path),
-                caption=text, parse_mode="HTML", reply_markup=kb,
-            )
-        else:
-            await bot.send_message(
-                chat_id=user.telegram_id, text=text,
-                parse_mode="HTML", disable_web_page_preview=True,
-                reply_markup=kb,
-            )
+            await bot.send_photo(chat_id=user.telegram_id, photo=types.InputFile(boom.image.path))
+        await bot.send_message(
+            chat_id=user.telegram_id, text=text,
+            parse_mode="HTML", disable_web_page_preview=True,
+            reply_markup=kb,
+        )
         await _mark_rules_sent(user, boom_id)
     except Exception as e:
         print(f"boom welcome DM failed uid={user.id}: {e}")
