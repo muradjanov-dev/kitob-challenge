@@ -291,6 +291,47 @@ def internal_diag_blocked_users(request: HttpRequest):
 
 
 @csrf_exempt
+def internal_diag_challenge_reward_history(request: HttpRequest):
+    """One-off diagnostic: were past 3-day Challenges actually finalized and
+    winners rewarded, or did some sit overdue/un-finalized (the exact
+    failure mode tgbot/management/commands/diagnose_challenges.py was
+    written to investigate -- same class of bug as the boom launch task
+    that never ran because celery_worker was stale). GET, read-only."""
+    import os as _os
+    from django.utils import timezone
+    from tgbot.models import Challenge, ChallengeParticipant
+
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+        return HttpResponse(status=403)
+
+    today = timezone.localdate()
+    rows = []
+    for c in Challenge.objects.order_by("-created_at")[:15]:
+        participants = ChallengeParticipant.objects.filter(challenge=c)
+        total = participants.count()
+        rewarded = participants.filter(reward_given=True).count()
+        top3 = list(
+            participants.filter(reward_given=True).order_by("rank")
+            .values_list("rank", "user__full_name", "days_completed")[:3]
+        )
+        overdue = bool(c.is_active and c.end_date and c.end_date < today)
+        rows.append({
+            "id": c.id, "title": c.title,
+            "condition_type": c.condition_type, "condition_value": c.condition_value,
+            "start_date": c.start_date, "end_date": c.end_date,
+            "is_active": c.is_active, "announced_at": c.announced_at,
+            "participant_count": total, "rewarded_count": rewarded,
+            "top3": top3, "OVERDUE_NOT_FINALIZED": overdue,
+        })
+
+    return JsonResponse({
+        "server_today": str(today),
+        "challenges": rows,
+    }, json_dumps_params={"indent": 2, "default": str})
+
+
+@csrf_exempt
 def internal_diag_challenge_boom_state(request: HttpRequest):
     """One-off diagnostic: current active Challenge (if any) + its
     participants' progress, and current active/queued ReferralBoom state.

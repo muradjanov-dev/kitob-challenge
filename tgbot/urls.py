@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     home, telegram, library_view, internal_diag_blocked_users, internal_unblock_false_positives,
     internal_diag_challenge_boom_state, internal_retire_challenge_and_launch_boom,
+    internal_diag_challenge_reward_history,
 )
 from src.settings import WEBHOOK_PATH
 from tgbot.views import health_check_celery, health_check_redis
@@ -42,6 +43,7 @@ urlpatterns = [
     path("internal/diag/blocked-users/", internal_diag_blocked_users, name="internal-diag-blocked-users"),
     path("internal/fix/unblock-false-positives/", internal_unblock_false_positives, name="internal-unblock-false-positives"),
     path("internal/diag/challenge-boom-state/", internal_diag_challenge_boom_state, name="internal-diag-challenge-boom-state"),
+    path("internal/diag/challenge-reward-history/", internal_diag_challenge_reward_history, name="internal-diag-challenge-reward-history"),
     path("internal/fix/retire-challenge-and-launch-boom/", internal_retire_challenge_and_launch_boom, name="internal-retire-challenge-and-launch-boom"),
     path("health-check/redis/", health_check_redis, name="health-check-redis"),
     path("health-check/celery/", health_check_celery, name="health-check-celery"),
