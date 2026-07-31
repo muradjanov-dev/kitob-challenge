@@ -8,7 +8,7 @@ from tgbot.bot import dp
 from tgbot.models import TelegramProfile, BookReport, ConfirmationReport, BooksToRead, UserAchievement
 from aiogram import types
 from aiogram.dispatcher import FSMContext
-from tgbot.bot.states.main import StatisticState, NotificationState, AdminUserBrowse
+from tgbot.bot.states.main import StatisticState, NotificationState, AdminUserBrowse, AdminGiveKitobcha
 from tgbot.bot.filters import IsPrivate
 from tgbot.bot.utils import aget_user
 from tgbot.bot.loader import gettext as _, bot
@@ -1299,6 +1299,93 @@ async def admin_grant_kitobcha_command(message: types.Message, state: FSMContext
         print(f"kitobcha-grant notify failed for {target.telegram_id}: {e}")
 
 
+@dp.callback_query_handler(
+    IsPrivate(),
+    lambda c: c.data and c.data.startswith("adm_kitobcha_start:"),
+    state="*",
+)
+async def adm_kitobcha_start(call: types.CallbackQuery, state: FSMContext):
+    """'🪙 Kitobcha berish' button on a user's detail card — asks the admin
+    for an amount, same free-form flow as the /kitobcha command."""
+    actor = await aget_user(call.from_user.id)
+    if not (actor and actor.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    target_id = int(call.data.split(":", 1)[1])
+    target = await sync_to_async(TelegramProfile.objects.filter(id=target_id).first)()
+    if not target:
+        await call.answer("Foydalanuvchi topilmadi.", show_alert=True)
+        return
+    await call.answer()
+    await state.update_data(kitobcha_target_id=target_id)
+    await state.set_state(AdminGiveKitobcha.amount.state)
+    name = target.full_name or (("@" + target.username) if target.username else "Ism yo'q")
+    await call.message.answer(
+        f"🪙 <b>{name}</b> uchun necha Kitobcha berilsin?\n"
+        "Butun son yuboring (ayirish uchun manfiy son, masalan <code>-100</code>).\n"
+        "Bekor qilish uchun /bekor yozing.",
+        parse_mode="HTML",
+    )
+
+
+@dp.message_handler(IsPrivate(), commands=["bekor"], state=AdminGiveKitobcha.amount)
+async def adm_kitobcha_cancel(message: types.Message, state: FSMContext):
+    await state.finish()
+    await message.answer("Bekor qilindi.")
+
+
+@dp.message_handler(IsPrivate(), state=AdminGiveKitobcha.amount)
+async def adm_kitobcha_apply(message: types.Message, state: FSMContext):
+    from tgbot.services import market as market_service
+
+    actor = await aget_user(message.from_user.id)
+    if not (actor and actor.is_admin):
+        await state.finish()
+        return
+
+    raw = (message.text or "").strip()
+    if not raw.lstrip("+-").isdigit():
+        await message.answer("Butun son yuboring, masalan <code>500</code> yoki <code>-100</code>.",
+                             parse_mode="HTML")
+        return
+    amount = int(raw)
+    if amount == 0:
+        await message.answer("Miqdor 0 bo'lmasligi kerak.")
+        return
+
+    data = await state.get_data()
+    target_id = data.get("kitobcha_target_id")
+    target = await sync_to_async(TelegramProfile.objects.filter(id=target_id).first)()
+    await state.finish()
+    if not target:
+        await message.answer("❌ Foydalanuvchi topilmadi.")
+        return
+
+    new_balance = await sync_to_async(
+        market_service.admin_grant_kitobcha, thread_sensitive=True
+    )(target, amount)
+
+    name = target.full_name or (("@" + target.username) if target.username else "Ism yo'q")
+    sign = "+" if amount > 0 else ""
+    await message.answer(
+        f"✅ <b>{sign}{amount} Kitobcha</b> — {name} (<code>{target.telegram_id}</code>)\n"
+        f"Yangi balans: <b>{int(new_balance)} 🪙</b>",
+        parse_mode="HTML",
+    )
+    try:
+        if amount > 0:
+            note = f"🎁 Sizga bosh admin tomonidan <b>+{amount} Kitobcha</b> berildi!"
+        else:
+            note = f"⚠️ Hisobingizdan <b>{-amount} Kitobcha</b> ayirildi."
+        await bot.send_message(target.telegram_id, note, parse_mode="HTML")
+    except Exception as e:
+        print(f"kitobcha-grant notify failed for {target.telegram_id}: {e}")
+
+    text, target_user, is_premium = await sync_to_async(_detail_text_user_premium)(target_id)
+    await message.answer(text, parse_mode="HTML",
+                         reply_markup=_user_detail_markup(target_user, is_premium))
+
+
 @dp.message_handler(IsPrivate(), state=AdminUserBrowse.searching)
 async def admin_user_search_query(message: types.Message, state: FSMContext):
     actor = await aget_user(message.from_user.id)
@@ -1362,6 +1449,11 @@ def _user_detail_markup(target_user, is_premium: bool) -> InlineKeyboardMarkup:
                 "❌ Premiumni o'chirish",
                 callback_data=f"adm_prem_toggle:{target_user.id}:0",
             ))
+        # Free-form Kitobcha grant/deduct — bosh admin uchun istalgan miqdor.
+        kb.add(InlineKeyboardButton(
+            "🪙 Kitobcha berish",
+            callback_data=f"adm_kitobcha_start:{target_user.id}",
+        ))
         # Block / Unblock toggle — admin-only control over user access.
         if target_user.is_blocked:
             kb.add(InlineKeyboardButton(

@@ -145,6 +145,10 @@ class AdminUserBrowse(StatesGroup):
     searching = State()  # waiting for a search query (name / username / phone / id)
 
 
+class AdminGiveKitobcha(StatesGroup):
+    amount = State()  # waiting for the Kitobcha amount to grant/deduct for a chosen target
+
+
 class BoomLaunchState(StatesGroup):
     text = State()   # custom announcement copy (or /skip for the auto-generated one)
     image = State()  # optional banner photo (or /skip)
