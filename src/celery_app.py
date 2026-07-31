@@ -104,6 +104,13 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.boom_daily_standings',
         'schedule': crontab(hour=22, minute=0),
     },
+    'boom-public-daily-update': {
+        # Public TOP-30 version of the above (posted to groups + everyone's
+        # DM, not just each participant privately) -- a separate time slot
+        # (10:00) so the two don't land back-to-back.
+        'task': 'tgbot.tasks.boom_public_daily_update',
+        'schedule': crontab(hour=10, minute=0),
+    },
     'recompute-optimal-send-hours': {
         'task': 'tgbot.tasks.recompute_optimal_send_hours',
         'schedule': crontab(hour=3, minute=0, day_of_week=0),

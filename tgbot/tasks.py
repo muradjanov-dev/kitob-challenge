@@ -3979,6 +3979,80 @@ def unblock_and_apologize_false_positives():
     return {"unblocked": unblocked, "notified": notified}
 
 
+def retire_challenge_and_launch_boom(challenge_id=None, boom_days=7):
+    """One-off transition: retire the currently-active 3-day Challenge (or
+    the given one) and launch a fresh Yaxshilik ulashuvchi boom in its
+    place. If the challenge being retired is a referrals_daily one, each
+    participant's ALREADY-MADE referrals during the challenge's window are
+    carried over as their starting boom referrals_count (+ the equivalent
+    tier1 Kitobcha) -- so switching systems mid-challenge doesn't erase
+    real effort already made. The challenge's own reward payout is skipped
+    for transferred participants (marked reward_given=True directly) to
+    avoid paying the same referrals out twice, once per system. Other
+    challenge types have nothing comparable to carry over -- just retired.
+    launch_referral_boom() sends the full announcement broadcast to every
+    group + registered user, same as any other boom launch."""
+    from tgbot.models import (
+        Challenge, ChallengeParticipant, UserReferal, ReferralBoom, ReferralBoomParticipant,
+    )
+
+    challenge = (
+        Challenge.objects.filter(id=challenge_id).first() if challenge_id
+        else Challenge.objects.filter(is_active=True).order_by("-created_at").first()
+    )
+    if not challenge:
+        return {"error": "no_active_challenge"}
+
+    transfers = []
+    if challenge.condition_type == "referrals_daily":
+        participants = list(
+            ChallengeParticipant.objects.filter(challenge=challenge).select_related("user")
+        )
+        for p in participants:
+            made = UserReferal.objects.filter(
+                referrer=p.user, created_at__date__gte=challenge.start_date,
+            ).count()
+            if made > 0:
+                transfers.append((p.user, made))
+
+    Challenge.objects.filter(id=challenge.id).update(is_active=False)
+    ChallengeParticipant.objects.filter(challenge=challenge).update(reward_given=True)
+
+    boom_id = launch_referral_boom(days=boom_days)
+    boom = ReferralBoom.objects.filter(id=boom_id).first()
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    credited = 0
+    for user, made in transfers:
+        participant, _created = ReferralBoomParticipant.objects.get_or_create(boom=boom, user=user)
+        awarded = user.update_ball(True, made * boom.tier1_reward)
+        participant.referrals_count = made
+        participant.kitobcha_earned = awarded
+        participant.save(update_fields=["referrals_count", "kitobcha_earned"])
+        credited += 1
+        try:
+            requests.post(
+                url,
+                data={
+                    "chat_id": user.telegram_id,
+                    "text": (
+                        f"🔄 <b>«{challenge.title}» {boom.title}ga aylandi!</b>\n\n"
+                        f"Siz allaqachon qilgan <b>{made}</b> ta taklifingiz yangi "
+                        f"<b>{boom.title}</b> musobaqasiga o'tkazildi va "
+                        f"<b>{awarded} Kitobcha</b> hisobingizga qo'shildi! 🎉\n\n"
+                        f"Musobaqa endi {boom_days} kun davom etadi — davom eting!"
+                    ),
+                    "parse_mode": "HTML",
+                },
+                timeout=5,
+            )
+        except Exception as e:
+            print(f"retire_challenge_and_launch_boom transfer DM failed uid={user.id}: {e}")
+
+    print(f"retire_challenge_and_launch_boom: challenge_id={challenge.id} boom_id={boom_id} credited={credited}")
+    return {"challenge_id": challenge.id, "boom_id": boom_id, "credited": credited}
+
+
 @shared_task
 def boom_reminder_tick():
     """Beat (every ~5 min): for each participant whose next scheduled reminder
@@ -4206,32 +4280,95 @@ def boom_daily_standings():
     print(f"boom_daily_standings: boom={boom.id} sent={sent}/{len(participants)}")
 
 
-@shared_task
-def boom_recovery_announcement():
-    """One-off (2026-07-31): apologize for this morning's brief interruption
-    (a deploy-time bug force-finalized the boom for ~4 hours before the fix
-    shipped) and re-announce the still-running competition with a public
-    TOP-30 leaderboard, everywhere -- every group AND every registered user.
-    Not on any schedule; call once by hand after the fix + DB recovery land."""
-    import time as _time
-    from tgbot.models import ReferralBoom, ReferralBoomParticipant
-
-    boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
-    if not boom:
-        print("boom_recovery_announcement: no active boom")
-        return
+def _boom_leaderboard_block(boom, top_n=30):
+    from tgbot.models import ReferralBoomParticipant
 
     participants = list(
         ReferralBoomParticipant.objects.filter(boom=boom, referrals_count__gt=0)
         .select_related("user")
-        .order_by("-referrals_count", "joined_at")[:30]
+        .order_by("-referrals_count", "joined_at")[:top_n]
     )
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
     lines = [
         f"{medals.get(i, f'{i}.')} {(p.user.full_name or 'Kitobxon')[:28]} — <b>{p.referrals_count}</b> ta"
         for i, p in enumerate(participants, 1)
     ]
-    leaderboard = "\n".join(lines) if lines else "Hali hech kim taklif qilmagan — birinchi bo'ling!"
+    return "\n".join(lines) if lines else "Hali hech kim taklif qilmagan — birinchi bo'ling!"
+
+
+def _broadcast_boom_update(boom, text, pin: bool = False):
+    """Send `text` (photo+caption if the boom has an image, plain text
+    otherwise) to every announce-group AND every registered user. When `pin`
+    is set, pins the message in each group (best-effort -- the bot needs
+    pin rights there; silently skipped if it doesn't have them)."""
+    import time as _time
+    from django.conf import settings as _settings
+
+    photo_url = f"{_settings.WEB_DOMAIN}{boom.image.url}" if boom.image else None
+    send_method = "sendPhoto" if photo_url else "sendMessage"
+    send_url = f"https://api.telegram.org/bot{BOT_TOKEN}/{send_method}"
+    pin_url = f"https://api.telegram.org/bot{BOT_TOKEN}/pinChatMessage"
+
+    def _payload(chat_id):
+        if photo_url:
+            return {"chat_id": chat_id, "photo": photo_url, "caption": text, "parse_mode": "HTML"}
+        return {"chat_id": chat_id, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"}
+
+    group_sent = 0
+    for group_id, thread_id in _announce_targets():
+        try:
+            data = _payload(group_id)
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            resp = requests.post(send_url, data=data, timeout=10)
+            group_sent += 1
+            if pin and resp.ok:
+                msg_id = resp.json().get("result", {}).get("message_id")
+                if msg_id:
+                    try:
+                        requests.post(
+                            pin_url,
+                            data={"chat_id": group_id, "message_id": msg_id,
+                                  "disable_notification": "true"},
+                            timeout=5,
+                        )
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"_broadcast_boom_update group {group_id}: {e}")
+
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    user_sent = 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(send_url, data=_payload(chat_id), timeout=5)
+            if resp.ok:
+                user_sent += 1
+            elif resp.status_code == 429:
+                _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
+        except Exception:
+            pass
+        _time.sleep(0.05)
+
+    return group_sent, user_sent
+
+
+@shared_task
+def boom_recovery_announcement():
+    """One-off (2026-07-31): apologize for this morning's brief interruption
+    (a deploy-time bug force-finalized the boom for ~4 hours before the fix
+    shipped) and re-announce the still-running competition -- WITH the boom's
+    banner image, pinned in every group -- alongside a public TOP-30
+    leaderboard, everywhere. Not on any schedule; call once by hand after the
+    fix + DB recovery land."""
+    from tgbot.models import ReferralBoom
+
+    boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
+    if not boom:
+        print("boom_recovery_announcement: no active boom")
+        return
+
+    leaderboard = _boom_leaderboard_block(boom)
     days_left = max(0, (boom.end_at - timezone.now()).days)
 
     text = (
@@ -4244,39 +4381,34 @@ def boom_recovery_announcement():
         f"juda katta imkoniyat! Do'stlaringizni taklif qilishda davom eting, "
         f"reytingda yuqoriga ko'tariling va qimmatbaho sovg'alarga ega bo'ling! 🎁"
     )
-
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    group_sent = 0
-    for group_id, thread_id in _announce_targets():
-        try:
-            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
-                    "disable_web_page_preview": "true"}
-            if thread_id:
-                data["message_thread_id"] = thread_id
-            requests.post(url, data=data, timeout=10)
-            group_sent += 1
-        except Exception as e:
-            print(f"boom_recovery_announcement group {group_id}: {e}")
-
-    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
-    user_sent = 0
-    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
-        try:
-            resp = requests.post(
-                url,
-                data={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
-                      "disable_web_page_preview": "true"},
-                timeout=5,
-            )
-            if resp.ok:
-                user_sent += 1
-            elif resp.status_code == 429:
-                _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
-        except Exception:
-            pass
-        _time.sleep(0.05)
-
+    group_sent, user_sent = _broadcast_boom_update(boom, text, pin=True)
     print(f"boom_recovery_announcement: boom={boom.id} groups={group_sent} users={user_sent}")
+
+
+@shared_task
+def boom_public_daily_update():
+    """Once daily: public TOP-30 leaderboard + days-left reminder, posted to
+    every group and DMed to every registered user. Distinct from
+    boom_daily_standings (personal-only, no other names) -- this is the
+    openly-public version the competition also wants. No-ops if no boom
+    is live."""
+    from tgbot.models import ReferralBoom
+
+    boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
+    if not boom:
+        return
+
+    leaderboard = _boom_leaderboard_block(boom)
+    days_left = max(0, (boom.end_at - timezone.now()).days)
+    text = (
+        f"📊 <b>{boom.title} — kunlik statistika</b>\n\n"
+        f"🏆 <b>TOP-30:</b>\n{leaderboard}\n\n"
+        f"⏳ Musobaqa hali <b>{days_left} kun</b> davom etadi — ulgurish uchun "
+        f"vaqt bor! Do'stlaringizni taklif qiling, reytingda ko'tariling va "
+        f"sovg'alarga ega bo'ling! 🎁"
+    )
+    group_sent, user_sent = _broadcast_boom_update(boom, text, pin=False)
+    print(f"boom_public_daily_update: boom={boom.id} groups={group_sent} users={user_sent}")
 
 
 # ────────────────────────────────────────────────────────────────────────
