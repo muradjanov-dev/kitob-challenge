@@ -28,3 +28,4 @@ from . import book_quiz
 from . import project_survey
 from . import library_admin
 from . import market
+from . import boom_admin

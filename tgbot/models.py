@@ -1196,8 +1196,14 @@ class ReferralBoom(BaseModel):
     title = models.CharField(max_length=200, default="3 Kunlik Referal BOOM")
     image = models.ImageField(
         upload_to="referral_boom/", blank=True, null=True,
-        help_text="Optional banner sent with the welcome DM when someone joins "
+        help_text="Optional banner sent with the welcome DM when someone joins, "
+                  "and with the initial launch announcement "
                   "(sendPhoto + caption instead of a plain text message).",
+    )
+    announce_text = models.TextField(
+        blank=True, default="",
+        help_text="Custom launch-announcement copy (HTML allowed). If blank, an "
+                  "auto-generated announcement is used instead.",
     )
     planned_days = models.PositiveIntegerField(
         default=3,

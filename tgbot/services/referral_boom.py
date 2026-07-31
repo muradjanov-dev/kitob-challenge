@@ -6,7 +6,7 @@ Kept dependency-light (only stdlib + Django timezone) so it imports cleanly
 from both the aiogram side and the Celery side.
 """
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 from django.utils import timezone
 
@@ -41,6 +41,33 @@ def generate_reminder_schedule(now, end_at, count, day_start=DAY_START_HOUR, day
     # don't dump a burst the instant someone joins. Keep at least one if all fell.
     future = [d for d in fires if d > now]
     fires = future or fires
+    return [d.isoformat() for d in fires]
+
+
+def generate_daily_reminder_schedule(start_at, end_at, day_start=DAY_START_HOUR, day_end=DAY_END_HOUR):
+    """One reminder per calendar day (Tashkent-local) across [start_at, end_at),
+    each at a random time within [day_start, day_end) hours. Unlike
+    generate_reminder_schedule (a fixed count spread randomly across the
+    *whole* window, which can cluster several reminders on one day and skip
+    another), this guarantees a steady one-a-day cadence -- the shape a
+    single daily CTA competition wants. Skips the join day entirely if
+    fewer than 2 hours remain before day_end that day."""
+    local_start = timezone.localtime(start_at)
+    local_end = timezone.localtime(end_at)
+    fires = []
+    day = local_start.date()
+    while day <= local_end.date():
+        day_end_dt = timezone.make_aware(datetime.combine(day, time(day_end, 0)))
+        if day == local_start.date() and (day_end_dt - local_start).total_seconds() < 2 * 3600:
+            day += timedelta(days=1)
+            continue
+        fire = timezone.make_aware(
+            datetime.combine(day, time(random.randint(day_start, day_end - 1), random.randint(0, 59)))
+        )
+        if local_start < fire < local_end:
+            fires.append(fire)
+        day += timedelta(days=1)
+    fires.sort()
     return [d.isoformat() for d in fires]
 
 

@@ -13,7 +13,7 @@ from django.utils import timezone
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.utils import aget_user
 from tgbot.services.referral_boom import (
-    generate_reminder_schedule,
+    generate_daily_reminder_schedule,
     build_welcome_text,
     boom_share_texts,
 )
@@ -39,9 +39,7 @@ def _join_boom(user, boom_id):
     if not created:
         return boom, "already"
 
-    schedule = generate_reminder_schedule(
-        timezone.now(), boom.end_at, boom.total_reminders,
-    )
+    schedule = generate_daily_reminder_schedule(timezone.now(), boom.end_at)
     participant.reminder_schedule = schedule
     participant.save(update_fields=["reminder_schedule"])
     return boom, "joined"

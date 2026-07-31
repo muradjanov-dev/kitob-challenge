@@ -37,6 +37,22 @@ def region_markup():
     return button
 
 
+def _active_boom_for_menu():
+    """The live ReferralBoom (if any), cached briefly -- main_markup() renders
+    on every /start and menu tap, far more often than a boom's state changes,
+    so this avoids a query per render without risking a stale button for long
+    after a boom starts/ends."""
+    from django.core.cache import cache
+    from tgbot.models import ReferralBoom
+
+    cached = cache.get("active_boom_for_menu", "unset")
+    if cached != "unset":
+        return cached
+    boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
+    cache.set("active_boom_for_menu", boom, 30)
+    return boom
+
+
 def main_markup(language="uz", is_admin=False):
     """Inline main menu. callback_data uses `menu:<action>` namespace.
     The 📚 Kitob hisoboti button is rendered as a tall full-width hero
@@ -70,6 +86,15 @@ def main_markup(language="uz", is_admin=False):
 
     kb = InlineKeyboardMarkup(row_width=2)
     kb.row(InlineKeyboardButton(text=labels["report_big"], callback_data="menu:report"))
+    # Dedicated, prominent entry while a Referral BOOM is live -- separate
+    # from the always-there Kabinet -> Referal entry so a running competition
+    # doesn't get buried a menu deep.
+    active_boom = _active_boom_for_menu()
+    if active_boom:
+        kb.row(InlineKeyboardButton(
+            text=f"🌟 {active_boom.title}",
+            callback_data=f"join_boom:{active_boom.id}",
+        ))
     kb.row(InlineKeyboardButton(text=labels["how"], callback_data="menu:how"))
     # Shop entry lives on the native chat menu button now (see
     # set_shop_menu_button management command), so it's removed from the
@@ -216,6 +241,7 @@ admin_keyboard.row(
 )
 admin_keyboard.row(
     InlineKeyboardButton(text="🖱 Sayt Statistikasi", callback_data="admin:site_stats:7d"),
+    InlineKeyboardButton(text="🌟 Yaxshilik ulashuvchi", callback_data="admin:boom"),
 )
 
 # The deprecated reply-keyboard version (kept for any legacy callers).

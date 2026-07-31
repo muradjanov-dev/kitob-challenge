@@ -209,8 +209,17 @@ def _get_reading_record(profile, book):
     own self-report flow, report.py, can create rows against the same
     GlobalBook), so a couple of accounts may already carry more than one row
     for the same book -- always take the first instead of update_or_create()
-    to avoid MultipleObjectsReturned."""
-    return BooksToRead.objects.filter(user=profile, global_book=book).first()
+    to avoid MultipleObjectsReturned.
+
+    Critical: prefer an already fee_charged=True row over any duplicate.
+    Plain .first() with no ordering is non-deterministic across calls, so if
+    one duplicate was already charged and another wasn't, an unordered pick
+    could intermittently show the book as "not started" and charge
+    BOOK_START_FEE a second time. Preferring the charged row makes "already
+    started" permanent and deterministic regardless of which duplicate a
+    plain query would otherwise have picked."""
+    qs = BooksToRead.objects.filter(user=profile, global_book=book)
+    return qs.filter(fee_charged=True).order_by("id").first() or qs.order_by("id").first()
 
 
 # ── POST /kutubxona/api/start-reading/ ─────────────────────────────────────

@@ -145,6 +145,11 @@ class AdminUserBrowse(StatesGroup):
     searching = State()  # waiting for a search query (name / username / phone / id)
 
 
+class BoomLaunchState(StatesGroup):
+    text = State()   # custom announcement copy (or /skip for the auto-generated one)
+    image = State()  # optional banner photo (or /skip)
+
+
 class LibraryBookCreateState(StatesGroup):
     title = State()
     author = State()

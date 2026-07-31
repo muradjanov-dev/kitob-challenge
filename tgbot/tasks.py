@@ -3754,6 +3754,7 @@ def announce_referral_boom(boom_id):
     button, then send an admin summary."""
     import time as _time
     import os as _os
+    from django.conf import settings as _settings
     from tgbot.models import ReferralBoom
 
     boom = ReferralBoom.objects.filter(id=boom_id, is_active=True).first()
@@ -3764,10 +3765,9 @@ def announce_referral_boom(boom_id):
     end_l = timezone.localtime(boom.end_at)
     date_range = f"{start_l.strftime('%d.%m %H:%M')} – {end_l.strftime('%d.%m %H:%M')}"
 
-    text = (
-        f"💥💥💥 <b>REFERAL BOOM BOSHLANDI!</b> 💥💥💥\n\n"
-        f"⚡️ Faqat <b>3 KUN</b> — har taklif qilgan do'stingiz uchun "
-        f"<b>{boom.tier1_reward} Kitobcha</b>!\n"
+    text = boom.announce_text or (
+        f"💥💥💥 <b>{boom.title.upper()} BOSHLANDI!</b> 💥💥💥\n\n"
+        f"⚡️ Har taklif qilgan do'stingiz uchun <b>{boom.tier1_reward} Kitobcha</b>!\n"
         f"🤯 <b>{boom.tier1_cap} tadan</b> oshsa — har biri uchun "
         f"<b>{boom.tier2_reward} Kitobcha</b>!\n\n"
         f"📅 <b>Muddat:</b> {date_range}\n\n"
@@ -3776,12 +3776,23 @@ def announce_referral_boom(boom_id):
         f"👇 Qo'shiling — shaxsiy havolangizni darhol yuboramiz!"
     )
     keyboard = _boom_join_keyboard(boom.id)
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    # Photo+caption when the admin attached a banner, plain text otherwise --
+    # same choice the welcome DM (referral_boom.py join handler) already
+    # makes, just via the HTTP API (this task is sync) instead of aiogram.
+    photo_url = f"{_settings.WEB_DOMAIN}{boom.image.url}" if boom.image else None
+    send_method = "sendPhoto" if photo_url else "sendMessage"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/{send_method}"
+
+    def _payload(chat_id):
+        if photo_url:
+            return {"chat_id": chat_id, "photo": photo_url, "caption": text,
+                     "parse_mode": "HTML", "reply_markup": keyboard}
+        return {"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                "reply_markup": keyboard, "disable_web_page_preview": "true"}
 
     for group_id, thread_id in _announce_targets():
         try:
-            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
-                    "reply_markup": keyboard, "disable_web_page_preview": "true"}
+            data = _payload(group_id)
             if thread_id:
                 data["message_thread_id"] = thread_id
             requests.post(
@@ -3796,12 +3807,7 @@ def announce_referral_boom(boom_id):
     sent = 0
     for chat_id in qs.values_list("telegram_id", flat=True).iterator():
         try:
-            resp = requests.post(
-                url,
-                data={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
-                      "reply_markup": keyboard, "disable_web_page_preview": "true"},
-                timeout=5,
-            )
+            resp = requests.post(url, data=_payload(chat_id), timeout=5)
             if resp.ok:
                 sent += 1
             elif resp.status_code == 429:
@@ -3943,6 +3949,7 @@ def boom_reminder_tick():
     participants = list(
         ReferralBoomParticipant.objects.filter(boom=boom).select_related("user")
     )
+    all_counts = [pp.referrals_count for pp in participants]
     sent = 0
     for p in participants:
         schedule = p.reminder_schedule or []
@@ -3973,6 +3980,20 @@ def boom_reminder_tick():
             body = tmpl["text"].format(**ctx)
         except Exception:
             body = tmpl["text"]
+
+        # Daily-cadence-specific addition: how many more referrals close the
+        # gap to whoever's immediately ahead -- the concrete "almost there"
+        # nudge a once-a-day CTA needs, since the random playful pool alone
+        # doesn't always surface it.
+        higher = [c for c in all_counts if c > p.referrals_count]
+        if higher:
+            need = min(higher) - p.referrals_count + 1
+            body += (
+                f"\n\n📈 Yana <b>{need} ta</b> do'st taklif qilsangiz, "
+                f"sizdan oldingi kishidan o'tib ketasiz!"
+            )
+        else:
+            body += "\n\n👑 Siz hozircha reytingda birinchisiz — mavqeingizni saqlang!"
 
         data = {"chat_id": user.telegram_id, "text": body,
                 "parse_mode": "HTML", "disable_web_page_preview": "true"}
