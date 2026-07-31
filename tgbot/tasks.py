@@ -4301,11 +4301,12 @@ def _boom_leaderboard_block(boom, top_n=30):
     return "\n".join(lines) if lines else "Hali hech kim taklif qilmagan — birinchi bo'ling!"
 
 
-def _broadcast_boom_update(boom, text, pin: bool = False):
+def _broadcast_boom_update(boom, text, pin: bool = False, keyboard=None):
     """Send `text` (photo+caption if the boom has an image, plain text
     otherwise) to every announce-group AND every registered user. When `pin`
     is set, pins the message in each group (best-effort -- the bot needs
-    pin rights there; silently skipped if it doesn't have them)."""
+    pin rights there; silently skipped if it doesn't have them). `keyboard`
+    is a pre-built inline_keyboard JSON string (e.g. the join button)."""
     import time as _time
     from django.conf import settings as _settings
 
@@ -4316,8 +4317,12 @@ def _broadcast_boom_update(boom, text, pin: bool = False):
 
     def _payload(chat_id):
         if photo_url:
-            return {"chat_id": chat_id, "photo": photo_url, "caption": text, "parse_mode": "HTML"}
-        return {"chat_id": chat_id, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"}
+            data = {"chat_id": chat_id, "photo": photo_url, "caption": text, "parse_mode": "HTML"}
+        else:
+            data = {"chat_id": chat_id, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"}
+        if keyboard:
+            data["reply_markup"] = keyboard
+        return data
 
     group_sent = 0
     for group_id, thread_id in _announce_targets():
@@ -4386,7 +4391,9 @@ def boom_recovery_announcement():
         f"juda katta imkoniyat! Do'stlaringizni taklif qilishda davom eting, "
         f"reytingda yuqoriga ko'tariling va qimmatbaho sovg'alarga ega bo'ling! 🎁"
     )
-    group_sent, user_sent = _broadcast_boom_update(boom, text, pin=True)
+    group_sent, user_sent = _broadcast_boom_update(
+        boom, text, pin=True, keyboard=_boom_join_keyboard(boom.id),
+    )
     print(f"boom_recovery_announcement: boom={boom.id} groups={group_sent} users={user_sent}")
 
 
@@ -4412,7 +4419,9 @@ def boom_public_daily_update():
         f"vaqt bor! Do'stlaringizni taklif qiling, reytingda ko'tariling va "
         f"sovg'alarga ega bo'ling! 🎁"
     )
-    group_sent, user_sent = _broadcast_boom_update(boom, text, pin=False)
+    group_sent, user_sent = _broadcast_boom_update(
+        boom, text, pin=False, keyboard=_boom_join_keyboard(boom.id),
+    )
     print(f"boom_public_daily_update: boom={boom.id} groups={group_sent} users={user_sent}")
 
 
