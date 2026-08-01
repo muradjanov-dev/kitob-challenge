@@ -149,6 +149,10 @@ class AdminGiveKitobcha(StatesGroup):
     amount = State()  # waiting for the Kitobcha amount to grant/deduct for a chosen target
 
 
+class WelcomeVideoState(StatesGroup):
+    upload = State()  # waiting for the video (with its caption) to save as the welcome video
+
+
 class BoomLaunchState(StatesGroup):
     text = State()   # custom announcement copy (or /skip for the auto-generated one)
     image = State()  # optional banner photo (or /skip)

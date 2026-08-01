@@ -629,6 +629,20 @@ class LastTopicID(SingletonModel):
         return self.topic_id
 
 
+class WelcomeVideo(SingletonModel):
+    """Admin-uploaded video sent to every newly-registered user right after
+    onboarding (see tgbot/bot/handlers/users/start.py age_pick), plus an
+    optional one-time broadcast to everyone already registered (see the
+    "🎬 Xush kelibsiz video" admin-panel flow). Only Telegram's file_id is
+    kept — the video itself stays hosted on Telegram's servers, so nothing
+    is downloaded or re-stored here."""
+    video_file_id = models.CharField(max_length=255, blank=True, default="")
+    caption = models.TextField(blank=True, default="")
+
+    def __str__(self):
+        return self.caption[:50] or self.video_file_id or "Welcome video"
+
+
 class DailyMessage(models.Model):
     message = models.TextField(
         verbose_name=_("Message"),

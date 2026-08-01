@@ -3914,6 +3914,44 @@ def announce_referral_boom(boom_id):
         print(f"boom announce admin notif failed: {e}")
 
 
+@shared_task
+def broadcast_welcome_video():
+    """Admin-triggered one-time catch-up: send the currently-configured
+    WelcomeVideo (tgbot/models.py) to every already-registered user. New users
+    get the same video automatically right after onboarding instead (see
+    age_pick in tgbot/bot/handlers/users/start.py) -- this task exists only so
+    people who joined before the video was uploaded also receive it."""
+    import time as _time
+    from tgbot.models import WelcomeVideo
+
+    wv = WelcomeVideo.get_solo()
+    if not wv.video_file_id:
+        return
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendVideo"
+
+    def _payload(chat_id):
+        data = {"chat_id": chat_id, "video": wv.video_file_id}
+        if wv.caption:
+            data["caption"] = wv.caption
+            data["parse_mode"] = "HTML"
+        return data
+
+    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    sent = 0
+    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        try:
+            resp = requests.post(url, data=_payload(chat_id), timeout=10)
+            if resp.ok:
+                sent += 1
+            elif resp.status_code == 429:
+                _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
+        except Exception:
+            pass
+        _time.sleep(0.05)
+    print(f"broadcast_welcome_video: sent={sent}")
+
+
 def broadcast_library_music_update():
     """One-off announcement: library background music + general 'lots of new
     stuff, go look' nudge, plus a soft teaser for the upcoming 'Yaxshilik

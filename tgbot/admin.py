@@ -596,6 +596,12 @@ class BookQuizPromoStateAdmin(admin.ModelAdmin):
     list_display = ('launched_on', 'last_sent_on')
 
 
+@admin.register(models.WelcomeVideo)
+class WelcomeVideoAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'video_file_id')
+    readonly_fields = ('video_file_id',)
+
+
 ################################################################################
 #                            KITOB ZANJIRI (GAME)                              #
 ################################################################################

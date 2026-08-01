@@ -250,6 +250,7 @@ admin_keyboard.row(
 )
 admin_keyboard.row(
     InlineKeyboardButton(text="🚀 Musobaqa boshlash", callback_data="admin:boom"),
+    InlineKeyboardButton(text="🎬 Xush kelibsiz video", callback_data="admin:welcome_video"),
 )
 
 # The deprecated reply-keyboard version (kept for any legacy callers).

@@ -451,6 +451,20 @@ async def age_pick(call: types.CallbackQuery, state: FSMContext):
     except Exception as e:
         print(f"how-it-works auto-send failed for {call.from_user.id}: {e}")
 
+    # Auto-send the admin's "Xush kelibsiz" video, if one has been uploaded
+    # (see tgbot/models.py WelcomeVideo + the admin-panel upload flow). Only
+    # a file_id is stored, so this never re-uploads anything.
+    try:
+        from tgbot.models import WelcomeVideo
+        wv = await sync_to_async(WelcomeVideo.get_solo)()
+        if wv.video_file_id:
+            await bot.send_video(
+                call.from_user.id, video=wv.video_file_id,
+                caption=(wv.caption or None), parse_mode="HTML" if wv.caption else None,
+            )
+    except Exception as e:
+        print(f"welcome video auto-send failed for {call.from_user.id}: {e}")
+
     # Notify admins (best-effort, doesn't block the user). Always Uzbek for admin.
     try:
         admins_raw = os.environ.get("ADMINS", "")

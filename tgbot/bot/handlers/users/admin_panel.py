@@ -8,7 +8,9 @@ from tgbot.bot import dp
 from tgbot.models import TelegramProfile, BookReport, ConfirmationReport, BooksToRead, UserAchievement
 from aiogram import types
 from aiogram.dispatcher import FSMContext
-from tgbot.bot.states.main import StatisticState, NotificationState, AdminUserBrowse, AdminGiveKitobcha
+from tgbot.bot.states.main import (
+    StatisticState, NotificationState, AdminUserBrowse, AdminGiveKitobcha, WelcomeVideoState,
+)
 from tgbot.bot.filters import IsPrivate
 from tgbot.bot.utils import aget_user
 from tgbot.bot.loader import gettext as _, bot
@@ -653,6 +655,86 @@ async def confirm_and_send_notification_handler(message: types.Message, state: F
 
     await message.answer(f"Habar {users.count()} foydalanuvchiga yuborildi.", reply_markup=main_markup())
     await state.finish()
+
+
+async def welcome_video_start_handler(message: types.Message, state: FSMContext):
+    """'🎬 Xush kelibsiz video' — bosh admin videoni (caption bilan birga, bitta
+    xabar sifatida) yuboradi. Faqat file_id + caption saqlanadi, video Telegram
+    serverida qoladi — qayta yuklab olib saqlash shart emas."""
+    await message.answer(
+        "🎬 Yangi \"Xush kelibsiz\" videoni matni (caption) bilan birga, "
+        "bitta video-xabar sifatida yuboring.\n\n"
+        "Bu video har bir yangi ro'yxatdan o'tgan foydalanuvchiga avtomatik "
+        "yuboriladi. Bekor qilish uchun /bekor yozing.",
+        reply_markup=types.ReplyKeyboardRemove(),
+    )
+    await WelcomeVideoState.upload.set()
+
+
+@dp.message_handler(IsPrivate(), commands=["bekor"], state=WelcomeVideoState.upload)
+async def welcome_video_cancel(message: types.Message, state: FSMContext):
+    await state.finish()
+    await message.answer("Bekor qilindi.", reply_markup=main_markup())
+
+
+@dp.message_handler(IsPrivate(), content_types=types.ContentType.VIDEO, state=WelcomeVideoState.upload)
+async def welcome_video_upload(message: types.Message, state: FSMContext):
+    from tgbot.models import WelcomeVideo
+
+    file_id = message.video.file_id
+    caption = message.caption or ""
+
+    @sync_to_async
+    def _save():
+        wv = WelcomeVideo.get_solo()
+        wv.video_file_id = file_id
+        wv.caption = caption
+        wv.save(update_fields=["video_file_id", "caption"])
+
+    await _save()
+    await state.finish()
+
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton(
+        "📤 Hoziroq barcha foydalanuvchilarga yuborish", callback_data="admin:welcome_video_broadcast",
+    ))
+    await message.answer_video(
+        file_id, caption=(caption or None), parse_mode="HTML" if caption else None,
+    )
+    await message.answer(
+        "✅ Saqlandi! Bundan keyin ro'yxatdan o'tgan har bir yangi foydalanuvchiga "
+        "shu video avtomatik yuboriladi.\n\n"
+        "Xohlasangiz, hozirgi barcha foydalanuvchilarga ham darhol yuborishingiz mumkin:",
+        reply_markup=kb,
+    )
+
+
+@dp.message_handler(
+    IsPrivate(), content_types=types.ContentType.ANY, state=WelcomeVideoState.upload,
+)
+async def welcome_video_reject_non_video(message: types.Message):
+    await message.answer(
+        "❗️ Faqat video (caption bilan birga) yuboring — boshqa turdagi fayllar qabul qilinmaydi. "
+        "Bekor qilish uchun /bekor yozing."
+    )
+
+
+@dp.callback_query_handler(
+    IsPrivate(), lambda c: c.data == "admin:welcome_video_broadcast", state="*",
+)
+async def welcome_video_broadcast_confirm(call: types.CallbackQuery):
+    actor = await aget_user(call.from_user.id)
+    if not (actor and actor.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    from tgbot.tasks import broadcast_welcome_video
+
+    await call.answer()
+    broadcast_welcome_video.delay()
+    await call.message.answer(
+        "📤 Video barcha ro'yxatdan o'tgan foydalanuvchilarga jo'natilmoqda — "
+        "bu bir necha daqiqa davom etishi mumkin."
+    )
 
 
 @dp.message_handler(IsPrivate(), Text("✅ Ro'yhatdan o'tganlar"))
@@ -1837,6 +1919,8 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
         await show_global_statistics(msg)
     elif action == "notify":
         await send_notification_text_handler(msg)
+    elif action == "welcome_video":
+        await welcome_video_start_handler(msg, state)
     elif action == "reminders":
         from tgbot.bot.handlers.users.reminders import reminders_menu
         await reminders_menu(msg, state, _admin_id=admin_id)
