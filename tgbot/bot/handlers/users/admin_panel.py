@@ -303,7 +303,7 @@ async def admin_start_emoji_cb(call: types.CallbackQuery, state: FSMContext = No
     await _launch_game(call.message, start_emoji_game, "/emoji/", "Emoji Kitob")
 
 
-# ── All 14 games — one submenu, manual start for any of them ────────────────
+# ── All 15 games — one submenu, manual start for any of them ────────────────
 # (key, title, web_path, tasks.py function name). Covers the original 4 (which
 # also still have their own direct top-level buttons above) plus all 10 games
 # built 2026-07-22, so every live game has a manual-start button in one place.
@@ -322,6 +322,7 @@ _GAMES_MENU = [
     ("timeline", "🕰️ Vaqt Mashinasi", "/vaqt-mashinasi/", "start_quiz_timeline_game"),
     ("matchbook", "🎯 Muallif-Asar Moslashtirish", "/muallif-asar/", "start_quiz_matchbook_game"),
     ("reverse", "🔄 Teskari Viktorina", "/teskari-viktorina/", "start_quiz_reverse_game"),
+    ("cover", "🖼 Kitob Muqovasi", "/kitob-muqovasi/", "start_quiz_cover_game"),
 ]
 _GAMES_MENU_BY_KEY = {key: (title, path, task_name) for key, title, path, task_name in _GAMES_MENU}
 

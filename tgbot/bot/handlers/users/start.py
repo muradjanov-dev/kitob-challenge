@@ -215,6 +215,7 @@ async def do_start(message: types.Message, state: FSMContext):
         "vaqt-mashinasi": ("/vaqt-mashinasi/", "🕰️ O'yinni ochish", "Vaqt Mashinasi"),
         "muallif-asar": ("/muallif-asar/", "🎯 O'yinni ochish", "Muallif-Asar Moslashtirish"),
         "teskari-viktorina": ("/teskari-viktorina/", "🔄 O'yinni ochish", "Teskari Viktorina"),
+        "kitob-muqovasi": ("/kitob-muqovasi/", "🖼 O'yinni ochish", "Kitob Muqovasi"),
     }
     if args in _GAME_DEEPLINKS and already_registered:
         if user and not user.is_registered:
