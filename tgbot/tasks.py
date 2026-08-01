@@ -3281,18 +3281,38 @@ def announce_challenge():
     title_short = challenge.title
     if len(title_short) > 25:
         title_short = title_short[:22] + "..."
-    keyboard = json.dumps({
-        "inline_keyboard": [[{
-            "text": f"🎮 \"{title_short}\"da qatnashaman! {challenge.emoji}",
-            "callback_data": f"join_challenge:{challenge.id}",
-        }]]
-    })
+    challenge_button = {
+        "text": f"🎮 \"{title_short}\"da qatnashaman! {challenge.emoji}",
+        "callback_data": f"join_challenge:{challenge.id}",
+    }
+
+    # Defensive belt-and-suspenders: this function is only supposed to reach
+    # here when NO boom is active (see the early-return above), but a stale
+    # caller getting that wrong is exactly the bug that has twice killed a
+    # live boom in production. If a boom is somehow active anyway, every
+    # copy of this announcement (group + each user's DM) makes clear it's
+    # an ADDITIONAL challenge, not a replacement, and still pushes people
+    # toward the boom with their own referral link.
+    active_boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    group_text = text
+    group_buttons = [challenge_button]
+    if active_boom:
+        group_text += (
+            f"\n\n🌟 <b>Eslatma:</b> «{active_boom.title}» musobaqasi hali ham "
+            f"davom etmoqda — bu shunchaki QO'SHIMCHA challenge, uni almashtirmaydi!"
+        )
+        group_buttons.append({
+            "text": f"🌟 {active_boom.title}", "callback_data": f"join_boom:{active_boom.id}",
+        })
+    group_keyboard = json.dumps({"inline_keyboard": [[b] for b in group_buttons]})
+
     for group_id, thread_id in _announce_targets():
         try:
-            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
-                    "reply_markup": keyboard}
+            data = {"chat_id": group_id, "text": group_text, "parse_mode": "HTML",
+                    "reply_markup": group_keyboard}
             if thread_id:
                 data["message_thread_id"] = thread_id
             requests.post(url, data=data, timeout=10)
@@ -3301,11 +3321,27 @@ def announce_challenge():
 
     qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
     sent = 0
-    for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+    for user in qs.iterator():
+        user_text = text
+        buttons = [challenge_button]
+        if active_boom:
+            try:
+                code = _ensure_referral_code(user)
+                bot_username = _get_bot_username()
+                link = f"https://t.me/{bot_username}?start={code}" if bot_username and code else None
+            except Exception:
+                link = None
+            user_text += (
+                f"\n\n🌟 <b>Eslatma:</b> «{active_boom.title}» musobaqasi hali ham "
+                f"davom etmoqda — bu shunchaki QO'SHIMCHA challenge, uni almashtirmaydi! "
+                + (f"Shaxsiy havolangiz:\n{link}" if link else "")
+            )
+            buttons.append({"text": f"🌟 {active_boom.title}", "callback_data": f"join_boom:{active_boom.id}"})
+        keyboard = json.dumps({"inline_keyboard": [[b] for b in buttons]})
         try:
             resp = requests.post(
                 url,
-                data={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                data={"chat_id": user.telegram_id, "text": user_text, "parse_mode": "HTML",
                       "reply_markup": keyboard},
                 timeout=5,
             )
@@ -4090,8 +4126,11 @@ def retire_challenge_and_launch_boom(challenge_id=None, boom_days=7):
 @shared_task
 def boom_reminder_tick():
     """Beat (every ~5 min): for each participant whose next scheduled reminder
-    is due, send ONE playful nudge (one per tick avoids bursts). Finalizes the
-    boom when the window has closed."""
+    is due, send ONE playful nudge (one per tick avoids bursts). Once the
+    window has closed, asks an admin to confirm before actually finalizing
+    (see _request_boom_finalize_confirmation) rather than auto-finalizing --
+    the admin wants a final human check (physical prizes, etc.) before
+    tallies go out and winners are decided."""
     from urllib.parse import quote as _urlquote
     from tgbot.models import ReferralBoom, ReferralBoomParticipant
     from tgbot.services.referral_boom import pick_reminder, parse_iso, humanize_left, boom_share_texts
@@ -4102,7 +4141,7 @@ def boom_reminder_tick():
 
     now = timezone.now()
     if now > boom.end_at:
-        finalize_referral_boom(boom.id)
+        _request_boom_finalize_confirmation(boom)
         return
     if now < boom.start_at:
         return
@@ -4187,14 +4226,64 @@ def boom_reminder_tick():
 
 
 @shared_task
-def finalize_referral_boom(boom_id):
+def _request_boom_finalize_confirmation(boom):
+    """Boom's window has closed -- instead of auto-finalizing, DM every admin
+    (is_admin=True) asking them to confirm before tallies are paid out and
+    winners decided. Re-pings at most once every 6h (cache-throttled) so a
+    5-min beat tick doesn't spam admins while they take their time deciding."""
+    from django.core.cache import cache
+    from tgbot.bot.utils import get_admin_ids_sync
+
+    throttle_key = f"boom_finalize_ping:{boom.id}"
+    if cache.get(throttle_key):
+        return
+    cache.set(throttle_key, True, 6 * 3600)
+
+    from tgbot.models import ReferralBoomParticipant
+    participants = ReferralBoomParticipant.objects.filter(boom=boom)
+    total_referrals = sum(p.referrals_count for p in participants)
+    kb = json.dumps({"inline_keyboard": [[
+        {"text": "✅ Yakunlash va g'oliblarni aniqlash", "callback_data": f"boom_finalize_confirm:{boom.id}"},
+    ]]})
+    text = (
+        f"⏰ <b>«{boom.title}» muddati tugadi!</b>\n\n"
+        f"👥 Ishtirokchilar: <b>{participants.count()}</b>\n"
+        f"🔗 Jami takliflar: <b>{total_referrals}</b>\n\n"
+        f"Yakunlash tugmasini bosguningizcha musobaqa hali ham 'faol' hisoblanadi "
+        f"(hech kimga tugaganini bildirmaymiz) — g'oliblarni tekshirib, sovg'alarni "
+        f"tayyorlab bo'lgach bosing."
+    )
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    for admin_id in get_admin_ids_sync():
+        try:
+            requests.post(url, data={"chat_id": admin_id, "text": text,
+                                      "parse_mode": "HTML", "reply_markup": kb}, timeout=5)
+        except Exception as e:
+            print(f"_request_boom_finalize_confirmation admin={admin_id}: {e}")
+
+
+def finalize_referral_boom(boom_id, force=False):
     """Deactivate the boom, DM each participant their final tally, and send an
-    admin summary. Idempotent — the is_active guard makes it run once."""
+    admin summary. Idempotent — the is_active guard makes it run once.
+
+    Refuses to finalize before `end_at` unless `force=True` is passed
+    explicitly (the Django admin's manual "finalize now" action does this).
+    This is a deliberate defense-in-depth guard: every caller upstream
+    (announce_challenge, boom_reminder_tick) is ALSO supposed to only call
+    this on an expired boom, but a stale/old copy of one of those callers
+    unconditionally finalizing every active boom is exactly the bug that
+    twice killed a live 7-day boom in production -- fixing it here means it
+    can't happen again regardless of what any caller, present or future,
+    gets wrong."""
     import os as _os
     from tgbot.models import ReferralBoom, ReferralBoomParticipant
 
     boom = ReferralBoom.objects.filter(id=boom_id).first()
     if not boom or not boom.is_active:
+        return
+    if not force and timezone.now() < boom.end_at:
+        print(f"finalize_referral_boom: boom={boom_id} hasn't reached end_at="
+              f"{boom.end_at} yet -- refusing to finalize early (pass force=True to override)")
         return
     ReferralBoom.objects.filter(id=boom_id).update(is_active=False)
 

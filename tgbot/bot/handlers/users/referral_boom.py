@@ -179,3 +179,28 @@ async def boom_stats_button(message: types.Message, state: FSMContext):
         f"{blurb}"
     )
     await message.answer(text, parse_mode="HTML", disable_web_page_preview=True, reply_markup=kb)
+
+
+@sync_to_async
+def _is_admin_sync(telegram_id):
+    from tgbot.bot.utils import is_admin_id_sync
+    return is_admin_id_sync(telegram_id)
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith("boom_finalize_confirm:"), state="*")
+async def boom_finalize_confirm_cb(call: types.CallbackQuery, state: FSMContext = None):
+    """Admin taps 'Yakunlash' on the finalize-confirmation DM (sent once the
+    boom's window has closed) -- only then does the real finalize (tallies,
+    participant DMs, admin summary) actually run."""
+    if not await _is_admin_sync(call.from_user.id):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    boom_id = int(call.data.split(":", 1)[1])
+    await call.answer("Yakunlanmoqda…")
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    from tgbot.tasks import finalize_referral_boom
+    await sync_to_async(finalize_referral_boom)(boom_id, force=True)
+    await call.message.answer("✅ Musobaqa yakunlandi — ishtirokchilarga yakuniy hisobot yuborildi.")
