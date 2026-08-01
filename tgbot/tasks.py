@@ -1826,11 +1826,11 @@ def _send_and_pin_progress(user) -> int:
     code = _ensure_referral_code(user) if bot_username else None
     if bot_username and code:
         ref_link = f"https://t.me/{bot_username}?start={code}"
+        blurb = random.choice(_referral_share_texts(user))
         text += (
             "\n\n🌟 <b>Sizning referal havolangiz:</b>\n"
             f"<code>{ref_link}</code>\n\n"
-            "Havolani nusxalab kitobxonlarga ulashing — har taklif uchun Kitobcha, "
-            "har 3 taklifga 1 kun Premium va boshqa sovg'alardan foydalaning! 🎁"
+            f"{blurb}"
         )
         share_text = _urlquote(random.choice(_referral_share_texts(user)))
         buttons.append([{
@@ -1857,6 +1857,9 @@ def _send_and_pin_progress(user) -> int:
             f"🏆 TOP-3ga: Premium obuna + kitoblar + minglab Kitobcha!"
         )
         buttons.append([{
+            "text": f"🌟 {active_boom.title}",
+            "url": f"https://t.me/{bot_username}?start=yaxshilik-ulashuvchi",
+        }] if bot_username else [{
             "text": f"🌟 {active_boom.title}",
             "callback_data": f"join_boom:{active_boom.id}",
         }])
@@ -3294,6 +3297,7 @@ def announce_challenge():
     # an ADDITIONAL challenge, not a replacement, and still pushes people
     # toward the boom with their own referral link.
     active_boom = ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
+    boom_bot_username = _get_bot_username() if active_boom else None
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
@@ -3304,9 +3308,15 @@ def announce_challenge():
             f"\n\n🌟 <b>Eslatma:</b> «{active_boom.title}» musobaqasi hali ham "
             f"davom etmoqda — bu shunchaki QO'SHIMCHA challenge, uni almashtirmaydi!"
         )
-        group_buttons.append({
-            "text": f"🌟 {active_boom.title}", "callback_data": f"join_boom:{active_boom.id}",
-        })
+        # URL deep link (not callback_data) so tapping it from a group opens
+        # the bot chat directly and delivers the personal link right away --
+        # see _boom_join_keyboard for the same reasoning.
+        group_buttons.append(
+            {"text": f"🌟 {active_boom.title}",
+             "url": f"https://t.me/{boom_bot_username}?start=yaxshilik-ulashuvchi"}
+            if boom_bot_username else
+            {"text": f"🌟 {active_boom.title}", "callback_data": f"join_boom:{active_boom.id}"}
+        )
     group_keyboard = json.dumps({"inline_keyboard": [[b] for b in group_buttons]})
 
     for group_id, thread_id in _announce_targets():
@@ -3336,7 +3346,12 @@ def announce_challenge():
                 f"davom etmoqda — bu shunchaki QO'SHIMCHA challenge, uni almashtirmaydi! "
                 + (f"Shaxsiy havolangiz:\n{link}" if link else "")
             )
-            buttons.append({"text": f"🌟 {active_boom.title}", "callback_data": f"join_boom:{active_boom.id}"})
+            buttons.append(
+                {"text": f"🌟 {active_boom.title}",
+                 "url": f"https://t.me/{bot_username}?start=yaxshilik-ulashuvchi"}
+                if bot_username else
+                {"text": f"🌟 {active_boom.title}", "callback_data": f"join_boom:{active_boom.id}"}
+            )
         keyboard = json.dumps({"inline_keyboard": [[b] for b in buttons]})
         try:
             resp = requests.post(
@@ -3722,6 +3737,19 @@ def _ensure_referral_code(user):
 
 
 def _boom_join_keyboard(boom_id):
+    """URL deep-link button (not callback_data) so tapping it -- whether the
+    post is in a group or a DM -- actually opens the bot's private chat and
+    immediately delivers the personal referral link, instead of just firing
+    a toast in place. Some participants didn't realize a toast-only tap had
+    even done anything or where their link was."""
+    bot_username = _get_bot_username()
+    if bot_username:
+        return json.dumps({"inline_keyboard": [[{
+            "text": "🌟 Qatnashaman!",
+            "url": f"https://t.me/{bot_username}?start=yaxshilik-ulashuvchi",
+        }]]})
+    # Fallback if the username lookup fails for some reason -- keep the old
+    # callback behavior rather than rendering a broken button.
     return json.dumps({
         "inline_keyboard": [[{
             "text": "🌟 Qatnashaman!",

@@ -55,20 +55,11 @@ def _mark_rules_sent(user, boom_id):
     ).update(rules_sent=True)
 
 
-@dp.callback_query_handler(lambda c: c.data and c.data.startswith("join_boom:"), state="*")
-async def join_boom_handler(call: types.CallbackQuery, state: FSMContext):
-    user = await aget_user(call.from_user.id)
-    if not user or not user.is_registered:
-        await call.answer("Avval /start bosib ro'yxatdan o'ting.", show_alert=True)
-        return
-
-    boom_id = int(call.data.split(":")[1])
-    boom, status = await _join_boom(user, boom_id)
-
-    if status == "expired":
-        await call.answer("❌ Bu musobaqa tugagan yoki mavjud emas.", show_alert=True)
-        return
-
+async def _deliver_boom_join_messages(user, boom, status, boom_id):
+    """Send whatever DM(s) match `status` ('already' or 'joined') -- always
+    including the personal referral link directly in the message body, not
+    just in a toast, since several users didn't realize where to find their
+    link. Shared by the group callback button and the /start deep link."""
     from tgbot.services.referral import ReferralService
     referral_link = await ReferralService.get_referral_link(user)
     share_text = _urlquote(random.choice(boom_share_texts(user.full_name, boom.title)))
@@ -78,17 +69,14 @@ async def join_boom_handler(call: types.CallbackQuery, state: FSMContext):
     ))
 
     if status == "already":
-        # They tapped "join" again -- the toast alone doesn't show the actual
-        # link anywhere they can copy/tap, so resend it as a real message
-        # (not just the welcome DM, which only ever sends once). Body text
-        # rotates through the same ~20-variant creative pool as the share
-        # button, not a fixed line, so repeat taps don't look copy-pasted.
-        await call.answer(f"✅ Siz allaqachon {boom.title}'da qatnashyapsiz!", show_alert=False)
+        # Body text rotates through the same ~20-variant creative pool as the
+        # share button, not a fixed line, so repeat taps don't look copy-pasted.
         blurb = random.choice(boom_share_texts(user.full_name, boom.title))
         try:
             await bot.send_message(
                 chat_id=user.telegram_id,
                 text=(
+                    f"✅ <b>Siz allaqachon {boom.title}'da qatnashyapsiz!</b>\n\n"
                     f"🔗 <b>Sizning shaxsiy havolangiz:</b>\n{referral_link}\n\n"
                     f"{blurb}"
                 ),
@@ -98,8 +86,6 @@ async def join_boom_handler(call: types.CallbackQuery, state: FSMContext):
         except Exception as e:
             print(f"boom link resend failed uid={user.id}: {e}")
         return
-
-    await call.answer(f"🎉 {boom.title}'ga qo'shildingiz!", show_alert=False)
 
     # Build the once-only welcome + rules + personal link, then DM it. The
     # full rules copy (rewards + TOP-3 prizes + link) regularly exceeds
@@ -121,6 +107,48 @@ async def join_boom_handler(call: types.CallbackQuery, state: FSMContext):
         await _mark_rules_sent(user, boom_id)
     except Exception as e:
         print(f"boom welcome DM failed uid={user.id}: {e}")
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith("join_boom:"), state="*")
+async def join_boom_handler(call: types.CallbackQuery, state: FSMContext):
+    user = await aget_user(call.from_user.id)
+    if not user or not user.is_registered:
+        await call.answer("Avval /start bosib ro'yxatdan o'ting.", show_alert=True)
+        return
+
+    boom_id = int(call.data.split(":")[1])
+    boom, status = await _join_boom(user, boom_id)
+
+    if status == "expired":
+        await call.answer("❌ Bu musobaqa tugagan yoki mavjud emas.", show_alert=True)
+        return
+
+    await call.answer(
+        f"✅ Siz allaqachon {boom.title}'da qatnashyapsiz!" if status == "already"
+        else f"🎉 {boom.title}'ga qo'shildingiz!",
+        show_alert=False,
+    )
+    await _deliver_boom_join_messages(user, boom, status, boom_id)
+
+
+async def handle_boom_deeplink(message: types.Message, user):
+    """/start yaxshilik-ulashuvchi deep link (from a URL-type join button in
+    group/DM broadcasts, so tapping it actually opens the bot chat instead of
+    just firing a toast in the group). Joins the currently active boom (if
+    any) and immediately sends full info + the personal link."""
+    from tgbot.models import ReferralBoom
+
+    boom = await sync_to_async(
+        lambda: ReferralBoom.objects.filter(is_active=True).order_by("-created_at").first()
+    )()
+    if not boom:
+        await message.answer("❌ Hozircha faol musobaqa yo'q.")
+        return
+    boom, status = await _join_boom(user, boom.id)
+    if status == "expired":
+        await message.answer("❌ Bu musobaqa tugagan yoki mavjud emas.")
+        return
+    await _deliver_boom_join_messages(user, boom, status, boom.id)
 
 
 @sync_to_async

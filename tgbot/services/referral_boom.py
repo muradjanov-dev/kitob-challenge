@@ -137,30 +137,31 @@ def boom_share_texts(full_name: str, boom_title: str) -> list:
     """~20 varied, punchy invite blurbs for the boom's own share button --
     urgency/competition framed (time-limited, ranking, tiered reward), unlike
     the general always-on referral share pool. A different random one each
-    time the button is (re)built so repeat shares don't look copy-pasted."""
-    name = (full_name or "").strip().split(" ")[0] if full_name else ""
-    name = name or "Kitobxon"
+    time the button is (re)built so repeat shares don't look copy-pasted.
+
+    Deliberately name-free (neither the sharer's nor anyone else's) — the
+    hook is the project/competition itself, not "so-and-so invited you"."""
     return [
-        f"🔥 {name} bilan birga «{boom_title}» musobaqasida qatnashamizmi? Bir necha kun qoldi, qo'shil!",
-        f"🏆 {boom_title} boshlandi — do'stlarni taklif qilib, reytingda ko'tarilaylik! Sen ham qo'shil 👇",
-        f"⏳ Vaqt kam qoldi! {boom_title} musobaqasida men allaqachon qatnashyapman — sen ham qo'shil, birga g'alaba qilamiz!",
-        f"👋 {name} seni «{boom_title}» musobaqasiga taklif qilyapti — o'qish + do'stlik + sovg'alar, hammasi bitta joyda!",
+        f"🔥 «{boom_title}» musobaqasida qatnashamizmi? Bir necha kun qoldi, qo'shil!",
+        f"🏆 {boom_title} boshlandi — do'stlarni taklif qilib, reytingda ko'tarilaylik! Qo'shil 👇",
+        f"⏳ Vaqt kam qoldi! {boom_title} musobaqasi davom etyapti — hoziroq qo'shil, birga g'alaba qilamiz!",
+        f"👋 O'qish + do'stlik + sovg'alar, hammasi bitta joyda — «{boom_title}»ga qo'shil!",
         f"🚀 Kitob Challenge'da yangi musobaqa — «{boom_title}»! Qo'shil, birga reytingda ko'tarilamiz.",
-        f"🎯 {boom_title}: kim ko'proq do'st taklif qilsa, shuncha ko'p Kitobcha yutadi. Men boshladim — sen-chi?",
-        f"💥 Musobaqa qizidi! «{boom_title}»ga qo'shilib, {name} bilan bellashamizmi?",
+        f"🎯 {boom_title}: kim ko'proq do'st taklif qilsa, shuncha ko'p Kitobcha yutadi. Sen-chi?",
+        f"💥 Musobaqa qizidi! «{boom_title}»ga qo'shilib, bellashib ko'r!",
         f"📣 Do'stim, {boom_title} musobaqasi ketyapti — bir necha kunda tugaydi. Hoziroq qo'shil!",
-        f"🎁 {boom_title} davomida qo'shilganlar sovg'alarga yaqinroq. {name} allaqachon ichida — sen ham kir!",
-        f"😏 {name}dan chaqiriq: «{boom_title}» musobaqasida meni yenga olasanmi? Qo'shil, sinab ko'r!",
+        f"🎁 {boom_title} davomida qo'shilganlar sovg'alarga yaqinroq. Sen ham kir!",
+        f"😏 «{boom_title}» musobaqasida meni yenga olasanmi? Qo'shil, sinab ko'r!",
         f"🏁 Marra yaqin — «{boom_title}» tugashiga sanoqli kun qoldi. Sen ham safga qo'shil!",
-        f"🌟 Kitob Challenge'dagi eng qizg'in musobaqa — «{boom_title}». {name} bilan birga qatnashamiz!",
-        f"🤝 {name} bilan birga o'qib, birga taklif qilib, «{boom_title}»da ko'proq yutamiz. Qo'shil!",
+        f"🌟 Kitob Challenge'dagi eng qizg'in musobaqa — «{boom_title}». Birga qatnashamiz!",
+        f"🤝 Birga o'qib, birga taklif qilib, «{boom_title}»da ko'proq yutamiz. Qo'shil!",
         f"📈 Reytingda yuqoriga chiqishni xohlaysanmi? «{boom_title}» musobaqasi aynan shu imkoniyat!",
         f"🎉 {boom_title} — Kitob Challenge'ning eng qiziqarli musobaqasi hozir davom etmoqda. Sen ham bo'l!",
-        f"💪 {name} musobaqada faol — sen ortda qolma! «{boom_title}»ga hoziroq qo'shil.",
-        f"🔗 Bitta havola — «{boom_title}» musobaqasiga kirish darvozasi. {name} seni kutmoqda!",
+        f"💪 Musobaqada faol bo'lganlar ortda qolmaydi! «{boom_title}»ga hoziroq qo'shil.",
+        f"🔗 Bitta havola — «{boom_title}» musobaqasiga kirish darvozasi. Seni kutmoqda!",
         f"⚡️ Tezroq qo'shilsang, ko'proq vaqting bor! «{boom_title}» hali davom etyapti.",
-        f"🥇 Kim g'olib bo'ladi? «{boom_title}»da {name} bilan raqobatlashib ko'r!",
-        f"📚 O'qish qiziqarli, lekin musobaqa — battar qiziqarli! «{boom_title}»ga {name} bilan qo'shil.",
+        f"🥇 Kim g'olib bo'ladi? «{boom_title}»da raqobatlashib ko'r!",
+        f"📚 O'qish qiziqarli, lekin musobaqa — battar qiziqarli! «{boom_title}»ga qo'shil.",
     ]
 
 

@@ -177,6 +177,20 @@ async def do_start(message: types.Message, state: FSMContext):
         await offer_ai_quiz_start(message, user, state)
         return
 
+    # Yaxshilik ulashuvchi deep link: /start yaxshilik-ulashuvchi -- from the
+    # boom's own join button (group posts, DMs, the daily pin). URL-type
+    # button so tapping it actually opens the bot chat instead of just
+    # firing a toast in place; joins the currently-live boom (if any) and
+    # immediately delivers the personal referral link.
+    if args == "yaxshilik-ulashuvchi" and already_registered:
+        if user and not user.is_registered:
+            user.is_registered = True
+            await sync_to_async(user.save)(update_fields=["is_registered"])
+        await state.finish()
+        from tgbot.bot.handlers.users.referral_boom import handle_boom_deeplink
+        await handle_boom_deeplink(message, user)
+        return
+
     # Kitob Zanjiri deep link: /start zanjir — from the group announcement
     # button. Opens the live game Mini App (web_app buttons are only allowed in
     # private chats, so we hand it off here in the DM).
