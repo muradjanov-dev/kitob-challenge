@@ -41,9 +41,7 @@ async def _redirect_to_private(call: types.CallbackQuery):
             text="🎪 Botga o'tish", url=f"https://t.me/{username}?start=market",
         ))
         try:
-            await call.message.answer(
-                "🎪 Market'ni ochish uchun pastdagi tugmani bosing:", reply_markup=kb,
-            )
+            await call.message.answer("👇", reply_markup=kb)
         except Exception:
             pass
 

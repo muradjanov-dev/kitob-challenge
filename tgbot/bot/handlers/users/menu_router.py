@@ -1271,10 +1271,7 @@ async def referral_link_handler(call: types.CallbackQuery, state: FSMContext):
                 text="🔗 Botga o'tish", url=f"https://t.me/{username}?start=referral",
             ))
             try:
-                await call.message.answer(
-                    "🔗 Referal havolangizni olish uchun pastdagi tugmani bosing:",
-                    reply_markup=kb,
-                )
+                await call.message.answer("👇", reply_markup=kb)
             except Exception:
                 pass
         return
