@@ -416,6 +416,30 @@ def internal_unblock_false_positives(request: HttpRequest):
 
 
 @csrf_exempt
+def internal_broadcast_mystery_box_update(request: HttpRequest):
+    """One-off trigger for mystery_box_announce.broadcast_mystery_box_update.
+    POST only, runs in a background thread. Delete this view/URL once used."""
+    import os as _os
+
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+        return HttpResponse(status=403)
+
+    from tgbot.services.mystery_box_announce import broadcast_mystery_box_update
+
+    def _run():
+        try:
+            broadcast_mystery_box_update()
+        except Exception as e:
+            print(f"internal_broadcast_mystery_box_update failed: {e}")
+
+    threading.Thread(target=_run, daemon=True).start()
+    return HttpResponse("started", status=202)
+
+
+@csrf_exempt
 def internal_retire_challenge_and_launch_boom(request: HttpRequest):
     """One-off trigger for tgbot.tasks.retire_challenge_and_launch_boom.
     POST only. WARNING: this launches the boom, which sends the full
