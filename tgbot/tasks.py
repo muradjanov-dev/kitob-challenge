@@ -6483,14 +6483,16 @@ def _finalize_quiz_flavor(flavor):
             for w in winners[:8]:
                 tag = "🔵" if w.get("team") == "a" else "🔴"
                 rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
-                lines.append(f"{tag} {escape(w['name'])} — {w['points']} ochko{rew}")
+                badge = " 💎" if w.get("boosted") else ""
+                lines.append(f"{tag} {escape(w['name'])}{badge} — {w['points']} ochko{rew}")
         else:
             lines = [f"{emoji_} <b>{title} — yakun!</b>\n"]
             if winners:
                 for i, w in enumerate(winners[:5]):
                     m = medals[i] if i < 3 else f"{i + 1}."
                     rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
-                    lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{rew}")
+                    badge = " 💎" if w.get("boosted") else ""
+                    lines.append(f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko{rew}")
             else:
                 lines.append("Bu safar hech kim ochko olmadi 😔")
         _broadcast_and_dm(lines, winners, lambda w: (

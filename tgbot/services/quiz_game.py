@@ -347,6 +347,7 @@ def _finalize_individual(g) -> dict:
         winners.append({
             "rank": i + 1, "user_id": s.user_id, "telegram_id": s.user.telegram_id,
             "name": s.user.full_name or "Kitobxon", "points": s.points, "reward": applied,
+            "boosted": applied != reward,
         })
     g.rewarded = True
     g.save(update_fields=["rewarded", "updated_at"])
@@ -377,6 +378,7 @@ def _finalize_teams(g) -> dict:
             "user_id": s.user_id, "telegram_id": s.user.telegram_id,
             "name": s.user.full_name or "Kitobxon", "points": s.points,
             "team": s.team, "reward": s.reward or 0,
+            "boosted": bool(s.reward) and s.reward != reward,
         })
     g.rewarded = True
     g.save(update_fields=["rewarded", "updated_at"])
