@@ -619,9 +619,12 @@
         if (r.status === 403 && r.data.error === "profile_not_found") {
           document.getElementById("locked").style.display = "block";
         } else {
+          const friendlyErr = r.data.error === "invalid_init_data"
+            ? "Ulanishda muammo — sahifani qayta yuklab ko'ring."
+            : "Yuklab bo'lmadi: " + (r.data.error || r.status);
           document.getElementById("empty").style.display = "block";
           document.getElementById("empty").innerHTML =
-            '<div class="em">⚠️</div><div>Yuklab bo\'lmadi: ' + (r.data.error || r.status) + '</div>' +
+            '<div class="em">⚠️</div><div>' + friendlyErr + '</div>' +
             '<button id="retryLoadBtn" style="margin-top:14px;padding:10px 20px;border-radius:12px;' +
             'border:1px solid var(--card-border);background:var(--card);color:var(--text);' +
             'font-size:15px;cursor:pointer;">🔄 Qayta urinish</button>';
@@ -731,7 +734,8 @@
       document.getElementById("cancelBtn").addEventListener("click", () => { sound.play("tap"); hideSheet(); });
     }
 
-    async function buyOpen() {
+    async function buyOpen(attempt) {
+      attempt = attempt || 1;
       if (!openProduct) return;
       sound.play("tap");
       const btn = document.getElementById("buyBtn");
@@ -739,11 +743,18 @@
       btn.disabled = true; btn.textContent = "Yuborilmoqda…";
       const r = await api("/shop/api/buy/", { method: "POST", body: { product_id: openProduct.id } });
       if (!r.ok) {
+        // Same timing race as loadProducts() (initData handed off late by the
+        // WebView) — retry a few times before showing an error.
+        if (r.status === 403 && r.data.error === "invalid_init_data" && attempt < 5) {
+          await new Promise(res => setTimeout(res, attempt * 700));
+          return buyOpen(attempt + 1);
+        }
         sound.play("error");
         const msg = ({
           insufficient_balance: "Yetarli Kitobcha yo'q.",
           out_of_stock: "Mahsulot tugadi.",
           product_unavailable: "Mahsulot mavjud emas.",
+          invalid_init_data: "Ulanishda muammo — sahifani qayta yuklab, qayta urinib ko'ring.",
         })[r.data.error] || ("Xatolik: " + (r.data.error || r.status));
         err.textContent = msg;
         btn.disabled = false;

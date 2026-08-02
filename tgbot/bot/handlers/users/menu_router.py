@@ -1308,7 +1308,24 @@ async def referral_link_handler(call: types.CallbackQuery, state: FSMContext):
         text += _t(lang, "\n\n👥 <i>Hozircha hech kimni taklif qilmagansiz.</i>",
                    "\n\n👥 <i>Пока вы никого не пригласили.</i>")
 
-    await call.message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
+    # Varied invite hook + share button — same randomized pool used by the
+    # daily pinned progress message, so this screen doesn't repeat the same
+    # pitch every time it's opened. Uzbek-only pool, so only applied for uz.
+    kb = None
+    if lang != "ru":
+        import random
+        from urllib.parse import quote as _urlquote
+        from tgbot.tasks import _referral_share_texts
+
+        texts = await sync_to_async(_referral_share_texts, thread_sensitive=True)(user)
+        text += f"\n\n{random.choice(texts)}"
+        share_text = _urlquote(random.choice(texts))
+        kb = InlineKeyboardMarkup().add(InlineKeyboardButton(
+            "📤 Referalni ulashish",
+            url=f"https://t.me/share/url?url={_urlquote(ref_link)}&text={share_text}",
+        ))
+
+    await call.message.answer(text, parse_mode="HTML", reply_markup=kb, disable_web_page_preview=True)
 
 
 # ──────────────────────────────────────────────────────────────────────────

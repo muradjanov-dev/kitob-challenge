@@ -23,6 +23,25 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 # Load task modules from all registered Django app configs.
 app.autodiscover_tasks()
 
+
+# celery_worker runs --pool=threads --concurrency=20 (entrypoint.sh). Django
+# only auto-closes DB connections at the end of an HTTP request (via a signal
+# wired for the WSGI request cycle) -- Celery has no such hook, so without
+# this, each of those 20 threads accumulates its own permanent Postgres
+# connection the moment it first touches the DB and never releases it. A
+# stuck worker left running for a couple of days was enough on its own to
+# exhaust Postgres's max_connections and take down the whole platform
+# (2026-08-02). close_old_connections() after every task makes Celery behave
+# like the request cycle: drop the connection once it's past CONN_MAX_AGE
+# (unset here, so every time).
+from celery.signals import task_postrun  # noqa: E402
+
+
+@task_postrun.connect
+def _close_db_connections_after_task(**kwargs):
+    from django.db import close_old_connections
+    close_old_connections()
+
 app.conf.beat_schedule = {
 
     # ── Leaderboards (group posts, not DMs) ──────────────────────────────────

@@ -3341,10 +3341,12 @@ def announce_challenge():
                 link = f"https://t.me/{bot_username}?start={code}" if bot_username and code else None
             except Exception:
                 link = None
+            from tgbot.services.referral_boom import boom_share_texts
+            blurb = random.choice(boom_share_texts(user.full_name, active_boom.title))
             user_text += (
                 f"\n\n🌟 <b>Eslatma:</b> «{active_boom.title}» musobaqasi hali ham "
                 f"davom etmoqda — bu shunchaki QO'SHIMCHA challenge, uni almashtirmaydi! "
-                + (f"Shaxsiy havolangiz:\n{link}" if link else "")
+                + (f"Shaxsiy havolangiz:\n{link}\n\n{blurb}" if link else "")
             )
             buttons.append(
                 {"text": f"🌟 {active_boom.title}",
@@ -6372,7 +6374,7 @@ def games_finalize_tick():
     _finalize_detective()
     _finalize_survival()
     for flavor in ("twofacts", "impostor", "connection", "teams",
-                   "timeline", "matchbook", "reverse"):
+                   "timeline", "matchbook", "reverse", "cover"):
         _finalize_quiz_flavor(flavor)
 
 
@@ -6465,9 +6467,9 @@ def _finalize_quiz_flavor(flavor):
     titles = {"twofacts": "Ikki haqiqat, bir yolg'on", "impostor": "Kim yolg'onchi?",
               "connection": "Yashirin bog'lanish", "teams": "Jamoa Jangi",
               "timeline": "Vaqt Mashinasi", "matchbook": "Muallif-Asar Moslashtirish",
-              "reverse": "Teskari Viktorina"}
+              "reverse": "Teskari Viktorina", "cover": "Kitob Muqovasi"}
     emojis = {"twofacts": "🎭", "impostor": "🃏", "connection": "🧩", "teams": "👥",
-              "timeline": "🕰️", "matchbook": "🎯", "reverse": "🔄"}
+              "timeline": "🕰️", "matchbook": "🎯", "reverse": "🔄", "cover": "🖼"}
     for game, summary in quiz_game.finalize_due_games(flavor):
         winners = summary.get("winners", [])
         emoji_, title = emojis[flavor], titles[flavor]

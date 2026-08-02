@@ -548,20 +548,37 @@
     // full height and route t.me links through the native opener. Internal
     // links (e.g. /shop/) navigate within the same Mini App session.
     const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+
+    // Resolve initData fresh on each call, polling briefly. Mobile clients
+    // populate tg.initData synchronously when the SDK loads, but Telegram
+    // Desktop hands the payload to the WebView via postMessage a tick or two
+    // AFTER script load — a synchronous read races and comes back empty,
+    // which is what caused intermittent invalid_init_data on /shop/, /zanjir/
+    // and the live-games widget link (they all read tg.initData once,
+    // synchronously, at click time). Mirrors shop/index.html's getInitData().
+    async function getInitData() {
+      if (tg && tg.initData) return tg.initData;
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 100));
+        if (tg && tg.initData) return tg.initData;
+      }
+      return "";
+    }
+
     if (tg) {
       try { tg.ready(); tg.expand(); } catch (e) {}
       // Telegram does NOT re-inject initData when you navigate to another page
       // inside the same Mini App, so the shop would fail auth (invalid_init_data).
       // Carry the launch initData to /shop/ via the URL hash (the shop reads
-      // tgWebAppData from the hash). Done at click time so a late-arriving
-      // initData (Telegram Desktop race) is already available.
+      // tgWebAppData from the hash). Waits for a possibly-late initData instead
+      // of reading it synchronously at click time.
       document.querySelectorAll('a[href^="/shop"]').forEach(a => {
-        a.addEventListener("click", () => {
-          const id = tg.initData || "";
-          if (id) {
-            const base = a.getAttribute("href").split("?")[0].split("#")[0];
-            a.setAttribute("href", base + "?tgWebAppData=" + encodeURIComponent(id));
-          }
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          const base = a.getAttribute("href").split("?")[0].split("#")[0];
+          getInitData().then((id) => {
+            window.location.href = id ? base + "?tgWebAppData=" + encodeURIComponent(id) : base;
+          });
         });
       });
       document.querySelectorAll('a[href^="https://t.me/"]').forEach(a => {
@@ -574,9 +591,9 @@
     }
 
     // Open the live Kitob Zanjiri game, carrying initData for auth.
-    function openGame() {
+    async function openGame() {
       let url = "/zanjir/";
-      const id = tg && tg.initData ? tg.initData : "";
+      const id = await getInitData();
       if (id) url += "?tgWebAppData=" + encodeURIComponent(id);
       window.location.href = url;
     }
@@ -639,9 +656,9 @@
                 link.onclick = function (e) {
                   e.preventDefault();
                   let url = d.active.url;
-                  const id = tg && tg.initData ? tg.initData : "";
-                  if (id) url += "?tgWebAppData=" + encodeURIComponent(id);
-                  window.location.href = url;
+                  getInitData().then((id) => {
+                    window.location.href = id ? url + "?tgWebAppData=" + encodeURIComponent(id) : url;
+                  });
                 };
               }
             } else {
