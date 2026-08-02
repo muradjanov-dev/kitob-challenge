@@ -48,6 +48,7 @@ async def _redirect_to_private(call: types.CallbackQuery):
 
 def _market_menu_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton(text="🎒 Mening yutuq zahiram", callback_data="market:stash"))
     for key, item in market_service.ITEMS.items():
         kb.add(InlineKeyboardButton(
             text=f"{item['emoji']} {item['title']} — {item['price']} 🪙",
@@ -55,6 +56,49 @@ def _market_menu_kb() -> InlineKeyboardMarkup:
         ))
     kb.add(InlineKeyboardButton(text="🏠 Bosh menyu", callback_data="market:home"))
     return kb
+
+
+@dp.callback_query_handler(lambda c: c.data == "market:stash")
+async def market_show_stash(call: types.CallbackQuery):
+    """Sirli quti'dan yig'ilgan, hali ishlatilmagan mukofotlar — har biri qanday
+    ishlashini ham tushuntiradi, chunki bu tokenlar avtomatik ishlatiladi
+    (foydalanuvchi alohida "faollashtirish" tugmasini bosishi shart emas)."""
+    if not _is_private(call):
+        await _redirect_to_private(call)
+        return
+    await call.answer()
+    user = await aget_user(call.from_user.id)
+    if not user:
+        await call.message.answer("Avval /start bosing")
+        return
+
+    freeze = user.streak_freeze_count or 0
+    lives = user.bonus_survival_lives or 0
+    tickets = user.bonus_free_game_entries or 0
+    discount = user.next_market_discount_pct or 0
+
+    lines = ["🎒 <b>Mening yutuq zahiram</b>\n"]
+    lines.append(
+        f"🛡 <b>Streak muzlatish:</b> {freeze} ta\n"
+        "<i>Hisobot yubormay qolib ketgan birinchi kuningizga avtomatik "
+        "ishlatiladi — ketma-ketligingiz (streak) buzilmaydi. Hech narsa bosish shart emas.</i>"
+    )
+    lines.append(
+        f"\n❤️ <b>Qo'shimcha jon (Omon qolish):</b> {lives} ta\n"
+        "<i>Keyingi \"Omon qolish\" o'yiniga qo'shilganingizda avtomatik qo'shiladi.</i>"
+    )
+    lines.append(
+        f"\n🎟 <b>Jonli o'yin bileti:</b> {tickets} ta\n"
+        "<i>Har qanday jonli o'yinga (Zanjiri, Qal'a, Viktorina va h.k.) kirishda "
+        "25 Kitobcha o'rniga avtomatik shu biletdan ishlatiladi.</i>"
+    )
+    lines.append(
+        f"\n💸 <b>Market chegirmasi:</b> {discount}%\n"
+        "<i>Keyingi Marketdan xarid qilganingizda narxdan avtomatik ayiriladi.</i>"
+    )
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton(text="🔙 Marketga qaytish", callback_data="menu:market"))
+    await call.message.answer("\n".join(lines), parse_mode="HTML", reply_markup=kb)
 
 
 @dp.callback_query_handler(lambda c: c.data == "market:home")
