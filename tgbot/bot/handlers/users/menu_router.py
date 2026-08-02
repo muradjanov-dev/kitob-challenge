@@ -1346,7 +1346,7 @@ async def show_referral_link_screen(message: types.Message, user):
             url=f"https://t.me/share/url?url={_urlquote(ref_link)}&text={share_text}",
         ))
 
-    await call.message.answer(text, parse_mode="HTML", reply_markup=kb, disable_web_page_preview=True)
+    await message.answer(text, parse_mode="HTML", reply_markup=kb, disable_web_page_preview=True)
 
 
 # ──────────────────────────────────────────────────────────────────────────
