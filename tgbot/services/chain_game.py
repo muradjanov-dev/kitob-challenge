@@ -51,10 +51,18 @@ def _add_ball_reward(user, amount: int) -> int:
 def charge_entry_fee(profile, amount: int = ENTRY_FEE) -> bool:
     """Deduct `amount` Kitobcha from profile.ball if affordable (defaults to
     ENTRY_FEE=25). Shared by every live game so the join-cost logic is
-    consistent; newer games pass a higher `amount` for their pricier entry."""
+    consistent; newer games pass a higher `amount` for their pricier entry.
+
+    A banked free-entry ticket (Market 'Sirli quti' win) is spent first,
+    skipping the Kitobcha charge entirely -- one ticket per join, regardless
+    of `amount`."""
     from tgbot.models import KitobchaLedger
     with transaction.atomic():
         p = TelegramProfile.objects.select_for_update().get(id=profile.id)
+        if int(p.bonus_free_game_entries or 0) > 0:
+            p.bonus_free_game_entries = p.bonus_free_game_entries - 1
+            p.save(update_fields=["bonus_free_game_entries"])
+            return True
         if int(p.ball or 0) < amount:
             return False
         p.ball = p.ball - amount

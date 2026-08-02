@@ -254,6 +254,17 @@ class TelegramProfile(BaseModel):
         help_text="Extra starting lives for the next Omon qolish (Survival) game, "
                   "from a Market 'Sirli quti' win. Consumed on join.",
     )
+    bonus_free_game_entries = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Free live-game entries banked from a 'Sirli quti' win -- "
+                  "consumed one at a time by chain_game.charge_entry_fee instead "
+                  "of the normal Kitobcha entry fee, shared by every live game.",
+    )
+    next_market_discount_pct = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Percent off the next Market purchase, from a 'Sirli quti' win. "
+                  "Consumed (reset to 0) on the next successful market.charge() call.",
+    )
 
     def has_active_premium(self) -> bool:
         """True if the user has a paid Payment active today, OR is inside a

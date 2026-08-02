@@ -34,9 +34,11 @@ ITEMS = {
         "title": "Sirli quti",
         "price": 200,
         "description": (
-            "Tasodifiy mukofot: kichik yoki katta Kitobcha, hattoki MEGA yutuq, "
-            "Omon qolish o'yiniga +1/+2 qo'shimcha jon, bonus streak-muzlatish "
-            "yoki bepul Shaxsiy sertifikat — 7 xil natija bor!"
+            "Tasodifiy mukofot: turli xil va miqdorlarda Kitobcha (hattoki ULTRA "
+            "MEGA yutuq!), Omon qolish o'yiniga qo'shimcha jon, bonus streak-"
+            "muzlatish, bepul Shaxsiy sertifikat, BEPUL jonli o'yin biletlari, "
+            "1 soatlik AI Quiz, 3 soatlik Premium, Market chegirmasi va yana "
+            "ko'plab syurprizlar — 40 dan ortiq xil natija bor!"
         ),
     },
     CERTIFICATE: {
@@ -83,15 +85,24 @@ def log_purchase(user, item_key: str, price: int) -> None:
 def charge(user, price: int) -> bool:
     """Deduct `price` Kitobcha from `user` if affordable (or refund, when
     `price` is negative — see the Reyting sponsorligi race-loss refund).
-    Atomic + row-locked so concurrent taps can't double-spend."""
+    Atomic + row-locked so concurrent taps can't double-spend.
+
+    A banked Market discount (Market 'Sirli quti' win) is applied and
+    consumed here, on the first purchase after winning it -- only for a
+    real charge (price > 0), never on a refund."""
     from tgbot.models import TelegramProfile, KitobchaLedger
     with transaction.atomic():
         p = TelegramProfile.objects.select_for_update().get(id=user.id)
-        if Decimal(p.ball or 0) < Decimal(price):
+        effective_price = price
+        discount_pct = int(p.next_market_discount_pct or 0)
+        if price > 0 and discount_pct > 0:
+            effective_price = max(0, price - (price * discount_pct) // 100)
+            p.next_market_discount_pct = 0
+        if Decimal(p.ball or 0) < Decimal(effective_price):
             return False
-        p.ball = Decimal(p.ball or 0) - Decimal(price)
-        p.save(update_fields=["ball"])
-        KitobchaLedger.objects.create(user=p, delta=-price, reason="market_charge")
+        p.ball = Decimal(p.ball or 0) - Decimal(effective_price)
+        p.save(update_fields=["ball", "next_market_discount_pct"])
+        KitobchaLedger.objects.create(user=p, delta=-effective_price, reason="market_charge")
     return True
 
 
@@ -110,14 +121,77 @@ def admin_grant_kitobcha(target, amount: int) -> Decimal:
 
 
 MYSTERY_PRIZES = [
-    ("kitobcha_small", 32),
-    ("kitobcha_big", 13),
-    ("kitobcha_mega", 3),
-    ("survival_life_1", 20),
-    ("survival_life_2", 5),
-    ("streak_freeze", 17),
-    ("free_certificate", 10),
+    ("kitobcha_small", 22),
+    ("kitobcha_big", 9),
+    ("kitobcha_mega", 2),
+    ("kitobcha_ultra_mega", 1),
+    ("survival_life_1", 13),
+    ("survival_life_2", 4),
+    ("survival_life_3", 2),
+    ("streak_freeze", 11),
+    ("streak_freeze_2", 3),
+    ("free_certificate", 6),
+    ("free_game_ticket_1", 8),
+    ("free_game_ticket_2", 3),
+    ("ai_quiz_trial", 4),
+    ("premium_trial_3h", 3),
+    ("refund_box_cost", 5),
+    ("market_discount_20", 4),
+    ("market_discount_50", 1),
+    # Flavor Kitobcha family — same underlying mechanic as kitobcha_small/
+    # big/mega, but each with its own themed name, emoji and amount range,
+    # so the "what did I win" moment stays varied and playful.
+    ("flavor_kutubxonachi", 5),
+    ("flavor_sahifalar_sehri", 5),
+    ("flavor_muallif_duosi", 4),
+    ("flavor_yarim_tun", 4),
+    ("flavor_qadimiy_xazina", 3),
+    ("flavor_kitob_qurti", 5),
+    ("flavor_bilim_yogdusi", 5),
+    ("flavor_varaqlar", 5),
+    ("flavor_kutubxona_kaliti", 4),
+    ("flavor_soz_ustasi", 4),
+    ("flavor_uyqusiz_kecha", 4),
+    ("flavor_ilk_bob", 5),
+    ("flavor_oxirgi_sahifa", 3),
+    ("flavor_changbosgan_javon", 3),
+    ("flavor_sirli_xat", 4),
+    ("flavor_kutubxona_arvohi", 4),
+    ("flavor_qissa_qahramoni", 4),
+    ("flavor_sehrli_xatchop", 5),
+    ("flavor_sehrli_chirog", 4),
+    ("flavor_kitobxonlar_ittifoqi", 3),
+    ("flavor_tong_saharlik", 5),
+    ("flavor_yulduzli_tun", 4),
+    ("flavor_buyuk_kutubxona", 1),
 ]
+
+# key -> (label incl. emoji, min amount, max amount)
+FLAVOR_KITOBCHA = {
+    "flavor_kutubxonachi":        ("📖 Kutubxonachi in'omi", 75, 200),
+    "flavor_sahifalar_sehri":     ("✨ Sahifalar sehri", 60, 180),
+    "flavor_muallif_duosi":       ("🙏 Muallif duosi", 100, 250),
+    "flavor_yarim_tun":           ("🌙 Yarim tungi kashfiyot", 90, 220),
+    "flavor_qadimiy_xazina":      ("🏺 Qadimiy xazina", 150, 400),
+    "flavor_kitob_qurti":         ("🐛 Kitob qurti bonusi", 40, 120),
+    "flavor_bilim_yogdusi":       ("💡 Bilim yog'dusi", 75, 190),
+    "flavor_varaqlar":            ("🍃 Varaqlar shitirlashi", 50, 140),
+    "flavor_kutubxona_kaliti":    ("🗝 Kutubxona kaliti", 110, 280),
+    "flavor_soz_ustasi":          ("✍️ So'z ustasi in'omi", 85, 210),
+    "flavor_uyqusiz_kecha":       ("🦉 Uyqusiz kecha mukofoti", 95, 230),
+    "flavor_ilk_bob":             ("📗 Ilk bob hayajoni", 65, 160),
+    "flavor_oxirgi_sahifa":       ("🎉 Oxirgi sahifa zavqi", 120, 300),
+    "flavor_changbosgan_javon":   ("🗄 Chang bosgan javon xazinasi", 140, 350),
+    "flavor_sirli_xat":           ("💌 Yozuvchining sirli xati", 100, 260),
+    "flavor_kutubxona_arvohi":    ("👻 Kutubxona arvohi sovg'asi", 80, 200),
+    "flavor_qissa_qahramoni":     ("⚔️ Qissa qahramonining duosi", 110, 270),
+    "flavor_sehrli_xatchop":      ("🔖 Sehrli xatcho'p", 60, 150),
+    "flavor_sehrli_chirog":       ("🪔 Sehrli chiroq bergan tilak", 70, 190),
+    "flavor_kitobxonlar_ittifoqi": ("🤝 Kitobxonlar ittifoqi bonusi", 130, 320),
+    "flavor_tong_saharlik":       ("🌅 Tong saharlik ilhom", 55, 140),
+    "flavor_yulduzli_tun":        ("🌌 Yulduzli tun mukofoti", 105, 260),
+    "flavor_buyuk_kutubxona":     ("🏛 Buyuk kutubxona duosi", 300, 600),
+}
 
 
 def resolve_mystery_box(user):
@@ -133,6 +207,15 @@ def resolve_mystery_box(user):
     )[0]
     with transaction.atomic():
         p = TelegramProfile.objects.select_for_update().get(id=user.id)
+
+        if pick in FLAVOR_KITOBCHA:
+            label, lo, hi = FLAVOR_KITOBCHA[pick]
+            amount = random.randint(lo, hi)
+            p.ball = Decimal(p.ball or 0) + Decimal(amount)
+            p.save(update_fields=["ball"])
+            KitobchaLedger.objects.create(user=p, delta=amount, reason="mystery_box")
+            return f"{label}: <b>+{amount} Kitobcha</b>!", False
+
         if pick == "kitobcha_small":
             amount = random.randint(50, 150)
             p.ball = Decimal(p.ball or 0) + Decimal(amount)
@@ -151,6 +234,13 @@ def resolve_mystery_box(user):
             p.save(update_fields=["ball"])
             KitobchaLedger.objects.create(user=p, delta=amount, reason="mystery_box")
             return f"💥 MEGA YUTUQ!!! <b>+{amount} Kitobcha</b>!!! 🎉", False
+        if pick == "kitobcha_ultra_mega":
+            amount = random.randint(2000, 3500)
+            p.ball = Decimal(p.ball or 0) + Decimal(amount)
+            p.save(update_fields=["ball"])
+            KitobchaLedger.objects.create(user=p, delta=amount, reason="mystery_box")
+            return f"🌋 ULTRA MEGA YUTUQ!!! <b>+{amount} Kitobcha</b>!!! 🏆🎉", False
+
         if pick == "survival_life_1":
             p.bonus_survival_lives = (p.bonus_survival_lives or 0) + 1
             p.save(update_fields=["bonus_survival_lives"])
@@ -159,9 +249,60 @@ def resolve_mystery_box(user):
             p.bonus_survival_lives = (p.bonus_survival_lives or 0) + 2
             p.save(update_fields=["bonus_survival_lives"])
             return "💖 OMON! Keyingi <b>Omon qolish</b> o'yiningizga <b>+2 qo'shimcha jon</b>!", False
+        if pick == "survival_life_3":
+            p.bonus_survival_lives = (p.bonus_survival_lives or 0) + 3
+            p.save(update_fields=["bonus_survival_lives"])
+            return "🛡❤️ SUPER OMON! Keyingi <b>Omon qolish</b> o'yiningizga <b>+3 qo'shimcha jon</b>!", False
+
         if pick == "free_certificate":
             return "📜 Sizga <b>BEPUL Shaxsiy sertifikat</b> tushdi — tayyorlanmoqda!", True
+
+        if pick == "free_game_ticket_1":
+            p.bonus_free_game_entries = (p.bonus_free_game_entries or 0) + 1
+            p.save(update_fields=["bonus_free_game_entries"])
+            return "🎟 Keyingi jonli o'yinga <b>1 ta BEPUL bilet</b> yutdingiz!", False
+        if pick == "free_game_ticket_2":
+            p.bonus_free_game_entries = (p.bonus_free_game_entries or 0) + 2
+            p.save(update_fields=["bonus_free_game_entries"])
+            return "🎟🎟 Keyingi jonli o'yinlarga <b>2 ta BEPUL bilet</b> yutdingiz!", False
+
+        if pick == "ai_quiz_trial":
+            import datetime as _dt
+            from tgbot.tasks import expire_ai_quiz_trial
+            until = timezone.now() + _dt.timedelta(hours=1)
+            p.trial_ai_quiz_until = until
+            p.save(update_fields=["trial_ai_quiz_until"])
+            expire_ai_quiz_trial.apply_async(args=[p.id], countdown=3600)
+            return "🤖 <b>1 soatlik BEPUL AI Quiz yaratish</b> imkoniyati yutdingiz!", False
+        if pick == "premium_trial_3h":
+            import datetime as _dt
+            from tgbot.tasks import expire_trial_premium
+            until = timezone.now() + _dt.timedelta(hours=3)
+            p.trial_premium_until = until
+            p.save(update_fields=["trial_premium_until"])
+            expire_trial_premium.apply_async(args=[p.id], countdown=3 * 3600)
+            return "💎 <b>3 soatlik BEPUL Premium</b> yutdingiz — barcha imtiyozlar ochiq!", False
+
+        if pick == "refund_box_cost":
+            amount = ITEMS[MYSTERY_BOX]["price"]
+            p.ball = Decimal(p.ball or 0) + Decimal(amount)
+            p.save(update_fields=["ball"])
+            KitobchaLedger.objects.create(user=p, delta=amount, reason="mystery_box")
+            return f"🔁 Qutining narxi qaytarildi — <b>+{amount} Kitobcha</b>! Amalda bepul aylanish edi 😄", False
+        if pick == "market_discount_20":
+            p.next_market_discount_pct = max(int(p.next_market_discount_pct or 0), 20)
+            p.save(update_fields=["next_market_discount_pct"])
+            return "🏷 Keyingi Market xaridingizga <b>20% chegirma</b> yutdingiz!", False
+        if pick == "market_discount_50":
+            p.next_market_discount_pct = max(int(p.next_market_discount_pct or 0), 50)
+            p.save(update_fields=["next_market_discount_pct"])
+            return "🏷🔥 KATTA CHEGIRMA! Keyingi Market xaridingizga <b>50% chegirma</b>!", False
+
         p.streak_freeze_count = (p.streak_freeze_count or 0) + 1
+        if pick == "streak_freeze_2":
+            p.streak_freeze_count += 1
+            p.save(update_fields=["streak_freeze_count"])
+            return "🛡🛡 Bonus <b>2 ta Streak muzlatish</b> tokeni yutdingiz!", False
         p.save(update_fields=["streak_freeze_count"])
         return "🛡 Bonus <b>Streak muzlatish</b> tokeni yutdingiz!", False
 
