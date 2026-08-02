@@ -206,7 +206,13 @@ async def boom_stats_button(message: types.Message, state: FSMContext):
         f"🔗 <b>Sizning shaxsiy havolangiz:</b>\n{referral_link}\n\n"
         f"{blurb}"
     )
-    await message.answer(text, parse_mode="HTML", disable_web_page_preview=True, reply_markup=kb)
+    if boom.image and len(text) <= 1024:
+        await message.answer_photo(
+            types.InputFile(boom.image.path), caption=text,
+            parse_mode="HTML", reply_markup=kb,
+        )
+    else:
+        await message.answer(text, parse_mode="HTML", disable_web_page_preview=True, reply_markup=kb)
 
 
 @sync_to_async

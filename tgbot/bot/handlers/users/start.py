@@ -164,6 +164,19 @@ async def do_start(message: types.Message, state: FSMContext):
         await show_market_menu(message, user)
         return
 
+    # Referral deep link: /start referral — from the "🔗 Botga o'tish" button
+    # a group tap on "Referal havolam" bounces to (see menu_router.py
+    # referral_link_handler's group guard). Lands the user straight on their
+    # personal referral-link screen in the DM.
+    if args == "referral" and already_registered:
+        if user and not user.is_registered:
+            user.is_registered = True
+            await sync_to_async(user.save)(update_fields=["is_registered"])
+        await state.finish()
+        from tgbot.bot.handlers.users.menu_router import show_referral_link_screen
+        await show_referral_link_screen(message, user)
+        return
+
     # AI quiz deep link: /start aiquiz — from the AI-quiz-upgrade broadcast's
     # inline button, lands the user straight in AI quiz creation (same gate
     # as the "🤖 AI yordamida Quiz yaratish" button: Premium, trial window,

@@ -1258,11 +1258,35 @@ async def reyting_period_pick(call: types.CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(lambda c: c.data == "referral:link", state="*")
 async def referral_link_handler(call: types.CallbackQuery, state: FSMContext):
     del state  # injected by aiogram, unused here
+    if call.message.chat.type != "private":
+        # Never post someone's personal referral link/stats into a group --
+        # bounce to the bot's DM instead, same pattern as Market's group tap.
+        await call.answer(
+            "🔒 Bu faqat botning shaxsiy chatida ishlaydi!", show_alert=True,
+        )
+        from tgbot.tasks import _get_bot_username
+        username = await sync_to_async(_get_bot_username, thread_sensitive=True)()
+        if username:
+            kb = InlineKeyboardMarkup().add(InlineKeyboardButton(
+                text="🔗 Botga o'tish", url=f"https://t.me/{username}?start=referral",
+            ))
+            try:
+                await call.message.answer(
+                    "🔗 Referal havolangizni olish uchun pastdagi tugmani bosing:",
+                    reply_markup=kb,
+                )
+            except Exception:
+                pass
+        return
     user = await aget_user(call.from_user.id)
     if not user:
         await call.answer("Avval /start bosing.", show_alert=True)
         return
     await call.answer()
+    await show_referral_link_screen(call.message, user)
+
+
+async def show_referral_link_screen(message: types.Message, user):
     from tgbot.services.referral import ReferralService
     lang = _user_lang(user)
     ref_count = await ReferralService.get_referral_count(user)
