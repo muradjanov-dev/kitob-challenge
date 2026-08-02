@@ -29,6 +29,12 @@
     { src: "/static/audio/classical/mozart-piano-sonata-11.mp3", label: "Mozart — Eine kleine Nachtmusik (Rondo)" }
   ];
   var MUTE_KEY = "kc_music_muted";
+  var POS_KEY = "kc_music_pos"; // {src, time, savedAt} -- lets the next page
+  // resume the SAME track at the SAME spot instead of restarting, so moving
+  // between Bosh sahifa/Kutubxona/Do'kon/Kabinet feels like the music never
+  // stopped (a real page reload always has to re-fetch/re-decode audio --
+  // this just hides that gap by not also jumping back to 0:00).
+  var POS_MAX_AGE_MS = 30 * 60 * 1000; // stale after 30 min idle -- start fresh instead
   var VOLUME = 0.14;
 
   var audio = document.getElementById("kcBgAudio");
@@ -39,6 +45,26 @@
   var muted = localStorage.getItem(MUTE_KEY) === "1";
   var lastIndex = -1;
 
+  function trackIndexBySrc(src) {
+    // audio.currentSrc resolves to an absolute URL; TRACKS[i].src is
+    // root-relative -- compare by suffix so both forms match.
+    for (var i = 0; i < TRACKS.length; i++) {
+      if (src && src.indexOf(TRACKS[i].src) !== -1) return i;
+    }
+    return -1;
+  }
+
+  function savePos() {
+    if (!audio.src || !audio.currentTime) return;
+    try {
+      localStorage.setItem(POS_KEY, JSON.stringify({
+        src: audio.currentSrc || audio.src,
+        time: audio.currentTime,
+        savedAt: Date.now(),
+      }));
+    } catch (e) {}
+  }
+
   function pickTrack() {
     if (TRACKS.length === 1) return 0;
     var i;
@@ -48,8 +74,33 @@
   }
 
   function loadRandomTrack() {
-    audio.src = TRACKS[pickTrack()].src;
+    var i = pickTrack();
+    audio.src = TRACKS[i].src;
     audio.volume = VOLUME;
+  }
+
+  // Resume the exact track+position from the previous page, if there is a
+  // recent one; otherwise behaves exactly like loadRandomTrack().
+  function loadResumedOrRandomTrack() {
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(POS_KEY) || "null"); } catch (e) {}
+    if (saved && saved.src && (Date.now() - saved.savedAt) < POS_MAX_AGE_MS) {
+      var idx = trackIndexBySrc(saved.src);
+      if (idx !== -1) {
+        lastIndex = idx;
+        audio.src = saved.src;
+        audio.volume = VOLUME;
+        var resumeTime = saved.time || 0;
+        audio.addEventListener("loadedmetadata", function onMeta() {
+          audio.removeEventListener("loadedmetadata", onMeta);
+          if (resumeTime < (audio.duration || Infinity) - 2) {
+            audio.currentTime = resumeTime;
+          }
+        });
+        return;
+      }
+    }
+    loadRandomTrack();
   }
 
   function updateIcon() {
@@ -86,9 +137,17 @@
   }
 
   audio.addEventListener("ended", function () {
+    localStorage.removeItem(POS_KEY); // finished naturally -- nothing to resume
     loadRandomTrack();
     if (!muted) audio.play().catch(function () {});
   });
+
+  // Periodic + on-leave position saving, so the next page can resume here.
+  var savePosTimer = setInterval(function () { if (!muted) savePos(); }, 3000);
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden && !muted) savePos();
+  });
+  window.addEventListener("pagehide", function () { if (!muted) savePos(); });
 
   btn.addEventListener("click", function () {
     muted = !muted;
@@ -107,7 +166,7 @@
 
   updateIcon();
   if (!muted) {
-    loadRandomTrack();
+    loadResumedOrRandomTrack();
     tryPlay();
   }
 })();
