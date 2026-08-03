@@ -18,6 +18,7 @@ from tgbot.models import (
     TelegramProfile, ConfirmationReport, BooksToRead, UserAchievement,
     UserReferal, ChainScore, FeudScore, CastleHit, EmojiScore, WisdomScore,
     DetectiveScore, SurvivalPlayer, QuizScore, ShopPurchase, Payment, BookComment,
+    KitobchaLedger,
 )
 
 
@@ -55,6 +56,21 @@ class Stats(TypedDict):
     pioneer_comments: int
     comment_languages: int
     comment_days: int
+    night_owl_reading: bool
+    anniversary_reading: bool
+    reached_page_100: bool
+    reached_page_500: bool
+    no_gap_restart: bool
+    spring_reading: bool
+    summer_reading: bool
+    winter_reading: bool
+    was_daily_top1: bool
+    same_day_two_books: bool
+    deep_single_book: bool
+    recommender: bool
+    honorary_reader: bool
+    both_ends_of_day: bool
+    resumed_after_mystery_box: bool
 
 
 def compute_user_stats(user: TelegramProfile) -> Stats:
@@ -121,6 +137,7 @@ def compute_user_stats(user: TelegramProfile) -> Stats:
         book_comments, long_comments_300, long_comments_500,
         pioneer_comments, comment_languages, comment_days,
     ) = _book_comment_stats(user)
+    creative = _creative_website_stats(user)
 
     return {
         "reports": reports_count,
@@ -150,6 +167,139 @@ def compute_user_stats(user: TelegramProfile) -> Stats:
         "pioneer_comments": pioneer_comments,
         "comment_languages": comment_languages,
         "comment_days": comment_days,
+        **creative,
+    }
+
+
+def _creative_website_stats(user: TelegramProfile) -> dict:
+    """15 creative website/library achievement conditions, bundled together
+    since most are cheap booleans over BooksToRead/KitobchaLedger timestamps
+    rather than each needing its own Stats field wiring. Several are
+    best-effort approximations given what's actually stored (BooksToRead only
+    keeps the LATEST touch per book, not a full per-day activity history) --
+    each one says so inline where it matters."""
+    # 1. Tungi qorovul -- any web-reader save logged at 03:00-04:59 local time
+    #    (TIME_ZONE=Asia/Tashkent, so __hour already reads in that zone).
+    night_owl_reading = BooksToRead.objects.filter(user=user, updated_at__hour__in=[3, 4]).exists()
+
+    # 2. Yubiley kitobxoni -- read on the same calendar month+day as the
+    #    account's own registration date (any year).
+    anniversary_reading = BooksToRead.objects.filter(
+        user=user, updated_at__month=user.created_at.month, updated_at__day=user.created_at.day,
+    ).exists()
+
+    # 3/4. Sirli sahifa -- reached at least page 100 / 500 in some book.
+    reached_page_100 = BooksToRead.objects.filter(user=user, max_page_reached__gte=100).exists()
+    reached_page_500 = BooksToRead.objects.filter(user=user, max_page_reached__gte=500).exists()
+
+    # 5. Fursatni boy bermas -- finished a book, then started a new one
+    #    within 24 hours. Approximated: a finished book's updated_at as its
+    #    finish moment, any book's created_at as a start moment.
+    no_gap_restart = False
+    finished_at_times = list(
+        BooksToRead.objects.filter(
+            user=user, total_pages__gt=0, current_page__gte=F("total_pages"),
+        ).values_list("updated_at", flat=True)
+    )
+    if finished_at_times:
+        starts = list(BooksToRead.objects.filter(user=user).values_list("created_at", flat=True))
+        no_gap_restart = any(
+            timedelta(0) < (s_at - f_at) <= timedelta(hours=24)
+            for f_at in finished_at_times for s_at in starts
+        )
+
+    # 6/7/8. Seasonal presence -- any web-reader activity that month/day.
+    spring_reading = BooksToRead.objects.filter(user=user, updated_at__month=3, updated_at__day=21).exists()
+    summer_reading = BooksToRead.objects.filter(user=user, updated_at__month=7).exists()
+    winter_reading = BooksToRead.objects.filter(user=user, updated_at__month=1).exists()
+
+    # 9. Kunning yulduzi -- was the #1 daily page-reader (same metric as the
+    #    bot's own daily leaderboard) on at least one day. Bounded by the
+    #    user's own active-day count -- same cost class as
+    #    _max_consecutive_days above.
+    was_daily_top1 = False
+    my_days = list(
+        ConfirmationReport.objects.filter(user=user, is_audio=False)
+        .annotate(_d=TruncDate("date")).values("_d")
+        .annotate(total=Sum("pages_read")).filter(total__gt=0)
+    )
+    for row in my_days:
+        top = (
+            ConfirmationReport.objects.filter(date__date=row["_d"], is_audio=False)
+            .values("user_id").annotate(t=Sum("pages_read"))
+            .aggregate(m=Max("t"))["m"] or 0
+        )
+        if row["total"] >= top:
+            was_daily_top1 = True
+            break
+
+    # 10. Ikki kitob raqsi -- currently juggling 2+ books with real progress
+    #     both touched today. Best-effort/live-catch: BooksToRead only
+    #     stores the latest touch per book, not per-day history, so this
+    #     reads true while it's happening rather than reconstructing the past.
+    today = timezone.localdate()
+    same_day_two_books = BooksToRead.objects.filter(
+        user=user, current_page__gt=0, updated_at__date=today,
+    ).count() >= 2
+
+    # 11. Sadoqatli sherik -- 3+ cumulative hours of active reading time on
+    #     a single book (depth on one book, not breadth across many).
+    deep_single_book = BooksToRead.objects.filter(user=user, active_seconds__gte=10800).exists()
+
+    # 12. Tavsiyachi -- finished at least one book AND brought in at least
+    #     one referral ("recommend what moved you" spirit).
+    recommender = (
+        BooksToRead.objects.filter(
+            user=user, total_pages__gt=0, current_page__gte=F("total_pages"),
+        ).exists()
+        and UserReferal.objects.filter(referrer=user).exists()
+    )
+
+    # 13. Faxriy o'quvchi -- active in the library on the exact calendar day
+    #     the account turned 100 days old.
+    day100 = user.created_at + timedelta(days=100)
+    honorary_reader = BooksToRead.objects.filter(
+        user=user, updated_at__year=day100.year, updated_at__month=day100.month, updated_at__day=day100.day,
+    ).exists()
+
+    # 14. Ikki chekka -- activity in both the early-morning (05-06) and
+    #     late-evening (22-23) windows on the same calendar day.
+    both_ends_of_day = bool(
+        set(BooksToRead.objects.filter(user=user, updated_at__hour__in=[5, 6])
+            .annotate(_d=TruncDate("updated_at")).values_list("_d", flat=True))
+        & set(BooksToRead.objects.filter(user=user, updated_at__hour__in=[22, 23])
+              .annotate(_d=TruncDate("updated_at")).values_list("_d", flat=True))
+    )
+
+    # 15. Uzluksiz ishtiyoq -- resumed reading within 5 minutes of a Sirli
+    #     quti win (any book, not just the one open at the time).
+    resumed_after_mystery_box = False
+    box_times = list(
+        KitobchaLedger.objects.filter(user=user, reason="mystery_box").values_list("created_at", flat=True)
+    )
+    if box_times:
+        touch_times = list(BooksToRead.objects.filter(user=user).values_list("updated_at", flat=True))
+        resumed_after_mystery_box = any(
+            timedelta(0) < (t_at - b_at) <= timedelta(minutes=5)
+            for b_at in box_times for t_at in touch_times
+        )
+
+    return {
+        "night_owl_reading": night_owl_reading,
+        "anniversary_reading": anniversary_reading,
+        "reached_page_100": reached_page_100,
+        "reached_page_500": reached_page_500,
+        "no_gap_restart": no_gap_restart,
+        "spring_reading": spring_reading,
+        "summer_reading": summer_reading,
+        "winter_reading": winter_reading,
+        "was_daily_top1": was_daily_top1,
+        "same_day_two_books": same_day_two_books,
+        "deep_single_book": deep_single_book,
+        "recommender": recommender,
+        "honorary_reader": honorary_reader,
+        "both_ends_of_day": both_ends_of_day,
+        "resumed_after_mystery_box": resumed_after_mystery_box,
     }
 
 
@@ -458,6 +608,23 @@ ACHIEVEMENTS_RAW = [
 
     {"code": "cmlang_3", "emoji": "🌐", "title_uz": "Ko'p tilli sharhlovchi",     "title_ru": "Многоязычный рецензент",     "hint_uz": "3 xil tildagi kitoblarga izoh qoldiring.", "hint_ru": "Оставьте комментарии к книгам на 3 разных языках.", "cond": _at_least("comment_languages", 3), "points": 80},
     {"code": "cmday_10", "emoji": "📆", "title_uz": "Kundalik fikr ustasi",       "title_ru": "Мастер ежедневных отзывов",  "hint_uz": "10 xil kunda izoh qoldiring (bir kunda bir nechtasi bitta kun sifatida hisoblanadi).", "hint_ru": "Оставляйте комментарии в 10 разных дней.", "cond": _at_least("comment_days", 10), "points": 150},
+
+    # — Creative website/library achievements — 15 entries —
+    {"code": "cr_nightowl", "emoji": "🌙", "title_uz": "Tungi qorovul",              "title_ru": "Ночной страж",              "hint_uz": "Kutubxonada soat 03:00–05:00 orasida faol o'qing.", "hint_ru": "Читайте в библиотеке с 03:00 до 05:00.", "cond": lambda s: s.get("night_owl_reading", False), "points": 60},
+    {"code": "cr_anniv",    "emoji": "🎂", "title_uz": "Yubiley kitobxoni",           "title_ru": "Юбилейный читатель",         "hint_uz": "Ro'yxatdan o'tgan kuningiz (oy va kun mos kelganda) kutubxonada o'qing.", "hint_ru": "Читайте в день годовщины регистрации (месяц и число совпадают).", "cond": lambda s: s.get("anniversary_reading", False), "points": 100},
+    {"code": "cr_page100",  "emoji": "🔢", "title_uz": "Sirli sahifa — 100",          "title_ru": "Магическая страница — 100",  "hint_uz": "Biror kitobda kamida 100-sahifaga yeting.", "hint_ru": "Дойдите как минимум до 100-й страницы в любой книге.", "cond": lambda s: s.get("reached_page_100", False), "points": 30},
+    {"code": "cr_page500",  "emoji": "🔮", "title_uz": "Sirli sahifa — 500",          "title_ru": "Магическая страница — 500",  "hint_uz": "Biror kitobda kamida 500-sahifaga yeting.", "hint_ru": "Дойдите как минимум до 500-й страницы в любой книге.", "cond": lambda s: s.get("reached_page_500", False), "points": 150},
+    {"code": "cr_nogap",    "emoji": "⚡", "title_uz": "Fursatni boy bermas",         "title_ru": "Не теряя момента",           "hint_uz": "Bir kitobni tugatgach, 24 soat ichida yangi kitob boshlang.", "hint_ru": "Закончив книгу, начните новую в течение 24 часов.", "cond": lambda s: s.get("no_gap_restart", False), "points": 80},
+    {"code": "cr_spring",   "emoji": "🌸", "title_uz": "Bahor kitobxoni",             "title_ru": "Весенний читатель",          "hint_uz": "21 mart — bahorning birinchi kunida kutubxonada o'qing.", "hint_ru": "Читайте 21 марта — в первый день весны.", "cond": lambda s: s.get("spring_reading", False), "points": 50},
+    {"code": "cr_summer",   "emoji": "☀️", "title_uz": "Yoz posangisi",               "title_ru": "Летний книголюб",            "hint_uz": "Iyul oyida kutubxonada faol bo'ling.", "hint_ru": "Будьте активны в библиотеке в июле.", "cond": lambda s: s.get("summer_reading", False), "points": 50},
+    {"code": "cr_winter",   "emoji": "❄️", "title_uz": "Qish sehri",                  "title_ru": "Зимнее волшебство",          "hint_uz": "Yanvar oyida kutubxonada faol bo'ling.", "hint_ru": "Будьте активны в библиотеке в январе.", "cond": lambda s: s.get("winter_reading", False), "points": 50},
+    {"code": "cr_top1",     "emoji": "🏅", "title_uz": "Kunning yulduzi",             "title_ru": "Звезда дня",                "hint_uz": "Kunlik \"Eng ko'p bet o'qiganlar\" reytingida 1-o'rinni egallang.", "hint_ru": "Займите 1-е место в дневном рейтинге читателей.", "cond": lambda s: s.get("was_daily_top1", False), "points": 120},
+    {"code": "cr_twobooks", "emoji": "🎭", "title_uz": "Ikki kitob raqsi",            "title_ru": "Танец двух книг",            "hint_uz": "Bitta kunda 2 xil kitobni navbatma-navbat o'qing.", "hint_ru": "Читайте 2 разные книги поочерёдно в один день.", "cond": lambda s: s.get("same_day_two_books", False), "points": 60},
+    {"code": "cr_deepbook", "emoji": "🌟", "title_uz": "Sadoqatli sherik",            "title_ru": "Верный спутник",             "hint_uz": "Bitta kitobda jami 3 soatdan ko'proq o'qing.", "hint_ru": "Читайте одну книгу в сумме более 3 часов.", "cond": lambda s: s.get("deep_single_book", False), "points": 90},
+    {"code": "cr_recommend", "emoji": "🎁", "title_uz": "Tavsiyachi",                 "title_ru": "Рекомендатель",              "hint_uz": "Kitob tugating va kamida bitta do'stingizni taklif qiling.", "hint_ru": "Закончите книгу и пригласите хотя бы одного друга.", "cond": lambda s: s.get("recommender", False), "points": 100},
+    {"code": "cr_day100",   "emoji": "🧓", "title_uz": "Faxriy o'quvchi",             "title_ru": "Почётный читатель",          "hint_uz": "Hisobingiz aynan 100 kunlik bo'lgan kuni ham kutubxonada o'qing.", "hint_ru": "Читайте в день, когда вашему аккаунту исполнится ровно 100 дней.", "cond": lambda s: s.get("honorary_reader", False), "points": 100},
+    {"code": "cr_bothends", "emoji": "🌗", "title_uz": "Ikki chekka",                 "title_ru": "Два предела",               "hint_uz": "Bitta kunda ham 05:00–07:00, ham 22:00–00:00 orasida o'qing.", "hint_ru": "Читайте в один день и с 05:00–07:00, и с 22:00–00:00.", "cond": lambda s: s.get("both_ends_of_day", False), "points": 80},
+    {"code": "cr_boxread",  "emoji": "🎪", "title_uz": "Uzluksiz ishtiyoq",           "title_ru": "Непрерывный азарт",          "hint_uz": "Sirli qutini ochgandan keyin 5 daqiqa ichida o'qishni davom ettiring.", "hint_ru": "Продолжите чтение в течение 5 минут после открытия Sirli quti.", "cond": lambda s: s.get("resumed_after_mystery_box", False), "points": 40},
 ]
 
 
