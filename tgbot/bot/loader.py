@@ -109,24 +109,14 @@ class BigBrother(BaseMiddleware):
 
 dp.middleware.setup(BigBrother())
 
-
-class GroupMessageFilter(BaseMiddleware):
-    """Delete user messages in group chats when they accidentally trigger FSM-based handlers."""
-
-    async def on_pre_process_message(self, message: types.Message, data: dict):
-        if message.chat.type not in (types.ChatType.GROUP, types.ChatType.SUPERGROUP):
-            return
-        # Check if user has an active FSM state
-        state = dp.current_state(chat=message.from_user.id, user=message.from_user.id)
-        current = await state.get_state()
-        if current is None:
-            return
-        # User is mid-flow in a private chat — silently delete their group message and cancel
-        try:
-            await message.delete()
-        except Exception:
-            pass
-        raise CancelHandler()
-
-
-dp.middleware.setup(GroupMessageFilter())
+# NOTE: a GroupMessageFilter middleware used to live here (added 2026-06-15,
+# commit b4eae1d), deleting any group message from a user who had ANY active
+# FSM state in their private chat with the bot -- meant to stop "mid-flow
+# private input typed in a group" from misfiring a DM handler. That scenario
+# doesn't actually happen: aiogram scopes FSM state per (chat_id, user_id),
+# so a group message (chat_id = the group's id) can never match a handler
+# state-filtered against the user's private chat state (chat_id = user_id).
+# The middleware was silently deleting real, unrelated group messages from
+# any user who simply had an unfinished flow anywhere in the bot (report,
+# quiz creation, admin panel, ...) -- removed 2026-08-03 after user reports
+# of messages vanishing in the group.
