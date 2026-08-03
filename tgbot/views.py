@@ -473,6 +473,54 @@ def internal_retire_challenge_and_launch_boom(request: HttpRequest):
     return HttpResponse("started", status=202)
 
 
+@csrf_exempt
+def internal_backfill_missed_referrals(request: HttpRequest):
+    """One-off trigger: 5 users submitted their first report during the
+    2026-08-02 DB-connection-exhaustion outage, but the deferred referral
+    credit (report.py's _consume_pending_ref -> process_referral) never ran
+    because the outage killed the handler before it got there -- their
+    pending_referral_code is still set despite the report existing. Backfills
+    exactly those 5 (hardcoded TelegramProfile ids, verified against
+    ConfirmationReport before this was written) through the normal
+    process_referral path so referrers get the same reward + Yaxshilik
+    ulashuvchi boom bonus + notification DM they'd have gotten on time.
+    POST only. Delete this view/URL once used."""
+    import os as _os
+    import json as _json
+    from asgiref.sync import async_to_sync
+
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+        return HttpResponse(status=403)
+
+    from tgbot.models import TelegramProfile, UserReferal
+    from tgbot.services.referral import ReferralService
+
+    targets = [1655, 1541, 1682, 1681, 1630]
+    results = []
+    for pid in targets:
+        profile = TelegramProfile.objects.filter(id=pid).first()
+        if not profile:
+            results.append({"id": pid, "error": "profile not found"})
+            continue
+        code = profile.pending_referral_code
+        if not code:
+            results.append({"id": pid, "name": profile.full_name, "error": "no pending code (already processed?)"})
+            continue
+        if UserReferal.objects.filter(referred_user=profile).exists():
+            results.append({"id": pid, "name": profile.full_name, "error": "UserReferal already exists, skipped"})
+            continue
+        try:
+            ok = async_to_sync(ReferralService.process_referral)(profile, code)
+            results.append({"id": pid, "name": profile.full_name, "code": code, "processed": ok})
+        except Exception as e:
+            results.append({"id": pid, "name": profile.full_name, "error": str(e)})
+
+    return JsonResponse({"results": results}, json_dumps_params={"ensure_ascii": False})
+
+
 app = Celery("core")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 

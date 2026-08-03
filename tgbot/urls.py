@@ -3,6 +3,7 @@ from .views import (
     home, telegram, library_view, internal_diag_blocked_users, internal_unblock_false_positives,
     internal_diag_challenge_boom_state, internal_retire_challenge_and_launch_boom,
     internal_diag_challenge_reward_history, internal_broadcast_mystery_box_update,
+    internal_backfill_missed_referrals,
 )
 from src.settings import WEBHOOK_PATH
 from tgbot.views import health_check_celery, health_check_redis
@@ -46,6 +47,7 @@ urlpatterns = [
     path("internal/diag/challenge-reward-history/", internal_diag_challenge_reward_history, name="internal-diag-challenge-reward-history"),
     path("internal/fix/retire-challenge-and-launch-boom/", internal_retire_challenge_and_launch_boom, name="internal-retire-challenge-and-launch-boom"),
     path("internal/broadcast/mystery-box-update/", internal_broadcast_mystery_box_update, name="internal-broadcast-mystery-box-update"),
+    path("internal/fix/backfill-missed-referrals/", internal_backfill_missed_referrals, name="internal-backfill-missed-referrals"),
     path("health-check/redis/", health_check_redis, name="health-check-redis"),
     path("health-check/celery/", health_check_celery, name="health-check-celery"),
     path("shop/", shop_index, name="shop"),

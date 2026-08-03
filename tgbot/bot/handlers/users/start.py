@@ -272,7 +272,16 @@ async def do_start(message: types.Message, state: FSMContext):
         )
         return
 
-    if args:
+    # Reserved deep-link values (functional buttons, not referral codes) --
+    # a NOT-YET-registered user tapping e.g. a group's "Hisobot jo'natish"
+    # (report) or a game link (ikki-haqiqat, jamoa-jangi, ...) falls through
+    # to here since those branches above are gated on already_registered.
+    # Without this guard, that literal arg got stored as if it were the
+    # inviter's referral code -- harmless (process_referral just fails to
+    # find a matching referrer) but permanently occupies pending_referral_code
+    # so a *real* referral link tapped afterwards can no longer register.
+    _RESERVED_START_ARGS = {"report", "market", "referral", "aiquiz", "yaxshilik-ulashuvchi", "zanjir"} | set(_GAME_DEEPLINKS)
+    if args and args not in _RESERVED_START_ARGS and not args.startswith(("quiz_", "prof_", "msg_")):
         await state.update_data(referral_code=args)
 
     await message.answer(

@@ -1341,6 +1341,24 @@ async def _do_confirm_report(message, user, state: FSMContext):
     minutes_listened = data.get("minutes_listened")
     conclusion = data.get("conclusion")
     book_ids = data.get("selected_book_ids")
+    book_reports = data.get("book_reports", {})
+
+    # A multi-book report (book_reports) can mix a live/paper book with an
+    # audio one in the same session -- `book` above is every title joined
+    # together regardless of type, so using it for BOTH rows below mislabels
+    # the live-pages row with the audio book's title and vice versa (e.g.
+    # "Jimjitlik" pages + "Qora Kamar" minutes both showing as "Jimjitlik,
+    # Qora Kamar"). Split by each book's own is_audio flag instead.
+    live_book, audio_book = book, book
+    if book_reports and is_combined:
+        live_titles, audio_titles = [], []
+        for bid in book_reports.keys():
+            b_obj = await get_book_by_id(bid)
+            if not b_obj:
+                continue
+            (audio_titles if b_obj.is_audio else live_titles).append(b_obj.title)
+        live_book = ", ".join(live_titles) or book
+        audio_book = ", ".join(audio_titles) or book
 
     datetime_now = timezone.now()
 
@@ -1350,7 +1368,7 @@ async def _do_confirm_report(message, user, state: FSMContext):
         date=datetime_now,
         conclusion=conclusion,
         book_ids=book_ids,
-        book_title=book,
+        book_title=live_book,
         is_audio=is_audio,
         minutes_listened=minutes_listened,
     )
@@ -1362,12 +1380,10 @@ async def _do_confirm_report(message, user, state: FSMContext):
             date=datetime_now,
             conclusion=conclusion,
             book_ids=book_ids,
-            book_title=book,
+            book_title=audio_book,
             is_audio=True,
             minutes_listened=minutes_listened,
         )
-
-    book_reports = (await state.get_data()).get("book_reports", {})
     for bid, value in book_reports.items():
         try:
             book_obj = await get_book_by_id(bid)
@@ -1403,11 +1419,11 @@ async def _do_confirm_report(message, user, state: FSMContext):
         books_block = _format_books_block(today_books, fallback_title=book)
     else:
         if has_pages and has_audio:
-            books_block = f"<b>O'qilgan kitoblar:</b>\n\n📖 {book} ({total_pages}+ bet)\n🎧 {book} ({total_minutes} daqiqa)"
+            books_block = f"<b>O'qilgan kitoblar:</b>\n\n📖 {live_book} ({total_pages}+ bet)\n🎧 {audio_book} ({total_minutes} daqiqa)"
         elif has_audio:
-            books_block = f"<b>O'qilgan kitoblar:</b>\n\n🎧 {book} ({total_minutes} daqiqa)"
+            books_block = f"<b>O'qilgan kitoblar:</b>\n\n🎧 {audio_book} ({total_minutes} daqiqa)"
         else:
-            books_block = f"<b>O'qilgan kitoblar:</b>\n\n📖 {book} ({total_pages}+ bet)"
+            books_block = f"<b>O'qilgan kitoblar:</b>\n\n📖 {live_book} ({total_pages}+ bet)"
 
     aggregate_note = ""
     if is_aggregating:
