@@ -242,6 +242,62 @@ def telegram(request: HttpRequest):
 
 
 @csrf_exempt
+def internal_diag_achievements(request: HttpRequest):
+    """One-off diagnostic + fix: for every user with at least one BookComment
+    or recent ConfirmationReport, run award_new_achievements SYNCHRONOUSLY
+    (bypassing Celery entirely) and report what happened. Confirms whether
+    the achievement CODE itself is sound (any exception here is a real bug,
+    not a delivery gap) and, separately, catches anyone whose achievements
+    should already have fired via the normal check_user_achievements.delay()
+    path but didn't (celery_worker not picking up new task code -- the same
+    class of gap found earlier this session with launch_referral_boom).
+    POST only, guarded, safe to re-run (award_new_achievements is itself
+    idempotent -- already-awarded codes are skipped)."""
+    import os as _os
+    from tgbot.models import TelegramProfile, BookComment, ConfirmationReport
+    from tgbot.services.achievements import award_new_achievements, compute_user_stats, ACHIEVEMENTS
+
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+        return HttpResponse(status=403)
+
+    commenter_ids = set(BookComment.objects.values_list("user_id", flat=True).distinct())
+    recent_reporter_ids = set(
+        ConfirmationReport.objects.order_by("-date").values_list("user_id", flat=True)[:300]
+    )
+    candidate_ids = list(commenter_ids | recent_reporter_ids)[:400]
+
+    newly_awarded = []
+    errors = []
+    checked = 0
+    for uid in candidate_ids:
+        user = TelegramProfile.objects.filter(id=uid).first()
+        if not user:
+            continue
+        checked += 1
+        try:
+            newly = award_new_achievements(user)
+        except Exception as e:
+            errors.append({"user_id": uid, "error": str(e)})
+            continue
+        if newly:
+            newly_awarded.append({
+                "user_id": uid,
+                "name": user.full_name,
+                "codes": [a["code"] for a in newly],
+            })
+
+    return JsonResponse({
+        "total_achievements_defined": len(ACHIEVEMENTS),
+        "candidates_checked": checked,
+        "users_newly_awarded": newly_awarded,
+        "errors": errors,
+    }, json_dumps_params={"indent": 2, "default": str})
+
+
+@csrf_exempt
 def internal_diag_blocked_users(request: HttpRequest):
     """One-off diagnostic: recent is_blocked changes on TelegramProfile via
     django-auditlog, to find out who/what has been wrongly blocking new
