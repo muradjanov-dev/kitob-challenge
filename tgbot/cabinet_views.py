@@ -16,7 +16,7 @@ from django.views.decorators.http import require_GET
 
 from tgbot.models import (
     BookQuizAnswer, BookReport, BooksToRead, ConfirmationReport,
-    ReferralBoom, ReferralBoomParticipant, TelegramProfile,
+    ReferralBoom, ReferralBoomParticipant, TelegramProfile, UserAchievement,
 )
 
 
@@ -169,6 +169,16 @@ def api_cabinet_me(request: HttpRequest) -> JsonResponse:
                 "ends_at": boom.end_at.isoformat(),
             }
 
+    # Full stats — reuses the same aggregate the achievement system already
+    # computes (compute_user_stats), so the cabinet never drifts out of sync
+    # with what actually unlocks an achievement, plus how many are unlocked.
+    from tgbot.models import MarketPurchase
+    from tgbot.services.achievements import compute_user_stats, ACHIEVEMENTS
+
+    stats = compute_user_stats(profile)
+    achievements_unlocked = UserAchievement.objects.filter(user=profile).count()
+    market_purchases = MarketPurchase.objects.filter(user=profile).count()
+
     return JsonResponse({
         "ok": True,
         "full_name": profile.full_name or "Kitobxon",
@@ -186,4 +196,19 @@ def api_cabinet_me(request: HttpRequest) -> JsonResponse:
         "pages_to_overtake": pages_to_overtake,
         "quiz_correct_count": quiz_correct_count,
         "active_boom": active_boom,
+        "full_stats": {
+            "reports": stats["reports"],
+            "max_streak": stats["max_streak"],
+            "referrals": stats["referrals"],
+            "book_comments": stats["book_comments"],
+            "distinct_authors": stats["distinct_authors"],
+            "live_games_played": stats["live_games_played"],
+            "live_games_won": stats["live_games_won"],
+            "shop_purchases": stats["shop_purchases"],
+            "market_purchases": market_purchases,
+            "premium_payments": stats["premium_payments"],
+            "account_age_days": stats["account_age_days"],
+            "achievements_unlocked": achievements_unlocked,
+            "achievements_total": len(ACHIEVEMENTS),
+        },
     })

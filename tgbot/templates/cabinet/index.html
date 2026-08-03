@@ -298,6 +298,55 @@
       </div>
       <div class="overtake" id="cabOvertake" style="display:none"></div>
     </div>
+
+    <div class="sec-title">To'liq statistika</div>
+    <div class="stat-grid" id="cabFullStats">
+      <div class="stat-card">
+        <div class="stat-icon">🏆</div>
+        <div class="stat-val" id="cabAchievements">0/0</div>
+        <div class="stat-label">Ochilgan yutuqlar</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🔥</div>
+        <div class="stat-val" id="cabStreak">0</div>
+        <div class="stat-label">Eng uzun streak (kun)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📤</div>
+        <div class="stat-val" id="cabReports">0</div>
+        <div class="stat-label">Jami hisobotlar</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-val" id="cabReferrals">0</div>
+        <div class="stat-label">Taklif qilingan do'stlar</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💬</div>
+        <div class="stat-val" id="cabComments">0</div>
+        <div class="stat-label">Kutubxona izohlari</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✍️</div>
+        <div class="stat-val" id="cabAuthors">0</div>
+        <div class="stat-label">O'qilgan mualliflar</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🎮</div>
+        <div class="stat-val" id="cabGames">0</div>
+        <div class="stat-label">Jonli o'yinlar (g'alaba)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🛍</div>
+        <div class="stat-val" id="cabPurchases">0</div>
+        <div class="stat-label">Do'kon + Market xaridlari</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🎂</div>
+        <div class="stat-val" id="cabAccountAge">0</div>
+        <div class="stat-label">Kun — biz bilan</div>
+      </div>
+    </div>
   </div>
 
 <nav class="site-tabbar">
@@ -383,6 +432,19 @@
             ov.style.display = 'block';
             ov.textContent = `🎯 Yana ${d.pages_to_overtake} bet o'qisangiz, keyingi kitobxondan o'tib ketasiz!`;
           }
+        }
+
+        if (d.full_stats) {
+          const fs = d.full_stats;
+          document.getElementById('cabAchievements').textContent = `${fs.achievements_unlocked}/${fs.achievements_total}`;
+          document.getElementById('cabStreak').textContent = fs.max_streak;
+          document.getElementById('cabReports').textContent = fs.reports;
+          document.getElementById('cabReferrals').textContent = fs.referrals;
+          document.getElementById('cabComments').textContent = fs.book_comments;
+          document.getElementById('cabAuthors').textContent = fs.distinct_authors;
+          document.getElementById('cabGames').textContent = `${fs.live_games_played} (${fs.live_games_won} 🏆)`;
+          document.getElementById('cabPurchases').textContent = fs.shop_purchases + fs.market_purchases;
+          document.getElementById('cabAccountAge').textContent = fs.account_age_days;
         }
       })
       .catch(() => {
