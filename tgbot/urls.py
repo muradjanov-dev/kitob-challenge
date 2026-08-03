@@ -10,6 +10,7 @@ from tgbot.shop_views import shop_index, api_products, api_me, api_buy
 from tgbot.library_views import (
     api_comments, api_add_comment, api_delete_comment, api_my_books, api_recent_comments,
     api_get_progress, api_save_progress, api_start_reading, api_premium_access,
+    api_top_active_readers,
 )
 from tgbot.cabinet_views import cabinet_index, api_cabinet_me
 from tgbot.report_views import api_submit_report, api_my_report_books
@@ -35,6 +36,7 @@ urlpatterns = [
     path('kutubxona/api/comment/delete/', api_delete_comment, name='library-api-delete-comment'),
     path('kutubxona/api/my-books/', api_my_books, name='library-api-my-books'),
     path('kutubxona/api/comments/recent/', api_recent_comments, name='library-api-recent-comments'),
+    path('kutubxona/api/top-active/', api_top_active_readers, name='library-api-top-active'),
     path('kutubxona/api/progress/', api_get_progress, name='library-api-get-progress'),
     path('kutubxona/api/progress/save/', api_save_progress, name='library-api-save-progress'),
     path('kutubxona/api/start-reading/', api_start_reading, name='library-api-start-reading'),

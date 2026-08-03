@@ -169,6 +169,49 @@
     .continue-bar-fill { height: 100%; background: var(--accent); }
     .continue-pct { font-size: 10px; color: rgba(245,234,216,.55); margin-top: 3px; font-variant-numeric: tabular-nums; }
 
+    /* Top-100 most active readers -- live-ish (refreshes periodically),
+       scoped to actual web-reader activity (BooksToRead.active_seconds),
+       distinct from the bot's report-based leaderboards. */
+    .topactive-wrap { padding: 0 24px 22px; max-width: 1280px; margin: 0 auto; }
+    .topactive-card {
+      background: rgba(245,234,216,.05); border: 1px solid rgba(245,234,216,.12);
+      border-radius: 16px; padding: 16px 16px 6px;
+    }
+    .topactive-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .topactive-title {
+      font-size: 13px; font-weight: 700; color: rgba(245,234,216,.7);
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .topactive-live-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: #ff4d4d; flex-shrink: 0;
+      animation: topactiveLivePulse 1.6s ease-out infinite;
+    }
+    @keyframes topactiveLivePulse {
+      0%   { box-shadow: 0 0 0 0 rgba(255,77,77,.55); }
+      70%  { box-shadow: 0 0 0 7px rgba(255,77,77,0); }
+      100% { box-shadow: 0 0 0 0 rgba(255,77,77,0); }
+    }
+    .topactive-sub { font-size: 11.5px; color: rgba(245,234,216,.45); margin-bottom: 10px; }
+    .topactive-list { max-height: 320px; overflow-y: auto; }
+    .topactive-row {
+      display: flex; align-items: center; gap: 10px; padding: 8px 4px;
+      border-bottom: 1px solid rgba(245,234,216,.08);
+    }
+    .topactive-row:last-child { border-bottom: 0; }
+    .topactive-rank {
+      width: 24px; height: 24px; flex: none; border-radius: 7px; display: grid; place-items: center;
+      font-size: 11px; font-weight: 800; background: rgba(198,113,57,.15); color: var(--accent);
+    }
+    .topactive-row:nth-child(1) .topactive-rank { background: linear-gradient(135deg,#ffd76a,#d99a1e); color: #5a3c00; }
+    .topactive-row:nth-child(2) .topactive-rank { background: linear-gradient(135deg,#e7e7ea,#b9bcc4); color: #3a3a3a; }
+    .topactive-row:nth-child(3) .topactive-rank { background: linear-gradient(135deg,#f0b486,#c97f45); color: #4a2400; }
+    .topactive-name {
+      flex: 1; font-size: 13px; font-weight: 600; color: #f5ead8;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .topactive-val { font-size: 12.5px; font-weight: 700; color: var(--accent2); white-space: nowrap; }
+    .topactive-empty { color: rgba(245,234,216,.45); font-size: 13px; text-align: center; padding: 16px 0; }
+
     /* Shelf controls bar */
     .shelf-controls {
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -1009,6 +1052,19 @@
     </div>
   </div>
 
+  <div class="topactive-wrap">
+    <div class="topactive-card">
+      <div class="topactive-head">
+        <span class="topactive-live-dot"></span>
+        <span class="topactive-title">🔥 Eng faol 100 kitobxon</span>
+      </div>
+      <div class="topactive-sub">Kutubxonada o'qish vaqti bo'yicha — har 60 soniyada yangilanadi</div>
+      <div class="topactive-list" id="topActiveList">
+        <div class="topactive-empty">Yuklanmoqda…</div>
+      </div>
+    </div>
+  </div>
+
   <div class="shelf-controls">
     <button class="shelf-mode-btn active" data-mode="global">Umumiy javon</button>
     <button class="shelf-mode-btn" data-mode="my">Mening javonim</button>
@@ -1490,6 +1546,38 @@ async function loadContinueReading() {
   } catch (e) { /* silent -- this is a nice-to-have shortcut row, not core content */ }
 }
 loadContinueReading();
+
+// ── Top-100 most active readers -- public, no auth needed, refreshes
+// periodically so it feels live without hammering the endpoint (the view
+// itself also caches the aggregate for ~55s). ──────────────────────────
+function _topActiveEsc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+async function loadTopActiveReaders() {
+  const list = document.getElementById('topActiveList');
+  if (!list) return;
+  try {
+    const res = await fetch('/kutubxona/api/top-active/');
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const rows = data.rows || [];
+    if (!rows.length) {
+      list.innerHTML = '<div class="topactive-empty">Hozircha ma\'lumot yo\'q</div>';
+      return;
+    }
+    list.innerHTML = rows.map((r, i) => `
+      <div class="topactive-row">
+        <div class="topactive-rank">${i + 1}</div>
+        <div class="topactive-name">${_topActiveEsc(r.name)}</div>
+        <div class="topactive-val">${_topActiveEsc(r.value)}</div>
+      </div>
+    `).join('');
+  } catch (e) {
+    list.innerHTML = '<div class="topactive-empty">Yuklab bo\'lmadi.</div>';
+  }
+}
+loadTopActiveReaders();
+setInterval(loadTopActiveReaders, 60000);
 
 // ── Search ───────────────────────────────────────────────────────
 const searchInput = document.getElementById('searchInput');

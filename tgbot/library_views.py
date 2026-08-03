@@ -491,3 +491,36 @@ def api_recent_comments(request: HttpRequest):
             for c in comments
         ]
     })
+
+
+# ── GET /kutubxona/api/top-active/ ────────────────────────────────────────
+# Top 100 by actual web-reader activity (BooksToRead.active_seconds summed
+# across every book) -- distinct from the bot's report-based leaderboards,
+# scoped specifically to time spent in this reader. Cached briefly so the
+# ~60s client refresh doesn't re-run the aggregate on every single request.
+@require_GET
+def api_top_active_readers(request: HttpRequest):
+    from django.core.cache import cache
+    from django.db.models import Sum
+
+    cached = cache.get("kc_top_active_readers_v1")
+    if cached is not None:
+        return JsonResponse({"rows": cached})
+
+    rows = list(
+        BooksToRead.objects
+        .filter(user__is_blocked=False, active_seconds__gt=0)
+        .values("user_id", "user__full_name")
+        .annotate(total_seconds=Sum("active_seconds"))
+        .order_by("-total_seconds")[:100]
+    )
+    out = []
+    for r in rows:
+        secs = r["total_seconds"] or 0
+        hours, rem = divmod(secs, 3600)
+        minutes = rem // 60
+        value = f"{hours}s {minutes}d" if hours else f"{minutes}d"
+        out.append({"name": r["user__full_name"] or "Kitobxon", "value": value})
+
+    cache.set("kc_top_active_readers_v1", out, 55)  # refresh cadence matches the client's 60s poll
+    return JsonResponse({"rows": out})
