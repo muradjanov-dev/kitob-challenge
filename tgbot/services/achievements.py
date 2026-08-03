@@ -10,14 +10,14 @@ Workflow:
 from datetime import timedelta
 from typing import Callable, List, Optional, TypedDict
 
-from django.db.models import Count, Sum, Avg, F, Max
+from django.db.models import Count, Sum, Avg, F, Max, Min
 from django.db.models.functions import Length, TruncDate
 from django.utils import timezone
 
 from tgbot.models import (
     TelegramProfile, ConfirmationReport, BooksToRead, UserAchievement,
     UserReferal, ChainScore, FeudScore, CastleHit, EmojiScore, WisdomScore,
-    DetectiveScore, SurvivalPlayer, QuizScore, ShopPurchase, Payment,
+    DetectiveScore, SurvivalPlayer, QuizScore, ShopPurchase, Payment, BookComment,
 )
 
 
@@ -49,6 +49,12 @@ class Stats(TypedDict):
     combo_days: int
     distinct_authors: int
     wisdom_best_streak: int
+    book_comments: int
+    long_comments_300: int
+    long_comments_500: int
+    pioneer_comments: int
+    comment_languages: int
+    comment_days: int
 
 
 def compute_user_stats(user: TelegramProfile) -> Stats:
@@ -111,6 +117,11 @@ def compute_user_stats(user: TelegramProfile) -> Stats:
     )
     wisdom_best_streak = WisdomScore.objects.filter(user=user).aggregate(m=Max("best_streak"))["m"] or 0
 
+    (
+        book_comments, long_comments_300, long_comments_500,
+        pioneer_comments, comment_languages, comment_days,
+    ) = _book_comment_stats(user)
+
     return {
         "reports": reports_count,
         "pages": pages,
@@ -133,7 +144,49 @@ def compute_user_stats(user: TelegramProfile) -> Stats:
         "combo_days": combo_days,
         "distinct_authors": distinct_authors,
         "wisdom_best_streak": wisdom_best_streak,
+        "book_comments": book_comments,
+        "long_comments_300": long_comments_300,
+        "long_comments_500": long_comments_500,
+        "pioneer_comments": pioneer_comments,
+        "comment_languages": comment_languages,
+        "comment_days": comment_days,
     }
+
+
+def _book_comment_stats(user: TelegramProfile) -> tuple[int, int, int, int, int, int]:
+    """(total comments, 300+ char comments, 500+ char comments, "pioneer"
+    comments -- ones that were the first ever left on their book, distinct
+    book languages commented on, distinct days commented on)."""
+    rows = list(
+        BookComment.objects.filter(user=user)
+        .annotate(_len=Length("text"))
+        .values_list("book_id", "created_at", "_len")
+    )
+    if not rows:
+        return 0, 0, 0, 0, 0, 0
+
+    total = len(rows)
+    long_300 = sum(1 for _, _, l in rows if l >= 300)
+    long_500 = sum(1 for _, _, l in rows if l >= 500)
+
+    book_ids = [bid for bid, _, _ in rows]
+    first_at_by_book = dict(
+        BookComment.objects.filter(book_id__in=book_ids)
+        .values("book_id").annotate(first_at=Min("created_at"))
+        .values_list("book_id", "first_at")
+    )
+    pioneer = sum(1 for bid, created_at, _ in rows if first_at_by_book.get(bid) == created_at)
+
+    languages = (
+        BookComment.objects.filter(user=user)
+        .values_list("book__language", flat=True).distinct().count()
+    )
+    days = (
+        BookComment.objects.filter(user=user)
+        .annotate(_d=TruncDate("created_at"))
+        .values_list("_d", flat=True).distinct().count()
+    )
+    return total, long_300, long_500, pioneer, languages, days
 
 
 # Reward value that separates "placed/won" from mere participation across the
@@ -388,6 +441,23 @@ ACHIEVEMENTS_RAW = [
     {"code": "wst_3",  "emoji": "🧠", "title_uz": "Hikmat seriyasi — 3",          "title_ru": "Серия мудрости — 3",         "hint_uz": "☪️ Hikmat Xazinasi jonli o'yinida ketma-ket 3 marta to'g'ri javob bering.", "hint_ru": "В игре «Hikmat Xazinasi» ответьте правильно 3 раза подряд.", "cond": _at_least("wisdom_best_streak", 3),  "points": 50},
     {"code": "wst_10", "emoji": "🦉", "title_uz": "Hikmat seriyasi — 10, dono",   "title_ru": "Серия мудрости — 10",        "hint_uz": "☪️ Hikmat Xazinasi jonli o'yinida ketma-ket 10 marta to'g'ri javob bering.", "hint_ru": "В игре «Hikmat Xazinasi» ответьте правильно 10 раз подряд.", "cond": _at_least("wisdom_best_streak", 10), "points": 300},
     {"code": "wst_20", "emoji": "🔮", "title_uz": "Hikmat seriyasi — 20, ustoz",  "title_ru": "Серия мудрости — 20",        "hint_uz": "☪️ Hikmat Xazinasi jonli o'yinida ketma-ket 20 marta to'g'ri javob bering.", "hint_ru": "В игре «Hikmat Xazinasi» ответьте правильно 20 раз подряд.", "cond": _at_least("wisdom_best_streak", 20), "points": 900},
+
+    # — Book comments (kutubxona) — ladder + quality/pioneer/diversity —
+    {"code": "cm_1",  "emoji": "💬", "title_uz": "Birinchi fikr",                 "title_ru": "Первый отзыв",               "hint_uz": "Kutubxonadagi istalgan kitobga izoh qoldiring.", "hint_ru": "Оставьте комментарий к любой книге в библиотеке.", "cond": _at_least("book_comments", 1),  "points": 15},
+    {"code": "cm_3",  "emoji": "🗨",  "title_uz": "Uch fikr",                      "title_ru": "Три отзыва",                 "hint_uz": "Jami 3 ta kitobga izoh qoldiring.", "hint_ru": "Оставьте комментарии к 3 книгам.", "cond": _at_least("book_comments", 3),  "points": 30},
+    {"code": "cm_5",  "emoji": "📣", "title_uz": "Besh fikr",                     "title_ru": "Пять отзывов",               "hint_uz": "Jami 5 ta kitobga izoh qoldiring.", "hint_ru": "Оставьте комментарии к 5 книгам.", "cond": _at_least("book_comments", 5),  "points": 50},
+    {"code": "cm_10", "emoji": "📢", "title_uz": "O'n fikr — faol sharhlovchi",   "title_ru": "Десять отзывов — активный рецензент", "hint_uz": "Jami 10 ta kitobga izoh qoldiring.", "hint_ru": "Оставьте комментарии к 10 книгам.", "cond": _at_least("book_comments", 10), "points": 100},
+    {"code": "cm_25", "emoji": "🏛", "title_uz": "Yigirma besh fikr — kutubxona jonkuyari", "title_ru": "Двадцать пять — душа библиотеки", "hint_uz": "Jami 25 ta kitobga izoh qoldiring.", "hint_ru": "Оставьте комментарии к 25 книгам.", "cond": _at_least("book_comments", 25), "points": 250},
+    {"code": "cm_50", "emoji": "🏆", "title_uz": "Ellik fikr — kutubxona faoli",  "title_ru": "Пятьдесят отзывов — активист библиотеки", "hint_uz": "Jami 50 ta kitobga izoh qoldiring.", "hint_ru": "Оставьте комментарии к 50 книгам.", "cond": _at_least("book_comments", 50), "points": 500},
+
+    {"code": "cml_1", "emoji": "✍️", "title_uz": "Mulohazakor",                  "title_ru": "Вдумчивый читатель",         "hint_uz": "Kamida 300 belgidan iborat chuqur izoh yozing.", "hint_ru": "Напишите содержательный комментарий не менее 300 символов.", "cond": _at_least("long_comments_300", 1), "points": 25},
+    {"code": "cml_5", "emoji": "📜", "title_uz": "Chuqur mutafakkir",             "title_ru": "Глубокий мыслитель",         "hint_uz": "500+ belgidan iborat 5 ta izoh yozing.", "hint_ru": "Напишите 5 комментариев не менее 500 символов каждый.", "cond": _at_least("long_comments_500", 5), "points": 150},
+
+    {"code": "cmpi_1", "emoji": "🧭", "title_uz": "Birinchi kashfiyotchi",        "title_ru": "Первый первопроходец",       "hint_uz": "Hech kim izoh qoldirmagan kitobga BIRINCHI bo'lib izoh yozing.", "hint_ru": "Оставьте ПЕРВЫЙ комментарий к книге, у которой ещё не было отзывов.", "cond": _at_least("pioneer_comments", 1), "points": 40},
+    {"code": "cmpi_5", "emoji": "🗺",  "title_uz": "Beshta kashfiyot — yo'l ochuvchi", "title_ru": "Пять открытий — первопроходец", "hint_uz": "5 xil kitobga birinchi bo'lib izoh yozing.", "hint_ru": "Оставьте первый комментарий к 5 разным книгам.", "cond": _at_least("pioneer_comments", 5), "points": 200},
+
+    {"code": "cmlang_3", "emoji": "🌐", "title_uz": "Ko'p tilli sharhlovchi",     "title_ru": "Многоязычный рецензент",     "hint_uz": "3 xil tildagi kitoblarga izoh qoldiring.", "hint_ru": "Оставьте комментарии к книгам на 3 разных языках.", "cond": _at_least("comment_languages", 3), "points": 80},
+    {"code": "cmday_10", "emoji": "📆", "title_uz": "Kundalik fikr ustasi",       "title_ru": "Мастер ежедневных отзывов",  "hint_uz": "10 xil kunda izoh qoldiring (bir kunda bir nechtasi bitta kun sifatida hisoblanadi).", "hint_ru": "Оставляйте комментарии в 10 разных дней.", "cond": _at_least("comment_days", 10), "points": 150},
 ]
 
 

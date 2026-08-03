@@ -137,6 +137,12 @@ def api_add_comment(request: HttpRequest):
         user=profile,
         defaults={"text": text},
     )
+    if created:
+        try:
+            from tgbot.tasks import check_user_achievements
+            check_user_achievements.delay(profile.id)
+        except Exception as e:
+            print(f"check_user_achievements dispatch failed (comment): {e}")
     return JsonResponse({
         "ok": True,
         "created": created,
