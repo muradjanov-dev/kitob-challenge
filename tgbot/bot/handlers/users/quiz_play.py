@@ -7,6 +7,7 @@ import random
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import ChatType, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.exceptions import BadRequest
 from asgiref.sync import sync_to_async
 from django.core.cache import cache
 from django.db.models import F
@@ -657,16 +658,27 @@ async def _send_group_question_poll(chat_id: int, session_id: int, q_idx: int):
     correct_idx = next((i for i, o in enumerate(opts) if o.is_correct), 0)
     poll_question = f"❓ {q_idx + 1}/{total}  {question.text}"[:300]
 
-    poll_msg = await bot.send_poll(
-        chat_id=chat_id,
-        question=poll_question,
-        options=[o.text[:100] for o in opts],
-        type="quiz",
-        correct_option_id=correct_idx,
-        is_anonymous=False,
-        explanation=(question.hint[:200] if question.hint else None),
-        open_period=max(5, min(600, time_limit)),
-    )
+    try:
+        poll_msg = await bot.send_poll(
+            chat_id=chat_id,
+            question=poll_question,
+            options=[o.text[:100] for o in opts],
+            type="quiz",
+            correct_option_id=correct_idx,
+            is_anonymous=False,
+            explanation=(question.hint[:200] if question.hint else None),
+            open_period=max(5, min(600, time_limit)),
+        )
+    except BadRequest as e:
+        # e.g. bot lost admin rights / "can post polls" in this group. Left
+        # unhandled, this raised inside the asyncio.create_task chain that
+        # calls this function (see _group_poll_advance_after_close below),
+        # so the exception was never retrieved and the session just hung
+        # forever instead of ending (2026-08-02 logs). Stop the session
+        # cleanly instead of leaving it stuck mid-quiz.
+        print(f"_send_group_question_poll chat={chat_id} session={session_id}: {e}")
+        await sync_to_async(QuizSession.objects.filter(id=session_id).update)(status="finished")
+        return
 
     cache.set(
         f"{POLL_CACHE_PREFIX}{poll_msg.poll.id}",

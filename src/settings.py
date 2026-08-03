@@ -123,8 +123,17 @@ if DEBUG:
     }
 else:
     # PG Bouncer Database
+    #
+    # conn_max_age was 600 (10 min) -- combined with 3 gunicorn processes x 8
+    # threads, a dedicated per-process bot-processing thread, and Celery's 20
+    # worker threads, that let live connections pile up as evening traffic
+    # ramped up faster than they aged out, exhausting Postgres's
+    # max_connections and freezing the bot (2026-08-02). Cut way down as a
+    # safety net alongside the connections.close_all() fixes in
+    # celery_app.py / tgbot/views.py / localization.py, which now
+    # force-close after every unit of work instead of relying on this alone.
     DATABASES = {
-        'default': dj_database_url.config(conn_max_age=600, ssl_require=False)
+        'default': dj_database_url.config(conn_max_age=60, ssl_require=False)
     }
     DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
 

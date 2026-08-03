@@ -3,7 +3,7 @@ import threading
 import time
 import traceback
 
-from django.db import close_old_connections
+from django.db import connections
 from django.shortcuts import render
 from .webhook import proceed_update_from_body
 from django.http import HttpResponse, HttpRequest, JsonResponse
@@ -39,7 +39,13 @@ async def _process_with_cleanup(body_bytes: bytes) -> None:
     except Exception:
         print("webhook bg error:\n" + traceback.format_exc())
     finally:
-        close_old_connections()
+        # Force-close, not close_old_connections() -- that only closes a
+        # connection once it's already past CONN_MAX_AGE, so this persistent
+        # background thread (see _bot_loop above) just kept accumulating a
+        # live connection across updates instead of releasing it. See
+        # celery_app.py's _close_db_connections_after_task for the same fix
+        # applied on the Celery side (2026-08-02 outage).
+        connections.close_all()
         elapsed_ms = int((time.monotonic() - start) * 1000)
         if elapsed_ms > 500:
             print(f"webhook handler took {elapsed_ms} ms")

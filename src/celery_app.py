@@ -31,16 +31,21 @@ app.autodiscover_tasks()
 # connection the moment it first touches the DB and never releases it. A
 # stuck worker left running for a couple of days was enough on its own to
 # exhaust Postgres's max_connections and take down the whole platform
-# (2026-08-02). close_old_connections() after every task makes Celery behave
-# like the request cycle: drop the connection once it's past CONN_MAX_AGE
-# (unset here, so every time).
+# (2026-08-02).
+#
+# NOTE: close_old_connections() (the first attempt at this fix, same day)
+# does NOT actually close a connection here -- it only closes one that's
+# already past CONN_MAX_AGE (600s, set in settings.py), so busy threads just
+# kept holding live connections and the outage recurred that same evening
+# once traffic ramped up. connections.close_all() force-closes unconditionally,
+# so every thread starts its next task with a clean slate.
 from celery.signals import task_postrun  # noqa: E402
 
 
 @task_postrun.connect
 def _close_db_connections_after_task(**kwargs):
-    from django.db import close_old_connections
-    close_old_connections()
+    from django.db import connections
+    connections.close_all()
 
 app.conf.beat_schedule = {
 

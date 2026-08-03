@@ -4,7 +4,7 @@ from typing import Tuple, Any
 from aiogram.contrib.middlewares.i18n import I18nMiddleware
 from tgbot.models import TelegramProfile
 
-from django.db import close_old_connections
+from django.db import connections
 from asgiref.sync import sync_to_async
 
 # LANG_STORAGE = {}
@@ -20,7 +20,7 @@ class Localization(I18nMiddleware):
         :param args: event arguments
         :return: locale name
         """
-        await sync_to_async(close_old_connections)()
+        await sync_to_async(connections.close_all)()
         user: types.User = types.User.get_current()
         language_code = "uz"
         if user:
