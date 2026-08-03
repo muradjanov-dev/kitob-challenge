@@ -1,11 +1,30 @@
 import string
 import random
+import requests
 from datetime import timedelta
+from django.conf import settings
 from django.utils import timezone
 from asgiref.sync import sync_to_async
 from tgbot.models import UserReferal, TelegramProfile
 from tgbot.bot.loader import bot
 from tgbot.bot.consts import ADMIN_GROUP_ID, TECHNICAL_SUPPORT_THREAD_ID, REFERRAL_CODE_LENGTH
+
+
+def _send_telegram_message(chat_id, text, thread_id=None, parse_mode="HTML"):
+    """Plain HTTP send, deliberately NOT going through the aiogram `bot`
+    object. process_referral() is invoked both from the bot's own event loop
+    (report.py chat flow) and, via async_to_sync, from a Django sync view's
+    thread-pool loop (report_views.py web flow). aiogram's Bot lazily binds
+    its aiohttp ClientSession/connector to whichever loop first touches it,
+    so a second, different loop touching it later intermittently blows up
+    with "Timeout context manager should be used inside a task". A bare
+    requests.post has no loop affinity and sidesteps that -- same fix already
+    used by tgbot/tasks.py's send_message() for the same reason."""
+    url = f"https://api.telegram.org/bot{settings.API_TOKEN}/sendMessage"
+    data = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
+    if thread_id:
+        data["message_thread_id"] = thread_id
+    requests.post(url, data=data, timeout=10).raise_for_status()
 
 
 class ReferralService:
@@ -230,10 +249,7 @@ class ReferralService:
                 payload["total_earned"],
                 payload["balance"],
             )
-            await bot.send_message(
-                chat_id=referrer.telegram_id, text=text, parse_mode="HTML",
-                disable_web_page_preview=True,
-            )
+            await sync_to_async(_send_telegram_message)(referrer.telegram_id, text)
         except Exception as e:
             print(f"Failed to send boom payout DM ({referrer.telegram_id}): {e}")
 
@@ -246,11 +262,8 @@ class ReferralService:
                 f"👤 <b>Yangi a'zo:</b> {new_user.full_name} ({new_user.telegram_id})\n"
                 f"🔗 <b>Kod:</b> {code}"
             )
-            await bot.send_message(
-                chat_id=ADMIN_GROUP_ID,
-                text=notification_msg,
-                message_thread_id=TECHNICAL_SUPPORT_THREAD_ID,
-                parse_mode='HTML'
+            await sync_to_async(_send_telegram_message)(
+                ADMIN_GROUP_ID, notification_msg, thread_id=TECHNICAL_SUPPORT_THREAD_ID,
             )
         except Exception as e:
             print(f"Failed to send referral notification to admin: {e}")
@@ -276,11 +289,7 @@ class ReferralService:
                 f"📊 <b>Jami referallar:</b> {ref_count}\n\n"
                 + "\n".join(reward_lines)
             )
-            await bot.send_message(
-                chat_id=referrer.telegram_id,
-                text=referrer_notification,
-                parse_mode='HTML'
-            )
+            await sync_to_async(_send_telegram_message)(referrer.telegram_id, referrer_notification)
         except Exception as e:
             print(
                 f"Failed to send notification to referrer ({referrer.telegram_id}): {e}")
