@@ -895,16 +895,33 @@ def _format_books_section(user) -> str:
 _BOT_USERNAME = None
 
 
+def _fetch_bot_username_sync():
+    """Plain HTTP getMe, deliberately not aiogram's bot.get_me(). This worker
+    process may also have run report_views.py's async_to_sync bridge, which
+    binds the aiogram Bot's aiohttp session to a throwaway loop; a later
+    bot.* call from a different loop then intermittently raises "Timeout
+    context manager should be used inside a task" (same class of bug fixed
+    in tgbot/services/referral.py). A bare request has no loop affinity."""
+    try:
+        import requests
+        from django.conf import settings
+        resp = requests.get(
+            f"https://api.telegram.org/bot{settings.API_TOKEN}/getMe", timeout=10,
+        )
+        resp.raise_for_status()
+        return resp.json()["result"].get("username") or ""
+    except Exception:
+        return ""
+
+
 async def _ensure_bot_username():
     """Cache the bot's @username once — needed to build t.me deep links inside
-    the (sync) profile-card text builder."""
+    the (sync) profile-card text builder. Only a successful fetch is cached;
+    a transient failure must NOT latch _BOT_USERNAME to "" forever (that
+    previously killed the "Yozish" link for the rest of the worker's life)."""
     global _BOT_USERNAME
-    if _BOT_USERNAME is None:
-        try:
-            from tgbot.bot.loader import bot
-            _BOT_USERNAME = (await bot.get_me()).username or ""
-        except Exception:
-            _BOT_USERNAME = ""
+    if not _BOT_USERNAME:
+        _BOT_USERNAME = await sync_to_async(_fetch_bot_username_sync)()
     return _BOT_USERNAME
 
 
