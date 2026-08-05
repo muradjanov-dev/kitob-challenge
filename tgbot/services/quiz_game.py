@@ -44,14 +44,35 @@ ANSWER_SECONDS = 20
 REVEAL_SECONDS = 8
 POINTS = 10
 # Winning-team reward: a per-person BASE that grows with that team's own
-# turnout (capped, so payout doesn't run away for huge teams), plus a rank
-# bonus for the top-3 scorers on the team -- so joining a bigger team never
-# shrinks your cut, AND outscoring your teammates is worth more.
+# turnout, banded so growth tapers off for very large teams instead of
+# running away, plus a rank bonus for the top-3 scorers on the team -- so
+# joining a bigger team never shrinks your cut, AND outscoring your
+# teammates is worth more.
 TEAM_BASE_REWARD = 60
-TEAM_SIZE_BONUS_PER_MEMBER = 4   # base grows by this per teammate beyond the first
-TEAM_SIZE_BONUS_CAP = 60         # ...up to this much extra (reached at 16 members)
+# (team-size upper bound, Kitobcha added per member within this band).
+# Cumulative base at each threshold: 16->120, 30->162, 40->182, 50->202,
+# 60->212, 100->252. Beyond 100 members the base stays flat at 252.
+TEAM_SIZE_BANDS = [
+    (16, 4),
+    (30, 3),
+    (40, 2),
+    (50, 2),
+    (60, 1),
+    (100, 1),
+]
 TEAM_RANK_BONUS = {0: 40, 1: 25, 2: 10}  # extra Kitobcha for the team's top 3 scorers
 COVER_BLUR_RADIUS = 14  # strong enough that any title text on the cover is unreadable
+
+
+def _dynamic_base(team_size):
+    base = TEAM_BASE_REWARD
+    prev = 1
+    for upper, step in TEAM_SIZE_BANDS:
+        if team_size <= upper:
+            return base + step * (team_size - prev)
+        base += step * (upper - prev)
+        prev = upper
+    return base  # 100+ members: flat at the last band's cumulative value
 
 TITLES = {
     "twofacts": "Ikki haqiqat, bir yolg'on",
@@ -366,10 +387,6 @@ def _finalize_teams(g) -> dict:
     winning_team = "a" if g.team_a_points >= g.team_b_points else "b"
     tie = g.team_a_points == g.team_b_points
     team_sizes = {"a": len(g.team_a or []), "b": len(g.team_b or [])}
-
-    def _dynamic_base(team_size):
-        grown = TEAM_SIZE_BONUS_PER_MEMBER * max(team_size - 1, 0)
-        return TEAM_BASE_REWARD + min(grown, TEAM_SIZE_BONUS_CAP)
 
     # Rank each winning side's own scorers (ties make both sides "winning",
     # each ranked separately) so the top-3 scorers get a bonus on top of the
