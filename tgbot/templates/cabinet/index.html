@@ -371,6 +371,29 @@
 (function() {
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+  // Telegram does NOT re-inject initData when navigating to another page
+  // inside the same Mini App, so /shop/ fails auth (invalid_init_data) when
+  // reached from here via the tab bar. Carry the initData forward through
+  // the URL query -- same fix already applied to site/index.html's shop links.
+  async function _getInitDataForNav() {
+    if (tg && tg.initData) return tg.initData;
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      if (tg && tg.initData) return tg.initData;
+    }
+    return '';
+  }
+  if (tg) {
+    document.querySelectorAll('a[href^="/shop"]').forEach(a => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const base = a.getAttribute('href').split('?')[0].split('#')[0];
+        _getInitDataForNav().then((id) => {
+          window.location.href = id ? base + '?tgWebAppData=' + encodeURIComponent(id) : base;
+        });
+      });
+    });
+  }
   // Some mobile WebViews (Telegram's especially, around the expand()
   // resize) only reflow a position:fixed element on the next scroll --
   // the bottom tab bar can sit off-screen until the user scrolls once.
