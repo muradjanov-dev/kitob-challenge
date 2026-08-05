@@ -43,7 +43,10 @@ LEAD_SECONDS = 30
 ANSWER_SECONDS = 20
 REVEAL_SECONDS = 8
 POINTS = 10
-TEAM_JACKPOT = 300
+TEAM_WIN_REWARD = 60  # flat per-person reward for every winning-team contributor --
+                      # NOT split across the team, so a bigger turnout never shrinks
+                      # anyone's individual share; it only means more total Kitobcha
+                      # paid out.
 COVER_BLUR_RADIUS = 14  # strong enough that any title text on the cover is unreadable
 
 TITLES = {
@@ -365,12 +368,7 @@ def _finalize_teams(g) -> dict:
         on_winning_side = tie or s.team == winning_team
         reward = 0
         if on_winning_side:
-            # Winners split a fixed jackpot across their own team's size, so a
-            # big (auto-balanced, not user-chosen) winning team could end up
-            # with a smaller per-person share than the losing team's flat
-            # PARTICIPATION reward -- winning must never pay less than losing.
-            team_size = len(g.team_a if s.team == "a" else g.team_b) or 1
-            reward = max(PARTICIPATION + 10, TEAM_JACKPOT // team_size)
+            reward = TEAM_WIN_REWARD
         elif s.points > 0:
             reward = PARTICIPATION
         if reward and not s.rewarded:

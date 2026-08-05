@@ -6053,7 +6053,7 @@ def _start_quiz_flavor(flavor):
             "👥 <b>JAMOA JANGI</b> — ikki jamoa bo'lib jang!\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
             "Kirganlaringiz avtomatik ikki jamoaga bo'linadi. Jamoangiz ko'proq "
-            "to'g'ri javob bersa — jamoa jackpotni bo'lishadi!\n\n"
+            "to'g'ri javob bersa — g'olib jamoadagi HAR BIR kishi 60 Kitobcha oladi!\n\n"
             f"💰 <b>Kirish: {ENTRY_FEES['teams']} Kitobcha.</b>\n👇 Kiring:"
         ),
         "timeline": (
