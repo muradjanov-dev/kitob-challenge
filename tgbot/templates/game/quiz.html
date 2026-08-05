@@ -98,7 +98,7 @@
     document.getElementById('pageTitle').textContent = M.title;
     document.getElementById('gameEmoji').textContent = M.emoji;
     document.getElementById('gameTitle').textContent = M.title;
-    document.getElementById('feeBanner').innerHTML = '💰 <b>Kirish: '+M.fee+' Kitobcha</b> (birinchi javobda).' + (FLAVOR==='teams' ? ' 👥 Jamoangiz ko\'proq to\'g\'ri javob bersa — g\'olib jamoadagi HAR BIR kishi 60 Kitobcha oladi!' : '');
+    document.getElementById('feeBanner').innerHTML = '💰 <b>Kirish: '+M.fee+' Kitobcha</b> (birinchi javobda).' + (FLAVOR==='teams' ? ' 👥 Jamoangiz g\'olib chiqsa — HAR BIR a\'zo Kitobcha oladi (jamoa kattaroq bo\'lsa, ko\'proq!), eng ko\'p to\'g\'ri javob berganlar esa qo\'shimcha bonus oladi!' : '');
     if (FLAVOR === 'teams') { document.getElementById('myPtsLbl').textContent = 'Sizning ballaringiz'; }
 
     var tg=(window.Telegram&&window.Telegram.WebApp)?window.Telegram.WebApp:null;

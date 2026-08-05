@@ -43,10 +43,14 @@ LEAD_SECONDS = 30
 ANSWER_SECONDS = 20
 REVEAL_SECONDS = 8
 POINTS = 10
-TEAM_WIN_REWARD = 60  # flat per-person reward for every winning-team contributor --
-                      # NOT split across the team, so a bigger turnout never shrinks
-                      # anyone's individual share; it only means more total Kitobcha
-                      # paid out.
+# Winning-team reward: a per-person BASE that grows with that team's own
+# turnout (capped, so payout doesn't run away for huge teams), plus a rank
+# bonus for the top-3 scorers on the team -- so joining a bigger team never
+# shrinks your cut, AND outscoring your teammates is worth more.
+TEAM_BASE_REWARD = 60
+TEAM_SIZE_BONUS_PER_MEMBER = 4   # base grows by this per teammate beyond the first
+TEAM_SIZE_BONUS_CAP = 60         # ...up to this much extra (reached at 16 members)
+TEAM_RANK_BONUS = {0: 40, 1: 25, 2: 10}  # extra Kitobcha for the team's top 3 scorers
 COVER_BLUR_RADIUS = 14  # strong enough that any title text on the cover is unreadable
 
 TITLES = {
@@ -361,6 +365,26 @@ def _finalize_teams(g) -> dict:
     scores = list(QuizScore.objects.filter(game=g).select_related("user"))
     winning_team = "a" if g.team_a_points >= g.team_b_points else "b"
     tie = g.team_a_points == g.team_b_points
+    team_sizes = {"a": len(g.team_a or []), "b": len(g.team_b or [])}
+
+    def _dynamic_base(team_size):
+        grown = TEAM_SIZE_BONUS_PER_MEMBER * max(team_size - 1, 0)
+        return TEAM_BASE_REWARD + min(grown, TEAM_SIZE_BONUS_CAP)
+
+    # Rank each winning side's own scorers (ties make both sides "winning",
+    # each ranked separately) so the top-3 scorers get a bonus on top of the
+    # size-scaled base, instead of everyone on the team earning the same cut.
+    rank_by_score_id = {}
+    for team in ("a", "b"):
+        if not (tie or team == winning_team):
+            continue
+        ranked = sorted(
+            (s for s in scores if s.team == team),
+            key=lambda s: (-s.points, s.created_at),
+        )
+        for i, s in enumerate(ranked):
+            rank_by_score_id[s.id] = i
+
     winners = []
     for s in scores:
         if not s.team:
@@ -368,7 +392,8 @@ def _finalize_teams(g) -> dict:
         on_winning_side = tie or s.team == winning_team
         reward = 0
         if on_winning_side:
-            reward = TEAM_WIN_REWARD
+            base = _dynamic_base(team_sizes[s.team])
+            reward = base + TEAM_RANK_BONUS.get(rank_by_score_id.get(s.id), 0)
         elif s.points > 0:
             reward = PARTICIPATION
         if reward and not s.rewarded:
