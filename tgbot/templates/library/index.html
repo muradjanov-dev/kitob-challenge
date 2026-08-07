@@ -936,6 +936,12 @@
     hintRight.style.width = '0px'; hintRight.style.opacity = '0';
   }
 
+  // Only arm the swipe-nav gesture for touches starting near a screen edge
+  // (matches the edge-hint glow's own visual promise). Previously it armed
+  // from anywhere on the page, so an ordinary vertical scroll with a slight
+  // diagonal drift -- normal on a tall list -- could cross the dx/dy ratio
+  // check below and yank the user to another page mid-scroll.
+  const SWIPE_EDGE_ZONE = 28;
   let drag = null; // {x, y, t, active, dx}
   document.body.addEventListener('touchstart', (e) => {
     drag = null;
@@ -943,7 +949,9 @@
     const reader = document.getElementById('pdfReader');
     if (reader && reader.classList.contains('open')) return;
     if (_hasHorizontalOverflow(e.target)) return;
-    drag = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), active: false, dx: 0 };
+    const x0 = e.touches[0].clientX;
+    if (x0 > SWIPE_EDGE_ZONE && x0 < window.innerWidth - SWIPE_EDGE_ZONE) return;
+    drag = { x: x0, y: e.touches[0].clientY, t: Date.now(), active: false, dx: 0 };
   }, { passive: true });
 
   document.body.addEventListener('touchmove', (e) => {
