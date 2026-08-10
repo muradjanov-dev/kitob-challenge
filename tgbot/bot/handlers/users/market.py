@@ -54,8 +54,50 @@ def _market_menu_kb() -> InlineKeyboardMarkup:
             text=f"{item['emoji']} {item['title']} — {item['price']} 🪙",
             callback_data=f"market:view:{key}",
         ))
+    kb.add(InlineKeyboardButton(text="🛍 Do'kon mahsulotlari", callback_data="market:shop_products"))
     kb.add(InlineKeyboardButton(text="🏠 Bosh menyu", callback_data="market:home"))
     return kb
+
+
+@dp.callback_query_handler(lambda c: c.data == "market:shop_products")
+async def market_show_shop_products(call: types.CallbackQuery):
+    """Preview of the Mini App shop's live catalog, right in the chat --
+    actually buying still happens in the shop itself (atomic balance/stock
+    handling, images, admin notify are already solid there; no reason to
+    fork a second purchase path here). This is a discovery surface with a
+    button straight into it."""
+    if not _is_private(call):
+        await _redirect_to_private(call)
+        return
+    await call.answer()
+
+    @sync_to_async
+    def _load():
+        from tgbot.models import ShopProduct
+        products = list(ShopProduct.objects.filter(is_active=True).order_by("sort_order", "-created_at"))
+        products.sort(key=lambda p: not p.is_available)
+        return products[:20]
+
+    products = await _load()
+    if not products:
+        await call.message.answer("🛍 Hozircha do'konda mahsulot yo'q.")
+        return
+
+    lines = ["🛍 <b>Do'kon mahsulotlari</b>\n"]
+    for p in products:
+        if p.is_available:
+            stock = "" if p.stock_qty is None else f" — {p.stock_qty} ta qoldi"
+            lines.append(f"• <b>{p.name}</b> — {p.price_kitobcha} 🪙{stock}")
+        else:
+            lines.append(f"• <s>{p.name}</s> — tugadi")
+    lines.append("\n👇 Sotib olish uchun do'konni oching:")
+
+    from src.settings import WEB_DOMAIN
+    from aiogram.types import WebAppInfo
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton(text="🛍 Do'konni ochish", web_app=WebAppInfo(url=f"{WEB_DOMAIN}/shop/")))
+    kb.add(InlineKeyboardButton(text="🔙 Marketga qaytish", callback_data="menu:market"))
+    await call.message.answer("\n".join(lines), parse_mode="HTML", reply_markup=kb)
 
 
 @dp.callback_query_handler(lambda c: c.data == "market:stash")
