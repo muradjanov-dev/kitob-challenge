@@ -141,6 +141,9 @@
     .card .stock {
       font-size: 11px; color: var(--text-dim);
     }
+    .card .shortfall {
+      font-size: 10.5px; color: var(--error); font-weight: 700; margin-top: 2px;
+    }
     .card .stock.low { color: var(--error); }
     .card .stock.urgent {
       color: #ff9f1c; font-weight: 800; font-size: 12.5px;
@@ -679,12 +682,16 @@
                   : '<div class="stock">Mavjud: ' + p.stock_qty + '</div>'));
         const soldBadge = (p.stock_qty != null && p.stock_qty <= 0)
           ? '<div class="badge-soldout">TUGADI</div>' : '';
+        const shortfall = p.price - balance;
+        const shortfallNote = shortfall > 0
+          ? '<div class="shortfall">Yana ' + shortfall + ' 🪙 kerak</div>' : '';
         card.innerHTML =
           soldBadge +
           '<div class="img-wrap">' + img + '</div>' +
           '<div class="body">' +
             '<div class="name">' + escapeHTML(p.name) + '</div>' +
             '<div class="price-row"><span class="mini-coin"></span>' + p.price + '</div>' +
+            shortfallNote +
             stockNote +
           '</div>';
         card.addEventListener("click", () => {
@@ -720,7 +727,7 @@
       const canAfford = balance >= p.price;
       const buyLabel = canAfford
         ? p.price + ' Kitobcha bilan sotib olish'
-        : 'Yetarli Kitobcha yo\'q (kerak: ' + p.price + ')';
+        : 'Yetarli emas — yana ' + (p.price - balance) + ' 🪙 kerak';
       showSheet(
         '<div class="preview">' + img + '</div>' +
         '<h2>' + escapeHTML(p.name) + '</h2>' +
