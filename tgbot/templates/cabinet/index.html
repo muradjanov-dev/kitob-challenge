@@ -409,16 +409,25 @@
     window.scrollTo(0, 1);
     requestAnimationFrame(() => window.scrollTo(0, 0));
   });
-  const initData = tg && tg.initData ? tg.initData : '';
+  // `let`, not `const` -- a synchronous read here can easily lose the race
+  // (Telegram can take well over the old 3s guess to hand initData off on a
+  // slow connection/cold WebView start), so this starts with whatever's
+  // available RIGHT NOW as a fast-path, then gets overwritten below once the
+  // patient poll resolves. Later code in this file (report submission etc.)
+  // reads this same binding, so it naturally sees the corrected value too.
+  let initData = tg && tg.initData ? tg.initData : '';
 
   const loading = document.getElementById('cabLoading');
   const empty = document.getElementById('cabEmpty');
   const body = document.getElementById('cabBody');
 
-  if (!initData) {
-    loading.style.display = 'none';
-    empty.style.display = 'block';
-  } else {
+  _getInitDataForNav().then((polledInitData) => {
+    if (polledInitData) initData = polledInitData;
+    if (!initData) {
+      loading.style.display = 'none';
+      empty.style.display = 'block';
+      return;
+    }
     fetch('/kabinet/api/me/', { headers: { 'X-Telegram-Init-Data': initData } })
       .then(r => r.json())
       .then(d => {
@@ -481,6 +490,7 @@
         loading.style.display = 'none';
         empty.style.display = 'block';
       });
+  });
 
     // ── Daily report form: one or more books, each its own type/amount ──
     let rfEntryCount = 0;
@@ -631,7 +641,6 @@
           rfMsg.classList.add('error');
         });
     });
-  }
 
   // Shared tab-bar swipe + keyboard nav (identical to the other 3 pages).
   const tabs = ['/', '/kutubxona/', '/shop/', '/kabinet/'];
