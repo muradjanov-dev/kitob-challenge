@@ -525,9 +525,15 @@
     async function getInitData() {
       let data = _readInitDataOnce();
       if (data) return data;
-      // 30 × 100ms = 3s — covers slow cold-start WebViews (older Android
-      // devices, Telegram Desktop) that hand off initData late.
-      for (let i = 0; i < 30; i++) {
+      // 80 × 100ms = 8s. Was 3s, which real production traffic showed isn't
+      // always enough -- even a current, fully up-to-date Telegram Android
+      // client (not just old/rare builds) has been observed taking well
+      // over 3s to hand off initData on a slow connection/cold WebView
+      // start. Checks every 100ms so it still returns immediately once the
+      // data actually shows up; this only extends how long it's willing to
+      // keep waiting before giving up. (loadProducts below retries this
+      // whole function several times on top, for cases slower still.)
+      for (let i = 0; i < 80; i++) {
         await new Promise(r => setTimeout(r, 100));
         data = _readInitDataOnce();
         if (data) return data;
@@ -619,8 +625,8 @@
         // off late by the WebView, or a request that raced Telegram's own
         // hash refresh) rather than a real auth failure — retry a few times
         // with backoff before showing the user anything.
-        if (r.status === 403 && r.data.error === "invalid_init_data" && attempt < 5) {
-          await new Promise(res => setTimeout(res, attempt * 700));
+        if (r.status === 403 && r.data.error === "invalid_init_data" && attempt < 8) {
+          await new Promise(res => setTimeout(res, Math.min(attempt * 800, 2500)));
           return loadProducts(attempt + 1);
         }
         spinner.style.display = "none";
@@ -767,8 +773,8 @@
       if (!r.ok) {
         // Same timing race as loadProducts() (initData handed off late by the
         // WebView) — retry a few times before showing an error.
-        if (r.status === 403 && r.data.error === "invalid_init_data" && attempt < 5) {
-          await new Promise(res => setTimeout(res, attempt * 700));
+        if (r.status === 403 && r.data.error === "invalid_init_data" && attempt < 8) {
+          await new Promise(res => setTimeout(res, Math.min(attempt * 800, 2500)));
           return buyOpen(attempt + 1);
         }
         sound.play("error");

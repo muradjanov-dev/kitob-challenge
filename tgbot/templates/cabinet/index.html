@@ -379,7 +379,10 @@
   // the URL query -- same fix already applied to site/index.html's shop links.
   async function _getInitDataForNav() {
     if (tg && tg.initData) return tg.initData;
-    for (let i = 0; i < 30; i++) {
+    // 80 × 100ms = 8s. Was 3s -- production traffic showed even a fully
+    // up-to-date Telegram Android client can take well over 3s to hand
+    // off initData on a slow connection/cold WebView start.
+    for (let i = 0; i < 80; i++) {
       await new Promise(r => setTimeout(r, 100));
       if (tg && tg.initData) return tg.initData;
     }
