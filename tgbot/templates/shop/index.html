@@ -683,7 +683,7 @@
         const soldBadge = (p.stock_qty != null && p.stock_qty <= 0)
           ? '<div class="badge-soldout">TUGADI</div>' : '';
         const shortfall = p.price - balance;
-        const shortfallNote = shortfall > 0
+        const shortfallNote = (p.is_available && shortfall > 0)
           ? '<div class="shortfall">Yana ' + shortfall + ' 🪙 kerak</div>' : '';
         card.innerHTML =
           soldBadge +
