@@ -573,13 +573,22 @@
       // Carry the launch initData to /shop/ via the URL hash (the shop reads
       // tgWebAppData from the hash). Waits for a possibly-late initData instead
       // of reading it synchronously at click time.
-      document.querySelectorAll('a[href^="/shop"]').forEach(a => {
-        a.addEventListener("click", (e) => {
-          e.preventDefault();
-          const base = a.getAttribute("href").split("?")[0].split("#")[0];
-          getInitData().then((id) => {
-            window.location.href = id ? base + "?tgWebAppData=" + encodeURIComponent(id) : base;
-          });
+      //
+      // Delegated on `document` (not attached per-element via querySelectorAll)
+      // because the bottom tab-bar's own "Do'kon" link is added to the DOM
+      // LOWER DOWN the page than this script -- a direct querySelectorAll here
+      // runs before that link exists, so it silently never got a handler and
+      // initData was dropped for anyone using the tab bar (the most common way
+      // in). Delegation matches the click target at click time, so DOM order
+      // no longer matters -- covers every /shop link on the page, present now
+      // or added later.
+      document.addEventListener("click", (e) => {
+        const a = e.target.closest('a[href^="/shop"]');
+        if (!a) return;
+        e.preventDefault();
+        const base = a.getAttribute("href").split("?")[0].split("#")[0];
+        getInitData().then((id) => {
+          window.location.href = id ? base + "?tgWebAppData=" + encodeURIComponent(id) : base;
         });
       });
       document.querySelectorAll('a[href^="https://t.me/"]').forEach(a => {

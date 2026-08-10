@@ -384,13 +384,15 @@
     return '';
   }
   if (tg) {
-    document.querySelectorAll('a[href^="/shop"]').forEach(a => {
-      a.addEventListener('click', (e) => {
-        e.preventDefault();
-        const base = a.getAttribute('href').split('?')[0].split('#')[0];
-        _getInitDataForNav().then((id) => {
-          window.location.href = id ? base + '?tgWebAppData=' + encodeURIComponent(id) : base;
-        });
+    // Delegated so it covers every /shop link regardless of DOM order --
+    // same fix applied to site/index.html.
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest('a[href^="/shop"]');
+      if (!a) return;
+      e.preventDefault();
+      const base = a.getAttribute('href').split('?')[0].split('#')[0];
+      _getInitDataForNav().then((id) => {
+        window.location.href = id ? base + '?tgWebAppData=' + encodeURIComponent(id) : base;
       });
     });
   }
