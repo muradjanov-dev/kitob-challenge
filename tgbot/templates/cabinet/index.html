@@ -18,6 +18,8 @@
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; padding: 0; min-height: 100vh; overflow-x: hidden; max-width: 100vw; }
+    html { transition: opacity .12s ease; }
+    html.kc-navigating { opacity: 0; }
     body {
       background:
         radial-gradient(1100px 600px at 12% -10%, rgba(31,107,76,0.30), transparent 70%),
@@ -660,6 +662,14 @@
     hintRight.style.width = '0px'; hintRight.style.opacity = '0';
   }
 
+  // Fades out before the real (hard) page navigation fires, so a committed
+  // swipe/arrow-key tab change reads as an intentional transition instead
+  // of an abrupt jump-cut.
+  function _navigateTo(url) {
+    document.documentElement.classList.add('kc-navigating');
+    setTimeout(() => { window.location.href = url; }, 110);
+  }
+
   // Only arm the swipe-nav gesture for touches starting near a screen edge
   // (matches the edge-hint glow's own visual promise). Previously it armed
   // from anywhere on the page, so an ordinary vertical scroll with a slight
@@ -711,7 +721,7 @@
     const commit = Math.abs(dx) > threshold || velocity > SWIPE_COMMIT_VELOCITY;
     const next = dx < 0 ? activeIdx + 1 : activeIdx - 1;
     if (commit && next >= 0 && next < tabs.length) {
-      window.location.href = tabs[next];
+      _navigateTo(tabs[next]);
     } else {
       _resetSwipeHints();
     }
@@ -725,7 +735,7 @@
     const tag = (document.activeElement && document.activeElement.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     const next = e.key === 'ArrowLeft' ? activeIdx - 1 : activeIdx + 1;
-    if (next >= 0 && next < tabs.length) window.location.href = tabs[next];
+    if (next >= 0 && next < tabs.length) _navigateTo(tabs[next]);
   });
 })();
 </script>
