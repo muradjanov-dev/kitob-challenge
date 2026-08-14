@@ -291,6 +291,13 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.grant_daily_ai_quiz_trial',
         'schedule': crontab(hour=13, minute=0),
     },
+    # One-off make-good campaign: 100 users/hour, 05:00-00:59 Tashkent. The
+    # task itself no-ops outside those hours and once the queue is empty, so
+    # it's harmless to leave scheduled after the campaign finishes.
+    'drip-ai-quiz-bonus': {
+        'task': 'tgbot.tasks.drip_ai_quiz_bonus_task',
+        'schedule': crontab(minute=10),
+    },
 
     # Top 5 most active game players today — 23:00, after the evening game
     # sequence has wrapped up, before the admin summary and personal reports.

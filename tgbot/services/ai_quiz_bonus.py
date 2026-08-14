@@ -1,8 +1,9 @@
 """One-off make-good: the 'qz:ai' button used to be blocked by the blanket
 admin-or-Premium gate, so anyone who won the Sirli quti's 1-hour AI-quiz
 prize (or the daily giveaway) could never actually redeem it. Rather than
-try to reconstruct who was affected from records that don't exist, this
-grants the same 1-hour window to every registered user at once.
+try to reconstruct who was affected from records that don't exist, the same
+1-hour window is granted to every registered non-Premium user -- but dripped
+out in small hourly batches rather than all at once.
 
 Separate module (not tasks.py) so it doesn't get bundled with whatever else
 is mid-edit there -- same reasoning as mystery_box_announce.
@@ -10,8 +11,72 @@ is mid-edit there -- same reasoning as mystery_box_announce.
 
 BONUS_HOURS = 1
 
+# Drip pacing. The bonus goes out to a fixed number of users per hour rather
+# than to everyone at once: a single mass send would both crowd the AI-quiz
+# global rate limit (quiz_ai.AI_QUIZ_GLOBAL_PER_MINUTE) and land in a lot of
+# pockets at 3am.
+DRIP_USERS_PER_HOUR = 100
 
-def grant_ai_quiz_bonus_to_everyone(hours: int = BONUS_HOURS, announce: bool = True):
+# Hours (Asia/Tashkent, see settings.TIME_ZONE) the drip is allowed to send
+# in: 05:00 through 00:59. Nobody gets woken at 01:00-04:59 -- and since each
+# batch's usable window starts when THEY are notified, sending at night would
+# also mean sleeping through the whole gift.
+DRIP_ACTIVE_HOURS = set(range(5, 24)) | {0}
+
+
+def _eligible_qs():
+    """Registered, reachable, and not already holding Premium.
+
+    Premium subscribers are excluded deliberately: AI quiz creation has
+    always been available to them, so the apology doesn't apply and DMing
+    them an irrelevant "now it's open to you too" would be noise.
+    """
+    from django.utils import timezone
+    from tgbot.models import TelegramProfile
+
+    return (
+        TelegramProfile.objects
+        .filter(is_registered=True, is_blocked=False)
+        .exclude(payments__status="paid", payments__end_date__gte=timezone.localdate())
+        .distinct()
+    )
+
+
+def _build_texts(hours: int):
+    text_uz = (
+        "🎁 <b>Sizga sovg'a: 1 soat BEPUL AI Quiz!</b>\n\n"
+        "Sirli qutidan chiqadigan 🤖 <b>AI yordamida quiz tuzish</b> imkoniyati "
+        "ba'zi kitobxonlarga texnik nosozlik tufayli ochilmay qolgan edi. "
+        "Kechirim so'raymiz — qarzdor bo'lib qolmaslik uchun bu imkoniyatni "
+        "sizga ham ochib qo'ydik!\n\n"
+        f"⏳ Keyingi <b>{hours} soat</b> davomida — Premium bo'lmasangiz ham — "
+        "AI yordamida o'z quizingizni tuzishingiz mumkin.\n\n"
+        "📖 Matn, rasm yoki PDF kitob yuboring — AI o'zi savollar tuzib beradi. "
+        "Tayyor quizni do'stlaringizga yoki guruhingizga ulashing!\n\n"
+        "Hoziroq sinab ko'ring 👇"
+    )
+    text_ru = (
+        "🎁 <b>Вам подарок: 1 час БЕСПЛАТНОГО AI Quiz!</b>\n\n"
+        "Возможность 🤖 <b>создания квиза с помощью AI</b>, выпадающая из "
+        "Таинственной коробки, из-за технической ошибки не открывалась у части "
+        "читателей. Приносим извинения — чтобы не остаться в долгу, мы открыли "
+        "её и для вас!\n\n"
+        f"⏳ В течение следующего <b>{hours} часа</b> — даже без Premium — вы "
+        "можете создать свой квиз с помощью AI.\n\n"
+        "📖 Отправьте текст, изображение или PDF-книгу — AI сам составит "
+        "вопросы. Готовым квизом поделитесь с друзьями или в группе!\n\n"
+        "Попробуйте прямо сейчас 👇"
+    )
+    return text_uz, text_ru
+
+
+def drip_ai_quiz_bonus(limit: int = DRIP_USERS_PER_HOUR, hours: int = BONUS_HOURS,
+                       force: bool = False):
+    """Send the bonus to the next `limit` users who haven't had it yet.
+
+    Intended to run hourly from celery beat. Outside DRIP_ACTIVE_HOURS it
+    does nothing (pass force=True to override, e.g. for a manual test).
+    """
     import datetime as _dt
     import json
     import time as _time
@@ -20,79 +85,42 @@ def grant_ai_quiz_bonus_to_everyone(hours: int = BONUS_HOURS, announce: bool = T
     from django.utils import timezone
 
     from tgbot.models import TelegramProfile
-    from tgbot.tasks import BOT_TOKEN, _announce_targets, _get_bot_username
+    from tgbot.tasks import BOT_TOKEN, _get_bot_username
 
-    qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+    local_hour = timezone.localtime().hour
+    if not force and local_hour not in DRIP_ACTIVE_HOURS:
+        print(f"drip_ai_quiz_bonus: hour {local_hour} outside active window, skipping")
+        return {"skipped": "outside_active_hours", "hour": local_hour}
 
-    # Everyone must get the full `hours` counted from when THEY receive the
-    # DM, not from when the grant runs -- DMing tens of thousands of users
-    # takes many minutes, so a flat now+hours would leave the last people
-    # notified with an almost-expired window. Add the projected broadcast
-    # duration as headroom (~0.15s/user observed: 0.05s pacing sleep plus
-    # request latency), so even the final recipient still has a full hour.
-    headroom = _dt.timedelta(seconds=qs.count() * 0.15) if announce else _dt.timedelta(0)
+    batch = list(
+        _eligible_qs()
+        .filter(ai_quiz_bonus_sent_at__isnull=True)
+        .values_list("id", "telegram_id", "language")[:limit]
+    )
+    if not batch:
+        print("drip_ai_quiz_bonus: nobody left to send to")
+        return {"sent": 0, "remaining": 0, "done": True}
+
+    # Each batch gets its own fresh window, counted from when THIS batch is
+    # notified -- so every user gets the full `hours` no matter how far into
+    # the campaign they are. Headroom covers this batch's own send duration
+    # (~0.15s/user: 0.05s pacing sleep plus request latency).
+    headroom = _dt.timedelta(seconds=len(batch) * 0.15)
     until = timezone.now() + headroom + _dt.timedelta(hours=hours)
-
-    # Bulk update on purpose: this is a uniform bonus grant to everyone, not
-    # a per-user decision worth an audit row each. No per-user
-    # expire_ai_quiz_trial task is scheduled either -- that task only nulls
-    # the field and DMs an upsell, and scheduling one per user would flood
-    # the queue. The access gate compares trial_ai_quiz_until against now,
-    # so the window closes on its own regardless.
-    granted = qs.update(trial_ai_quiz_until=until)
-    print(f"grant_ai_quiz_bonus_to_everyone: granted={granted} until={until} headroom={headroom}")
-
-    if not announce:
-        return {"granted": granted, "until": until, "groups": 0, "users": 0}
+    TelegramProfile.objects.filter(id__in=[b[0] for b in batch]).update(
+        trial_ai_quiz_until=until,
+    )
 
     bot_username = _get_bot_username() or "kitob_challange_bot"
-    aiquiz_url = f"https://t.me/{bot_username}?start=aiquiz"
-
-    text_uz = (
-        "🎁 <b>Hammaga sovg'a: 1 soat BEPUL AI Quiz!</b>\n\n"
-        "Sirli qutidan chiqadigan 🤖 <b>AI yordamida quiz tuzish</b> imkoniyati "
-        "ba'zi kitobxonlarga texnik nosozlik tufayli ochilmay qolgan edi. "
-        "Kechirim so'raymiz — qarzdor bo'lib qolmaslik uchun bu imkoniyatni "
-        "<b>hammaga</b> ochib qo'ydik!\n\n"
-        f"⏳ Keyingi <b>{hours} soat</b> davomida — Premium bo'lmasangiz ham — "
-        "AI yordamida o'z quizingizni tuzishingiz mumkin.\n\n"
-        "📖 Matn, rasm yoki PDF kitob yuboring — AI o'zi savollar tuzib beradi. "
-        "Tayyor quizni do'stlaringizga yoki guruhingizga ulashing!\n\n"
-        "Hoziroq sinab ko'ring 👇"
-    )
-    text_ru = (
-        "🎁 <b>Подарок всем: 1 час БЕСПЛАТНОГО AI Quiz!</b>\n\n"
-        "Возможность 🤖 <b>создания квиза с помощью AI</b>, выпадающая из "
-        "Таинственной коробки, из-за технической ошибки не открывалась у части "
-        "читателей. Приносим извинения — чтобы не остаться в долгу, мы открыли "
-        "её <b>для всех</b>!\n\n"
-        f"⏳ В течение следующего <b>{hours} часа</b> — даже без Premium — вы "
-        "можете создать свой квиз с помощью AI.\n\n"
-        "📖 Отправьте текст, изображение или PDF-книгу — AI сам составит "
-        "вопросы. Готовым квизом поделитесь с друзьями или в группе!\n\n"
-        "Попробуйте прямо сейчас 👇"
-    )
-
     keyboard = json.dumps({"inline_keyboard": [[{
-        "text": "🤖 AI bilan quiz tuzish", "url": aiquiz_url,
+        "text": "🤖 AI bilan quiz tuzish",
+        "url": f"https://t.me/{bot_username}?start=aiquiz",
     }]]})
+    text_uz, text_ru = _build_texts(hours)
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-    groups_sent = 0
-    for group_id, thread_id in _announce_targets():
-        try:
-            data = {"chat_id": group_id, "text": text_uz, "parse_mode": "HTML",
-                    "reply_markup": keyboard, "disable_web_page_preview": "true"}
-            if thread_id:
-                data["message_thread_id"] = thread_id
-            resp = requests.post(url, data=data, timeout=10)
-            if resp.ok:
-                groups_sent += 1
-        except Exception as e:
-            print(f"ai quiz bonus announce group {group_id}: {e}")
-
-    users_sent = 0
-    for tg_id, lang in qs.values_list("telegram_id", "language").iterator():
+    sent = 0
+    for uid, tg_id, lang in batch:
         text = text_ru if lang == "ru" else text_uz
         try:
             resp = requests.post(
@@ -102,12 +130,39 @@ def grant_ai_quiz_bonus_to_everyone(hours: int = BONUS_HOURS, announce: bool = T
                 timeout=5,
             )
             if resp.ok:
-                users_sent += 1
+                sent += 1
             elif resp.status_code == 429:
                 _time.sleep(resp.json().get("parameters", {}).get("retry_after", 5))
         except Exception:
             pass
+        # Marked whether or not the send succeeded: a permanently unreachable
+        # user (blocked the bot, deleted account) must not be re-picked every
+        # hour forever, which would stall the queue behind them.
+        TelegramProfile.objects.filter(id=uid).update(ai_quiz_bonus_sent_at=timezone.now())
         _time.sleep(0.05)
 
-    print(f"grant_ai_quiz_bonus_to_everyone: groups_sent={groups_sent} users_sent={users_sent}")
-    return {"granted": granted, "until": until, "groups": groups_sent, "users": users_sent}
+    remaining = _eligible_qs().filter(ai_quiz_bonus_sent_at__isnull=True).count()
+    print(f"drip_ai_quiz_bonus: sent={sent}/{len(batch)} remaining={remaining} until={until}")
+    return {"sent": sent, "batch": len(batch), "remaining": remaining, "until": until}
+
+
+def drip_status():
+    """Progress snapshot for the campaign — used by the status endpoint."""
+    from django.utils import timezone
+
+    eligible = _eligible_qs()
+    total = eligible.count()
+    remaining = eligible.filter(ai_quiz_bonus_sent_at__isnull=True).count()
+    hours_left = (remaining / DRIP_USERS_PER_HOUR) if DRIP_USERS_PER_HOUR else 0
+    active_hours_per_day = len(DRIP_ACTIVE_HOURS)
+    return {
+        "eligible_total": total,
+        "already_sent": total - remaining,
+        "remaining": remaining,
+        "per_hour": DRIP_USERS_PER_HOUR,
+        "active_hours": sorted(DRIP_ACTIVE_HOURS),
+        "current_hour_tashkent": timezone.localtime().hour,
+        "sending_now": timezone.localtime().hour in DRIP_ACTIVE_HOURS,
+        "est_sending_hours_left": round(hours_left, 1),
+        "est_days_left": round(hours_left / active_hours_per_day, 1) if active_hours_per_day else None,
+    }

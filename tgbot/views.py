@@ -313,22 +313,42 @@ def internal_grant_ai_quiz_bonus_everyone(request: HttpRequest):
     if not secret or secret != _os.environ.get("API_TOKEN", ""):
         return HttpResponse(status=403)
 
-    from tgbot.services.ai_quiz_bonus import grant_ai_quiz_bonus_to_everyone, BONUS_HOURS
+    from tgbot.services.ai_quiz_bonus import drip_ai_quiz_bonus, DRIP_USERS_PER_HOUR, BONUS_HOURS
 
-    announce = request.GET.get("announce", "1") != "0"
+    try:
+        limit = int(request.GET.get("limit", DRIP_USERS_PER_HOUR))
+    except ValueError:
+        limit = DRIP_USERS_PER_HOUR
     try:
         hours = int(request.GET.get("hours", BONUS_HOURS))
     except ValueError:
         hours = BONUS_HOURS
+    force = request.GET.get("force", "0") == "1"
 
     def _run():
         try:
-            grant_ai_quiz_bonus_to_everyone(hours=hours, announce=announce)
+            drip_ai_quiz_bonus(limit=limit, hours=hours, force=force)
         except Exception as e:
             print(f"internal_grant_ai_quiz_bonus_everyone failed: {e}")
 
     threading.Thread(target=_run, daemon=True).start()
-    return HttpResponse(f"started hours={hours} announce={announce}", status=202)
+    return HttpResponse(f"started limit={limit} hours={hours} force={force}", status=202)
+
+
+@csrf_exempt
+def internal_ai_quiz_bonus_status(request: HttpRequest):
+    """Progress of the drip campaign: how many are left, whether it's
+    currently inside its sending window, and the projected finish. GET,
+    read-only."""
+    import os as _os
+
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+        return HttpResponse(status=403)
+
+    from tgbot.services.ai_quiz_bonus import drip_status
+
+    return JsonResponse(drip_status(), json_dumps_params={"indent": 2, "default": str})
 
 
 @csrf_exempt

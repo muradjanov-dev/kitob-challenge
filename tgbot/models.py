@@ -234,6 +234,14 @@ class TelegramProfile(BaseModel):
                   "generation (separate from the daily trial-window giveaway) — set "
                   "True the moment they use it. See quiz_admin.py's 'ai' action gate.",
     )
+    ai_quiz_bonus_sent_at = models.DateTimeField(
+        null=True, blank=True, db_index=True,
+        help_text="When this user received the one-off site-wide AI-quiz make-good "
+                  "bonus (the qz:ai gate bug denied Sirli quti winners their prize). "
+                  "NULL = not yet reached by the drip. Set by "
+                  "services.ai_quiz_bonus.drip_ai_quiz_bonus, which paces the "
+                  "rollout at a fixed number of users per hour during waking hours.",
+    )
     optimal_send_hour = models.PositiveSmallIntegerField(
         null=True,
         blank=True,

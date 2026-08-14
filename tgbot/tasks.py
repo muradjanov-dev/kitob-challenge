@@ -5426,6 +5426,14 @@ AI_QUIZ_TRIAL_HOURS = 1
 
 
 @shared_task
+def drip_ai_quiz_bonus_task():
+    """Hourly drip of the one-off AI-quiz make-good bonus. The service itself
+    no-ops outside its allowed hours, so this can safely run every hour."""
+    from tgbot.services.ai_quiz_bonus import drip_ai_quiz_bonus
+    return drip_ai_quiz_bonus()
+
+
+@shared_task
 def grant_daily_ai_quiz_trial():
     """Daily: randomly grant AI_QUIZ_TRIAL_DAILY_COUNT non-Premium users a
     1-hour window where they can use the 🤖 AI quiz-creation feature (normally
