@@ -162,6 +162,26 @@ def _product_payload(p: ShopProduct, request: HttpRequest) -> dict:
 
 @csrf_exempt
 @require_GET
+def api_products_public(request: HttpRequest) -> JsonResponse:
+    """Catalog only, no Telegram auth -- the product list itself (name,
+    price, image, stock) isn't personal data, so it doesn't need to wait on
+    initData at all. This is what makes the shop page feel instant: the grid
+    renders the moment this resolves, while the slower authed balance/'me'
+    call (api_me) fills in the personal parts in the background. Cached
+    briefly since it's now the very first thing every shop-page load hits."""
+    from django.core.cache import cache
+
+    cached = cache.get("kc_shop_products_public_v1")
+    if cached is None:
+        products = list(ShopProduct.objects.filter(is_active=True).order_by("sort_order", "-created_at"))
+        products.sort(key=lambda p: not p.is_available)
+        cached = [_product_payload(p, request) for p in products]
+        cache.set("kc_shop_products_public_v1", cached, 20)
+    return JsonResponse({"ok": True, "products": cached})
+
+
+@csrf_exempt
+@require_GET
 @_require_authed_admin
 def api_products(request: HttpRequest) -> JsonResponse:
     products = list(ShopProduct.objects.filter(is_active=True).order_by("sort_order", "-created_at"))

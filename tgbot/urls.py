@@ -7,7 +7,7 @@ from .views import (
 )
 from src.settings import WEBHOOK_PATH
 from tgbot.views import health_check_celery, health_check_redis
-from tgbot.shop_views import shop_index, api_products, api_me, api_buy
+from tgbot.shop_views import shop_index, api_products, api_products_public, api_me, api_buy
 from tgbot.library_views import (
     api_comments, api_add_comment, api_delete_comment, api_my_books, api_recent_comments,
     api_get_progress, api_save_progress, api_start_reading, api_premium_access,
@@ -56,6 +56,7 @@ urlpatterns = [
     path("health-check/celery/", health_check_celery, name="health-check-celery"),
     path("shop/", shop_index, name="shop"),
     path("shop/api/products/", api_products, name="shop-api-products"),
+    path("shop/api/products-public/", api_products_public, name="shop-api-products-public"),
     path("shop/api/me/", api_me, name="shop-api-me"),
     path("shop/api/buy/", api_buy, name="shop-api-buy"),
     path("kabinet/", cabinet_index, name="cabinet"),

@@ -559,6 +559,7 @@
     // ─── State ───────────────────────────────────────────────
     let products = [];
     let balance = 0;
+    let balanceLoaded = false;
     let openProduct = null;
 
     // ─── Sound engine (Web Audio API, synthesized) ───────────
@@ -616,46 +617,55 @@
     };
 
     // ─── Loaders ─────────────────────────────────────────────
-    async function loadProducts(attempt) {
-      attempt = attempt || 1;
-      const r = await api("/shop/api/products/");
+    // Split in two so the product grid never waits on Telegram's initData
+    // handoff (which can take seconds): the catalog itself isn't personal
+    // data, so it loads from a public, briefly-cached endpoint the instant
+    // the page opens. Only the balance -- genuinely personal -- waits on
+    // auth, filling in a moment later without blocking anything visible.
+    async function loadProductsPublic() {
       const spinner = document.getElementById("spinner");
+      try {
+        const res = await fetch("/shop/api/products-public/", { headers: { "Accept": "application/json" } });
+        const data = await res.json();
+        spinner.style.display = "none";
+        if (!res.ok || !data.ok) {
+          document.getElementById("empty").style.display = "block";
+          return;
+        }
+        products = data.products || [];
+        renderGrid();
+      } catch (e) {
+        spinner.style.display = "none";
+        document.getElementById("empty").style.display = "block";
+      }
+    }
+
+    async function loadMe(attempt) {
+      attempt = attempt || 1;
+      const r = await api("/shop/api/me/");
       if (!r.ok) {
         // invalid_init_data is almost always a timing race (initData handed
-        // off late by the WebView, or a request that raced Telegram's own
-        // hash refresh) rather than a real auth failure — retry a few times
-        // with backoff before showing the user anything.
+        // off late by the WebView) rather than a real auth failure — retry a
+        // few times with backoff. The grid is already visible from the
+        // public catalog call either way, so this only ever delays the
+        // balance number and buy-ability, never the page itself.
         if (r.status === 403 && r.data.error === "invalid_init_data" && attempt < 8) {
           await new Promise(res => setTimeout(res, Math.min(attempt * 800, 2500)));
-          return loadProducts(attempt + 1);
+          return loadMe(attempt + 1);
         }
-        spinner.style.display = "none";
         if (r.status === 403 && r.data.error === "profile_not_found") {
           document.getElementById("locked").style.display = "block";
-        } else {
-          const friendlyErr = r.data.error === "invalid_init_data"
-            ? "Ulanishda muammo — sahifani qayta yuklab ko'ring."
-            : "Yuklab bo'lmadi: " + (r.data.error || r.status);
-          document.getElementById("empty").style.display = "block";
-          document.getElementById("empty").innerHTML =
-            '<div class="em">⚠️</div><div>' + friendlyErr + '</div>' +
-            '<button id="retryLoadBtn" style="margin-top:14px;padding:10px 20px;border-radius:12px;' +
-            'border:1px solid var(--card-border);background:var(--card);color:var(--text);' +
-            'font-size:15px;cursor:pointer;">🔄 Qayta urinish</button>';
-          const btn = document.getElementById("retryLoadBtn");
-          if (btn) btn.addEventListener("click", () => {
-            document.getElementById("empty").style.display = "none";
-            spinner.style.display = "block";
-            loadProducts(1);
-          });
         }
         return;
       }
-      spinner.style.display = "none";
-      products = r.data.products || [];
-      balance = r.data.me ? r.data.me.balance : 0;
+      balance = r.data.balance;
+      balanceLoaded = true;
       renderBalance(false);
-      renderGrid();
+      renderGrid(); // refresh shortfall notes now that balance is known
+      // If the user already opened a product before balance arrived, its
+      // buy button was showing the neutral "checking..." state -- refresh
+      // it now that we actually know whether they can afford it.
+      if (openProduct) openProductSheet(openProduct);
     }
 
     function renderBalance(pulse) {
@@ -694,7 +704,7 @@
         const soldBadge = (p.stock_qty != null && p.stock_qty <= 0)
           ? '<div class="badge-soldout">TUGADI</div>' : '';
         const shortfall = p.price - balance;
-        const shortfallNote = (p.is_available && shortfall > 0)
+        const shortfallNote = (balanceLoaded && p.is_available && shortfall > 0)
           ? '<div class="shortfall">Yana ' + shortfall + ' 🪙 kerak</div>' : '';
         card.innerHTML =
           soldBadge +
@@ -745,10 +755,16 @@
       const img = p.image_url
         ? '<img src="' + p.image_url + '" alt=""/>'
         : '🎁';
-      const canAfford = balance >= p.price;
-      const buyLabel = canAfford
+      // Balance may not have arrived from the authed call yet -- don't show
+      // a false "Yetarli emas" while it's still unknown. The buy button
+      // stays tappable either way; api_buy re-validates server-side and
+      // buyOpen() already handles a real insufficient_balance response.
+      const canAfford = !balanceLoaded || balance >= p.price;
+      const buyLabel = !balanceLoaded
         ? p.price + ' Kitobcha bilan sotib olish'
-        : 'Yetarli emas — yana ' + (p.price - balance) + ' 🪙 kerak';
+        : (canAfford
+            ? p.price + ' Kitobcha bilan sotib olish'
+            : 'Yetarli emas — yana ' + (p.price - balance) + ' 🪙 kerak');
       showSheet(
         '<div class="preview">' + img + '</div>' +
         '<h2>' + escapeHTML(p.name) + '</h2>' +
@@ -794,7 +810,15 @@
       sound.play("success");
       fireConfetti();
       showSuccessSheet(r.data.purchase);
-      loadProducts();  // refresh stock in background
+      // Reflect the stock decrement immediately rather than waiting on the
+      // public catalog's cache window -- the purchase already succeeded
+      // server-side, this is purely a display update.
+      const bought = products.find(p => p.id === openProduct.id);
+      if (bought && bought.stock_qty != null) {
+        bought.stock_qty = Math.max(0, bought.stock_qty - 1);
+        bought.is_available = bought.stock_qty > 0;
+        renderGrid();
+      }
     }
 
     function showSuccessSheet(p) {
@@ -910,7 +934,8 @@
       setTimeout(() => welcomeEl.remove(), 2200);
     }
 
-    loadProducts();
+    loadProductsPublic();
+    loadMe();
   </script>
 
   <style>
