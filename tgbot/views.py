@@ -298,6 +298,40 @@ def internal_diag_achievements(request: HttpRequest):
 
 
 @csrf_exempt
+def internal_grant_ai_quiz_bonus_everyone(request: HttpRequest):
+    """One-off trigger for ai_quiz_bonus.grant_ai_quiz_bonus_to_everyone --
+    grants every registered user the same 1-hour AI-quiz window the Sirli
+    quti prize gives, making good on the grants the qz:ai gate bug denied.
+    POST only, runs in a background thread (the broadcast runs well past
+    gunicorn's request timeout). ?announce=0 grants silently. Delete this
+    view/URL once used."""
+    import os as _os
+
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+        return HttpResponse(status=403)
+
+    from tgbot.services.ai_quiz_bonus import grant_ai_quiz_bonus_to_everyone, BONUS_HOURS
+
+    announce = request.GET.get("announce", "1") != "0"
+    try:
+        hours = int(request.GET.get("hours", BONUS_HOURS))
+    except ValueError:
+        hours = BONUS_HOURS
+
+    def _run():
+        try:
+            grant_ai_quiz_bonus_to_everyone(hours=hours, announce=announce)
+        except Exception as e:
+            print(f"internal_grant_ai_quiz_bonus_everyone failed: {e}")
+
+    threading.Thread(target=_run, daemon=True).start()
+    return HttpResponse(f"started hours={hours} announce={announce}", status=202)
+
+
+@csrf_exempt
 def internal_diag_ai_quiz_trial_backlog(request: HttpRequest):
     """One-off diagnostic: find every user currently holding a non-null
     TelegramProfile.trial_ai_quiz_until (Market 'Sirli quti' ai_quiz_trial
