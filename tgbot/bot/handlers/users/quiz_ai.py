@@ -19,6 +19,32 @@ from django.utils import timezone
 # client will be initialized dynamically inside handlers using the environment variable
 
 
+# ── Global admission control ────────────────────────────────────────────────
+# The per-user daily cap bounds any one person but says nothing about how many
+# people generate at the same moment — and a site-wide bonus window (see
+# services/ai_quiz_bonus.py, which can open AI quiz creation to the entire
+# user base at once) puts everybody at the door simultaneously. This caps how
+# many generations may START per minute across all users, so a burst queues
+# politely instead of saturating the OpenAI account, the bot's worker pool and
+# the PDF extraction threads.
+#
+# The counter is keyed per wall-clock minute so it expires on its own: a
+# handler that crashes mid-generation can never leak a permanently-held slot,
+# which a naive in-flight gauge would.
+AI_QUIZ_GLOBAL_PER_MINUTE = int(os.environ.get("AI_QUIZ_GLOBAL_PER_MINUTE", "20"))
+
+
+@sync_to_async
+def _take_global_slot() -> bool:
+    key = "ai_quiz_global_" + timezone.now().strftime("%Y%m%d%H%M")
+    try:
+        cache.add(key, 0, 120)
+        return cache.incr(key) <= AI_QUIZ_GLOBAL_PER_MINUTE
+    except Exception:
+        # A cache hiccup must never take the feature offline — fail open.
+        return True
+
+
 def _script_hint(text: str) -> str:
     """Detect the dominant alphabet of the source text and return a hard,
     explicit language directive. gpt-4o-mini tends to revert to English for
@@ -272,6 +298,18 @@ async def process_ai_input(message: types.Message, state: FSMContext):
         await state.finish()
         return
 
+    # Admission control before ANY expensive work (file download, PDF parse,
+    # OpenAI call). The FSM state is deliberately left untouched so the user
+    # can simply resend the same text/file a moment later.
+    if not await _take_global_slot():
+        await message.answer(
+            "⏳ <b>Hozir juda ko'p kitobxon AI quiz tuzyapti!</b>\n\n"
+            "Bir daqiqadan so'ng shu matn yoki faylni qayta yuboring — "
+            "navbatingiz albatta keladi. 🙏",
+            parse_mode="HTML",
+        )
+        return
+
     if message.document:
         if not message.document.file_name.lower().endswith('.pdf'):
             await message.answer("⚠️ Iltimos, faqat PDF formatidagi fayllarni yuboring.")
@@ -363,12 +401,24 @@ Return ONLY valid JSON in the following format:
         elif message.document:
             file_info = await bot.get_file(message.document.file_id)
             pdf_bytes_io = await bot.download_file(file_info.file_path)
+            pdf_raw = pdf_bytes_io.read()
 
-            import fitz
-            doc = fitz.open(stream=pdf_bytes_io.read(), filetype="pdf")
-            pages = [page.get_text() for page in doc]
-            doc.close()
+            # PyMuPDF is fully synchronous and a real book can run to
+            # hundreds of pages — extracting inline would block the bot's
+            # single event loop for every other user (not just quiz users)
+            # until it finished. thread_sensitive=False puts it on a real
+            # worker thread instead; the per-minute admission cap above is
+            # what keeps the number of those threads bounded.
+            @sync_to_async(thread_sensitive=False)
+            def _extract_pdf_pages(data):
+                import fitz
+                doc = fitz.open(stream=data, filetype="pdf")
+                try:
+                    return [page.get_text() for page in doc]
+                finally:
+                    doc.close()
 
+            pages = await _extract_pdf_pages(pdf_raw)
             extracted_text = _sample_book_text(pages, budget=80000)
 
             hint = _script_hint(extracted_text)

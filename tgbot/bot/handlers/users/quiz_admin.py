@@ -65,6 +65,41 @@ def _visible_quizzes(user):
     return Quiz.objects.filter(creator=user)
 
 
+# Every router action that carries a target id in its callback data, grouped
+# by what that id refers to. Ownership is resolved from the id back up to the
+# owning quiz — several of these actions used to trust the id outright, which
+# only looked safe while the router's blanket Premium gate stood in front of
+# them: any Premium user could edit or delete another's quiz by crafting
+# callback data. Now that quiz owners (including AI-trial users editing the
+# quiz they just generated) legitimately reach the router, the check has to
+# be real.
+_QUIZ_ID_ACTIONS = {"v", "e", "et", "ed", "em", "eqs", "sh", "del", "dc", "viz"}
+_QUESTION_ID_ACTIONS = {"qv", "qt", "qh", "qdel"}
+_OPTION_ID_ACTIONS = {"optt", "optc"}
+_ID_ACTIONS = _QUIZ_ID_ACTIONS | _QUESTION_ID_ACTIONS | _OPTION_ID_ACTIONS
+
+
+@sync_to_async
+def _owns_target(user, action: str, raw_id: str) -> bool:
+    """True if `user` may act on the object `raw_id` names. Admins may act on
+    anything; everyone else only on quizzes they created."""
+    if _is_admin(user):
+        return True
+    if not user:
+        return False
+    try:
+        oid = int(raw_id)
+    except (TypeError, ValueError):
+        return False
+    if action in _QUIZ_ID_ACTIONS:
+        return Quiz.objects.filter(id=oid, creator=user).exists()
+    if action in _QUESTION_ID_ACTIONS:
+        return QuizQuestion.objects.filter(id=oid, quiz__creator=user).exists()
+    if action in _OPTION_ID_ACTIONS:
+        return QuizOption.objects.filter(id=oid, question__quiz__creator=user).exists()
+    return True
+
+
 async def offer_ai_quiz_start(target_message, user, state: FSMContext):
     """Shared entry point for AI quiz creation — used by the '🤖 AI yordamida
     Quiz yaratish' button (quiz_admin callback) and the /start aiquiz deep
@@ -140,7 +175,7 @@ def _quiz_list_kb(quizzes) -> InlineKeyboardMarkup:
             callback_data=f"qz:v:{q.id}",
         ))
     kb.add(InlineKeyboardButton(text="➕ Yangi quiz", callback_data="qz:new"))
-    kb.add(InlineKeyboardButton(text="🤖 AI yordamida yaratish (Premium)", callback_data="qz:ai"))
+    kb.add(InlineKeyboardButton(text="🤖 AI yordamida yaratish", callback_data="qz:ai"))
     return kb
 
 
@@ -262,7 +297,7 @@ async def show_quiz_list(message: types.Message, user):
     if not quizzes:
         kb = InlineKeyboardMarkup()
         kb.add(InlineKeyboardButton(text="➕ Yangi quiz yaratish", callback_data="qz:new"))
-        kb.add(InlineKeyboardButton(text="🤖 AI yordamida yaratish (Premium)", callback_data="qz:ai"))
+        kb.add(InlineKeyboardButton(text="🤖 AI yordamida yaratish", callback_data="qz:ai"))
         await message.answer(
             "📭 Hali quiz yo'q. Birinchisini yarating!",
             reply_markup=kb,
@@ -297,12 +332,22 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
         await offer_ai_quiz_start(call.message, user, state)
         return
 
-    if not await _can_manage_quizzes(user):
+    # Creating a brand-new MANUAL quiz from scratch stays a Premium/admin
+    # perk. Everything else below is authorized either by ownership of the
+    # target (see _owns_target) or by its own admin check — so a trial user
+    # who just generated an AI quiz can still edit, share and delete that
+    # quiz, which the post-creation message explicitly invites them to do.
+    if action == "new" and not await _can_manage_quizzes(user):
         await call.answer(
             "Quiz yaratish va boshqarish — admin yoki 💎 Premium foydalanuvchilar uchun.",
             show_alert=True,
         )
         return
+
+    if action in _ID_ACTIONS and len(parts) > 2:
+        if not await _owns_target(user, action, parts[2]):
+            await call.answer("Topilmadi", show_alert=True)
+            return
 
     # Vizov (live broadcast to every registered user) stays admin-only — it's
     # a high-volume action that non-admin Premium users shouldn't trigger.
@@ -319,7 +364,7 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
         if not quizzes:
             kb = InlineKeyboardMarkup()
             kb.add(InlineKeyboardButton(text="➕ Yangi quiz", callback_data="qz:new"))
-            kb.add(InlineKeyboardButton(text="🤖 AI yordamida yaratish (Premium)", callback_data="qz:ai"))
+            kb.add(InlineKeyboardButton(text="🤖 AI yordamida yaratish", callback_data="qz:ai"))
             await call.message.edit_text("📭 Hali quiz yo'q.", reply_markup=kb)
             return
         try:
