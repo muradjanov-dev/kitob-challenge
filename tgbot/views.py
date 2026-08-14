@@ -298,6 +298,79 @@ def internal_diag_achievements(request: HttpRequest):
 
 
 @csrf_exempt
+def internal_diag_ai_quiz_trial_backlog(request: HttpRequest):
+    """One-off diagnostic: find every user currently holding a non-null
+    TelegramProfile.trial_ai_quiz_until (Market 'Sirli quti' ai_quiz_trial
+    win, or the daily grant_daily_ai_quiz_trial giveaway). Normally this
+    field self-clears an hour after grant (tasks.expire_ai_quiz_trial), so
+    anyone still holding a value now either (a) is mid-window, or (b) had
+    their whole window silently wasted by the qz:ai button's Premium-only
+    gate bug (fixed same session as this endpoint) and never got to use it
+    because celery never got the chance to null the field either way that
+    matters for the user experience. GET, read-only."""
+    import os as _os
+    from django.utils import timezone
+    from tgbot.models import TelegramProfile
+
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+        return HttpResponse(status=403)
+
+    now = timezone.now()
+    rows = list(
+        TelegramProfile.objects.filter(trial_ai_quiz_until__isnull=False)
+        .values("id", "telegram_id", "full_name", "trial_ai_quiz_until")
+    )
+    for r in rows:
+        r["still_active"] = r["trial_ai_quiz_until"] >= now
+
+    return JsonResponse({
+        "now": now,
+        "total": len(rows),
+        "still_active_count": sum(1 for r in rows if r["still_active"]),
+        "stale_expired_count": sum(1 for r in rows if not r["still_active"]),
+        "users": rows,
+    }, json_dumps_params={"indent": 2, "default": str})
+
+
+@csrf_exempt
+def internal_fix_ai_quiz_trial_backlog(request: HttpRequest):
+    """One-off fix, paired with internal_diag_ai_quiz_trial_backlog: for
+    every user currently holding a non-null trial_ai_quiz_until, refresh it
+    to a fresh AI_QUIZ_TRIAL_HOURS window starting now and (re)schedule the
+    matching expire_ai_quiz_trial task, so the access the gate bug silently
+    denied them is actually usable now that the bug is fixed. POST only,
+    guarded, safe to re-run (each call just grants another fresh hour)."""
+    import os as _os
+    import datetime as _dt
+    from django.utils import timezone
+    from tgbot.models import TelegramProfile
+    from tgbot.tasks import expire_ai_quiz_trial, AI_QUIZ_TRIAL_HOURS
+
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+        return HttpResponse(status=403)
+
+    now = timezone.now()
+    until = now + _dt.timedelta(hours=AI_QUIZ_TRIAL_HOURS)
+    profiles = list(
+        TelegramProfile.objects.filter(trial_ai_quiz_until__isnull=False)
+        .values("id", "telegram_id", "full_name")
+    )
+    for p in profiles:
+        TelegramProfile.objects.filter(id=p["id"]).update(trial_ai_quiz_until=until)
+        expire_ai_quiz_trial.apply_async(args=[p["id"]], countdown=AI_QUIZ_TRIAL_HOURS * 3600)
+
+    return JsonResponse({
+        "refreshed_until": until,
+        "count": len(profiles),
+        "users": profiles,
+    }, json_dumps_params={"indent": 2, "default": str})
+
+
+@csrf_exempt
 def internal_diag_blocked_users(request: HttpRequest):
     """One-off diagnostic: recent is_blocked changes on TelegramProfile via
     django-auditlog, to find out who/what has been wrongly blocking new

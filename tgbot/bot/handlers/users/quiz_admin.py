@@ -41,6 +41,23 @@ async def _can_manage_quizzes(user) -> bool:
     return await _is_active_premium(user)
 
 
+async def _has_ai_quiz_access(user) -> bool:
+    """Admin, active Premium, an active AI-quiz trial window (Market 'Sirli
+    quti' win or the daily giveaway — see TelegramProfile.trial_ai_quiz_until),
+    or an unused free lifetime try. Distinct from _can_manage_quizzes: this
+    only gates the AI-quiz feature, not manual quiz creation/management,
+    since a trial/free-try grant is explicitly just "make one AI quiz",
+    not full quiz-management access."""
+    from django.utils import timezone
+    if _is_admin(user):
+        return True
+    if await _is_active_premium(user):
+        return True
+    has_trial = bool(user.trial_ai_quiz_until and user.trial_ai_quiz_until >= timezone.now())
+    has_free_try = not user.free_ai_quiz_used
+    return has_trial or has_free_try
+
+
 def _visible_quizzes(user):
     """Quizzes shown in 'Mening quizlarim': everyone — admins included —
     sees only the ones they personally created. (Admins can still edit/
@@ -262,15 +279,30 @@ async def show_quiz_list(message: types.Message, user):
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("qz:"), state="*")
 async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
     user = await aget_user(call.from_user.id)
+    parts = call.data.split(":")
+    action = parts[1]
+
+    # "ai" has its own, more permissive gate (trial/free-try users included —
+    # see offer_ai_quiz_start) so it's checked separately, not against the
+    # manual-quiz-management Premium wall below.
+    if action == "ai":
+        if not await _has_ai_quiz_access(user):
+            await call.answer(
+                "🤖 AI yordamida quiz yaratish — admin, 💎 Premium yoki faol sinov "
+                "muddati bo'lgan foydalanuvchilar uchun.",
+                show_alert=True,
+            )
+            return
+        await call.answer()
+        await offer_ai_quiz_start(call.message, user, state)
+        return
+
     if not await _can_manage_quizzes(user):
         await call.answer(
             "Quiz yaratish va boshqarish — admin yoki 💎 Premium foydalanuvchilar uchun.",
             show_alert=True,
         )
         return
-
-    parts = call.data.split(":")
-    action = parts[1]
 
     # Vizov (live broadcast to every registered user) stays admin-only — it's
     # a high-volume action that non-admin Premium users shouldn't trigger.
@@ -304,11 +336,6 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
         await state.finish()
         await call.message.answer("📝 Quiz nomini kiriting:")
         await QuizCreateState.title.set()
-
-    # AI quiz — start creation
-    elif action == "ai":
-        await call.answer()
-        await offer_ai_quiz_start(call.message, user, state)
 
     # View
     elif action == "v" and len(parts) > 2:

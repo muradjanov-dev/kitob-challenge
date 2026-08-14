@@ -1903,9 +1903,14 @@ async def _menu_quiz(call, user, _state: FSMContext):
 
     is_admin = bool(getattr(user, "is_admin", False))
     # Premium subscribers can create + manage their own quizzes (same flow
-    # admins use). Free users see the playable list only.
-    from tgbot.bot.handlers.users.quiz_admin import _is_active_premium
+    # admins use). Free users see the playable list only -- UNLESS they hold
+    # an AI-quiz trial window (Market 'Sirli quti' win / daily giveaway) or
+    # an unused free lifetime try, in which case they can reach the AI-quiz
+    # flow specifically (not manual creation/management, which stays a
+    # Premium perk) — see _has_ai_quiz_access.
+    from tgbot.bot.handlers.users.quiz_admin import _is_active_premium, _has_ai_quiz_access
     can_create = is_admin or await _is_active_premium(user)
+    can_ai = can_create or await _has_ai_quiz_access(user)
 
     @sync_to_async
     def _load():
@@ -1920,9 +1925,10 @@ async def _menu_quiz(call, user, _state: FSMContext):
         kb.add(InlineKeyboardButton(
             text="➕ Yangi quiz yaratish", callback_data="qz:new",
         ))
-        kb.add(InlineKeyboardButton(
-            text="🤖 AI yordamida yaratish (Premium)", callback_data="qz:ai",
-        ))
+    if can_ai:
+        ai_label = "🤖 AI yordamida yaratish" if can_create else "🤖 AI yordamida yaratish (bepul sinov)"
+        kb.add(InlineKeyboardButton(text=ai_label, callback_data="qz:ai"))
+    if can_create:
         kb.add(InlineKeyboardButton(
             text="📋 Mening quizlarim", callback_data="qz:ls",
         ))
@@ -1932,7 +1938,7 @@ async def _menu_quiz(call, user, _state: FSMContext):
         ))
 
     if not quizzes:
-        if can_create:
+        if can_ai:
             await call.message.answer(
                 "📭 <b>Hozircha quiz mavjud emas.</b>\n\nBirinchisini yarating:",
                 parse_mode="HTML",

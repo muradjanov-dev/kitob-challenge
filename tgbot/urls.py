@@ -3,7 +3,7 @@ from .views import (
     home, telegram, library_view, internal_diag_blocked_users, internal_unblock_false_positives,
     internal_diag_challenge_boom_state, internal_retire_challenge_and_launch_boom,
     internal_diag_challenge_reward_history, internal_broadcast_mystery_box_update,
-    internal_diag_achievements,
+    internal_diag_achievements, internal_diag_ai_quiz_trial_backlog, internal_fix_ai_quiz_trial_backlog,
 )
 from src.settings import WEBHOOK_PATH
 from tgbot.views import health_check_celery, health_check_redis
@@ -45,6 +45,8 @@ urlpatterns = [
     path(WEBHOOK_PATH, telegram, name='webhook'),
     path("internal/diag/blocked-users/", internal_diag_blocked_users, name="internal-diag-blocked-users"),
     path("internal/diag/achievements/", internal_diag_achievements, name="internal-diag-achievements"),
+    path("internal/diag/ai-quiz-trial-backlog/", internal_diag_ai_quiz_trial_backlog, name="internal-diag-ai-quiz-trial-backlog"),
+    path("internal/fix/ai-quiz-trial-backlog/", internal_fix_ai_quiz_trial_backlog, name="internal-fix-ai-quiz-trial-backlog"),
     path("internal/fix/unblock-false-positives/", internal_unblock_false_positives, name="internal-unblock-false-positives"),
     path("internal/diag/challenge-boom-state/", internal_diag_challenge_boom_state, name="internal-diag-challenge-boom-state"),
     path("internal/diag/challenge-reward-history/", internal_diag_challenge_reward_history, name="internal-diag-challenge-reward-history"),

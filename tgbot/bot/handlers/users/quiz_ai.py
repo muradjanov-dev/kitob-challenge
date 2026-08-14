@@ -277,8 +277,11 @@ async def process_ai_input(message: types.Message, state: FSMContext):
             await message.answer("⚠️ Iltimos, faqat PDF formatidagi fayllarni yuboring.")
             return
 
-        # PDF input requires active Premium (any tier). Super-premium check
-        # has been retired — all Premium subscribers get one PDF/day.
+        # PDF input requires active Premium (any tier) OR an AI-quiz trial/
+        # free-try grant — the same eligibility as starting the AI-quiz flow
+        # at all (offer_ai_quiz_start), since the trial's own promo text
+        # explicitly offers "matn, rasm yoki PDF". Super-premium check has
+        # been retired — all Premium subscribers get one PDF/day.
         @sync_to_async
         def check_premium():
             return Payment.objects.filter(
@@ -287,7 +290,9 @@ async def process_ai_input(message: types.Message, state: FSMContext):
                 end_date__gte=timezone.localdate(),
             ).exists()
 
-        if not await check_premium():
+        has_trial = bool(user.trial_ai_quiz_until and user.trial_ai_quiz_until >= timezone.now())
+        has_free_try = not user.free_ai_quiz_used
+        if not await check_premium() and not has_trial and not has_free_try:
             await message.answer(
                 "💎 <b>Premium funksiyasi!</b>\n\n"
                 "PDF kitoblar orqali avtomatik quiz yaratish uchun sizda "
