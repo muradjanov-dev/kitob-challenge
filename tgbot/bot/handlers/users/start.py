@@ -329,6 +329,17 @@ async def do_start(message: types.Message, state: FSMContext):
         "numbers": ("/numbers/", "🔢 O'yinni ochish", "🔢 Adabiy Raqamlar"),
         "worldlit": ("/worldlit/", "🌍 O'yinni ochish", "🌍 Jahon Adabiyoti"),
         "mysterybox": ("/mysterybox/", "🎁 O'yinni ochish", "🎁 Sirli Sandiq"),
+        # 10 Mind, Logic & Conscious Living Games
+        "mindtrap": ("/mindtrap/", "🧠 O'yinni ochish", "🧠 Fikr Tuzog'i"),
+        "stoic": ("/stoic/", "🧘‍♂️ O'yinni ochish", "🧘‍♂️ Ongli Hayot"),
+        "antiherd": ("/antiherd/", "🐑 O'yinni ochish", "🐑 Podadan Ajral"),
+        "dilemma": ("/dilemma/", "⚖️ O'yinni ochish", "⚖️ Axloqiy Dilemma"),
+        "causeeffect": ("/causeeffect/", "🔮 O'yinni ochish", "🔮 Sabab va Oqibat"),
+        "masks": ("/masks/", "🎭 O'yinni ochish", "🎭 Niqoblar Foshi"),
+        "socrates": ("/socrates/", "🏛 O'yinni ochish", "🏛 Sokrat Suhbatlari"),
+        "memento": ("/memento/", "⌛️ O'yinni ochish", "⌛️ Vaqt Paradoksi"),
+        "strategy": ("/strategy/", "♟ O'yinni ochish", "♟ Strategik Tafakkur"),
+        "paradox": ("/paradox/", "💡 O'yinni ochish", "💡 Paradokslar Olami"),
     }
     if args in _GAME_DEEPLINKS and already_registered:
         if user and not user.is_registered:

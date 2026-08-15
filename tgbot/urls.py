@@ -249,6 +249,47 @@ urlpatterns = [
     path("mysterybox/api/state/", api_quiz_state, {"flavor": "mysterybox"}, name="quiz-mysterybox-api-state"),
     path("mysterybox/api/submit/", api_quiz_submit, {"flavor": "mysterybox"}, name="quiz-mysterybox-api-submit"),
 
+    # 10 Mind, Logic, and Conscious Living Games (🧠 Ongli Hayot)
+    path("mindtrap/", quiz_index, {"flavor": "mindtrap"}, name="quiz-mindtrap"),
+    path("mindtrap/api/state/", api_quiz_state, {"flavor": "mindtrap"}, name="quiz-mindtrap-api-state"),
+    path("mindtrap/api/submit/", api_quiz_submit, {"flavor": "mindtrap"}, name="quiz-mindtrap-api-submit"),
+
+    path("stoic/", quiz_index, {"flavor": "stoic"}, name="quiz-stoic"),
+    path("stoic/api/state/", api_quiz_state, {"flavor": "stoic"}, name="quiz-stoic-api-state"),
+    path("stoic/api/submit/", api_quiz_submit, {"flavor": "stoic"}, name="quiz-stoic-api-submit"),
+
+    path("antiherd/", quiz_index, {"flavor": "antiherd"}, name="quiz-antiherd"),
+    path("antiherd/api/state/", api_quiz_state, {"flavor": "antiherd"}, name="quiz-antiherd-api-state"),
+    path("antiherd/api/submit/", api_quiz_submit, {"flavor": "antiherd"}, name="quiz-antiherd-api-submit"),
+
+    path("dilemma/", quiz_index, {"flavor": "dilemma"}, name="quiz-dilemma"),
+    path("dilemma/api/state/", api_quiz_state, {"flavor": "dilemma"}, name="quiz-dilemma-api-state"),
+    path("dilemma/api/submit/", api_quiz_submit, {"flavor": "dilemma"}, name="quiz-dilemma-api-submit"),
+
+    path("causeeffect/", quiz_index, {"flavor": "causeeffect"}, name="quiz-causeeffect"),
+    path("causeeffect/api/state/", api_quiz_state, {"flavor": "causeeffect"}, name="quiz-causeeffect-api-state"),
+    path("causeeffect/api/submit/", api_quiz_submit, {"flavor": "causeeffect"}, name="quiz-causeeffect-api-submit"),
+
+    path("masks/", quiz_index, {"flavor": "masks"}, name="quiz-masks"),
+    path("masks/api/state/", api_quiz_state, {"flavor": "masks"}, name="quiz-masks-api-state"),
+    path("masks/api/submit/", api_quiz_submit, {"flavor": "masks"}, name="quiz-masks-api-submit"),
+
+    path("socrates/", quiz_index, {"flavor": "socrates"}, name="quiz-socrates"),
+    path("socrates/api/state/", api_quiz_state, {"flavor": "socrates"}, name="quiz-socrates-api-state"),
+    path("socrates/api/submit/", api_quiz_submit, {"flavor": "socrates"}, name="quiz-socrates-api-submit"),
+
+    path("memento/", quiz_index, {"flavor": "memento"}, name="quiz-memento"),
+    path("memento/api/state/", api_quiz_state, {"flavor": "memento"}, name="quiz-memento-api-state"),
+    path("memento/api/submit/", api_quiz_submit, {"flavor": "memento"}, name="quiz-memento-api-submit"),
+
+    path("strategy/", quiz_index, {"flavor": "strategy"}, name="quiz-strategy"),
+    path("strategy/api/state/", api_quiz_state, {"flavor": "strategy"}, name="quiz-strategy-api-state"),
+    path("strategy/api/submit/", api_quiz_submit, {"flavor": "strategy"}, name="quiz-strategy-api-submit"),
+
+    path("paradox/", quiz_index, {"flavor": "paradox"}, name="quiz-paradox"),
+    path("paradox/api/state/", api_quiz_state, {"flavor": "paradox"}, name="quiz-paradox-api-state"),
+    path("paradox/api/submit/", api_quiz_submit, {"flavor": "paradox"}, name="quiz-paradox-api-submit"),
+
     path("api/games/status/", api_games_status, name="games-api-status"),
 
     path("api/track/event/", api_track_event, name="track-event"),

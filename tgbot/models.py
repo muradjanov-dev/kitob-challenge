@@ -1958,6 +1958,17 @@ class QuizGame(BaseModel):
         ("numbers", "🔢 Adabiy Raqamlar"),
         ("worldlit", "🌍 Jahon Adabiyoti"),
         ("mysterybox", "🎁 Sirli Sandiq"),
+        # 10 Philosophy, Logic, and Conscious Living Games (🧠 Ongli Hayot & Farosat)
+        ("mindtrap", "🧠 Fikr Tuzog'i"),
+        ("stoic", "🧘‍♂️ Ongli Hayot"),
+        ("antiherd", "🐑 Podadan Ajral"),
+        ("dilemma", "⚖️ Axloqiy Dilemma"),
+        ("causeeffect", "🔮 Sabab va Oqibat"),
+        ("masks", "🎭 Niqoblar Foshi"),
+        ("socrates", "🏛 Sokrat Suhbatlari"),
+        ("memento", "⌛️ Vaqt Paradoksi"),
+        ("strategy", "♟ Strategik Tafakkur"),
+        ("paradox", "💡 Paradokslar Olami"),
     ]
     flavor = models.CharField(max_length=32, choices=FLAVOR_CHOICES)
     title = models.CharField(max_length=120, default="Bilim O'yini")
@@ -2041,6 +2052,9 @@ class GameSequence(BaseModel):
         "bracket", "auction", "regions", "king",
         "rhyme", "scholars", "genres", "numbers",
         "worldlit", "mysterybox",
+        # 10 Mind, Logic, and Conscious Living Games (🧠 Ongli Hayot & Farosat)
+        "mindtrap", "stoic", "antiherd", "dilemma", "causeeffect",
+        "masks", "socrates", "memento", "strategy", "paradox",
     ]
 
     slot = models.CharField(max_length=16, choices=SLOT_CHOICES)

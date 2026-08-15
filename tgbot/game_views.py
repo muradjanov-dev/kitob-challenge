@@ -256,6 +256,10 @@ _QUIZ_FLAVORS = (
     "bracket", "auction", "regions", "king",
     "rhyme", "scholars", "genres", "numbers",
     "worldlit", "mysterybox",
+    # 10 Mind, Logic & Conscious Living Games (🧠 Ongli Hayot)
+    "mindtrap", "stoic", "antiherd", "dilemma",
+    "causeeffect", "masks", "socrates", "memento",
+    "strategy", "paradox",
 )
 
 
@@ -347,6 +351,17 @@ _GAME_LABELS_URLS = {
     "numbers": ("🔢 Adabiy Raqamlar", "/numbers/"),
     "worldlit": ("🌍 Jahon Adabiyoti", "/worldlit/"),
     "mysterybox": ("🎁 Sirli Sandiq", "/mysterybox/"),
+    # 10 Mind, Logic & Conscious Living Games
+    "mindtrap": ("🧠 Fikr Tuzog'i", "/mindtrap/"),
+    "stoic": ("🧘‍♂️ Ongli Hayot", "/stoic/"),
+    "antiherd": ("🐑 Podadan Ajral", "/antiherd/"),
+    "dilemma": ("⚖️ Axloqiy Dilemma", "/dilemma/"),
+    "causeeffect": ("🔮 Sabab va Oqibat", "/causeeffect/"),
+    "masks": ("🎭 Niqoblar Foshi", "/masks/"),
+    "socrates": ("🏛 Sokrat Suhbatlari", "/socrates/"),
+    "memento": ("⌛️ Vaqt Paradoksi", "/memento/"),
+    "strategy": ("♟ Strategik Tafakkur", "/strategy/"),
+    "paradox": ("💡 Paradokslar Olami", "/paradox/"),
 }
 _QUIZ_FLAVOR_SET = set(_QUIZ_FLAVORS)
 

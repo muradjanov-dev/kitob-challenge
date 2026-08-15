@@ -48,6 +48,18 @@ from .numbers import QUIZ_NUMBERS_QUESTIONS
 from .worldlit import QUIZ_WORLDLIT_QUESTIONS
 from .mysterybox import QUIZ_MYSTERYBOX_QUESTIONS
 
+# 10 Mind, Logic, and Conscious Living Games
+from .mindtrap import QUIZ_MINDTRAP_QUESTIONS
+from .stoic import QUIZ_STOIC_QUESTIONS
+from .antiherd import QUIZ_ANTIHERD_QUESTIONS
+from .dilemma import QUIZ_DILEMMA_QUESTIONS
+from .causeeffect import QUIZ_CAUSEEFFECT_QUESTIONS
+from .masks import QUIZ_MASKS_QUESTIONS
+from .socrates import QUIZ_SOCRATES_QUESTIONS
+from .memento import QUIZ_MEMENTO_QUESTIONS
+from .strategy import QUIZ_STRATEGY_QUESTIONS
+from .paradox import QUIZ_PARADOX_QUESTIONS
+
 __all__ = [
     "FEUD_QUESTIONS",
     "CASTLE_QUESTIONS",
@@ -91,4 +103,14 @@ __all__ = [
     "QUIZ_NUMBERS_QUESTIONS",
     "QUIZ_WORLDLIT_QUESTIONS",
     "QUIZ_MYSTERYBOX_QUESTIONS",
+    "QUIZ_MINDTRAP_QUESTIONS",
+    "QUIZ_STOIC_QUESTIONS",
+    "QUIZ_ANTIHERD_QUESTIONS",
+    "QUIZ_DILEMMA_QUESTIONS",
+    "QUIZ_CAUSEEFFECT_QUESTIONS",
+    "QUIZ_MASKS_QUESTIONS",
+    "QUIZ_SOCRATES_QUESTIONS",
+    "QUIZ_MEMENTO_QUESTIONS",
+    "QUIZ_STRATEGY_QUESTIONS",
+    "QUIZ_PARADOX_QUESTIONS",
 ]

@@ -46,7 +46,10 @@ from tgbot.services.game_questions import (
     QUIZ_BRACKET_QUESTIONS, QUIZ_AUCTION_QUESTIONS, QUIZ_REGIONS_QUESTIONS,
     QUIZ_KING_QUESTIONS, QUIZ_RHYME_QUESTIONS, QUIZ_SCHOLARS_QUESTIONS,
     QUIZ_GENRES_QUESTIONS, QUIZ_NUMBERS_QUESTIONS, QUIZ_WORLDLIT_QUESTIONS,
-    QUIZ_MYSTERYBOX_QUESTIONS,
+    QUIZ_MYSTERYBOX_QUESTIONS, QUIZ_MINDTRAP_QUESTIONS, QUIZ_STOIC_QUESTIONS,
+    QUIZ_ANTIHERD_QUESTIONS, QUIZ_DILEMMA_QUESTIONS, QUIZ_CAUSEEFFECT_QUESTIONS,
+    QUIZ_MASKS_QUESTIONS, QUIZ_SOCRATES_QUESTIONS, QUIZ_MEMENTO_QUESTIONS,
+    QUIZ_STRATEGY_QUESTIONS, QUIZ_PARADOX_QUESTIONS,
 )
 
 LEAD_SECONDS = 30
@@ -66,7 +69,7 @@ TEAM_RANK_BONUS = {0: 40, 1: 25, 2: 10}
 COVER_BLUR_RADIUS = 14
 
 # VIP Premium Arena Rewards & Rules
-VIP_TOP_GAMES = ["king", "duel", "teams", "survival", "mysterybox"]
+VIP_TOP_GAMES = ["king", "duel", "teams", "survival", "mysterybox", "mindtrap", "stoic", "strategy"]
 VIP_REWARD_TIERS = {0: 500, 1: 300, 2: 200}
 VIP_PREMIUM_DAYS_BONUS = {0: 3, 1: 2, 2: 1}
 VIP_PARTICIPATION = 75
@@ -122,6 +125,17 @@ TITLES = {
     "numbers": "🔢 Adabiy Raqamlar",
     "worldlit": "🌍 Jahon Adabiyoti",
     "mysterybox": "🎁 Sirli Sandiq",
+    # 10 Mind, Logic & Conscious Living Games
+    "mindtrap": "🧠 Fikr Tuzog'i",
+    "stoic": "🧘‍♂️ Ongli Hayot",
+    "antiherd": "🐑 Podadan Ajral",
+    "dilemma": "⚖️ Axloqiy Dilemma",
+    "causeeffect": "🔮 Sabab va Oqibat",
+    "masks": "🎭 Niqoblar Foshi",
+    "socrates": "🏛 Sokrat Suhbatlari",
+    "memento": "⌛️ Vaqt Paradoksi",
+    "strategy": "♟ Strategik Tafakkur",
+    "paradox": "💡 Paradokslar Olami",
 }
 
 ENTRY_FEES = {k: (30 if k == "teams" else 25) for k in TITLES}
@@ -168,6 +182,17 @@ def _raw_pool(flavor):
         "numbers": QUIZ_NUMBERS_QUESTIONS,
         "worldlit": QUIZ_WORLDLIT_QUESTIONS,
         "mysterybox": QUIZ_MYSTERYBOX_QUESTIONS,
+        # 10 Mind, Logic & Conscious Living Games
+        "mindtrap": QUIZ_MINDTRAP_QUESTIONS,
+        "stoic": QUIZ_STOIC_QUESTIONS,
+        "antiherd": QUIZ_ANTIHERD_QUESTIONS,
+        "dilemma": QUIZ_DILEMMA_QUESTIONS,
+        "causeeffect": QUIZ_CAUSEEFFECT_QUESTIONS,
+        "masks": QUIZ_MASKS_QUESTIONS,
+        "socrates": QUIZ_SOCRATES_QUESTIONS,
+        "memento": QUIZ_MEMENTO_QUESTIONS,
+        "strategy": QUIZ_STRATEGY_QUESTIONS,
+        "paradox": QUIZ_PARADOX_QUESTIONS,
     }
     if flavor == "cover":
         return _cover_raw_pool()
