@@ -501,7 +501,7 @@ def resolve_mystery_box(user):
                 p.ball = Decimal(p.ball or 0) + Decimal(100)
                 p.save(update_fields=["bonus_free_game_entries", "ball"])
                 KitobchaLedger.objects.create(user=p, delta=100, reason="mystery_box")
-                return f"👑 <b>Yangi Faxriy Unvon:</b>\n✨ <b>{val}</b>!\n\n🎁 Profilingizda nishon faollashdi + <b>+100 Kitobcha</b> va <b>+1 ta Chipta</b> berildi!", False
+                return f"👑 <b>Yangi Faxriy Unvon:</b>\n✨ <b>{val}</b>!\n\n🎁 Yutuqlaringiz qatoriga qo'shildi + <b>+100 Kitobcha</b> va <b>+1 ta Chipta</b> berildi!", False
 
             elif ptype == "ball_direct":
                 p.ball = Decimal(p.ball or 0) + Decimal(val)
