@@ -12,7 +12,14 @@ if os.path.exists('.env'):
 
 API_TOKEN = env.str('API_TOKEN')
 SECRET_KEY = env.str('SECRET_KEY')
-WEB_DOMAIN = env.str('WEB_DOMAIN')
+
+_raw_web_domain = (env.str('WEB_DOMAIN', default='') or os.environ.get('RAILWAY_PUBLIC_DOMAIN', '') or '').strip().rstrip('/')
+if not _raw_web_domain or 'CHANGEME' in _raw_web_domain:
+    _raw_web_domain = 'invigorating-renewal-production-3829.up.railway.app'
+if not _raw_web_domain.startswith('http://') and not _raw_web_domain.startswith('https://'):
+    _raw_web_domain = f"https://{_raw_web_domain}"
+WEB_DOMAIN = _raw_web_domain
+
 DEBUG = env.bool('DEBUG')
 ADMINS = env.list('ADMINS')
 CHANNELS = env.list('CHANNELS')

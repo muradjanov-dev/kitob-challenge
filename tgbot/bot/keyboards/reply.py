@@ -136,9 +136,13 @@ def report_reply_keyboard(language="uz", bajardim_label=None, is_admin=False):
     # WebApp button opens the whole experience. Reply-keyboard WebApp buttons
     # always render the label (unlike the chat menu button which collapses to
     # an icon on mobile).
+    base_domain = str(WEB_DOMAIN).rstrip('/')
+    if not base_domain.startswith('http'):
+        base_domain = f"https://{base_domain}"
+
     rows = [
         [KeyboardButton(text=report_text), KeyboardButton(text=done_text)],
-        [KeyboardButton(text=site_text, web_app=WebAppInfo(url=f"{WEB_DOMAIN}/"))],
+        [KeyboardButton(text=site_text, web_app=WebAppInfo(url=f"{base_domain}/"))],
     ]
     # Persistent entry to this user's own boom stats + share link, while a
     # Referral BOOM is live -- same active-boom cache main_markup() uses.

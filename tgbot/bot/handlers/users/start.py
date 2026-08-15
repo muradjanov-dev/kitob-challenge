@@ -2,7 +2,7 @@ import os
 
 from aiogram import types
 from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters.builtin import CommandStart, ChatTypeFilter
+from aiogram.dispatcher.filters.builtin import CommandStart, ChatTypeFilter, Text
 from aiogram.types import ChatType
 from asgiref.sync import sync_to_async
 
@@ -20,7 +20,7 @@ from tgbot.bot.utils import aget_user
 
 
 AGE_LABELS = {
-    "u18": "&lt;18",
+    "u18": "<18",
     "18_25": "18-25",
     "26_35": "26-35",
     "36p": "36+",
@@ -36,6 +36,31 @@ def t(language: str, uz: str, ru: str) -> str:
 
 def _user_lang(user) -> str:
     return (user.language if user else None) or "uz"
+
+
+@dp.message_handler(
+    ChatTypeFilter(ChatType.PRIVATE),
+    Text(equals=["🌌 Parallel olam", "🌌 Параллельный мир", "Parallel olam", "Параллельный мир"], ignore_case=True),
+    state="*",
+)
+async def parallel_olam_text_handler(message: types.Message, state: FSMContext):
+    user = await aget_user(message.from_user.id)
+    lang = _user_lang(user)
+    from aiogram.types import InlineKeyboardMarkup as _IKM, InlineKeyboardButton as _IKB, WebAppInfo as _WAI
+    from src.settings import WEB_DOMAIN
+    base_domain = WEB_DOMAIN if str(WEB_DOMAIN).startswith("http") else f"https://{WEB_DOMAIN}"
+    kb = _IKM().add(_IKB(
+        "⚡️ Jonli o'yinlar / Parallel olam" if lang != "ru" else "⚡️ Живые игры / Параллельный мир",
+        web_app=_WAI(url=f"{base_domain}/")
+    ))
+    await message.answer(
+        "🌌 <b>Parallel olam & Jonli o'yinlar</b>\n\n"
+        "Platformaga kirish uchun pastdagi tugmani bosing 👇"
+        if lang != "ru" else
+        "🌌 <b>Параллельный мир & Живые игры</b>\n\n"
+        "Нажмите кнопку ниже, чтобы открыть платформу 👇",
+        reply_markup=kb, parse_mode="HTML",
+    )
 
 
 @sync_to_async
