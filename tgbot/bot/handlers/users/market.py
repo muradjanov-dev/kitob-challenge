@@ -102,9 +102,7 @@ async def market_show_shop_products(call: types.CallbackQuery):
 
 @dp.callback_query_handler(lambda c: c.data == "market:stash")
 async def market_show_stash(call: types.CallbackQuery):
-    """Sirli quti'dan yig'ilgan, hali ishlatilmagan mukofotlar — har biri qanday
-    ishlashini ham tushuntiradi, chunki bu tokenlar avtomatik ishlatiladi
-    (foydalanuvchi alohida "faollashtirish" tugmasini bosishi shart emas)."""
+    """Sirli quti va Marketdan yig'ilgan barcha mukofotlar va imtiyozlar zahirasi."""
     if not _is_private(call):
         await _redirect_to_private(call)
         return
@@ -114,31 +112,98 @@ async def market_show_stash(call: types.CallbackQuery):
         await call.message.answer("Avval /start bosing")
         return
 
-    freeze = user.streak_freeze_count or 0
-    lives = user.bonus_survival_lives or 0
-    tickets = user.bonus_free_game_entries or 0
-    discount = user.next_market_discount_pct or 0
+    @sync_to_async
+    def _load_stash_data(u):
+        from django.utils import timezone
+        from tgbot.models import Payment
+        now = timezone.now()
+        balance = int(u.ball or 0)
+        freeze = u.streak_freeze_count or 0
+        lives = u.bonus_survival_lives or 0
+        tickets = u.bonus_free_game_entries or 0
+        discount = u.next_market_discount_pct or 0
+
+        # Premium status
+        paid_sub = Payment.objects.filter(user=u, status="paid", end_date__gte=timezone.localdate()).order_by("-end_date").first()
+        is_trial_prem = bool(u.trial_premium_until and u.trial_premium_until >= now)
+        prem_until = None
+        prem_type = "none"
+        if paid_sub:
+            prem_type = "paid"
+            prem_until = paid_sub.end_date.strftime("%d.%m.%Y")
+        elif is_trial_prem:
+            prem_type = "trial"
+            rem_hrs = max(1, int((u.trial_premium_until - now).total_seconds() // 3600))
+            prem_until = f"{rem_hrs} soat ({timezone.localtime(u.trial_premium_until).strftime('%d.%m.%Y %H:%M')})"
+
+        # AI Quiz status
+        is_ai_trial = bool(u.trial_ai_quiz_until and u.trial_ai_quiz_until >= now)
+        ai_until = None
+        if is_ai_trial:
+            rem_m = max(1, int((u.trial_ai_quiz_until - now).total_seconds() // 60))
+            ai_until = f"{rem_m} daqiqa ({timezone.localtime(u.trial_ai_quiz_until).strftime('%H:%M')})"
+
+        return {
+            "balance": balance,
+            "freeze": freeze,
+            "lives": lives,
+            "tickets": tickets,
+            "discount": discount,
+            "prem_type": prem_type,
+            "prem_until": prem_until,
+            "is_ai_trial": is_ai_trial,
+            "ai_until": ai_until,
+        }
+
+    data = await _load_stash_data(user)
 
     lines = ["🎒 <b>Mening yutuq zahiram</b>\n"]
+    lines.append(f"🪙 <b>Joriy Kitobcha balansi:</b> <b>{data['balance']}</b> 🪙\n")
+
+    # 1. VIP Premium
+    if data["prem_type"] == "paid":
+        lines.append(f"💎 <b>VIP Premium Obuna:</b> ✅ <b>Faol</b> (Muddat: {data['prem_until']} gacha)\n<i>Barcha 65 ta o'yinga, 2X ball ko'paytirgichiga va VIP zallarga to'liq ruxsat.</i>\n")
+    elif data["prem_type"] == "trial":
+        lines.append(f"💎 <b>VIP Premium (Sirli quti / Yutuq):</b> ⚡️ <b>Faol</b>\n<i>Qolgan vaqt: {data['prem_until']}. Barcha VIP imtiyozlar yoqilgan!</i>\n")
+    else:
+        lines.append("💎 <b>VIP Premium Obuna:</b> ❌ Faol emas\n<i>Sirli qutidan bepul yutib olishingiz yoki Marketdan faollashtirishingiz mumkin.</i>\n")
+
+    # 2. AI Quiz Pass
+    if data["prem_type"] == "paid":
+        lines.append("🤖 <b>AI Viktorina Yaratish:</b> 👑 <b>Cheksiz</b> (Premium hisobidan)\n")
+    elif data["is_ai_trial"]:
+        lines.append(f"🤖 <b>AI Viktorina Yaratish (Pass):</b> ⚡️ <b>Faol</b> (Qolgan vaqt: {data['ai_until']})\n<i>Istalgan kitobingiz bo'yicha sun'iy intellekt orqali test tuzishingiz mumkin!</i>\n")
+
+    # 3. Tickets
     lines.append(
-        f"🛡 <b>Streak muzlatish:</b> {freeze} ta\n"
+        f"🎟 <b>Jonli o'yin bileti:</b> <b>{data['tickets']} ta</b>\n"
+        "<i>Har qanday jonli o'yinga (Zanjiri, Qal'a, Viktorina va barcha 65 ta o'yin) kirishda "
+        "25 Kitobcha o'rniga avtomatik shu biletdan ishlatiladi.</i>\n"
+    )
+
+    # 4. Streak Freeze
+    lines.append(
+        f"🛡 <b>Streak muzlatish qalqoni:</b> <b>{data['freeze']} ta</b>\n"
         "<i>Hisobot yubormay qolib ketgan birinchi kuningizga avtomatik "
-        "ishlatiladi — ketma-ketligingiz (streak) buzilmaydi. Hech narsa bosish shart emas.</i>"
+        "ishlatiladi — ketma-ketligingiz (streak) uzilmaydi.</i>\n"
     )
+
+    # 5. Extra Lives
     lines.append(
-        f"\n❤️ <b>Qo'shimcha jon (Omon qolish):</b> {lives} ta\n"
-        "<i>Keyingi \"Omon qolish\" o'yiniga qo'shilganingizda avtomatik qo'shiladi.</i>"
+        f"❤️ <b>Qo'shimcha jon (Omon qolish):</b> <b>{data['lives']} ta</b>\n"
+        "<i>Keyingi \"Omon qolish\" o'yiniga kirganingizda avtomatik 3 ta asosiy jonga qo'shiladi.</i>\n"
     )
-    lines.append(
-        f"\n🎟 <b>Jonli o'yin bileti:</b> {tickets} ta\n"
-        "<i>Har qanday jonli o'yinga (Zanjiri, Qal'a, Viktorina va h.k.) kirishda "
-        "25 Kitobcha o'rniga avtomatik shu biletdan ishlatiladi.</i>"
-    )
-    lines.append(
-        f"\n💸 <b>Market chegirmasi:</b> {discount}%\n"
-        "<i>Keyingi Marketdan xarid qilganingizda narxdan avtomatik ayiriladi.</i>"
-    )
+
+    # 6. Discount
+    if data["discount"] > 0:
+        lines.append(
+            f"💸 <b>Market chegirmasi:</b> <b>{data['discount']}%</b>\n"
+            "<i>Keyingi Market xaridingizda umumiy narxdan avtomatik ayirib tashlanadi.</i>\n"
+        )
+
     kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton(text="🎁 Sirli qutini ochish (200 🪙)", callback_data="market:view:mystery_box"))
+    kb.add(InlineKeyboardButton(text="📜 Shaxsiy sertifikat olish (150 🪙)", callback_data="market:view:certificate"))
     kb.add(InlineKeyboardButton(text="🔙 Marketga qaytish", callback_data="menu:market"))
     await call.message.answer("\n".join(lines), parse_mode="HTML", reply_markup=kb)
 
