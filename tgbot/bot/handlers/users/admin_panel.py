@@ -2411,3 +2411,53 @@ async def admin_period_report_cb(call: types.CallbackQuery):
     from tgbot.tasks import build_admin_period_report_text
     text = await sync_to_async(build_admin_period_report_text, thread_sensitive=True)(period)
     await call.message.answer(text, parse_mode="HTML")
+
+
+@dp.message_handler(IsPrivate(), commands=["mystery_stats"], state="*")
+async def admin_mystery_stats_cmd(message: types.Message):
+    """Real-time live statistics of mystery box opens by time intervals."""
+    user = await aget_user(message.from_user.id)
+    if not (user and user.is_admin):
+        await message.answer("Siz admin emassiz!")
+        return
+
+    @sync_to_async
+    def _compute_stats():
+        from tgbot.models import MarketPurchase, KitobchaLedger
+        from django.db.models import Count, Sum
+        from django.db.models.functions import TruncDate
+
+        total_cnt = MarketPurchase.objects.filter(item_key="mystery_box").count()
+        total_users = MarketPurchase.objects.filter(item_key="mystery_box").values("user_id").distinct().count()
+        total_spent = MarketPurchase.objects.filter(item_key="mystery_box").aggregate(s=Sum("price"))["s"] or 0
+        total_won = KitobchaLedger.objects.filter(reason="mystery_box").aggregate(s=Sum("delta"))["s"] or 0
+
+        daily_rows = list(
+            MarketPurchase.objects.filter(item_key="mystery_box")
+            .annotate(day=TruncDate("created_at"))
+            .values("day")
+            .annotate(cnt=Count("id"), spent=Sum("price"))
+            .order_by("-day")[:14]
+        )
+        return total_cnt, total_users, total_spent, total_won, daily_rows
+
+    total_cnt, total_users, total_spent, total_won, daily_rows = await _compute_stats()
+
+    lines = [
+        "🎁 <b>Sirli Quti Statistikasi (Vaqt intervallari bo'yicha)</b>\n",
+        f"📦 Jami ochilgan qutilar: <b>{total_cnt} ta</b>",
+        f"👤 Quti ochgan qatnashchilar: <b>{total_users} kishi</b>",
+        f"🪙 Sarflangan Kitobcha: <b>{int(total_spent):,}</b> 🪙".replace(",", " "),
+        f"✨ Qaytarilgan Kitobcha: <b>+{int(total_won):,}</b> 🪙".replace(",", " "),
+        f"🔥 Yonib ketgan sof Kitobcha: <b>{int(total_spent - total_won):,}</b> 🪙\n",
+        "📅 <b>Kunlik ochilishlar (Oxirgi 14 kun):</b>",
+    ]
+    if daily_rows:
+        for r in daily_rows:
+            d_str = r['day'].strftime('%d.%m.%Y') if r['day'] else "Noma'lum"
+            lines.append(f"• <b>{d_str}</b>: <b>{r['cnt']} ta</b> quti ({int(r['spent']):,} 🪙)".replace(",", " "))
+    else:
+        lines.append("<i>Hozircha xaridlar qayd etilmagan.</i>")
+
+    await message.answer("\n".join(lines), parse_mode="HTML")
+
