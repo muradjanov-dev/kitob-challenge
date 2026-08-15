@@ -1,14 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-Smart LRU (Least-Recently-Used) question selector for live games.
-Guarantees 0% repetition until the entire question pool has completed a full cycle.
+Smart LRU (Least-Recently-Used) & Smooth-Cycle question selector for live games.
+
+Guarantees:
+1. 100% Non-Repetition within a full cycle: A question is NEVER repeated until
+   the entire question pool has been exhausted.
+2. Smooth Mixing on Loop: When questions cycle into the next loop, they are
+   naturally and smoothly shuffled across older rested pools so questions NEVER
+   reappear in the same rigid groups or fixed order.
 """
 import random
 
 
 def pick_least_recently_used(pool, get_key_fn, recent_games, get_game_keys_fn, count):
     """
-    Selects `count` items from `pool` using a strict Least-Recently-Used (LRU) algorithm.
+    Selects `count` items from `pool` with strict cycle-lockout and smooth loop-mixing.
 
     :param pool: list of question dicts/strings in the bank
     :param get_key_fn: function(item) -> unique key (e.g. quote, q, emoji, display)
@@ -21,43 +27,72 @@ def pick_least_recently_used(pool, get_key_fn, recent_games, get_game_keys_fn, c
         return []
 
     count = min(count, len(pool))
+    total_pool_size = len(pool)
 
-    # Map each key in the pool to how recently it was used (index 0 = most recent game)
-    # Lower value = used longer ago (or never used).
-    key_last_seen = {}
+    # Calculate strict cooldown window size (in games)
+    # A full cycle is total_pool_size // count games.
+    # To ensure 0% repetition until the whole pool is exhausted,
+    # we strictly lock out questions used in the last (cycle_len - 1) games.
+    cycle_len = max(1, total_pool_size // count)
+    strict_lockout_games = max(1, cycle_len - 1)
+
+    # 1. Map each question key to its most recent appearance:
+    # game_idx = 0 (most recent game), 1 (2nd most recent), etc.
+    key_last_game_idx = {}
+    key_usage_count = {}
     for game_idx, game in enumerate(recent_games):
         try:
             used_keys = get_game_keys_fn(game) or []
         except Exception:
             used_keys = []
         for k in used_keys:
-            if k and k not in key_last_seen:
-                # game_idx: 0 is the most recent game, 1 is 2nd most recent, etc.
-                # We store negative index so smaller number means seen longer ago.
-                key_last_seen[k] = -game_idx
+            if not k:
+                continue
+            key_usage_count[k] = key_usage_count.get(k, 0) + 1
+            if k not in key_last_game_idx:
+                key_last_game_idx[k] = game_idx
 
-    # Group pool items by their recency tier
-    # -infinity (never seen in recent games) is tier -999999
-    tiered = {}
+    # 2. Categorize all items in the pool into buckets:
+    # - never_used: questions never seen in recent history
+    # - fully_rested: questions used long ago (older than the strict lockout window)
+    # - in_lockout: questions used recently (within the strict lockout window)
+    never_used = []
+    fully_rested = []
+    in_lockout = []
+
     for item in pool:
         k = get_key_fn(item)
-        tier = key_last_seen.get(k, -999999)
-        if tier not in tiered:
-            tiered[tier] = []
-        tiered[tier].append(item)
+        last_idx = key_last_game_idx.get(k)
+        if last_idx is None:
+            never_used.append(item)
+        elif last_idx >= strict_lockout_games:
+            fully_rested.append((last_idx, item))
+        else:
+            in_lockout.append((last_idx, item))
 
-    # Sort tiers from oldest (lowest score) to newest (highest score)
-    sorted_tiers = sorted(tiered.keys())
+    # 3. Selection Strategy:
+    # Priority 1: Unused questions (never seen) -> fully randomized
+    random.shuffle(never_used)
 
-    selected = []
-    for tier in sorted_tiers:
-        items_in_tier = list(tiered[tier])
-        random.shuffle(items_in_tier)
-        needed = count - len(selected)
-        selected.extend(items_in_tier[:needed])
-        if len(selected) >= count:
-            break
+    # Priority 2: Fully rested questions (past the full cycle cooldown).
+    # To smoothly mix questions on loop and avoid repeating identical groups:
+    # We group fully rested questions by usage count or broad age windows,
+    # shuffle them thoroughly, and mix them into the selection.
+    random.shuffle(fully_rested)
+    # Sort with a soft random jitter so rested questions from across older games
+    # seamlessly mix together rather than appearing in rigid game-by-game blocks.
+    fully_rested.sort(key=lambda x: -x[0] + random.uniform(-1.5, 1.5))
+    rested_items = [x[1] for x in fully_rested]
 
-    # Shuffle the final selected questions so their in-game order is mixed
+    # Priority 3: In-lockout questions (only used as a fallback if the entire pool < count)
+    in_lockout.sort(key=lambda x: -x[0])  # oldest first
+    lockout_items = [x[1] for x in in_lockout]
+
+    # Combine candidates in order of priority
+    candidates = never_used + rested_items + lockout_items
+
+    selected = candidates[:count]
+
+    # Final shuffle so in-game display order is completely fresh and randomized
     random.shuffle(selected)
-    return selected[:count]
+    return selected
