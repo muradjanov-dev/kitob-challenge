@@ -1196,17 +1196,26 @@ def _category_targets(boys_thread_id, girls_thread_id):
 
 
 def _announce_targets():
-    from tgbot.bot.consts import ANNOUNCE_BOYS_THREAD_ID, ANNOUNCE_GIRLS_THREAD_ID
+    try:
+        from tgbot.bot.consts import ANNOUNCE_BOYS_THREAD_ID, ANNOUNCE_GIRLS_THREAD_ID
+    except Exception:
+        ANNOUNCE_BOYS_THREAD_ID = ANNOUNCE_GIRLS_THREAD_ID = None
     return _category_targets(ANNOUNCE_BOYS_THREAD_ID, ANNOUNCE_GIRLS_THREAD_ID)
 
 
 def _game_targets():
-    from tgbot.bot.consts import GAMES_BOYS_THREAD_ID, GAMES_GIRLS_THREAD_ID
+    try:
+        from tgbot.bot.consts import GAMES_BOYS_THREAD_ID, GAMES_GIRLS_THREAD_ID
+    except Exception:
+        GAMES_BOYS_THREAD_ID = GAMES_GIRLS_THREAD_ID = None
     return _category_targets(GAMES_BOYS_THREAD_ID, GAMES_GIRLS_THREAD_ID)
 
 
 def _leaderboard_targets():
-    from tgbot.bot.consts import LEADERBOARD_BOYS_THREAD_ID, LEADERBOARD_GIRLS_THREAD_ID
+    try:
+        from tgbot.bot.consts import LEADERBOARD_BOYS_THREAD_ID, LEADERBOARD_GIRLS_THREAD_ID
+    except Exception:
+        LEADERBOARD_BOYS_THREAD_ID = LEADERBOARD_GIRLS_THREAD_ID = None
     return _category_targets(LEADERBOARD_BOYS_THREAD_ID, LEADERBOARD_GIRLS_THREAD_ID)
 
 
