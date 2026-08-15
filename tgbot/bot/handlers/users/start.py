@@ -151,17 +151,48 @@ async def do_start(message: types.Message, state: FSMContext):
         await send_daily_report_handler(message, state)
         return
 
-    # Market deep link: /start market — from the "🎪 Marketni ochish" button
-    # in group announcements (callback_data buttons only fire inside the
-    # chat they're posted in, so a group post must use a url deep link that
-    # lands here instead).
-    if args == "market" and already_registered:
+    # Market / Shop deep links: /start market, /start shop, /start dokon
+    if args in ("market", "shop", "dokon") and already_registered:
         if user and not user.is_registered:
             user.is_registered = True
             await sync_to_async(user.save)(update_fields=["is_registered"])
         await state.finish()
         from tgbot.bot.handlers.users.market import show_market_menu
         await show_market_menu(message, user)
+        return
+
+    # Games / Parallel Olam deep links: /start games, /start olam
+    if args in ("games", "olam", "parallel") and already_registered:
+        if user and not user.is_registered:
+            user.is_registered = True
+            await sync_to_async(user.save)(update_fields=["is_registered"])
+        await state.finish()
+        from aiogram.types import InlineKeyboardMarkup as _IKM, InlineKeyboardButton as _IKB, WebAppInfo as _WAI
+        from src.settings import WEB_DOMAIN
+        base_domain = WEB_DOMAIN if str(WEB_DOMAIN).startswith("http") else f"https://{WEB_DOMAIN}"
+        kb = _IKM().add(_IKB("⚡️ Jonli o'yinlar / Parallel olam", web_app=_WAI(url=f"{base_domain}/")))
+        await message.answer(
+            "🌌 <b>Parallel olam & Jonli o'yinlar</b>\n\n"
+            "O'yinlarda qatnashish va natijalarni ko'rish uchun pastdagi tugmani bosing 👇",
+            reply_markup=kb, parse_mode="HTML",
+        )
+        return
+
+    # Library deep links: /start library, /start kutubxona
+    if args in ("library", "kutubxona") and already_registered:
+        if user and not user.is_registered:
+            user.is_registered = True
+            await sync_to_async(user.save)(update_fields=["is_registered"])
+        await state.finish()
+        from aiogram.types import InlineKeyboardMarkup as _IKM, InlineKeyboardButton as _IKB, WebAppInfo as _WAI
+        from src.settings import WEB_DOMAIN
+        base_domain = WEB_DOMAIN if str(WEB_DOMAIN).startswith("http") else f"https://{WEB_DOMAIN}"
+        kb = _IKM().add(_IKB("📖 3D Kutubxona", web_app=_WAI(url=f"{base_domain}/kutubxona/")))
+        await message.answer(
+            "📖 <b>3D Kutubxona</b>\n\n"
+            "Kutubxonadagi kitoblarni yangi 3D varoqlash animatsiyasi bilan o'qish uchun pastdagi tugmani bosing 👇",
+            reply_markup=kb, parse_mode="HTML",
+        )
         return
 
     # Referral deep link: /start referral — from the "🔗 Botga o'tish" button

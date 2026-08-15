@@ -34,6 +34,8 @@ from tgbot.game_views import (
 urlpatterns = [
     path('', home, name='home'),
     path('kutubxona/', library_view, name='library'),
+    path('library/', library_view, name='library-alias'),
+    path('dokon/', shop_index, name='shop-alias'),
     path('kutubxona/api/comments/', api_comments, name='library-api-comments'),
     path('kutubxona/api/comment/', api_add_comment, name='library-api-add-comment'),
     path('kutubxona/api/comment/delete/', api_delete_comment, name='library-api-delete-comment'),
