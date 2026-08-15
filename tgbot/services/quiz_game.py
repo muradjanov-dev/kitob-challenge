@@ -389,7 +389,18 @@ def _prep_cover_question(item, pool_titles=None):
 from tgbot.services.question_picker import pick_least_recently_used
 
 
+def _ensure_quiz_schema():
+    """Ensure is_vip column exists in quiz_games table."""
+    try:
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("ALTER TABLE quiz_games ADD COLUMN IF NOT EXISTS is_vip boolean DEFAULT false;")
+    except Exception:
+        pass
+
+
 def create_scheduled_quiz(flavor: str, lead_seconds: int = LEAD_SECONDS, is_vip: bool = False) -> QuizGame:
+    _ensure_quiz_schema()
     pool = _raw_pool(flavor)
     num_questions = min(NUM_QUESTIONS[flavor], len(pool))
     recent_games = QuizGame.objects.filter(flavor=flavor).order_by("-starts_at")[:100]

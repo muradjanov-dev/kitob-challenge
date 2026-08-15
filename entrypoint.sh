@@ -3,12 +3,12 @@ set -e
 
 SERVICE_TYPE="${SERVICE_TYPE:-web}"
 
-# Migrations + collectstatic + deploy notification: only on web.
-# (Worker / beat must not race the migration; deploy-notify spam is dedup'd here.)
-if [ "$SERVICE_TYPE" = "web" ]; then
-  echo "=== Running migrations ==="
-  python manage.py migrate --noinput
+# Always ensure database migrations are applied before starting any service
+echo "=== Running database migrations ==="
+python manage.py migrate --noinput || echo "migrate warning (non-fatal)"
 
+# Web-specific setup: static files, commands, notifications
+if [ "$SERVICE_TYPE" = "web" ]; then
   echo "=== Collecting static files ==="
   python manage.py collectstatic --noinput 2>&1 || echo "collectstatic warning (non-fatal)"
 
