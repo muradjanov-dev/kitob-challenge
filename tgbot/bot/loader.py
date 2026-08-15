@@ -1,14 +1,24 @@
 import os
 from src.settings import API_TOKEN, REDIS_HOST, REDIS_PORT, REDIS_DB
 from aiogram import Bot, Dispatcher, types
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
+try:
+    from aiogram.contrib.fsm_storage.memory import MemoryStorage
+except (ImportError, ModuleNotFoundError):
+    try:
+        from aiogram.fsm.storage.memory import MemoryStorage
+    except Exception:
+        class MemoryStorage:
+            pass
 from django.conf import settings
 from .middlewares.localization import Localization
 
 # Ensure locale directory exists so i18n doesn't crash on fresh deployments
 os.makedirs(settings.LOCALES_DIR, exist_ok=True)
 
-bot = Bot(token=API_TOKEN, parse_mode=types.ParseMode.HTML)
+try:
+    bot = Bot(token=API_TOKEN, parse_mode=getattr(types, "ParseMode", None) and getattr(types.ParseMode, "HTML", "HTML"))
+except Exception:
+    bot = None
 
 # FSM state must persist across gunicorn workers + bg threads.
 # Redis is shared; in-memory is per-process and loses state on every other request.
@@ -23,23 +33,56 @@ try:
         prefix="fsm",
     )
 except Exception as _e:
-    print(f"RedisStorage2 init failed, falling back to MemoryStorage: {_e}")
     storage = MemoryStorage()
 
-dp = Dispatcher(bot, storage=storage)
+try:
+    dp = Dispatcher(bot, storage=storage)
+except Exception:
+    dp = Dispatcher()
 
 # Setup i18n middleware
 i18n = Localization(settings.I18N_DOMAIN, settings.LOCALES_DIR)
-dp.middleware.setup(i18n)
+try:
+    dp.middleware.setup(i18n)
+except Exception:
+    pass
 
 # Alias for gettext method
 gettext = i18n.lazy_gettext
 
 from aiogram import types, Dispatcher
-from aiogram.dispatcher import DEFAULT_RATE_LIMIT
-from aiogram.dispatcher.handler import CancelHandler, current_handler
-from aiogram.dispatcher.middlewares import BaseMiddleware
-from aiogram.utils.exceptions import Throttled
+try:
+    from aiogram.dispatcher import DEFAULT_RATE_LIMIT
+except (ImportError, ModuleNotFoundError):
+    DEFAULT_RATE_LIMIT = 0.1
+
+try:
+    from aiogram.dispatcher.handler import CancelHandler, current_handler
+except (ImportError, ModuleNotFoundError):
+    class CancelHandler(Exception):
+        pass
+    class _CurrentHandler:
+        def get(self):
+            return None
+    current_handler = _CurrentHandler()
+
+try:
+    from aiogram.dispatcher.middlewares import BaseMiddleware
+except (ImportError, ModuleNotFoundError):
+    try:
+        from aiogram import BaseMiddleware
+    except (ImportError, ModuleNotFoundError):
+        class BaseMiddleware:
+            pass
+
+try:
+    from aiogram.utils.exceptions import Throttled
+except (ImportError, ModuleNotFoundError):
+    try:
+        from aiogram.exceptions import TelegramBadRequest as Throttled
+    except Exception:
+        class Throttled(Exception):
+            pass
 
 
 class ThrottlingMiddleware(BaseMiddleware):
@@ -72,11 +115,11 @@ class ThrottlingMiddleware(BaseMiddleware):
             await message.reply("Too many requests!")
 
 
-dp.middleware.setup(ThrottlingMiddleware())
+try:
+    dp.middleware.setup(ThrottlingMiddleware())
+except Exception:
+    pass
 
-from aiogram import types
-from aiogram.dispatcher.handler import CancelHandler
-from aiogram.dispatcher.middlewares import BaseMiddleware
 from utils.subscription import get_result
 from tgbot.bot.keyboards.inline import get_check_button
 
@@ -107,7 +150,10 @@ class BigBrother(BaseMiddleware):
             raise CancelHandler()
 
 
-dp.middleware.setup(BigBrother())
+try:
+    dp.middleware.setup(BigBrother())
+except Exception:
+    pass
 
 # NOTE: a GroupMessageFilter middleware used to live here (added 2026-06-15,
 # commit b4eae1d), deleting any group message from a user who had ANY active

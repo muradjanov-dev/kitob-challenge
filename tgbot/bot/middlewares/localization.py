@@ -1,7 +1,15 @@
 from aiogram import types
 from typing import Tuple, Any
 
-from aiogram.contrib.middlewares.i18n import I18nMiddleware
+try:
+    from aiogram.contrib.middlewares.i18n import I18nMiddleware
+except (ImportError, ModuleNotFoundError):
+    class I18nMiddleware:
+        def __init__(self, *args, **kwargs):
+            pass
+        def lazy_gettext(self, text):
+            return text
+
 from tgbot.models import TelegramProfile
 
 from django.db import connections

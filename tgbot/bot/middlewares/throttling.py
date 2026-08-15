@@ -1,8 +1,36 @@
 from aiogram import types, Dispatcher
-from aiogram.dispatcher import DEFAULT_RATE_LIMIT
-from aiogram.dispatcher.handler import CancelHandler, current_handler
-from aiogram.dispatcher.middlewares import BaseMiddleware
-from aiogram.utils.exceptions import Throttled
+try:
+    from aiogram.dispatcher import DEFAULT_RATE_LIMIT
+except (ImportError, ModuleNotFoundError):
+    DEFAULT_RATE_LIMIT = 0.1
+
+try:
+    from aiogram.dispatcher.handler import CancelHandler, current_handler
+except (ImportError, ModuleNotFoundError):
+    class CancelHandler(Exception):
+        pass
+    class _CurrentHandler:
+        def get(self):
+            return None
+    current_handler = _CurrentHandler()
+
+try:
+    from aiogram.dispatcher.middlewares import BaseMiddleware
+except (ImportError, ModuleNotFoundError):
+    try:
+        from aiogram import BaseMiddleware
+    except Exception:
+        class BaseMiddleware:
+            pass
+
+try:
+    from aiogram.utils.exceptions import Throttled
+except (ImportError, ModuleNotFoundError):
+    try:
+        from aiogram.exceptions import TelegramBadRequest as Throttled
+    except Exception:
+        class Throttled(Exception):
+            pass
 
 
 class ThrottlingMiddleware(BaseMiddleware):

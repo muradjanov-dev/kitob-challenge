@@ -6035,7 +6035,7 @@ def start_survival_game():
 
 
 def _start_quiz_flavor(flavor):
-    from tgbot.services.quiz_game import create_scheduled_quiz, finalize_due_games, LEAD_SECONDS, ENTRY_FEES
+    from tgbot.services.quiz_game import create_scheduled_quiz, finalize_due_games, LEAD_SECONDS, ENTRY_FEES, TITLES
     finalize_due_games(flavor)
     game = create_scheduled_quiz(flavor)
     texts = {
@@ -6096,54 +6096,23 @@ def _start_quiz_flavor(flavor):
         "timeline": "vaqt-mashinasi", "matchbook": "muallif-asar",
         "reverse": "teskari-viktorina", "cover": "kitob-muqovasi",
     }
-    _announce_game(texts[flavor], deep_link_params[flavor])
+    game_title = TITLES.get(flavor, flavor.upper())
+    announcement_text = texts.get(
+        flavor,
+        f"🧪 <b>{game_title} (Test / Beta)</b>\n\n"
+        f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+        f"💰 <b>Kirish: {ENTRY_FEES.get(flavor, 25)} Kitobcha.</b>\n👇 Kiring:"
+    )
+    deep_link = deep_link_params.get(flavor, flavor)
+    _announce_game(announcement_text, deep_link)
     print(f"start_quiz_{flavor}: game #{game.id}")
     return game
-
-
-@shared_task
-def start_quiz_twofacts_game():
-    return _start_quiz_flavor("twofacts")
-
-
-@shared_task
-def start_quiz_impostor_game():
-    return _start_quiz_flavor("impostor")
-
-
-@shared_task
-def start_quiz_connection_game():
-    return _start_quiz_flavor("connection")
-
-
-@shared_task
-def start_quiz_teams_game():
-    return _start_quiz_flavor("teams")
-
-
-@shared_task
-def start_quiz_timeline_game():
-    return _start_quiz_flavor("timeline")
-
-
-@shared_task
-def start_quiz_matchbook_game():
-    return _start_quiz_flavor("matchbook")
-
-
-@shared_task
-def start_quiz_reverse_game():
-    return _start_quiz_flavor("reverse")
-
-
-@shared_task
-def start_quiz_cover_game():
-    return _start_quiz_flavor("cover")
 
 
 # Maps a game-type slug to the task that starts it (each returns the created
 # game instance). Shared by start_game_sequence and _advance_game_sequence to
 # run the daily 10:00/22:00 slot: 3 different types, back to back, no repeats.
+from tgbot.game_views import _QUIZ_FLAVORS
 _GAME_STARTERS = {
     "chain": start_chain_game,
     "feud": start_feud_game,
@@ -6152,15 +6121,9 @@ _GAME_STARTERS = {
     "wisdom": start_wisdom_game,
     "detective": start_detective_game,
     "survival": start_survival_game,
-    "twofacts": start_quiz_twofacts_game,
-    "impostor": start_quiz_impostor_game,
-    "connection": start_quiz_connection_game,
-    "teams": start_quiz_teams_game,
-    "timeline": start_quiz_timeline_game,
-    "matchbook": start_quiz_matchbook_game,
-    "reverse": start_quiz_reverse_game,
-    "cover": start_quiz_cover_game,
 }
+for fl in _QUIZ_FLAVORS:
+    _GAME_STARTERS[fl] = (lambda f=fl: _start_quiz_flavor(f))
 
 
 # The 10 games built today (2026-07-22) — used to source tonight's special

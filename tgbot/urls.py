@@ -128,6 +128,127 @@ urlpatterns = [
     path("kitob-muqovasi/api/state/", api_quiz_state, {"flavor": "cover"}, name="quiz-cover-api-state"),
     path("kitob-muqovasi/api/submit/", api_quiz_submit, {"flavor": "cover"}, name="quiz-cover-api-submit"),
 
+    # 30 New Games (🧪 Test / Beta)
+    path("anagram/", quiz_index, {"flavor": "anagram"}, name="quiz-anagram"),
+    path("anagram/api/state/", api_quiz_state, {"flavor": "anagram"}, name="quiz-anagram-api-state"),
+    path("anagram/api/submit/", api_quiz_submit, {"flavor": "anagram"}, name="quiz-anagram-api-submit"),
+
+    path("blitz/", quiz_index, {"flavor": "blitz"}, name="quiz-blitz"),
+    path("blitz/api/state/", api_quiz_state, {"flavor": "blitz"}, name="quiz-blitz-api-state"),
+    path("blitz/api/submit/", api_quiz_submit, {"flavor": "blitz"}, name="quiz-blitz-api-submit"),
+
+    path("crossword/", quiz_index, {"flavor": "crossword"}, name="quiz-crossword"),
+    path("crossword/api/state/", api_quiz_state, {"flavor": "crossword"}, name="quiz-crossword-api-state"),
+    path("crossword/api/submit/", api_quiz_submit, {"flavor": "crossword"}, name="quiz-crossword-api-submit"),
+
+    path("wordle/", quiz_index, {"flavor": "wordle"}, name="quiz-wordle"),
+    path("wordle/api/state/", api_quiz_state, {"flavor": "wordle"}, name="quiz-wordle-api-state"),
+    path("wordle/api/submit/", api_quiz_submit, {"flavor": "wordle"}, name="quiz-wordle-api-submit"),
+
+    path("cipher/", quiz_index, {"flavor": "cipher"}, name="quiz-cipher"),
+    path("cipher/api/state/", api_quiz_state, {"flavor": "cipher"}, name="quiz-cipher-api-state"),
+    path("cipher/api/submit/", api_quiz_submit, {"flavor": "cipher"}, name="quiz-cipher-api-submit"),
+
+    path("acronym/", quiz_index, {"flavor": "acronym"}, name="quiz-acronym"),
+    path("acronym/api/state/", api_quiz_state, {"flavor": "acronym"}, name="quiz-acronym-api-state"),
+    path("acronym/api/submit/", api_quiz_submit, {"flavor": "acronym"}, name="quiz-acronym-api-submit"),
+
+    path("character/", quiz_index, {"flavor": "character"}, name="quiz-character"),
+    path("character/api/state/", api_quiz_state, {"flavor": "character"}, name="quiz-character-api-state"),
+    path("character/api/submit/", api_quiz_submit, {"flavor": "character"}, name="quiz-character-api-submit"),
+
+    path("dialogue/", quiz_index, {"flavor": "dialogue"}, name="quiz-dialogue"),
+    path("dialogue/api/state/", api_quiz_state, {"flavor": "dialogue"}, name="quiz-dialogue-api-state"),
+    path("dialogue/api/submit/", api_quiz_submit, {"flavor": "dialogue"}, name="quiz-dialogue-api-submit"),
+
+    path("plotmap/", quiz_index, {"flavor": "plotmap"}, name="quiz-plotmap"),
+    path("plotmap/api/state/", api_quiz_state, {"flavor": "plotmap"}, name="quiz-plotmap-api-state"),
+    path("plotmap/api/submit/", api_quiz_submit, {"flavor": "plotmap"}, name="quiz-plotmap-api-submit"),
+
+    path("sequence/", quiz_index, {"flavor": "sequence"}, name="quiz-sequence"),
+    path("sequence/api/state/", api_quiz_state, {"flavor": "sequence"}, name="quiz-sequence-api-state"),
+    path("sequence/api/submit/", api_quiz_submit, {"flavor": "sequence"}, name="quiz-sequence-api-submit"),
+
+    path("oddone/", quiz_index, {"flavor": "oddone"}, name="quiz-oddone"),
+    path("oddone/api/state/", api_quiz_state, {"flavor": "oddone"}, name="quiz-oddone-api-state"),
+    path("oddone/api/submit/", api_quiz_submit, {"flavor": "oddone"}, name="quiz-oddone-api-submit"),
+
+    path("ending/", quiz_index, {"flavor": "ending"}, name="quiz-ending"),
+    path("ending/api/state/", api_quiz_state, {"flavor": "ending"}, name="quiz-ending-api-state"),
+    path("ending/api/submit/", api_quiz_submit, {"flavor": "ending"}, name="quiz-ending-api-submit"),
+
+    path("pixel/", quiz_index, {"flavor": "pixel"}, name="quiz-pixel"),
+    path("pixel/api/state/", api_quiz_state, {"flavor": "pixel"}, name="quiz-pixel-api-state"),
+    path("pixel/api/submit/", api_quiz_submit, {"flavor": "pixel"}, name="quiz-pixel-api-submit"),
+
+    path("aiart/", quiz_index, {"flavor": "aiart"}, name="quiz-aiart"),
+    path("aiart/api/state/", api_quiz_state, {"flavor": "aiart"}, name="quiz-aiart-api-state"),
+    path("aiart/api/submit/", api_quiz_submit, {"flavor": "aiart"}, name="quiz-aiart-api-submit"),
+
+    path("scenes/", quiz_index, {"flavor": "scenes"}, name="quiz-scenes"),
+    path("scenes/api/state/", api_quiz_state, {"flavor": "scenes"}, name="quiz-scenes-api-state"),
+    path("scenes/api/submit/", api_quiz_submit, {"flavor": "scenes"}, name="quiz-scenes-api-submit"),
+
+    path("audioquote/", quiz_index, {"flavor": "audioquote"}, name="quiz-audioquote"),
+    path("audioquote/api/state/", api_quiz_state, {"flavor": "audioquote"}, name="quiz-audioquote-api-state"),
+    path("audioquote/api/submit/", api_quiz_submit, {"flavor": "audioquote"}, name="quiz-audioquote-api-submit"),
+
+    path("mosaic/", quiz_index, {"flavor": "mosaic"}, name="quiz-mosaic"),
+    path("mosaic/api/state/", api_quiz_state, {"flavor": "mosaic"}, name="quiz-mosaic-api-state"),
+    path("mosaic/api/submit/", api_quiz_submit, {"flavor": "mosaic"}, name="quiz-mosaic-api-submit"),
+
+    path("hiddendetail/", quiz_index, {"flavor": "hiddendetail"}, name="quiz-hiddendetail"),
+    path("hiddendetail/api/state/", api_quiz_state, {"flavor": "hiddendetail"}, name="quiz-hiddendetail-api-state"),
+    path("hiddendetail/api/submit/", api_quiz_submit, {"flavor": "hiddendetail"}, name="quiz-hiddendetail-api-submit"),
+
+    path("duel/", quiz_index, {"flavor": "duel"}, name="quiz-duel"),
+    path("duel/api/state/", api_quiz_state, {"flavor": "duel"}, name="quiz-duel-api-state"),
+    path("duel/api/submit/", api_quiz_submit, {"flavor": "duel"}, name="quiz-duel-api-submit"),
+
+    path("buzzer/", quiz_index, {"flavor": "buzzer"}, name="quiz-buzzer"),
+    path("buzzer/api/state/", api_quiz_state, {"flavor": "buzzer"}, name="quiz-buzzer-api-state"),
+    path("buzzer/api/submit/", api_quiz_submit, {"flavor": "buzzer"}, name="quiz-buzzer-api-submit"),
+
+    path("bracket/", quiz_index, {"flavor": "bracket"}, name="quiz-bracket"),
+    path("bracket/api/state/", api_quiz_state, {"flavor": "bracket"}, name="quiz-bracket-api-state"),
+    path("bracket/api/submit/", api_quiz_submit, {"flavor": "bracket"}, name="quiz-bracket-api-submit"),
+
+    path("auction/", quiz_index, {"flavor": "auction"}, name="quiz-auction"),
+    path("auction/api/state/", api_quiz_state, {"flavor": "auction"}, name="quiz-auction-api-state"),
+    path("auction/api/submit/", api_quiz_submit, {"flavor": "auction"}, name="quiz-auction-api-submit"),
+
+    path("regions/", quiz_index, {"flavor": "regions"}, name="quiz-regions"),
+    path("regions/api/state/", api_quiz_state, {"flavor": "regions"}, name="quiz-regions-api-state"),
+    path("regions/api/submit/", api_quiz_submit, {"flavor": "regions"}, name="quiz-regions-api-submit"),
+
+    path("king/", quiz_index, {"flavor": "king"}, name="quiz-king"),
+    path("king/api/state/", api_quiz_state, {"flavor": "king"}, name="quiz-king-api-state"),
+    path("king/api/submit/", api_quiz_submit, {"flavor": "king"}, name="quiz-king-api-submit"),
+
+    path("rhyme/", quiz_index, {"flavor": "rhyme"}, name="quiz-rhyme"),
+    path("rhyme/api/state/", api_quiz_state, {"flavor": "rhyme"}, name="quiz-rhyme-api-state"),
+    path("rhyme/api/submit/", api_quiz_submit, {"flavor": "rhyme"}, name="quiz-rhyme-api-submit"),
+
+    path("scholars/", quiz_index, {"flavor": "scholars"}, name="quiz-scholars"),
+    path("scholars/api/state/", api_quiz_state, {"flavor": "scholars"}, name="quiz-scholars-api-state"),
+    path("scholars/api/submit/", api_quiz_submit, {"flavor": "scholars"}, name="quiz-scholars-api-submit"),
+
+    path("genres/", quiz_index, {"flavor": "genres"}, name="quiz-genres"),
+    path("genres/api/state/", api_quiz_state, {"flavor": "genres"}, name="quiz-genres-api-state"),
+    path("genres/api/submit/", api_quiz_submit, {"flavor": "genres"}, name="quiz-genres-api-submit"),
+
+    path("numbers/", quiz_index, {"flavor": "numbers"}, name="quiz-numbers"),
+    path("numbers/api/state/", api_quiz_state, {"flavor": "numbers"}, name="quiz-numbers-api-state"),
+    path("numbers/api/submit/", api_quiz_submit, {"flavor": "numbers"}, name="quiz-numbers-api-submit"),
+
+    path("worldlit/", quiz_index, {"flavor": "worldlit"}, name="quiz-worldlit"),
+    path("worldlit/api/state/", api_quiz_state, {"flavor": "worldlit"}, name="quiz-worldlit-api-state"),
+    path("worldlit/api/submit/", api_quiz_submit, {"flavor": "worldlit"}, name="quiz-worldlit-api-submit"),
+
+    path("mysterybox/", quiz_index, {"flavor": "mysterybox"}, name="quiz-mysterybox"),
+    path("mysterybox/api/state/", api_quiz_state, {"flavor": "mysterybox"}, name="quiz-mysterybox-api-state"),
+    path("mysterybox/api/submit/", api_quiz_submit, {"flavor": "mysterybox"}, name="quiz-mysterybox-api-submit"),
+
     path("api/games/status/", api_games_status, name="games-api-status"),
 
     path("api/track/event/", api_track_event, name="track-event"),

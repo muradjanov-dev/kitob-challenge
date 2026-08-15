@@ -243,9 +243,20 @@ def api_survival_submit(request: HttpRequest) -> JsonResponse:
     return JsonResponse(survival_game.submit_answer(g.id, request.tg_profile, choice))
 
 
-# ── Bilim O'yini — shared engine + shared template for 8 flavors ────────────
-_QUIZ_FLAVORS = ("twofacts", "impostor", "connection", "teams",
-                 "timeline", "matchbook", "reverse", "cover")
+# ── Bilim O'yini — shared engine + shared template for all flavors ────────────
+_QUIZ_FLAVORS = (
+    "twofacts", "impostor", "connection", "teams",
+    "timeline", "matchbook", "reverse", "cover",
+    # 30 New Games (🧪 Test / Beta)
+    "anagram", "blitz", "crossword", "wordle",
+    "cipher", "acronym", "character", "dialogue",
+    "plotmap", "sequence", "oddone", "ending",
+    "pixel", "aiart", "scenes", "audioquote",
+    "mosaic", "hiddendetail", "duel", "buzzer",
+    "bracket", "auction", "regions", "king",
+    "rhyme", "scholars", "genres", "numbers",
+    "worldlit", "mysterybox",
+)
 
 
 def quiz_index(request: HttpRequest, flavor: str) -> HttpResponse:
@@ -305,6 +316,37 @@ _GAME_LABELS_URLS = {
     "matchbook": ("Muallif-Asar Moslashtirish", "/muallif-asar/"),
     "reverse": ("Teskari Viktorina", "/teskari-viktorina/"),
     "cover": ("Kitob Muqovasi", "/kitob-muqovasi/"),
+    # 30 New Games (🧪 Test / Beta)
+    "anagram": ("🔠 Anagramma Kitob", "/anagram/"),
+    "blitz": ("⚡️ Blitz 60", "/blitz/"),
+    "crossword": ("🧩 Mini Krossvord", "/crossword/"),
+    "wordle": ("🔤 Harfma-Harf", "/wordle/"),
+    "cipher": ("🔐 Sherlok Kodi", "/cipher/"),
+    "acronym": ("🎯 Bosh Harflar", "/acronym/"),
+    "character": ("👤 Qahramonni Top", "/character/"),
+    "dialogue": ("🗣 Kimning gapi?", "/dialogue/"),
+    "plotmap": ("🗺 Syujet Xaritasi", "/plotmap/"),
+    "sequence": ("⏳ Ketma-ketlik", "/sequence/"),
+    "oddone": ("🔍 Ortiqchasini Top", "/oddone/"),
+    "ending": ("✍️ Asar Yakuni", "/ending/"),
+    "pixel": ("🖼 Piksel Muqova", "/pixel/"),
+    "aiart": ("🎨 AI Rasmlar", "/aiart/"),
+    "scenes": ("🎭 Sahna Ko'rinishi", "/scenes/"),
+    "audioquote": ("🎧 Ovozli Iqtibos", "/audioquote/"),
+    "mosaic": ("🧩 Kitob Mozaikasi", "/mosaic/"),
+    "hiddendetail": ("🔎 Yashirin Detal", "/hiddendetail/"),
+    "duel": ("🤺 1v1 Jonli Duel", "/duel/"),
+    "buzzer": ("🔔 Tezkor Qo'ng'iroq", "/buzzer/"),
+    "bracket": ("🏆 Haftalik Turnir", "/bracket/"),
+    "auction": ("💰 Kitob Auksioni", "/auction/"),
+    "regions": ("👥 Viloyatlar Jangi", "/regions/"),
+    "king": ("👑 Qirol Taxti", "/king/"),
+    "rhyme": ("📜 Bahri-Bayt", "/rhyme/"),
+    "scholars": ("🕌 Sharq Allomalari", "/scholars/"),
+    "genres": ("📚 Janrlar Ustasi", "/genres/"),
+    "numbers": ("🔢 Adabiy Raqamlar", "/numbers/"),
+    "worldlit": ("🌍 Jahon Adabiyoti", "/worldlit/"),
+    "mysterybox": ("🎁 Sirli Sandiq", "/mysterybox/"),
 }
 _QUIZ_FLAVOR_SET = set(_QUIZ_FLAVORS)
 

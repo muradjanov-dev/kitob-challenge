@@ -1927,8 +1927,39 @@ class QuizGame(BaseModel):
         ("matchbook", "Muallif-Asar Moslashtirish"),
         ("reverse", "Teskari Viktorina"),
         ("cover", "Kitob Muqovasi"),
+        # 30 New Game Flavors (🧪 Beta / Test)
+        ("anagram", "🔠 Anagramma Kitob"),
+        ("blitz", "⚡️ Blitz 60"),
+        ("crossword", "🧩 Mini Krossvord"),
+        ("wordle", "🔤 Harfma-Harf"),
+        ("cipher", "🔐 Sherlok Kodi"),
+        ("acronym", "🎯 Bosh Harflar"),
+        ("character", "👤 Qahramonni Top"),
+        ("dialogue", "🗣 Kimning gapi?"),
+        ("plotmap", "🗺 Syujet Xaritasi"),
+        ("sequence", "⏳ Ketma-ketlik"),
+        ("oddone", "🔍 Ortiqchasini Top"),
+        ("ending", "✍️ Asar Yakuni"),
+        ("pixel", "🖼 Piksel Muqova"),
+        ("aiart", "🎨 AI Rasmlar"),
+        ("scenes", "🎭 Sahna Ko'rinishi"),
+        ("audioquote", "🎧 Ovozli Iqtibos"),
+        ("mosaic", "🧩 Kitob Mozaikasi"),
+        ("hiddendetail", "🔎 Yashirin Detal"),
+        ("duel", "🤺 1v1 Jonli Duel"),
+        ("buzzer", "🔔 Tezkor Qo'ng'iroq"),
+        ("bracket", "🏆 Haftalik Turnir"),
+        ("auction", "💰 Kitob Auksioni"),
+        ("regions", "👥 Viloyatlar Jangi"),
+        ("king", "👑 Qirol Taxti"),
+        ("rhyme", "📜 Bahri-Bayt"),
+        ("scholars", "🕌 Sharq Allomalari"),
+        ("genres", "📚 Janrlar Ustasi"),
+        ("numbers", "🔢 Adabiy Raqamlar"),
+        ("worldlit", "🌍 Jahon Adabiyoti"),
+        ("mysterybox", "🎁 Sirli Sandiq"),
     ]
-    flavor = models.CharField(max_length=12, choices=FLAVOR_CHOICES)
+    flavor = models.CharField(max_length=32, choices=FLAVOR_CHOICES)
     title = models.CharField(max_length=120, default="Bilim O'yini")
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
     starts_at = models.DateTimeField()
@@ -1995,15 +2026,24 @@ class GameSequence(BaseModel):
         "wisdom", "detective", "survival",
         "twofacts", "impostor", "connection", "teams",
         "timeline", "matchbook", "reverse", "cover",
+        # 30 New Game Types (🧪 Test / Beta)
+        "anagram", "blitz", "crossword", "wordle",
+        "cipher", "acronym", "character", "dialogue",
+        "plotmap", "sequence", "oddone", "ending",
+        "pixel", "aiart", "scenes", "audioquote",
+        "mosaic", "hiddendetail", "duel", "buzzer",
+        "bracket", "auction", "regions", "king",
+        "rhyme", "scholars", "genres", "numbers",
+        "worldlit", "mysterybox",
     ]
 
     slot = models.CharField(max_length=10, choices=SLOT_CHOICES)
     date = models.DateField()
     game_types = models.JSONField(
-        default=list, help_text="3 randomly chosen, non-repeating game types for this slot.",
+        default=list, help_text="Randomly chosen, non-repeating game types for this slot.",
     )
     current_index = models.PositiveSmallIntegerField(default=0)
-    current_game_type = models.CharField(max_length=10, blank=True, default="")
+    current_game_type = models.CharField(max_length=32, blank=True, default="")
     current_game_id = models.PositiveIntegerField(null=True, blank=True)
     completed = models.BooleanField(default=False)
 

@@ -1,14 +1,25 @@
 import logging
-from aiogram.utils.exceptions import (Unauthorized, InvalidQueryID, TelegramAPIError,
-                                      CantDemoteChatCreator, MessageNotModified, MessageToDeleteNotFound,
-                                      MessageTextIsEmpty, RetryAfter,
-                                      CantParseEntities, MessageCantBeDeleted)
+try:
+    from aiogram.utils.exceptions import (Unauthorized, InvalidQueryID, TelegramAPIError,
+                                          CantDemoteChatCreator, MessageNotModified, MessageToDeleteNotFound,
+                                          MessageTextIsEmpty, RetryAfter,
+                                          CantParseEntities, MessageCantBeDeleted)
+except (ImportError, ModuleNotFoundError):
+    class TelegramAPIError(Exception): pass
+    class Unauthorized(TelegramAPIError): pass
+    class InvalidQueryID(TelegramAPIError): pass
+    class CantDemoteChatCreator(TelegramAPIError): pass
+    class MessageNotModified(TelegramAPIError): pass
+    class MessageToDeleteNotFound(TelegramAPIError): pass
+    class MessageTextIsEmpty(TelegramAPIError): pass
+    class RetryAfter(TelegramAPIError): pass
+    class CantParseEntities(TelegramAPIError): pass
+    class MessageCantBeDeleted(TelegramAPIError): pass
 
 
 from tgbot.bot.loader import dp
 
 
-@dp.errors_handler()
 async def errors_handler(update, exception):
     """
     Exceptions handler. Catches all exceptions within task factory tasks.
@@ -56,3 +67,7 @@ async def errors_handler(update, exception):
         return True
     
     logging.exception(f'Update: {update} \n{exception}')
+
+
+if hasattr(dp, "errors_handler"):
+    errors_handler = dp.errors_handler()(errors_handler)

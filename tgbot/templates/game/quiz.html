@@ -92,12 +92,63 @@
       reverse:   {emoji:'🔄', title:"Teskari Viktorina", fee:25, api:'/teskari-viktorina/api/', none:"Teskari Viktorina tez orada boshlanadi — guruhni kuzating!", scheduled:"Javob avval ko'rsatiladi — qaysi savolga mos kelishini toping!", accent:'#6a3dbf', accent2:'#e05cc7'},
       cover:     {emoji:'🖼', title:"Kitob Muqovasi", fee:25, api:'/kitob-muqovasi/api/', none:"Kitob Muqovasi tez orada boshlanadi — guruhni kuzating!", scheduled:"Xiralashtirilgan muqovadan kitobni 4 variantdan tez toping!", accent:'#c9962c', accent2:'#ffcc4d'}
     };
+    var BETA_GAMES = {
+      anagram:   {emoji:'🔠', title:"Anagramma Kitob", accent:'#ff5722', accent2:'#ff8a65'},
+      blitz:     {emoji:'⚡️', title:"Blitz 60", accent:'#ffc107', accent2:'#ffe082'},
+      crossword: {emoji:'🧩', title:"Mini Krossvord", accent:'#00bcd4', accent2:'#80deea'},
+      wordle:    {emoji:'🔤', title:"Harfma-Harf", accent:'#4caf50', accent2:'#a5d6a7'},
+      cipher:    {emoji:'🔐', title:"Sherlok Kodi", accent:'#9c27b0', accent2:'#ce93d8'},
+      acronym:   {emoji:'🎯', title:"Bosh Harflar", accent:'#e91e63', accent2:'#f48fb1'},
+      character: {emoji:'👤', title:"Qahramonni Top", accent:'#3f51b5', accent2:'#9fa8da'},
+      dialogue:  {emoji:'🗣', title:"Kimning gapi?", accent:'#009688', accent2:'#80cbc4'},
+      plotmap:   {emoji:'🗺', title:"Syujet Xaritasi", accent:'#795548', accent2:'#bcaaa4'},
+      sequence:  {emoji:'⏳', title:"Ketma-ketlik", accent:'#607d8b', accent2:'#b0bec5'},
+      oddone:    {emoji:'🔍', title:"Ortiqchasini Top", accent:'#f44336', accent2:'#ef9a9a'},
+      ending:    {emoji:'✍️', title:"Asar Yakuni", accent:'#673ab7', accent2:'#b39ddb'},
+      pixel:     {emoji:'🖼', title:"Piksel Muqova", accent:'#2196f3', accent2:'#90caf9'},
+      aiart:     {emoji:'🎨', title:"AI Rasmlar", accent:'#e91e63', accent2:'#f48fb1'},
+      scenes:    {emoji:'🎭', title:"Sahna Ko'rinishi", accent:'#9c27b0', accent2:'#ce93d8'},
+      audioquote:{emoji:'🎧', title:"Ovozli Iqtibos", accent:'#00bcd4', accent2:'#80deea'},
+      mosaic:    {emoji:'🧩', title:"Kitob Mozaikasi", accent:'#4caf50', accent2:'#a5d6a7'},
+      hiddendetail:{emoji:'🔎', title:"Yashirin Detal", accent:'#ff9800', accent2:'#ffcc80'},
+      duel:      {emoji:'🤺', title:"1v1 Jonli Duel", accent:'#d32f2f', accent2:'#ef9a9a'},
+      buzzer:    {emoji:'🔔', title:"Tezkor Qo'ng'iroq", accent:'#fbc02d', accent2:'#fff59d'},
+      bracket:   {emoji:'🏆', title:"Haftalik Turnir", accent:'#f57c00', accent2:'#ffb74d'},
+      auction:   {emoji:'💰', title:"Kitob Auksioni", accent:'#388e3c', accent2:'#a5d6a7'},
+      regions:   {emoji:'👥', title:"Viloyatlar Jangi", accent:'#1976d2', accent2:'#90caf9'},
+      king:      {emoji:'👑', title:"Qirol Taxti", accent:'#7b1fa2', accent2:'#ce93d8'},
+      rhyme:     {emoji:'📜', title:"Bahri-Bayt", accent:'#5d4037', accent2:'#bcaaa4'},
+      scholars:  {emoji:'🕌', title:"Sharq Allomalari", accent:'#00796b', accent2:'#80cbc4'},
+      genres:    {emoji:'📚', title:"Janrlar Ustasi", accent:'#303f9f', accent2:'#9fa8da'},
+      numbers:   {emoji:'🔢', title:"Adabiy Raqamlar", accent:'#c2185b', accent2:'#f48fb1'},
+      worldlit:  {emoji:'🌍', title:"Jahon Adabiyoti", accent:'#0288d1', accent2:'#81d4fa'},
+      mysterybox:{emoji:'🎁', title:"Sirli Sandiq", accent:'#e64a19', accent2:'#ffab91'},
+    };
+    for (var k in BETA_GAMES) {
+      if (!META[k]) {
+        var bg = BETA_GAMES[k];
+        META[k] = {
+          emoji: bg.emoji,
+          title: bg.title,
+          fee: 25,
+          api: '/' + k + '/api/',
+          none: bg.title + " tez orada boshlanadi — guruhni kuzating!",
+          scheduled: "Savollarga eng tez va to'g'ri javob bering!",
+          accent: bg.accent,
+          accent2: bg.accent2,
+          isBeta: true
+        };
+      }
+    }
     var M = META[FLAVOR] || META.twofacts;
     document.documentElement.style.setProperty('--accent', M.accent);
     document.documentElement.style.setProperty('--accent2', M.accent2);
     document.getElementById('pageTitle').textContent = M.title;
     document.getElementById('gameEmoji').textContent = M.emoji;
     document.getElementById('gameTitle').textContent = M.title;
+    if (M.isBeta) {
+      document.getElementById('subtitle').innerHTML = '<span style="display:inline-block;padding:2px 7px;background:linear-gradient(135deg,#ff9800,#f44336);color:#fff;border-radius:6px;font-size:10px;font-weight:800;letter-spacing:.5px;margin-left:4px">🧪 TEST / BETA</span>';
+    }
     document.getElementById('feeBanner').innerHTML = '💰 <b>Kirish: '+M.fee+' Kitobcha</b> (birinchi javobda).' + (FLAVOR==='teams' ? ' 👥 Jamoangiz g\'olib chiqsa — HAR BIR a\'zo Kitobcha oladi (jamoa kattaroq bo\'lsa, ko\'proq!), eng ko\'p to\'g\'ri javob berganlar esa qo\'shimcha bonus oladi!' : '');
     if (FLAVOR === 'teams') { document.getElementById('myPtsLbl').textContent = 'Sizning ballaringiz'; }
 

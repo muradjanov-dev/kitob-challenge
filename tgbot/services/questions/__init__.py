@@ -7,12 +7,46 @@ from .emoji import EMOJI_QUESTIONS
 from .wisdom import WISDOM_QUESTIONS
 from .detective import DETECTIVE_BOOKS
 from .survival import SURVIVAL_QUESTIONS
+
+# Existing Bilim O'yini Flavors
 from .quiz_twofacts import QUIZ_TWOFACTS_QUESTIONS
 from .quiz_impostor import QUIZ_IMPOSTOR_QUESTIONS
 from .quiz_connection import QUIZ_CONNECTION_QUESTIONS
 from .quiz_timeline import QUIZ_TIMELINE_QUESTIONS
 from .quiz_matchbook import QUIZ_MATCHBOOK_QUESTIONS
 from .quiz_reverse import QUIZ_REVERSE_QUESTIONS
+
+# 30 New Game Flavors
+from .anagram import ANAGRAM_QUESTIONS
+from .blitz import BLITZ_QUESTIONS
+from .crossword import CROSSWORD_QUESTIONS
+from .wordle import WORDLE_QUESTIONS
+from .cipher import CIPHER_QUESTIONS
+from .acronym import ACRONYM_QUESTIONS
+from .character import CHARACTER_QUESTIONS
+from .dialogue import DIALOGUE_QUESTIONS
+from .plotmap import QUIZ_PLOTMAP_QUESTIONS
+from .sequence import QUIZ_SEQUENCE_QUESTIONS
+from .oddone import QUIZ_ODDONE_QUESTIONS
+from .ending import QUIZ_ENDING_QUESTIONS
+from .pixel import QUIZ_PIXEL_QUESTIONS
+from .aiart import QUIZ_AIART_QUESTIONS
+from .scenes import QUIZ_SCENES_QUESTIONS
+from .audioquote import QUIZ_AUDIOQUOTE_QUESTIONS
+from .mosaic import QUIZ_MOSAIC_QUESTIONS
+from .hiddendetail import QUIZ_HIDDENDETAIL_QUESTIONS
+from .duel import QUIZ_DUEL_QUESTIONS
+from .buzzer import QUIZ_BUZZER_QUESTIONS
+from .bracket import QUIZ_BRACKET_QUESTIONS
+from .auction import QUIZ_AUCTION_QUESTIONS
+from .regions import QUIZ_REGIONS_QUESTIONS
+from .king import QUIZ_KING_QUESTIONS
+from .rhyme import QUIZ_RHYME_QUESTIONS
+from .scholars import QUIZ_SCHOLARS_QUESTIONS
+from .genres import QUIZ_GENRES_QUESTIONS
+from .numbers import QUIZ_NUMBERS_QUESTIONS
+from .worldlit import QUIZ_WORLDLIT_QUESTIONS
+from .mysterybox import QUIZ_MYSTERYBOX_QUESTIONS
 
 __all__ = [
     "FEUD_QUESTIONS",
@@ -27,4 +61,34 @@ __all__ = [
     "QUIZ_TIMELINE_QUESTIONS",
     "QUIZ_MATCHBOOK_QUESTIONS",
     "QUIZ_REVERSE_QUESTIONS",
+    "ANAGRAM_QUESTIONS",
+    "BLITZ_QUESTIONS",
+    "CROSSWORD_QUESTIONS",
+    "WORDLE_QUESTIONS",
+    "CIPHER_QUESTIONS",
+    "ACRONYM_QUESTIONS",
+    "CHARACTER_QUESTIONS",
+    "DIALOGUE_QUESTIONS",
+    "QUIZ_PLOTMAP_QUESTIONS",
+    "QUIZ_SEQUENCE_QUESTIONS",
+    "QUIZ_ODDONE_QUESTIONS",
+    "QUIZ_ENDING_QUESTIONS",
+    "QUIZ_PIXEL_QUESTIONS",
+    "QUIZ_AIART_QUESTIONS",
+    "QUIZ_SCENES_QUESTIONS",
+    "QUIZ_AUDIOQUOTE_QUESTIONS",
+    "QUIZ_MOSAIC_QUESTIONS",
+    "QUIZ_HIDDENDETAIL_QUESTIONS",
+    "QUIZ_DUEL_QUESTIONS",
+    "QUIZ_BUZZER_QUESTIONS",
+    "QUIZ_BRACKET_QUESTIONS",
+    "QUIZ_AUCTION_QUESTIONS",
+    "QUIZ_REGIONS_QUESTIONS",
+    "QUIZ_KING_QUESTIONS",
+    "QUIZ_RHYME_QUESTIONS",
+    "QUIZ_SCHOLARS_QUESTIONS",
+    "QUIZ_GENRES_QUESTIONS",
+    "QUIZ_NUMBERS_QUESTIONS",
+    "QUIZ_WORLDLIT_QUESTIONS",
+    "QUIZ_MYSTERYBOX_QUESTIONS",
 ]

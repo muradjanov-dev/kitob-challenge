@@ -1,7 +1,19 @@
 import logging
 from aiogram import types
-from aiogram.dispatcher.handler import CancelHandler
-from aiogram.dispatcher.middlewares import BaseMiddleware
+try:
+    from aiogram.dispatcher.handler import CancelHandler
+except (ImportError, ModuleNotFoundError):
+    class CancelHandler(Exception):
+        pass
+
+try:
+    from aiogram.dispatcher.middlewares import BaseMiddleware
+except (ImportError, ModuleNotFoundError):
+    try:
+        from aiogram import BaseMiddleware
+    except Exception:
+        class BaseMiddleware:
+            pass
 from utils.subscription import get_result
 from tgbot.bot.keyboards.inline import get_check_button
 from tgbot.bot.loader import gettext as _

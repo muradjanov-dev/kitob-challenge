@@ -37,21 +37,23 @@ from tgbot.services.game_questions import (
     QUIZ_TWOFACTS_QUESTIONS, QUIZ_IMPOSTOR_QUESTIONS, QUIZ_CONNECTION_QUESTIONS,
     QUIZ_TIMELINE_QUESTIONS, QUIZ_MATCHBOOK_QUESTIONS, QUIZ_REVERSE_QUESTIONS,
     SURVIVAL_QUESTIONS,
+    ANAGRAM_QUESTIONS, BLITZ_QUESTIONS, CROSSWORD_QUESTIONS, WORDLE_QUESTIONS,
+    CIPHER_QUESTIONS, ACRONYM_QUESTIONS, CHARACTER_QUESTIONS, DIALOGUE_QUESTIONS,
+    QUIZ_PLOTMAP_QUESTIONS, QUIZ_SEQUENCE_QUESTIONS, QUIZ_ODDONE_QUESTIONS,
+    QUIZ_ENDING_QUESTIONS, QUIZ_PIXEL_QUESTIONS, QUIZ_AIART_QUESTIONS,
+    QUIZ_SCENES_QUESTIONS, QUIZ_AUDIOQUOTE_QUESTIONS, QUIZ_MOSAIC_QUESTIONS,
+    QUIZ_HIDDENDETAIL_QUESTIONS, QUIZ_DUEL_QUESTIONS, QUIZ_BUZZER_QUESTIONS,
+    QUIZ_BRACKET_QUESTIONS, QUIZ_AUCTION_QUESTIONS, QUIZ_REGIONS_QUESTIONS,
+    QUIZ_KING_QUESTIONS, QUIZ_RHYME_QUESTIONS, QUIZ_SCHOLARS_QUESTIONS,
+    QUIZ_GENRES_QUESTIONS, QUIZ_NUMBERS_QUESTIONS, QUIZ_WORLDLIT_QUESTIONS,
+    QUIZ_MYSTERYBOX_QUESTIONS,
 )
 
 LEAD_SECONDS = 30
 ANSWER_SECONDS = 20
 REVEAL_SECONDS = 8
 POINTS = 10
-# Winning-team reward: a per-person BASE that grows with that team's own
-# turnout, banded so growth tapers off for very large teams instead of
-# running away, plus a rank bonus for the top-3 scorers on the team -- so
-# joining a bigger team never shrinks your cut, AND outscoring your
-# teammates is worth more.
 TEAM_BASE_REWARD = 60
-# (team-size upper bound, Kitobcha added per member within this band).
-# Cumulative base at each threshold: 16->120, 30->162, 40->182, 50->202,
-# 60->212, 100->252. Beyond 100 members the base stays flat at 252.
 TEAM_SIZE_BANDS = [
     (16, 4),
     (30, 3),
@@ -60,8 +62,8 @@ TEAM_SIZE_BANDS = [
     (60, 1),
     (100, 1),
 ]
-TEAM_RANK_BONUS = {0: 40, 1: 25, 2: 10}  # extra Kitobcha for the team's top 3 scorers
-COVER_BLUR_RADIUS = 14  # strong enough that any title text on the cover is unreadable
+TEAM_RANK_BONUS = {0: 40, 1: 25, 2: 10}
+COVER_BLUR_RADIUS = 14
 
 
 def _dynamic_base(team_size):
@@ -72,7 +74,7 @@ def _dynamic_base(team_size):
             return base + step * (team_size - prev)
         base += step * (upper - prev)
         prev = upper
-    return base  # 100+ members: flat at the last band's cumulative value
+    return base
 
 TITLES = {
     "twofacts": "Ikki haqiqat, bir yolg'on",
@@ -83,51 +85,98 @@ TITLES = {
     "matchbook": "Muallif-Asar Moslashtirish",
     "reverse": "Teskari Viktorina",
     "cover": "Kitob Muqovasi",
+    # 30 New Games (🧪 Test / Beta)
+    "anagram": "🔠 Anagramma Kitob",
+    "blitz": "⚡️ Blitz 60",
+    "crossword": "🧩 Mini Krossvord",
+    "wordle": "🔤 Harfma-Harf",
+    "cipher": "🔐 Sherlok Kodi",
+    "acronym": "🎯 Bosh Harflar",
+    "character": "👤 Qahramonni Top",
+    "dialogue": "🗣 Kimning gapi?",
+    "plotmap": "🗺 Syujet Xaritasi",
+    "sequence": "⏳ Ketma-ketlik",
+    "oddone": "🔍 Ortiqchasini Top",
+    "ending": "✍️ Asar Yakuni",
+    "pixel": "🖼 Piksel Muqova",
+    "aiart": "🎨 AI Rasmlar",
+    "scenes": "🎭 Sahna Ko'rinishi",
+    "audioquote": "🎧 Ovozli Iqtibos",
+    "mosaic": "🧩 Kitob Mozaikasi",
+    "hiddendetail": "🔎 Yashirin Detal",
+    "duel": "🤺 1v1 Jonli Duel",
+    "buzzer": "🔔 Tezkor Qo'ng'iroq",
+    "bracket": "🏆 Haftalik Turnir",
+    "auction": "💰 Kitob Auksioni",
+    "regions": "👥 Viloyatlar Jangi",
+    "king": "👑 Qirol Taxti",
+    "rhyme": "📜 Bahri-Bayt",
+    "scholars": "🕌 Sharq Allomalari",
+    "genres": "📚 Janrlar Ustasi",
+    "numbers": "🔢 Adabiy Raqamlar",
+    "worldlit": "🌍 Jahon Adabiyoti",
+    "mysterybox": "🎁 Sirli Sandiq",
 }
-ENTRY_FEES = {
-    "twofacts": 25, "impostor": 25, "connection": 25, "teams": 30,
-    "timeline": 25, "matchbook": 25, "reverse": 25, "cover": 25,
-}
-NUM_QUESTIONS = {
-    "twofacts": 11, "impostor": 11, "connection": 11, "teams": 11,
-    "timeline": 11, "matchbook": 11, "reverse": 11, "cover": 10,
-}
+
+ENTRY_FEES = {k: (30 if k == "teams" else 25) for k in TITLES}
+NUM_QUESTIONS = {k: (10 if k == "cover" else 11) for k in TITLES}
 
 
 def _raw_pool(flavor):
-    if flavor == "twofacts":
-        return QUIZ_TWOFACTS_QUESTIONS
-    if flavor == "connection":
-        return QUIZ_CONNECTION_QUESTIONS
-    if flavor == "teams":
-        return SURVIVAL_QUESTIONS
-    if flavor == "impostor":
-        return QUIZ_IMPOSTOR_QUESTIONS
-    if flavor == "timeline":
-        return QUIZ_TIMELINE_QUESTIONS
-    if flavor == "matchbook":
-        return QUIZ_MATCHBOOK_QUESTIONS
-    if flavor == "reverse":
-        return QUIZ_REVERSE_QUESTIONS
+    _MAP = {
+        "twofacts": QUIZ_TWOFACTS_QUESTIONS,
+        "connection": QUIZ_CONNECTION_QUESTIONS,
+        "teams": SURVIVAL_QUESTIONS,
+        "impostor": QUIZ_IMPOSTOR_QUESTIONS,
+        "timeline": QUIZ_TIMELINE_QUESTIONS,
+        "matchbook": QUIZ_MATCHBOOK_QUESTIONS,
+        "reverse": QUIZ_REVERSE_QUESTIONS,
+        "cover": None,
+        "anagram": ANAGRAM_QUESTIONS,
+        "blitz": BLITZ_QUESTIONS,
+        "crossword": CROSSWORD_QUESTIONS,
+        "wordle": WORDLE_QUESTIONS,
+        "cipher": CIPHER_QUESTIONS,
+        "acronym": ACRONYM_QUESTIONS,
+        "character": CHARACTER_QUESTIONS,
+        "dialogue": DIALOGUE_QUESTIONS,
+        "plotmap": QUIZ_PLOTMAP_QUESTIONS,
+        "sequence": QUIZ_SEQUENCE_QUESTIONS,
+        "oddone": QUIZ_ODDONE_QUESTIONS,
+        "ending": QUIZ_ENDING_QUESTIONS,
+        "pixel": QUIZ_PIXEL_QUESTIONS,
+        "aiart": QUIZ_AIART_QUESTIONS,
+        "scenes": QUIZ_SCENES_QUESTIONS,
+        "audioquote": QUIZ_AUDIOQUOTE_QUESTIONS,
+        "mosaic": QUIZ_MOSAIC_QUESTIONS,
+        "hiddendetail": QUIZ_HIDDENDETAIL_QUESTIONS,
+        "duel": QUIZ_DUEL_QUESTIONS,
+        "buzzer": QUIZ_BUZZER_QUESTIONS,
+        "bracket": QUIZ_BRACKET_QUESTIONS,
+        "auction": QUIZ_AUCTION_QUESTIONS,
+        "regions": QUIZ_REGIONS_QUESTIONS,
+        "king": QUIZ_KING_QUESTIONS,
+        "rhyme": QUIZ_RHYME_QUESTIONS,
+        "scholars": QUIZ_SCHOLARS_QUESTIONS,
+        "genres": QUIZ_GENRES_QUESTIONS,
+        "numbers": QUIZ_NUMBERS_QUESTIONS,
+        "worldlit": QUIZ_WORLDLIT_QUESTIONS,
+        "mysterybox": QUIZ_MYSTERYBOX_QUESTIONS,
+    }
     if flavor == "cover":
         return _cover_raw_pool()
+    if flavor in _MAP:
+        return _MAP[flavor]
     raise ValueError(f"unknown flavor {flavor}")
 
 
 def _cover_raw_pool():
-    """Every GlobalBook with a cover image, as raw {"book_id","title","book"}
-    items -- built live from library uploads, not a static authored bank
-    like every other flavor."""
     from tgbot.models import GlobalBook
-
     books = GlobalBook.objects.exclude(cover="").exclude(cover__isnull=True)
     return [{"book_id": b.id, "title": b.title, "book": b} for b in books]
 
 
 def _blurred_cover_url(book) -> str:
-    """Generate a strongly-blurred JPEG from `book.cover` and save it to
-    storage, returning the full public URL. Generated fresh per question
-    (not cached) -- covers rarely change and the blur is cheap."""
     import time as _time
     from PIL import Image, ImageFilter
     from django.core.files.base import ContentFile
@@ -148,21 +197,31 @@ def _blurred_cover_url(book) -> str:
 
 
 def _identity(flavor, item):
-    """A stable string identifying a raw content item, for no-repeat tracking.
-    "connection" items reuse the same handful of generic question texts
-    ("Bu 4 asarni nima bog'laydi?" etc.) across distinct puzzles — the actual
-    `items` list is what varies, so it's the identity there, not `q`."""
     if flavor == "impostor":
-        return item["fake"]
+        return item.get("fake") or item.get("q", "")
     if flavor == "connection":
-        return str(item.get("items"))
+        return str(item.get("items")) if "items" in item else item.get("q", "")
     if flavor == "cover":
-        return item["title"]
-    return item.get("q")
+        return item.get("title", "")
+    if flavor == "anagram":
+        return item.get("anagram", "")
+    if flavor == "wordle":
+        return item.get("word", "")
+    if flavor == "cipher":
+        return item.get("code", "")
+    if flavor == "acronym":
+        return item.get("acronym", "")
+    if flavor == "character":
+        return item.get("desc", "")
+    if flavor == "dialogue":
+        return item.get("quote", "")
+    if flavor == "crossword":
+        return item.get("clue", "")
+    return item.get("q", "")
 
 
 def _prep_one(flavor, item):
-    if flavor == "impostor":
+    if flavor == "impostor" and "fake" in item:
         options = list(item["real"]) + [item["fake"]]
         fake_text = item["fake"]
         random.shuffle(options)
@@ -170,11 +229,80 @@ def _prep_one(flavor, item):
                 "correct": options.index(fake_text)}
     if flavor == "cover":
         return _prep_cover_question(item)
-    # twofacts / connection / teams are already {"q","options","correct"}-shaped.
-    opts = list(item["options"])
-    correct_text = opts[item["correct"]]
-    random.shuffle(opts)
-    out = {"q": item["q"], "options": opts, "correct": opts.index(correct_text)}
+    if flavor == "anagram":
+        options = [item["answer"]] + list(item["distractors"])
+        ans = item["answer"]
+        random.shuffle(options)
+        return {
+            "q": f"🔠 Anagramma: <b>{item['anagram']}</b>\n(Maslahat: {item.get('hint', '')})",
+            "options": options,
+            "correct": options.index(ans),
+        }
+    if flavor == "crossword":
+        options = [item["answer"]] + list(item["distractors"])
+        ans = item["answer"]
+        random.shuffle(options)
+        return {
+            "q": f"🧩 Krossvord katagi:\n<b>{item['clue']}</b>",
+            "options": options,
+            "correct": options.index(ans),
+        }
+    if flavor == "wordle":
+        options = [item["word"]] + list(item["distractors"])
+        ans = item["word"]
+        random.shuffle(options)
+        return {
+            "q": f"🔤 Harfma-harf toping: <b>{item['hint']}</b>",
+            "options": options,
+            "correct": options.index(ans),
+        }
+    if flavor == "cipher":
+        options = [item["author"]] + list(item["distractors"])
+        ans = item["author"]
+        random.shuffle(options)
+        return {
+            "q": f"🔐 Sherlok Kodi: <b>{item['code']}</b>\n({item['decoded']})\nMuallifi / egasi kim?",
+            "options": options,
+            "correct": options.index(ans),
+        }
+    if flavor == "acronym":
+        options = [item["full"]] + list(item["distractors"])
+        ans = item["full"]
+        random.shuffle(options)
+        return {
+            "q": f"🎯 Bosh harflar: <b>{item['acronym']}</b> ({item['author']})\nQaysi asar?",
+            "options": options,
+            "correct": options.index(ans),
+        }
+    if flavor == "character":
+        options = [item["character"]] + list(item["distractors"])
+        ans = item["character"]
+        random.shuffle(options)
+        return {
+            "q": f"👤 Qahramonni toping:\n«{item['desc']}»",
+            "options": options,
+            "correct": options.index(ans),
+        }
+    if flavor == "dialogue":
+        options = [item["speaker"]] + list(item["distractors"])
+        ans = item["speaker"]
+        random.shuffle(options)
+        return {
+            "q": f"🗣 Kimning gapi?\n<b>{item['quote']}</b>\n({item.get('context', '')})",
+            "options": options,
+            "correct": options.index(ans),
+        }
+    # Standard format {"q", "options", "correct"}
+    if "correct" in item and isinstance(item["correct"], str):
+        correct_text = item["correct"]
+        options = [correct_text] + list(item.get("distractors", []))
+    else:
+        opts = list(item["options"])
+        correct_text = opts[item["correct"]]
+        options = opts
+
+    random.shuffle(options)
+    out = {"q": item["q"], "options": options, "correct": options.index(correct_text)}
     if "items" in item:
         out["items"] = item["items"]
     return out

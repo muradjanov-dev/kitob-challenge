@@ -1,5 +1,17 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
-from aiogram.types.chat_member import ChatMemberStatus
+try:
+    from aiogram.types.chat_member import ChatMemberStatus
+except (ImportError, ModuleNotFoundError):
+    try:
+        from aiogram.enums import ChatMemberStatus
+    except Exception:
+        class ChatMemberStatus:
+            CREATOR = "creator"
+            ADMINISTRATOR = "administrator"
+            MEMBER = "member"
+            RESTRICTED = "restricted"
+            LEFT = "left"
+            KICKED = "kicked"
 from django.conf import settings
 from tgbot.bot.loader import bot
 from tgbot.models import RequiredGroup, TelegramProfile, Region
@@ -106,10 +118,13 @@ async def get_required_chats_markup(required_chats, user_id):
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
-send_receipt_button = InlineKeyboardMarkup().add(
-    InlineKeyboardButton(_("🧾 To'lov chekini yuborish"),
-                         callback_data="send_receipt")
-)
+try:
+    send_receipt_button = InlineKeyboardMarkup().add(
+        InlineKeyboardButton(_("🧾 To'lov chekini yuborish"),
+                             callback_data="send_receipt")
+    )
+except Exception:
+    send_receipt_button = None
 
 
 async def make_send_receipt_to_group_button(price: int, telegram_id: str, message_id: int, days: int = 30):
@@ -121,11 +136,14 @@ async def make_send_receipt_to_group_button(price: int, telegram_id: str, messag
     )
 
 
-send_message_type = InlineKeyboardMarkup(row_width=2).add(
-    InlineKeyboardButton(_("🛠️ Texnik muammo"), callback_data="technical"),
-    InlineKeyboardButton(_("📝 Boshqa"), callback_data="other"),
-    InlineKeyboardButton(_("❌ Bekor qilish"), callback_data="cancel")
-)
+try:
+    send_message_type = InlineKeyboardMarkup(row_width=2).add(
+        InlineKeyboardButton(_("🛠️ Texnik muammo"), callback_data="technical"),
+        InlineKeyboardButton(_("📝 Boshqa"), callback_data="other"),
+        InlineKeyboardButton(_("❌ Bekor qilish"), callback_data="cancel")
+    )
+except Exception:
+    send_message_type = None
 
 
 async def send_answer_to_question(user_id):
@@ -134,7 +152,10 @@ async def send_answer_to_question(user_id):
                              callback_data=f"send_answer:{user_id}"),
     )
 
-yes_no_markup = InlineKeyboardMarkup(row_width=2).add(
-    InlineKeyboardButton(_("✅ Ha, tasdiqlayman"), callback_data="yes"),
-    InlineKeyboardButton(_("❌ Yo'q"), callback_data="no")
-)
+try:
+    yes_no_markup = InlineKeyboardMarkup(row_width=2).add(
+        InlineKeyboardButton(_("✅ Ha, tasdiqlayman"), callback_data="yes"),
+        InlineKeyboardButton(_("❌ Yo'q"), callback_data="no")
+    )
+except Exception:
+    yes_no_markup = None

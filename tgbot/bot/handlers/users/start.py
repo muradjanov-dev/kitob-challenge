@@ -282,8 +282,7 @@ async def do_start(message: types.Message, state: FSMContext):
         )
         return
 
-    # Ko'pchilik / Qal'a / Emoji / Hikmat / Detektiv / Omon qolish / Bilim
-    # O'yini (4 flavors) deep links — open the respective game Mini App.
+    # All 38 live games deep links — open the respective game Mini App.
     _GAME_DEEPLINKS = {
         "kopchilik": ("/kopchilik/", "🗣 O'yinni ochish", "Ko'pchilik nima dedi?"),
         "qala": ("/qala/", "🏰 O'yinni ochish", "Bilim Qal'asi"),
@@ -299,6 +298,37 @@ async def do_start(message: types.Message, state: FSMContext):
         "muallif-asar": ("/muallif-asar/", "🎯 O'yinni ochish", "Muallif-Asar Moslashtirish"),
         "teskari-viktorina": ("/teskari-viktorina/", "🔄 O'yinni ochish", "Teskari Viktorina"),
         "kitob-muqovasi": ("/kitob-muqovasi/", "🖼 O'yinni ochish", "Kitob Muqovasi"),
+        # 30 New Games (🧪 Test / Beta)
+        "anagram": ("/anagram/", "🔠 O'yinni ochish", "🔠 Anagramma Kitob"),
+        "blitz": ("/blitz/", "⚡️ O'yinni ochish", "⚡️ Blitz 60"),
+        "crossword": ("/crossword/", "🧩 O'yinni ochish", "🧩 Mini Krossvord"),
+        "wordle": ("/wordle/", "🔤 O'yinni ochish", "🔤 Harfma-Harf"),
+        "cipher": ("/cipher/", "🔐 O'yinni ochish", "🔐 Sherlok Kodi"),
+        "acronym": ("/acronym/", "🎯 O'yinni ochish", "🎯 Bosh Harflar"),
+        "character": ("/character/", "👤 O'yinni ochish", "👤 Qahramonni Top"),
+        "dialogue": ("/dialogue/", "🗣 O'yinni ochish", "🗣 Kimning gapi?"),
+        "plotmap": ("/plotmap/", "🗺 O'yinni ochish", "🗺 Syujet Xaritasi"),
+        "sequence": ("/sequence/", "⏳ O'yinni ochish", "⏳ Ketma-ketlik"),
+        "oddone": ("/oddone/", "🔍 O'yinni ochish", "🔍 Ortiqchasini Top"),
+        "ending": ("/ending/", "✍️ O'yinni ochish", "✍️ Asar Yakuni"),
+        "pixel": ("/pixel/", "🖼 O'yinni ochish", "🖼 Piksel Muqova"),
+        "aiart": ("/aiart/", "🎨 O'yinni ochish", "🎨 AI Rasmlar"),
+        "scenes": ("/scenes/", "🎭 O'yinni ochish", "🎭 Sahna Ko'rinishi"),
+        "audioquote": ("/audioquote/", "🎧 Ovozli Iqtibos", "🎧 Ovozli Iqtibos"),
+        "mosaic": ("/mosaic/", "🧩 O'yinni ochish", "🧩 Kitob Mozaikasi"),
+        "hiddendetail": ("/hiddendetail/", "🔎 O'yinni ochish", "🔎 Yashirin Detal"),
+        "duel": ("/duel/", "🤺 O'yinni ochish", "🤺 1v1 Jonli Duel"),
+        "buzzer": ("/buzzer/", "🔔 O'yinni ochish", "🔔 Tezkor Qo'ng'iroq"),
+        "bracket": ("/bracket/", "🏆 O'yinni ochish", "🏆 Haftalik Turnir"),
+        "auction": ("/auction/", "💰 O'yinni ochish", "💰 Kitob Auksioni"),
+        "regions": ("/regions/", "👥 O'yinni ochish", "👥 Viloyatlar Jangi"),
+        "king": ("/king/", "👑 O'yinni ochish", "👑 Qirol Taxti"),
+        "rhyme": ("/rhyme/", "📜 O'yinni ochish", "📜 Bahri-Bayt"),
+        "scholars": ("/scholars/", "🕌 O'yinni ochish", "🕌 Sharq Allomalari"),
+        "genres": ("/genres/", "📚 O'yinni ochish", "📚 Janrlar Ustasi"),
+        "numbers": ("/numbers/", "🔢 O'yinni ochish", "🔢 Adabiy Raqamlar"),
+        "worldlit": ("/worldlit/", "🌍 O'yinni ochish", "🌍 Jahon Adabiyoti"),
+        "mysterybox": ("/mysterybox/", "🎁 O'yinni ochish", "🎁 Sirli Sandiq"),
     }
     if args in _GAME_DEEPLINKS and already_registered:
         if user and not user.is_registered:
