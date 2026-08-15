@@ -38,7 +38,7 @@ ITEMS = {
             "MEGA yutuq!), Omon qolish o'yiniga qo'shimcha jon, bonus streak-"
             "muzlatish, bepul Shaxsiy sertifikat, BEPUL jonli o'yin biletlari, "
             "1 soatlik AI Quiz, 3 soatlik Premium, Market chegirmasi va yana "
-            "ko'plab syurprizlar — 40 dan ortiq xil natija bor!"
+            "ko'plab syurprizlar — 140 dan ortiq xil ajoyib natijalar va yangi 100 xil unikal yutuqlar bor!"
         ),
     },
     CERTIFICATE: {
@@ -164,6 +164,107 @@ MYSTERY_PRIZES = [
     ("flavor_tong_saharlik", 5),
     ("flavor_yulduzli_tun", 4),
     ("flavor_buyuk_kutubxona", 1),
+    # ── 100 YANGI SIRLI QUTI YUTUQLARI ──
+    ("navoiy_gavhari", 4),
+    ("bobur_xazinasi", 3),
+    ("ibn_sino_jomi", 4),
+    ("xorazmiy_tilsimi", 5),
+    ("beruniy_kombasi", 4),
+    ("rumiy_nayi", 4),
+    ("attor_atri", 4),
+    ("yassaviy_durdonasi", 3),
+    ("naqshband_duosi", 3),
+    ("gazzoliy_kimyosi", 3),
+    ("firdavsiy_toji", 4),
+    ("bedil_tilsimi", 4),
+    ("mashrab_olovli", 4),
+    ("ogahiy_chashmasi", 5),
+    ("furqat_sadosi", 5),
+    ("muqimiy_tuhfasi", 5),
+    ("nodirabegim_marjoni", 4),
+    ("uvaysiy_topishmog'i", 5),
+    ("zebunniso_bayti", 4),
+    ("al_fargoni_astrolabi", 4),
+    ("termiziy_rivoyati", 4),
+    ("moturidiy_qalqoni", 3),
+    ("zamaxshariy_lugati", 4),
+    ("qoshgariy_devoni", 3),
+    ("yusuf_xos_hojib", 2),
+    ("don_kixot_qalqoni", 5),
+    ("sherlok_lupasi", 4),
+    ("monte_kristo_oltini", 2),
+    ("shahzoda_guli", 4),
+    ("faust_kompasi", 4),
+    ("gamlet_monologi", 4),
+    ("robinzon_oroli", 5),
+    ("alisa_oynasi", 4),
+    ("garri_tayoqchasi", 3),
+    ("odisseya_kemasi", 3),
+    ("dante_yulduzlari", 2),
+    ("kapitan_granto", 5),
+    ("tom_soyer_xazinasi", 5),
+    ("mobi_dik_kompasi", 4),
+    ("uch_mushketyor", 4),
+    ("urush_va_tinchlik", 3),
+    ("jinoyat_va_jazo", 3),
+    ("chol_va_dengiz", 4),
+    ("yuz_yil_yolgizlik", 3),
+    ("1984_haqiqati", 3),
+    ("kichik_qora_baliqcha", 5),
+    ("otamdan_qolgan_dalalar", 4),
+    ("otkan_kunlar_kumush", 2),
+    ("mehrobdan_chayon", 4),
+    ("sarob_romani", 4),
+    ("simurgh_pati", 2),
+    ("humoy_soyasi", 2),
+    ("zulmat_obihayot", 3),
+    ("kohna_xarita", 4),
+    ("oltin_xatchop", 4),
+    ("zumrad_siyohdon", 3),
+    ("kumush_qalam", 5),
+    ("alifbo_tilsimi", 5),
+    ("hikmat_javohiri", 3),
+    ("haqiqat_kozgusi", 3),
+    ("ilm_mashalasi", 4),
+    ("sabab_oqibat_toshi", 4),
+    ("tavakkul_gavhari", 3),
+    ("qanoat_xazinasi", 3),
+    ("shukr_chirogi", 4),
+    ("sabr_qalqoni", 3),
+    ("saxovat_daryosi", 3),
+    ("odob_ziynati", 4),
+    ("farosat_kozoynagi", 4),
+    ("ziyoli_qalb_nuri", 3),
+    ("kitobsevar_tulpori", 4),
+    ("munozara_qilichi", 4),
+    ("mutolaa_halovati", 5),
+    ("sahifa_nafasi", 5),
+    ("oltin_sandıq", 1),
+    ("vip_gold_ticket_1", 3),
+    ("vip_gold_ticket_2", 2),
+    ("vip_gold_ticket_3", 1),
+    ("premium_pass_1d", 2),
+    ("premium_pass_2d", 1),
+    ("survival_armor_4", 2),
+    ("survival_armor_5", 1),
+    ("freeze_shield_3", 2),
+    ("market_mega_discount_70", 1),
+    ("market_discount_30", 3),
+    ("market_discount_40", 2),
+    ("ai_quiz_pass_3h", 2),
+    ("ai_quiz_pass_6h", 1),
+    ("gold_certificate_vip", 3),
+    ("double_refund_box", 2),
+    ("triple_refund_box", 1),
+    ("fortune_booster_100", 4),
+    ("fortune_booster_250", 3),
+    ("fortune_booster_500", 2),
+    ("fortune_booster_777", 1),
+    ("legend_reader_gift", 2),
+    ("champion_bonus", 2),
+    ("royal_kitobcha", 1),
+    ("secret_mastery", 1),
+    ("grand_mystery_jackpot", 1),
 ]
 
 # key -> (label incl. emoji, min amount, max amount)
@@ -191,6 +292,93 @@ FLAVOR_KITOBCHA = {
     "flavor_tong_saharlik":       ("🌅 Tong saharlik ilhom", 55, 140),
     "flavor_yulduzli_tun":        ("🌌 Yulduzli tun mukofoti", 105, 260),
     "flavor_buyuk_kutubxona":     ("🏛 Buyuk kutubxona duosi", 300, 600),
+    # ── 100 YANGI XAZINALAR VA MUKOFOTLAR ──
+    "navoiy_gavhari": ('💎 Alisher Navoiyning nazm gavhari', 150, 350),
+    "bobur_xazinasi": ('👑 Zahiriddin Muhammad Boburning Hind xazinasi', 200, 450),
+    "ibn_sino_jomi": ('🧪 Abu Ali ibn Sinoning hayot sharbati', 120, 300),
+    "xorazmiy_tilsimi": ('📐 Al-Xorazmiyning algebraik tilsimi', 100, 260),
+    "beruniy_kombasi": ('🌍 Abu Rayhon Beruniyning globusi', 130, 310),
+    "rumiy_nayi": ('🪈 Mavlono Rumiyning ilohiy nayi', 160, 380),
+    "attor_atri": ('🌸 Farididdin Attorning 7 vodiy atri', 140, 320),
+    "yassaviy_durdonasi": ('📜 Xoja Ahmad Yassaviyning Hikmat durdonasi', 175, 400),
+    "naqshband_duosi": ('🌾 Bahouddin Naqshbandning «Dil ba Yoru» duosi', 180, 420),
+    "gazzoliy_kimyosi": ("🗝 Imom G'azzoliyning Saodat kimyosi", 190, 440),
+    "firdavsiy_toji": ('👑 Firdavsiy «Shohnoma»sining Rustam toji', 160, 360),
+    "bedil_tilsimi": ('📜 Mirzo Bedilning botiniy sirlar kitobi', 130, 290),
+    "mashrab_olovli": ("🔥 Boborahim Mashrabning olovli g'azali", 150, 340),
+    "ogahiy_chashmasi": ("💧 Ogahiyning ma'rifat chashmasi", 110, 270),
+    "furqat_sadosi": ('🪕 Zokirjon Furqatning musofirlik nolasi', 95, 240),
+    "muqimiy_tuhfasi": ("🎭 Muhammad Aminxo'ja Muqimiy tuhfasi", 90, 230),
+    "nodirabegim_marjoni": ('📿 Nodirabegimning adabiy marjoni', 125, 280),
+    "uvaysiy_topishmog'i": ('🧩 Jahonotin Uvaysiyning sirli chistoni', 115, 260),
+    "zebunniso_bayti": ('✍️ Zebunniso begimning oltin bayti', 135, 300),
+    "al_fargoni_astrolabi": ("🔭 Ahmad al-Farg'oniyning yulduzlar jadvali", 145, 330),
+    "termiziy_rivoyati": ('🕌 Imom at-Termiziyning nurlari', 155, 350),
+    "moturidiy_qalqoni": ('🛡 Imom Moturidiyning tafakkur qalqoni', 170, 390),
+    "zamaxshariy_lugati": ("📚 Mahmud az-Zamaxshariyning «Asos ul-balog'a» duri", 140, 310),
+    "qoshgariy_devoni": ("🗺 Mahmud Qoshg'ariyning qadimiy turkiy xaritasi", 185, 410),
+    "yusuf_xos_hojib": ("👑 Yusuf Xos Hojibning «Qutadg'u Bilig» baxt kaliti", 220, 500),
+    "don_kixot_qalqoni": ('🛡 Don Kixot va Lamanchaning jasorat qalqoni', 100, 250),
+    "sherlok_lupasi": ('🔎 Sherlok Xolmsning detektiv lupasi', 140, 320),
+    "monte_kristo_oltini": ("💰 Graf Monte-Kristoning if qal'asi oltinlari", 250, 600),
+    "shahzoda_guli": ('🌹 Kichik Shahzodaning sayyoradagi yagona atirguli', 130, 290),
+    "faust_kompasi": ('🧭 Gyotening «Faust» qadimiy kompasi', 120, 280),
+    "gamlet_monologi": ("💀 Shekspirning «Bo'lmoq yo bo'lmaslik» javohiri", 150, 340),
+    "robinzon_oroli": ('🏝 Robinzon Kruzoning kashfiyot xaritasi', 110, 260),
+    "alisa_oynasi": ("🪞 Alisaning Mo''jizalar mamlakati oynasi", 125, 290),
+    "garri_tayoqchasi": ('🪄 Sehrgarlar maktabining zumrad tayoqchasi', 160, 370),
+    "odisseya_kemasi": ('⛵️ Gomerning «Odisseya» epik kemasi', 170, 380),
+    "dante_yulduzlari": ('✨ Dantening «Ilohiy Komediya» jannat yulduzlari', 200, 450),
+    "kapitan_granto": ('🗺 Kapitan Grantning 37-parallel xabarnomasi', 105, 250),
+    "tom_soyer_xazinasi": ("🏴\u200d☠️ Tom Soyer va Geklberri Finning g'or xazinasi", 115, 270),
+    "mobi_dik_kompasi": ('🐋 Oq kit (Mobi Dik) dengizchilari kompasi', 135, 300),
+    "uch_mushketyor": ("🤺 D'Artanyan va Uch Mushketyor qilichi", 145, 330),
+    "urush_va_tinchlik": ('📜 Lev Tolstoyning «Urush va Tinchlik» sahifasi', 180, 400),
+    "jinoyat_va_jazo": ('⚖️ Fyodor Dostoyevskiyning vijdon tarozisi', 165, 370),
+    "chol_va_dengiz": ('🎣 Ernest Xemingueyning sabr va matonati', 120, 270),
+    "yuz_yil_yolgizlik": ('🦋 Gabriel Garsia Markesning sariq kapalaklari', 155, 350),
+    "1984_haqiqati": ('👁 Jorj Oruellning «1984» erkin tafakkur siri', 175, 390),
+    "kichik_qora_baliqcha": ('🐟 Samad Behrangiyning ozodlik oqimi', 85, 210),
+    "otamdan_qolgan_dalalar": ("🌾 Tog'ay Murodning xalqona samimiyati", 160, 360),
+    "otkan_kunlar_kumush": ("👰 Abdulla Qodiriyning «O'tkan kunlar» sadoqati", 210, 480),
+    "mehrobdan_chayon": ("🕌 Anvar va Ra'noning pokiza sevgisi", 150, 330),
+    "sarob_romani": ('🌫 Abdulla Qahhorning yuksak mahorati', 130, 290),
+    "simurgh_pati": ("🪶 Qof tog'i Simurg'ining oltin pati", 200, 500),
+    "humoy_soyasi": ('🦅 Humoy qushining saodatli soyasi', 250, 550),
+    "zulmat_obihayot": ('🧪 Xizr chashmasining tiriklik suvi (Obihayot)', 180, 420),
+    "kohna_xarita": ('🗺 Aleksandriya kutubxonasining qadimiy xaritasi', 140, 330),
+    "oltin_xatchop": ("🔖 Qadimiy qo'lyozmaning sof oltin xatcho'pi", 120, 280),
+    "zumrad_siyohdon": ('🖋 Podshohlar kotibining zumrad siyohdoni', 150, 350),
+    "kumush_qalam": ('✏️ Shoirlar ilhomining kumush qalami', 110, 260),
+    "alifbo_tilsimi": ('🔤 Ming yillik qadimiy alifbo tilsimi', 100, 240),
+    "hikmat_javohiri": ('💎 Qalbni yorituvchi hikmat javohiri', 170, 390),
+    "haqiqat_kozgusi": ("🪞 Soxtalikni fosh etuvchi Haqiqat ko'zgusi", 160, 370),
+    "ilm_mashalasi": ("🔥 Qorong'ulikni quvuvchi Ilm mash'alasi", 135, 310),
+    "sabab_oqibat_toshi": ("🔮 Taqdir sabablarini ko'rsatuvchi sirli tosh", 145, 340),
+    "tavakkul_gavhari": ('✨ Xotirjam qalbning Tavakkul gavhari', 175, 400),
+    "qanoat_xazinasi": ('🏺 Hech qachon tugamaydigan Qanoat xazinasi', 190, 430),
+    "shukr_chirogi": ("🪔 Baraka keltiruvchi Shukr chirog'i", 150, 350),
+    "sabr_qalqoni": ('🛡 Barcha qiyinchiliklarni yenguvchi Sabr qalqoni', 165, 380),
+    "saxovat_daryosi": ('🌊 Muruvvatli insonning Saxovat daryosi', 185, 410),
+    "odob_ziynati": ('👑 Har qanday boylikdan ustun Odob ziynati', 130, 300),
+    "farosat_kozoynagi": ("👓 Inson botinini anglovchi Farosat ko'zoynagi", 140, 320),
+    "ziyoli_qalb_nuri": ('💡 Jamiyatni yorituvchi Ziyoli qalb nuri', 155, 360),
+    "kitobsevar_tulpori": ('🐎 Bilim vodiysiga eltuvchi tulpor', 125, 290),
+    "munozara_qilichi": ('⚔️ Mantiqiy bahsda yengilmas Munozara qilichi', 135, 310),
+    "mutolaa_halovati": ('☕️ Issiq choy va sokin Mutolaa halovati', 95, 230),
+    "sahifa_nafasi": ('🍃 Yangi kitob varaqlarining muattar hidi', 105, 250),
+    "oltin_sandıq": ("🎁 Sirli qutining eng qimmatbaho Oltin Sandig'i", 300, 750),
+    "double_refund_box": ('🔁🔁 2 BARAVAR QUTI QAYTIMI: +400 Kitobcha!', 400, 400),
+    "triple_refund_box": ('💥💥 3 BARAVAR QUTI QAYTIMI: +600 Kitobcha!', 600, 600),
+    "fortune_booster_100": ('⚡️ Omadli Tezlatkich: +100 Kitobcha!', 100, 100),
+    "fortune_booster_250": ('⚡️⚡️ Super Tezlatkich: +250 Kitobcha!', 250, 250),
+    "fortune_booster_500": ('⚡️🔥 Oltin Tezlatkich: +500 Kitobcha!', 500, 500),
+    "fortune_booster_777": ('🎰 777 OMAD JEKPOTI: +777 Kitobcha!', 777, 777),
+    "legend_reader_gift": ('🌟 Afsonaviy Kitobxon Mukofoti: +333 Kitobcha!', 333, 333),
+    "champion_bonus": ('🏆 Chempionlik Ilhomi: +444 Kitobcha!', 444, 444),
+    "royal_kitobcha": ("👑 Shohona Kitobcha Sovg'asi: +555 Kitobcha!", 555, 555),
+    "secret_mastery": ('🗝 Mutolaa Ustasi Xazinasi: +666 Kitobcha!', 666, 666),
+    "grand_mystery_jackpot": ('🌋👑 BUYUK SIRLI QUTI GRAND JEKPOTI: +3000 Kitobcha!', 3000, 3000),
 }
 
 
@@ -298,6 +486,79 @@ def resolve_mystery_box(user):
             p.save(update_fields=["next_market_discount_pct"])
             return "🏷🔥 KATTA CHEGIRMA! Keyingi Market xaridingizga <b>50% chegirma</b>!", False
 
+
+        # ── MAXSUS YANGI 100 TALIK MUKOFOTLARNI ISHLATISH ──
+        if pick == "free_game_ticket_3":
+            p.bonus_free_game_entries = (p.bonus_free_game_entries or 0) + 3
+            p.save(update_fields=["bonus_free_game_entries"])
+            return "🎟🎟🎟 OLTIN CHIPTA! Keyingi jonli o'yinlarga <b>3 ta BEPUL bilet</b> yutdingiz!", False
+
+        if pick == "premium_1d":
+            import datetime as _dt
+            from tgbot.models import Payment
+            Payment.grant_or_extend(p, 1, amount=0)
+            until = timezone.now() + _dt.timedelta(days=1)
+            p.trial_premium_until = max(p.trial_premium_until or until, until)
+            p.save(update_fields=["trial_premium_until"])
+            return "💎👑 <b>24 SOATLIK (1 KUN) TO'LIQ BEPUL PREMIUM!</b> Barcha VIP o'yinlar va imtiyozlar siz uchun ochiq!", False
+
+        if pick == "premium_2d":
+            import datetime as _dt
+            from tgbot.models import Payment
+            Payment.grant_or_extend(p, 2, amount=0)
+            until = timezone.now() + _dt.timedelta(days=2)
+            p.trial_premium_until = max(p.trial_premium_until or until, until)
+            p.save(update_fields=["trial_premium_until"])
+            return "💎👑🔥 <b>48 SOATLIK (2 KUN) TO'LIQ BEPUL PREMIUM!</b> Barcha VIP o'yinlar va imtiyozlar siz uchun ochiq!", False
+
+        if pick == "survival_4":
+            p.bonus_survival_lives = (p.bonus_survival_lives or 0) + 4
+            p.save(update_fields=["bonus_survival_lives"])
+            return "🛡🛡 SUPER BRONYA! Keyingi <b>Omon qolish</b> o'yiningizga <b>+4 qo'shimcha jon</b>!", False
+
+        if pick == "survival_5":
+            p.bonus_survival_lives = (p.bonus_survival_lives or 0) + 5
+            p.save(update_fields=["bonus_survival_lives"])
+            return "🛡❤️ AFSONAVIY BRONYA! Keyingi <b>Omon qolish</b> o'yiningizga <b>+5 TA SUPER JON</b>!", False
+
+        if pick == "freeze_3":
+            p.streak_freeze_count = (p.streak_freeze_count or 0) + 3
+            p.save(update_fields=["streak_freeze_count"])
+            return "❄️❄️❄️ QALQON! Bonus <b>3 ta Streak muzlatish</b> tokeni yutdingiz!", False
+
+        if pick == "discount_70":
+            p.next_market_discount_pct = max(int(p.next_market_discount_pct or 0), 70)
+            p.save(update_fields=["next_market_discount_pct"])
+            return "🏷🔥 SUPER CHEGIRMA! Keyingi Market xaridingizga <b>70% CHEGIRMA</b>!", False
+
+        if pick == "discount_30":
+            p.next_market_discount_pct = max(int(p.next_market_discount_pct or 0), 30)
+            p.save(update_fields=["next_market_discount_pct"])
+            return "🏷 Keyingi Market xaridingizga <b>30% chegirma</b> yutdingiz!", False
+
+        if pick == "discount_40":
+            p.next_market_discount_pct = max(int(p.next_market_discount_pct or 0), 40)
+            p.save(update_fields=["next_market_discount_pct"])
+            return "🏷 Keyingi Market xaridingizga <b>40% chegirma</b> yutdingiz!", False
+
+        if pick == "ai_quiz_3h":
+            import datetime as _dt
+            from tgbot.tasks import expire_ai_quiz_trial
+            until = timezone.now() + _dt.timedelta(hours=3)
+            p.trial_ai_quiz_until = until
+            p.save(update_fields=["trial_ai_quiz_until"])
+            expire_ai_quiz_trial.apply_async(args=[p.id], countdown=3 * 3600)
+            return "🤖 <b>3 soatlik BEPUL AI Quiz yaratish</b> imkoniyati yutdingiz!", False
+
+        if pick == "ai_quiz_6h":
+            import datetime as _dt
+            from tgbot.tasks import expire_ai_quiz_trial
+            until = timezone.now() + _dt.timedelta(hours=6)
+            p.trial_ai_quiz_until = until
+            p.save(update_fields=["trial_ai_quiz_until"])
+            expire_ai_quiz_trial.apply_async(args=[p.id], countdown=6 * 3600)
+            return "🤖🔥 <b>6 soatlik CHEKSIZ AI Quiz yaratish</b> imkoniyati yutdingiz!", False
+
         p.streak_freeze_count = (p.streak_freeze_count or 0) + 1
         if pick == "streak_freeze_2":
             p.streak_freeze_count += 1
@@ -311,6 +572,79 @@ def apply_streak_freeze_purchase(user) -> int:
     from tgbot.models import TelegramProfile
     with transaction.atomic():
         p = TelegramProfile.objects.select_for_update().get(id=user.id)
+
+        # ── MAXSUS YANGI 100 TALIK MUKOFOTLARNI ISHLATISH ──
+        if pick == "free_game_ticket_3":
+            p.bonus_free_game_entries = (p.bonus_free_game_entries or 0) + 3
+            p.save(update_fields=["bonus_free_game_entries"])
+            return "🎟🎟🎟 OLTIN CHIPTA! Keyingi jonli o'yinlarga <b>3 ta BEPUL bilet</b> yutdingiz!", False
+
+        if pick == "premium_1d":
+            import datetime as _dt
+            from tgbot.models import Payment
+            Payment.grant_or_extend(p, 1, amount=0)
+            until = timezone.now() + _dt.timedelta(days=1)
+            p.trial_premium_until = max(p.trial_premium_until or until, until)
+            p.save(update_fields=["trial_premium_until"])
+            return "💎👑 <b>24 SOATLIK (1 KUN) TO'LIQ BEPUL PREMIUM!</b> Barcha VIP o'yinlar va imtiyozlar siz uchun ochiq!", False
+
+        if pick == "premium_2d":
+            import datetime as _dt
+            from tgbot.models import Payment
+            Payment.grant_or_extend(p, 2, amount=0)
+            until = timezone.now() + _dt.timedelta(days=2)
+            p.trial_premium_until = max(p.trial_premium_until or until, until)
+            p.save(update_fields=["trial_premium_until"])
+            return "💎👑🔥 <b>48 SOATLIK (2 KUN) TO'LIQ BEPUL PREMIUM!</b> Barcha VIP o'yinlar va imtiyozlar siz uchun ochiq!", False
+
+        if pick == "survival_4":
+            p.bonus_survival_lives = (p.bonus_survival_lives or 0) + 4
+            p.save(update_fields=["bonus_survival_lives"])
+            return "🛡🛡 SUPER BRONYA! Keyingi <b>Omon qolish</b> o'yiningizga <b>+4 qo'shimcha jon</b>!", False
+
+        if pick == "survival_5":
+            p.bonus_survival_lives = (p.bonus_survival_lives or 0) + 5
+            p.save(update_fields=["bonus_survival_lives"])
+            return "🛡❤️ AFSONAVIY BRONYA! Keyingi <b>Omon qolish</b> o'yiningizga <b>+5 TA SUPER JON</b>!", False
+
+        if pick == "freeze_3":
+            p.streak_freeze_count = (p.streak_freeze_count or 0) + 3
+            p.save(update_fields=["streak_freeze_count"])
+            return "❄️❄️❄️ QALQON! Bonus <b>3 ta Streak muzlatish</b> tokeni yutdingiz!", False
+
+        if pick == "discount_70":
+            p.next_market_discount_pct = max(int(p.next_market_discount_pct or 0), 70)
+            p.save(update_fields=["next_market_discount_pct"])
+            return "🏷🔥 SUPER CHEGIRMA! Keyingi Market xaridingizga <b>70% CHEGIRMA</b>!", False
+
+        if pick == "discount_30":
+            p.next_market_discount_pct = max(int(p.next_market_discount_pct or 0), 30)
+            p.save(update_fields=["next_market_discount_pct"])
+            return "🏷 Keyingi Market xaridingizga <b>30% chegirma</b> yutdingiz!", False
+
+        if pick == "discount_40":
+            p.next_market_discount_pct = max(int(p.next_market_discount_pct or 0), 40)
+            p.save(update_fields=["next_market_discount_pct"])
+            return "🏷 Keyingi Market xaridingizga <b>40% chegirma</b> yutdingiz!", False
+
+        if pick == "ai_quiz_3h":
+            import datetime as _dt
+            from tgbot.tasks import expire_ai_quiz_trial
+            until = timezone.now() + _dt.timedelta(hours=3)
+            p.trial_ai_quiz_until = until
+            p.save(update_fields=["trial_ai_quiz_until"])
+            expire_ai_quiz_trial.apply_async(args=[p.id], countdown=3 * 3600)
+            return "🤖 <b>3 soatlik BEPUL AI Quiz yaratish</b> imkoniyati yutdingiz!", False
+
+        if pick == "ai_quiz_6h":
+            import datetime as _dt
+            from tgbot.tasks import expire_ai_quiz_trial
+            until = timezone.now() + _dt.timedelta(hours=6)
+            p.trial_ai_quiz_until = until
+            p.save(update_fields=["trial_ai_quiz_until"])
+            expire_ai_quiz_trial.apply_async(args=[p.id], countdown=6 * 3600)
+            return "🤖🔥 <b>6 soatlik CHEKSIZ AI Quiz yaratish</b> imkoniyati yutdingiz!", False
+
         p.streak_freeze_count = (p.streak_freeze_count or 0) + 1
         p.save(update_fields=["streak_freeze_count"])
         return p.streak_freeze_count
