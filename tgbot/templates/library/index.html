@@ -592,82 +592,147 @@
     /* PDF.js paginated canvas reader with 3D folding page curl */
     #pdfCanvasWrap {
       flex: 1; overflow: auto; display: flex; align-items: flex-start;
-      justify-content: center; background: #161616; padding: 14px 0 90px;
+      justify-content: center; background: #111113; padding: 16px 0 90px;
       -webkit-overflow-scrolling: touch;
-      perspective: 2000px;
+      perspective: 2600px;
       perspective-origin: center center;
       touch-action: pan-y;
     }
+    #bookStage {
+      position: relative;
+      display: inline-block;
+      perspective: 2600px;
+      perspective-origin: center center;
+      transform-style: preserve-3d;
+      margin: 0 auto;
+      border-radius: 4px 12px 12px 4px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.7), -4px 0 16px rgba(0,0,0,0.4), inset 4px 0 12px rgba(0,0,0,0.15);
+      background: #fdfbf7;
+    }
     #pdfCanvas {
-      box-shadow: 0 10px 32px rgba(0,0,0,.65), -2px 0 10px rgba(0,0,0,0.3);
-      background: #fff; max-width: 96vw; height: auto;
-      transform-style: preserve-3d; will-change: transform, filter, box-shadow;
-      opacity: 0; transition: opacity .3s ease;
-      border-radius: 2px 8px 8px 2px;
+      display: block;
+      background: #fdfbf7; max-width: 96vw; height: auto;
+      border-radius: 4px 12px 12px 4px;
+      opacity: 0; transition: opacity .2s ease;
     }
     #pdfCanvas.pdf-canvas-ready { opacity: 1; }
-    @keyframes pdfCurlNext {
+
+    #pdfFlipWrap {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      display: none;
+      transform-style: preserve-3d;
+      backface-visibility: hidden;
+      border-radius: 4px 12px 12px 4px;
+      overflow: hidden;
+      z-index: 10;
+    }
+    #pdfFlipCanvas {
+      width: 100%; height: 100%;
+      display: block;
+      background: #fdfbf7;
+    }
+    .pdf-flip-shadow {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(to right, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.2) 20%, transparent 65%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .25s ease;
+    }
+    .pdf-flip-highlight {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,0.45) 50%, rgba(0,0,0,0.2) 65%, transparent 80%);
+      pointer-events: none;
+      opacity: 0;
+    }
+    .book-spine-effect {
+      position: absolute;
+      top: 0; left: 0; bottom: 0; width: 22px;
+      background: linear-gradient(to right, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.12) 60%, transparent 100%);
+      pointer-events: none;
+      border-radius: 4px 0 0 4px;
+      z-index: 5;
+    }
+
+    @keyframes pageTurnNext {
       0% {
-        transform: perspective(2000px) rotateY(-84deg) skewY(-3deg) scale(0.92);
-        filter: brightness(0.68) contrast(1.12);
-        box-shadow: -20px 14px 34px rgba(0,0,0,0.7);
-        opacity: 0.25;
+        transform: rotateY(0deg) skewY(0deg) scale(1);
+        transform-origin: left center;
+        box-shadow: -2px 0 10px rgba(0,0,0,0.2);
+        filter: brightness(1);
+        opacity: 1;
       }
-      40% {
-        transform: perspective(2000px) rotateY(-36deg) skewY(-1.5deg) scale(0.97);
-        filter: brightness(0.88);
-        box-shadow: -12px 10px 26px rgba(0,0,0,0.48);
-        opacity: 0.85;
+      35% {
+        transform: rotateY(-42deg) skewY(-2.5deg) scale(0.98);
+        transform-origin: left center;
+        box-shadow: -18px 12px 35px rgba(0,0,0,0.6);
+        filter: brightness(0.92);
+        opacity: 1;
       }
-      75% {
-        transform: perspective(2000px) rotateY(-6deg) skewY(-0.3deg) scale(0.995);
-        filter: brightness(0.98);
-        box-shadow: -4px 6px 20px rgba(0,0,0,0.35);
-        opacity: 0.98;
+      70% {
+        transform: rotateY(-86deg) skewY(-1deg) scale(0.96);
+        transform-origin: left center;
+        box-shadow: -28px 18px 50px rgba(0,0,0,0.7);
+        filter: brightness(0.8);
+        opacity: 1;
       }
       100% {
-        transform: perspective(2000px) rotateY(0deg) skewY(0deg) scale(1);
+        transform: rotateY(-110deg) skewY(0deg) scale(0.94);
+        transform-origin: left center;
+        box-shadow: -35px 22px 55px rgba(0,0,0,0.8);
+        filter: brightness(0.55);
+        opacity: 0;
+      }
+    }
+
+    @keyframes pageTurnPrev {
+      0% {
+        transform: rotateY(-110deg) skewY(0deg) scale(0.94);
+        transform-origin: left center;
+        box-shadow: -35px 22px 55px rgba(0,0,0,0.8);
+        filter: brightness(0.55);
+        opacity: 0;
+      }
+      30% {
+        transform: rotateY(-86deg) skewY(-1deg) scale(0.96);
+        transform-origin: left center;
+        box-shadow: -28px 18px 50px rgba(0,0,0,0.7);
+        filter: brightness(0.8);
+        opacity: 1;
+      }
+      70% {
+        transform: rotateY(-42deg) skewY(-2.5deg) scale(0.98);
+        transform-origin: left center;
+        box-shadow: -18px 12px 35px rgba(0,0,0,0.6);
+        filter: brightness(0.92);
+        opacity: 1;
+      }
+      100% {
+        transform: rotateY(0deg) skewY(0deg) scale(1);
+        transform-origin: left center;
+        box-shadow: -2px 0 10px rgba(0,0,0,0.2);
         filter: brightness(1);
-        box-shadow: 0 10px 32px rgba(0,0,0,.65), -2px 0 10px rgba(0,0,0,0.3);
         opacity: 1;
       }
     }
-    @keyframes pdfCurlPrev {
-      0% {
-        transform: perspective(2000px) rotateY(84deg) skewY(3deg) scale(0.92);
-        filter: brightness(0.68) contrast(1.12);
-        box-shadow: 20px 14px 34px rgba(0,0,0,0.7);
-        opacity: 0.25;
-      }
-      40% {
-        transform: perspective(2000px) rotateY(36deg) skewY(1.5deg) scale(0.97);
-        filter: brightness(0.88);
-        box-shadow: 12px 10px 26px rgba(0,0,0,0.48);
-        opacity: 0.85;
-      }
-      75% {
-        transform: perspective(2000px) rotateY(6deg) skewY(0.3deg) scale(0.995);
-        filter: brightness(0.98);
-        box-shadow: 4px 6px 20px rgba(0,0,0,0.35);
-        opacity: 0.98;
-      }
-      100% {
-        transform: perspective(2000px) rotateY(0deg) skewY(0deg) scale(1);
-        filter: brightness(1);
-        box-shadow: 0 10px 32px rgba(0,0,0,.65), -2px 0 10px rgba(0,0,0,0.3);
-        opacity: 1;
-      }
+
+    .turning-next #pdfFlipWrap {
+      display: block;
+      animation: pageTurnNext 0.52s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
     }
-    #pdfCanvas.flip-in-next {
-      animation: pdfCurlNext .52s cubic-bezier(0.2, 0.75, 0.25, 1);
-      transform-origin: left center;
+    .turning-next .pdf-flip-shadow { opacity: 1; }
+    .turning-next .pdf-flip-highlight { opacity: 1; }
+
+    .turning-prev #pdfFlipWrap {
+      display: block;
+      animation: pageTurnPrev 0.52s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
     }
-    #pdfCanvas.flip-in-prev {
-      animation: pdfCurlPrev .52s cubic-bezier(0.2, 0.75, 0.25, 1);
-      transform-origin: right center;
-    }
+    .turning-prev .pdf-flip-shadow { opacity: 1; }
+    .turning-prev .pdf-flip-highlight { opacity: 1; }
+
     @media (prefers-reduced-motion: reduce) {
-      #pdfCanvas.flip-in-next, #pdfCanvas.flip-in-prev { animation: none; }
+      .turning-next #pdfFlipWrap, .turning-prev #pdfFlipWrap { display: none; }
     }
     #pdfLoading {
       position: absolute; inset: 0; top: 45px; display: flex; flex-direction: column;
@@ -1337,7 +1402,15 @@
     </div>
   </div>
   <div id="pdfCanvasWrap">
-    <canvas id="pdfCanvas"></canvas>
+    <div id="bookStage">
+      <canvas id="pdfCanvas"></canvas>
+      <div id="pdfFlipWrap">
+        <canvas id="pdfFlipCanvas"></canvas>
+        <div class="pdf-flip-shadow"></div>
+        <div class="pdf-flip-highlight"></div>
+      </div>
+      <div class="book-spine-effect"></div>
+    </div>
     <div id="pdfLoading">
       <div class="pdf-loading-book">📖</div>
       <div class="pdf-loading-dots"><span></span><span></span><span></span></div>
@@ -1798,14 +1871,38 @@ function _pdfToast(msg, duration = 1400) {
 }
 document.getElementById('pdfToastClose').addEventListener('click', _pdfToastHide);
 
+let _flipTimer = null;
 function _pdfPlayFlip(dir) {
-  pdfCanvas.classList.remove('flip-in-next', 'flip-in-prev');
-  void pdfCanvas.offsetWidth; // restart the CSS animation
-  // Swapped vs. the naive mapping -- the .flip-in-next/.flip-in-prev keyframes
-  // (left-hinge vs right-hinge) read backwards against their names, so this
-  // is what actually makes a right-swipe/next-page open toward the right and
-  // a left-swipe/prev-page open toward the left, matching the finger.
-  pdfCanvas.classList.add(dir > 0 ? 'flip-in-prev' : 'flip-in-next');
+  const stage = document.getElementById('bookStage');
+  const flipCanvas = document.getElementById('pdfFlipCanvas');
+  if (!stage || !flipCanvas || !pdfCanvas || !pdfCanvas.width || !pdfCanvas.height) return;
+
+  const flipCtx = flipCanvas.getContext('2d');
+  flipCanvas.width = pdfCanvas.width;
+  flipCanvas.height = pdfCanvas.height;
+  flipCtx.clearRect(0, 0, flipCanvas.width, flipCanvas.height);
+  try {
+    flipCtx.drawImage(pdfCanvas, 0, 0);
+  } catch (e) {}
+
+  stage.classList.remove('turning-next', 'turning-prev');
+  void stage.offsetWidth; // force DOM reflow to restart CSS animation
+
+  if (dir > 0) {
+    stage.classList.add('turning-next');
+  } else {
+    stage.classList.add('turning-prev');
+  }
+
+  // Native haptic feedback inside Telegram
+  if (window.Telegram && Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
+    try { Telegram.WebApp.HapticFeedback.impactOccurred('light'); } catch (e) {}
+  }
+
+  clearTimeout(_flipTimer);
+  _flipTimer = setTimeout(() => {
+    stage.classList.remove('turning-next', 'turning-prev');
+  }, 530);
 }
 
 function _pdfRenderPage(num, dir) {
@@ -1816,11 +1913,6 @@ function _pdfRenderPage(num, dir) {
     const baseViewport = page.getViewport({ scale: 1 });
     let viewport;
     if (_magMode) {
-      // Reading mode: ALWAYS fit the page width exactly to the window --
-      // never scaled up -- so no word is ever cropped off the side. The
-      // zoom preset instead controls the window's HEIGHT (set after render,
-      // once we know the page's real rendered height): showing 1/Nth of the
-      // page per screen is what makes it feel "zoomed in", not a wider render.
       const wrapW = pdfWrap.clientWidth;
       const fitScale = wrapW / baseViewport.width;
       viewport = page.getViewport({ scale: fitScale });
@@ -1829,20 +1921,10 @@ function _pdfRenderPage(num, dir) {
       const fitScale = Math.min(2.2, Math.max(0.5, wrapW / baseViewport.width));
       viewport = page.getViewport({ scale: fitScale * _pdfZoom });
     }
-    // Render at the screen's real pixel density, not just CSS pixels --
-    // without this, text on any Retina/high-DPI phone comes out visibly
-    // soft because the canvas bitmap has fewer physical pixels than the
-    // screen showing it. Capped at 2x so a high-DPR phone at max zoom in
-    // reading mode doesn't blow up canvas memory/render time.
     const outputScale = Math.min(window.devicePixelRatio || 1, 2);
     pdfCanvas.width = Math.floor(viewport.width * outputScale);
     pdfCanvas.height = Math.floor(viewport.height * outputScale);
     pdfCanvas.style.width = Math.floor(viewport.width) + 'px';
-    // Deliberately NOT setting style.height explicitly: leaving the CSS
-    // `height: auto` rule in control means the displayed height keeps
-    // tracking the canvas's real width/height ratio even in the edge case
-    // where `max-width: 96vw` ends up clamping style.width down -- an
-    // explicit pixel height here would go stale and skew the page.
     const renderTransform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
     const task = page.render({ canvasContext: pdfCtx, viewport, transform: renderTransform });
     task.promise.then(() => {
@@ -1850,21 +1932,12 @@ function _pdfRenderPage(num, dir) {
       pdfLoading.classList.add('hidden');
       pdfCanvas.classList.add('pdf-canvas-ready');
       if (_magMode) {
-        // viewport.height is the full page's CSS-px height at the width-fit
-        // scale -- dividing by the preset gives a height equal to one "band"
-        // (1/2, 1/3, or 1/4 of the page), which is what makes it feel zoomed
-        // in without ever touching the width. Clamped to a big, consistent
-        // rectangle (45-78% of the viewport height) so the window always
-        // reads as a proper large lupa, not a thin sliver at high zoom or an
-        // oddly short one on a squat page.
         _magPageHeightCss = viewport.height;
         const rawBand = _magPageHeightCss / _magZoomPreset;
         const minH = window.innerHeight * .45, maxH = window.innerHeight * .78;
         pdfWrap.style.height = Math.round(Math.min(maxH, Math.max(minH, rawBand))) + 'px';
         _magPanY = 0; // new page always starts at the top band
         _magApplyPan();
-      } else if (dir) {
-        _pdfPlayFlip(dir);
       }
       if (_pdfPendingPage !== null) {
         const next = _pdfPendingPage;
@@ -1876,7 +1949,7 @@ function _pdfRenderPage(num, dir) {
   _pdfPage = num;
   _pdfSetLabel();
   pdfWrap.scrollTop = 0;
-  _pdfPing(); // ping reflects the page actually being rendered, not just the click target
+  _pdfPing();
 }
 
 function _pdfQueueRender(num, dir) {
@@ -1888,6 +1961,9 @@ function _pdfQueueRender(num, dir) {
 function _pdfTurn(delta) {
   const target = _pdfPage + delta;
   if (target < 1 || (_pdfNumPages && target > _pdfNumPages)) return;
+  if (!_magMode) {
+    _pdfPlayFlip(delta > 0 ? 1 : -1);
+  }
   _pdfQueueRender(target, delta > 0 ? 1 : -1);
 }
 
