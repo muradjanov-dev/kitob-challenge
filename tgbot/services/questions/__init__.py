@@ -60,6 +60,18 @@ from .memento import QUIZ_MEMENTO_QUESTIONS
 from .strategy import QUIZ_STRATEGY_QUESTIONS
 from .paradox import QUIZ_PARADOX_QUESTIONS
 
+# 10 Sufism, Nafs Purification, and Divine Love Games
+from .simurgh import QUIZ_SIMURGH_QUESTIONS
+from .ishq import QUIZ_ISHQ_QUESTIONS
+from .nafs import QUIZ_NAFS_QUESTIONS
+from .qalb import QUIZ_QALB_QUESTIONS
+from .naqshband import QUIZ_NAQSHBAND_QUESTIONS
+from .yassaviy import QUIZ_YASSAVIY_QUESTIONS
+from .masnaviy import QUIZ_MASNAVIY_QUESTIONS
+from .gazzoliy import QUIZ_GAZZOLIY_QUESTIONS
+from .fano import QUIZ_FANO_QUESTIONS
+from .marifat import QUIZ_MARIFAT_QUESTIONS
+
 __all__ = [
     "FEUD_QUESTIONS",
     "CASTLE_QUESTIONS",
@@ -113,4 +125,14 @@ __all__ = [
     "QUIZ_MEMENTO_QUESTIONS",
     "QUIZ_STRATEGY_QUESTIONS",
     "QUIZ_PARADOX_QUESTIONS",
+    "QUIZ_SIMURGH_QUESTIONS",
+    "QUIZ_ISHQ_QUESTIONS",
+    "QUIZ_NAFS_QUESTIONS",
+    "QUIZ_QALB_QUESTIONS",
+    "QUIZ_NAQSHBAND_QUESTIONS",
+    "QUIZ_YASSAVIY_QUESTIONS",
+    "QUIZ_MASNAVIY_QUESTIONS",
+    "QUIZ_GAZZOLIY_QUESTIONS",
+    "QUIZ_FANO_QUESTIONS",
+    "QUIZ_MARIFAT_QUESTIONS",
 ]

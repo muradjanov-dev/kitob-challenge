@@ -260,6 +260,10 @@ _QUIZ_FLAVORS = (
     "mindtrap", "stoic", "antiherd", "dilemma",
     "causeeffect", "masks", "socrates", "memento",
     "strategy", "paradox",
+    # 10 Sufism, Nafs Purification & Divine Love Games (✨ Tasavvuf & Ishqulloh)
+    "simurgh", "ishq", "nafs", "qalb",
+    "naqshband", "yassaviy", "masnaviy", "gazzoliy",
+    "fano", "marifat",
 )
 
 
@@ -362,6 +366,17 @@ _GAME_LABELS_URLS = {
     "memento": ("⌛️ Vaqt Paradoksi", "/memento/"),
     "strategy": ("♟ Strategik Tafakkur", "/strategy/"),
     "paradox": ("💡 Paradokslar Olami", "/paradox/"),
+    # 10 Sufism, Nafs Purification & Divine Love Games
+    "simurgh": ("🕊 Simurg' Parvozi", "/simurgh/"),
+    "ishq": ("🕯 Parvona va Sham", "/ishq/"),
+    "nafs": ("⚔️ Buyuk Jihod", "/nafs/"),
+    "qalb": ("🪞 Qalb Sayqali", "/qalb/"),
+    "naqshband": ("🌾 Xalvat dar Anjuman", "/naqshband/"),
+    "yassaviy": ("📜 Hikmatlar Daryosi", "/yassaviy/"),
+    "masnaviy": ("🪈 Nay Nidosi", "/masnaviy/"),
+    "gazzoliy": ("🗝 Kimyoi Saodat", "/gazzoliy/"),
+    "fano": ("🌊 Fanofilloh", "/fano/"),
+    "marifat": ("☀️ Haqiqat Quyoshi", "/marifat/"),
 }
 _QUIZ_FLAVOR_SET = set(_QUIZ_FLAVORS)
 

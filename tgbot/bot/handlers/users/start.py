@@ -340,6 +340,17 @@ async def do_start(message: types.Message, state: FSMContext):
         "memento": ("/memento/", "⌛️ O'yinni ochish", "⌛️ Vaqt Paradoksi"),
         "strategy": ("/strategy/", "♟ O'yinni ochish", "♟ Strategik Tafakkur"),
         "paradox": ("/paradox/", "💡 O'yinni ochish", "💡 Paradokslar Olami"),
+        # 10 Sufism, Nafs Purification & Divine Love Games
+        "simurgh": ("/simurgh/", "🕊 O'yinni ochish", "🕊 Simurg' Parvozi"),
+        "ishq": ("/ishq/", "🕯 O'yinni ochish", "🕯 Parvona va Sham"),
+        "nafs": ("/nafs/", "⚔️ O'yinni ochish", "⚔️ Buyuk Jihod"),
+        "qalb": ("/qalb/", "🪞 O'yinni ochish", "🪞 Qalb Sayqali"),
+        "naqshband": ("/naqshband/", "🌾 O'yinni ochish", "🌾 Xalvat dar Anjuman"),
+        "yassaviy": ("/yassaviy/", "📜 O'yinni ochish", "📜 Hikmatlar Daryosi"),
+        "masnaviy": ("/masnaviy/", "🪈 O'yinni ochish", "🪈 Nay Nidosi"),
+        "gazzoliy": ("/gazzoliy/", "🗝 O'yinni ochish", "🗝 Kimyoi Saodat"),
+        "fano": ("/fano/", "🌊 O'yinni ochish", "🌊 Fanofilloh"),
+        "marifat": ("/marifat/", "☀️ O'yinni ochish", "☀️ Haqiqat Quyoshi"),
     }
     if args in _GAME_DEEPLINKS and already_registered:
         if user and not user.is_registered:

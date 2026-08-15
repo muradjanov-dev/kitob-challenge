@@ -290,6 +290,47 @@ urlpatterns = [
     path("paradox/api/state/", api_quiz_state, {"flavor": "paradox"}, name="quiz-paradox-api-state"),
     path("paradox/api/submit/", api_quiz_submit, {"flavor": "paradox"}, name="quiz-paradox-api-submit"),
 
+    # 10 Sufism, Nafs Purification, and Divine Love Games (✨ Tasavvuf & Ishqulloh)
+    path("simurgh/", quiz_index, {"flavor": "simurgh"}, name="quiz-simurgh"),
+    path("simurgh/api/state/", api_quiz_state, {"flavor": "simurgh"}, name="quiz-simurgh-api-state"),
+    path("simurgh/api/submit/", api_quiz_submit, {"flavor": "simurgh"}, name="quiz-simurgh-api-submit"),
+
+    path("ishq/", quiz_index, {"flavor": "ishq"}, name="quiz-ishq"),
+    path("ishq/api/state/", api_quiz_state, {"flavor": "ishq"}, name="quiz-ishq-api-state"),
+    path("ishq/api/submit/", api_quiz_submit, {"flavor": "ishq"}, name="quiz-ishq-api-submit"),
+
+    path("nafs/", quiz_index, {"flavor": "nafs"}, name="quiz-nafs"),
+    path("nafs/api/state/", api_quiz_state, {"flavor": "nafs"}, name="quiz-nafs-api-state"),
+    path("nafs/api/submit/", api_quiz_submit, {"flavor": "nafs"}, name="quiz-nafs-api-submit"),
+
+    path("qalb/", quiz_index, {"flavor": "qalb"}, name="quiz-qalb"),
+    path("qalb/api/state/", api_quiz_state, {"flavor": "qalb"}, name="quiz-qalb-api-state"),
+    path("qalb/api/submit/", api_quiz_submit, {"flavor": "qalb"}, name="quiz-qalb-api-submit"),
+
+    path("naqshband/", quiz_index, {"flavor": "naqshband"}, name="quiz-naqshband"),
+    path("naqshband/api/state/", api_quiz_state, {"flavor": "naqshband"}, name="quiz-naqshband-api-state"),
+    path("naqshband/api/submit/", api_quiz_submit, {"flavor": "naqshband"}, name="quiz-naqshband-api-submit"),
+
+    path("yassaviy/", quiz_index, {"flavor": "yassaviy"}, name="quiz-yassaviy"),
+    path("yassaviy/api/state/", api_quiz_state, {"flavor": "yassaviy"}, name="quiz-yassaviy-api-state"),
+    path("yassaviy/api/submit/", api_quiz_submit, {"flavor": "yassaviy"}, name="quiz-yassaviy-api-submit"),
+
+    path("masnaviy/", quiz_index, {"flavor": "masnaviy"}, name="quiz-masnaviy"),
+    path("masnaviy/api/state/", api_quiz_state, {"flavor": "masnaviy"}, name="quiz-masnaviy-api-state"),
+    path("masnaviy/api/submit/", api_quiz_submit, {"flavor": "masnaviy"}, name="quiz-masnaviy-api-submit"),
+
+    path("gazzoliy/", quiz_index, {"flavor": "gazzoliy"}, name="quiz-gazzoliy"),
+    path("gazzoliy/api/state/", api_quiz_state, {"flavor": "gazzoliy"}, name="quiz-gazzoliy-api-state"),
+    path("gazzoliy/api/submit/", api_quiz_submit, {"flavor": "gazzoliy"}, name="quiz-gazzoliy-api-submit"),
+
+    path("fano/", quiz_index, {"flavor": "fano"}, name="quiz-fano"),
+    path("fano/api/state/", api_quiz_state, {"flavor": "fano"}, name="quiz-fano-api-state"),
+    path("fano/api/submit/", api_quiz_submit, {"flavor": "fano"}, name="quiz-fano-api-submit"),
+
+    path("marifat/", quiz_index, {"flavor": "marifat"}, name="quiz-marifat"),
+    path("marifat/api/state/", api_quiz_state, {"flavor": "marifat"}, name="quiz-marifat-api-state"),
+    path("marifat/api/submit/", api_quiz_submit, {"flavor": "marifat"}, name="quiz-marifat-api-submit"),
+
     path("api/games/status/", api_games_status, name="games-api-status"),
 
     path("api/track/event/", api_track_event, name="track-event"),

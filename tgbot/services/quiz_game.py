@@ -50,6 +50,10 @@ from tgbot.services.game_questions import (
     QUIZ_ANTIHERD_QUESTIONS, QUIZ_DILEMMA_QUESTIONS, QUIZ_CAUSEEFFECT_QUESTIONS,
     QUIZ_MASKS_QUESTIONS, QUIZ_SOCRATES_QUESTIONS, QUIZ_MEMENTO_QUESTIONS,
     QUIZ_STRATEGY_QUESTIONS, QUIZ_PARADOX_QUESTIONS,
+    QUIZ_SIMURGH_QUESTIONS, QUIZ_ISHQ_QUESTIONS, QUIZ_NAFS_QUESTIONS,
+    QUIZ_QALB_QUESTIONS, QUIZ_NAQSHBAND_QUESTIONS, QUIZ_YASSAVIY_QUESTIONS,
+    QUIZ_MASNAVIY_QUESTIONS, QUIZ_GAZZOLIY_QUESTIONS, QUIZ_FANO_QUESTIONS,
+    QUIZ_MARIFAT_QUESTIONS,
 )
 
 LEAD_SECONDS = 30
@@ -69,7 +73,7 @@ TEAM_RANK_BONUS = {0: 40, 1: 25, 2: 10}
 COVER_BLUR_RADIUS = 14
 
 # VIP Premium Arena Rewards & Rules
-VIP_TOP_GAMES = ["king", "duel", "teams", "survival", "mysterybox", "mindtrap", "stoic", "strategy"]
+VIP_TOP_GAMES = ["king", "duel", "teams", "survival", "mysterybox", "mindtrap", "stoic", "strategy", "simurgh", "masnaviy", "gazzoliy"]
 VIP_REWARD_TIERS = {0: 500, 1: 300, 2: 200}
 VIP_PREMIUM_DAYS_BONUS = {0: 3, 1: 2, 2: 1}
 VIP_PARTICIPATION = 75
@@ -136,6 +140,17 @@ TITLES = {
     "memento": "⌛️ Vaqt Paradoksi",
     "strategy": "♟ Strategik Tafakkur",
     "paradox": "💡 Paradokslar Olami",
+    # 10 Sufism, Nafs Purification & Divine Love Games
+    "simurgh": "🕊 Simurg' Parvozi",
+    "ishq": "🕯 Parvona va Sham",
+    "nafs": "⚔️ Buyuk Jihod",
+    "qalb": "🪞 Qalb Sayqali",
+    "naqshband": "🌾 Xalvat dar Anjuman",
+    "yassaviy": "📜 Hikmatlar Daryosi",
+    "masnaviy": "🪈 Nay Nidosi",
+    "gazzoliy": "🗝 Kimyoi Saodat",
+    "fano": "🌊 Fanofilloh",
+    "marifat": "☀️ Haqiqat Quyoshi",
 }
 
 ENTRY_FEES = {k: (30 if k == "teams" else 25) for k in TITLES}
@@ -193,6 +208,17 @@ def _raw_pool(flavor):
         "memento": QUIZ_MEMENTO_QUESTIONS,
         "strategy": QUIZ_STRATEGY_QUESTIONS,
         "paradox": QUIZ_PARADOX_QUESTIONS,
+        # 10 Sufism, Nafs Purification & Divine Love Games
+        "simurgh": QUIZ_SIMURGH_QUESTIONS,
+        "ishq": QUIZ_ISHQ_QUESTIONS,
+        "nafs": QUIZ_NAFS_QUESTIONS,
+        "qalb": QUIZ_QALB_QUESTIONS,
+        "naqshband": QUIZ_NAQSHBAND_QUESTIONS,
+        "yassaviy": QUIZ_YASSAVIY_QUESTIONS,
+        "masnaviy": QUIZ_MASNAVIY_QUESTIONS,
+        "gazzoliy": QUIZ_GAZZOLIY_QUESTIONS,
+        "fano": QUIZ_FANO_QUESTIONS,
+        "marifat": QUIZ_MARIFAT_QUESTIONS,
     }
     if flavor == "cover":
         return _cover_raw_pool()

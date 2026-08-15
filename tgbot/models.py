@@ -1969,6 +1969,17 @@ class QuizGame(BaseModel):
         ("memento", "⌛️ Vaqt Paradoksi"),
         ("strategy", "♟ Strategik Tafakkur"),
         ("paradox", "💡 Paradokslar Olami"),
+        # 10 Sufism, Nafs Purification, and Divine Love Games (✨ Tasavvuf & Ishqulloh)
+        ("simurgh", "🕊 Simurg' Parvozi"),
+        ("ishq", "🕯 Parvona va Sham"),
+        ("nafs", "⚔️ Buyuk Jihod"),
+        ("qalb", "🪞 Qalb Sayqali"),
+        ("naqshband", "🌾 Xalvat dar Anjuman"),
+        ("yassaviy", "📜 Hikmatlar Daryosi"),
+        ("masnaviy", "🪈 Nay Nidosi"),
+        ("gazzoliy", "🗝 Kimyoi Saodat"),
+        ("fano", "🌊 Fanofilloh"),
+        ("marifat", "☀️ Haqiqat Quyoshi"),
     ]
     flavor = models.CharField(max_length=32, choices=FLAVOR_CHOICES)
     title = models.CharField(max_length=120, default="Bilim O'yini")
@@ -2055,6 +2066,9 @@ class GameSequence(BaseModel):
         # 10 Mind, Logic, and Conscious Living Games (🧠 Ongli Hayot & Farosat)
         "mindtrap", "stoic", "antiherd", "dilemma", "causeeffect",
         "masks", "socrates", "memento", "strategy", "paradox",
+        # 10 Sufism, Nafs Purification, and Divine Love Games (✨ Tasavvuf & Ishqulloh)
+        "simurgh", "ishq", "nafs", "qalb", "naqshband",
+        "yassaviy", "masnaviy", "gazzoliy", "fano", "marifat",
     ]
 
     slot = models.CharField(max_length=16, choices=SLOT_CHOICES)
