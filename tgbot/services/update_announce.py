@@ -40,11 +40,11 @@ def broadcast_update_announcement():
     keyboard_uz = json.dumps({
         "inline_keyboard": [
             [
-                {"text": "🎮 Jonli o'yinlar", "url": f"{base_domain}/"},
-                {"text": "📖 Kutubxona (3D)", "url": f"{base_domain}/library/"},
+                {"text": "⚡️ Jonli o'yinlar", "url": f"{base_domain}/"},
+                {"text": "📖 3D Kutubxona", "url": f"{base_domain}/library/"},
             ],
             [
-                {"text": "🛍 Do'kon (Shop)", "url": f"{base_domain}/shop/"},
+                {"text": "🛍 Yangilangan Do'kon", "url": f"{base_domain}/shop/"},
                 {"text": "🚀 Botga kirish", "url": bot_url},
             ]
         ]
@@ -53,11 +53,11 @@ def broadcast_update_announcement():
     keyboard_ru = json.dumps({
         "inline_keyboard": [
             [
-                {"text": "🎮 Живые игры", "url": f"{base_domain}/"},
-                {"text": "📖 Библиотека (3D)", "url": f"{base_domain}/library/"},
+                {"text": "⚡️ Живые игры", "url": f"{base_domain}/"},
+                {"text": "📖 3D Библиотека", "url": f"{base_domain}/library/"},
             ],
             [
-                {"text": "🛍 Магазин (Shop)", "url": f"{base_domain}/shop/"},
+                {"text": "🛍 Обновлённый Магазин", "url": f"{base_domain}/shop/"},
                 {"text": "🚀 Открыть бота", "url": bot_url},
             ]
         ]
