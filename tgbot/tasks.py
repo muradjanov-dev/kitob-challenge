@@ -6034,10 +6034,10 @@ def start_survival_game():
     return game
 
 
-def _start_quiz_flavor(flavor):
+def _start_quiz_flavor(flavor, is_vip=False):
     from tgbot.services.quiz_game import create_scheduled_quiz, finalize_due_games, LEAD_SECONDS, ENTRY_FEES, TITLES
     finalize_due_games(flavor)
-    game = create_scheduled_quiz(flavor)
+    game = create_scheduled_quiz(flavor, is_vip=is_vip)
     texts = {
         "twofacts": (
             "🎭 <b>IKKI HAQIQAT, BIR YOLG'ON</b>\n\n"
@@ -6097,15 +6097,23 @@ def _start_quiz_flavor(flavor):
         "reverse": "teskari-viktorina", "cover": "kitob-muqovasi",
     }
     game_title = TITLES.get(flavor, flavor.upper())
-    announcement_text = texts.get(
-        flavor,
-        f"🧪 <b>{game_title} (Test / Beta)</b>\n\n"
-        f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
-        f"💰 <b>Kirish: {ENTRY_FEES.get(flavor, 25)} Kitobcha.</b>\n👇 Kiring:"
-    )
+    if is_vip:
+        announcement_text = (
+            f"⭐️ <b>VIP PREMIUM ARENA: {game_title}</b> ⭐️\n\n"
+            f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi!\n"
+            f"👑 <b>Faqat VIP Premium a'zolar uchun!</b>\n\n"
+            f"💰 <b>Yutuq: 500 – 1000 Kitobcha + 3 kunlik Premium!</b>\n👇 Kiring:"
+        )
+    else:
+        announcement_text = texts.get(
+            flavor,
+            f"🧪 <b>{game_title} (Test / Beta)</b>\n\n"
+            f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+            f"💰 <b>Kirish: {ENTRY_FEES.get(flavor, 25)} Kitobcha.</b>\n👇 Kiring:"
+        )
     deep_link = deep_link_params.get(flavor, flavor)
     _announce_game(announcement_text, deep_link)
-    print(f"start_quiz_{flavor}: game #{game.id}")
+    print(f"start_quiz_{flavor}: game #{game.id} (is_vip={is_vip})")
     return game
 
 
@@ -6126,57 +6134,80 @@ for fl in _QUIZ_FLAVORS:
     _GAME_STARTERS[fl] = (lambda f=fl: _start_quiz_flavor(f))
 
 
-# The 10 games built today (2026-07-22) — used to source tonight's special
-# 5-game bonus lineup so it showcases only the new content.
 NEW_GAME_TYPES = [
     "wisdom", "detective", "survival", "twofacts", "impostor", "connection", "teams",
     "timeline", "matchbook", "reverse",
 ]
 
+# 5 Most Prestigious Games for the Daily VIP Premium Arena
+VIP_5_GAMES = ["king", "duel", "teams", "survival", "mysterybox"]
+
 
 @shared_task
 def start_game_sequence(slot, count=3, pool=None):
-    """Kick off today's `slot` ('morning' 10:00 or 'evening' 22:00) sequence:
-    pick `count` of the live games at random from `pool` (no repeats) and
-    start the first one. The rest are chained on as each prior game finishes
-    — see `_advance_game_sequence`, called from chain_game_tick/games_finalize_tick.
-
-    `count` defaults to 3 and `pool` defaults to every live game type (the
-    regular daily rotation); a bigger one-off event (see
-    start_special_evening_event) can request more from a narrower pool."""
+    """Kick off today's `slot` ('morning' 10:00, 'evening' 22:00, or 'vip_2230') sequence."""
     from tgbot.models import GameSequence
 
     pool = pool or GameSequence.GAME_TYPES
     today = timezone.localdate()
     count = min(count, len(pool))
+    is_vip = slot == GameSequence.SLOT_VIP
     seq, created = GameSequence.objects.get_or_create(
         slot=slot, date=today,
-        defaults={"game_types": random.sample(pool, count)},
+        defaults={"game_types": list(pool[:count]) if is_vip else random.sample(pool, count)},
     )
     if not created:
         print(f"start_game_sequence: {slot}/{today} already started, skipping")
         return
 
     first_type = seq.game_types[0]
-    game = _GAME_STARTERS[first_type]()
+    if is_vip and first_type in _QUIZ_FLAVORS:
+        game = _start_quiz_flavor(first_type, is_vip=True)
+    else:
+        game = _GAME_STARTERS[first_type]()
     seq.current_game_type = first_type
     seq.current_game_id = game.id
     seq.save(update_fields=["current_game_type", "current_game_id", "updated_at"])
-    print(f"start_game_sequence: {slot} sequence {seq.game_types}, starting {first_type} #{game.id}")
+    print(f"start_game_sequence: {slot} sequence {seq.game_types}, starting {first_type} #{game.id} (is_vip={is_vip})")
+
+
+@shared_task
+def start_vip_premium_evening_event():
+    """Daily at ~22:30 (right after 22:00 evening games wrap up):
+    Kicks off the exclusive 5-Game VIP Premium Arena for Premium subscribers only,
+    with massive 500-1000 Kitobcha prizes, free Premium days, and Gold badges!"""
+    from tgbot.models import GameSequence
+    text = (
+        "⭐️ <b>VIP PREMIUM ARENA BOSHLANMOQDA! (22:30)</b> ⭐️\n\n"
+        "Faqat <b>VIP Premium</b> foydalanuvchilar uchun <b>5 ta ENG ZO'R O'YIN</b> ketma-ket start oladi:\n\n"
+        "👑 1. <b>Qirol Taxti VIP</b>\n"
+        "🤺 2. <b>1v1 Jonli Duel VIP</b>\n"
+        "👥 3. <b>VIP Jamoa Jangi</b>\n"
+        "💀 4. <b>Omon Qolish VIP</b>\n"
+        "🎁 5. <b>Sirli Sandiq VIP</b>\n\n"
+        "💰 <b>KATTA YUTUQLAR:</b>\n"
+        "🥇 1-o'rin: <b>+500 – 1000 Kitobcha + 3 kun BEPUL Premium!</b>\n"
+        "🥈 2-o'rin: <b>+300 – 600 Kitobcha + 2 kun BEPUL Premium!</b>\n"
+        "🥉 3-o'rin: <b>+200 – 400 Kitobcha + 1 kun BEPUL Premium!</b>\n"
+        "🎖 4-10 o'rinlar: <b>+75 – 150 Kitobcha!</b>\n\n"
+        "<i>⚡️ Hali Premium bo'lmasangiz, hoziroq bot orqali faollashtiring va ulkan yutuqlarga ega bo'ling!</i>"
+    )
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    for group_id, thread_id in _game_targets():
+        try:
+            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                    "disable_web_page_preview": "true"}
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            requests.post(url, data=data, timeout=10)
+        except Exception as e:
+            print(f"start_vip_premium_evening_event announce {group_id}: {e}")
+
+    start_game_sequence(GameSequence.SLOT_VIP, count=5, pool=VIP_5_GAMES)
 
 
 @shared_task
 def start_special_evening_event(count=5, bonus_count=2):
-    """One-off bonus night: announce it to the groups, then immediately kick
-    off the evening GameSequence with `count` games (all drawn from
-    NEW_GAME_TYPES, today's new content) instead of the usual 3 from the full
-    pool. The first `count - bonus_count` are the "standard" slots, the last
-    `bonus_count` are announced as bonus.
-
-    Scheduled via apply_async(eta=...) a few seconds before 22:00 so it wins
-    the GameSequence.get_or_create race against the regular beat-triggered
-    start_game_sequence('evening') call at 22:00:00 sharp (whichever creates
-    the row first "wins"; the other becomes a harmless no-op)."""
     text = (
         f"🎉 <b>BUGUN KECHQURUN MAXSUS O'YIN TUNI!</b>\n\n"
         f"Bugun 22:00 da odatdagi 3 ta o'rniga <b>{count} ta YANGI o'yin</b> ketma-ket "
@@ -6199,7 +6230,7 @@ def start_special_evening_event(count=5, bonus_count=2):
 def _advance_game_sequence(game_type, game_id):
     """If `game_id` (of `game_type`) was the current step of a live daily
     sequence, start the next game type in line — or mark the sequence
-    completed once all 3 have run."""
+    completed once all have run."""
     from tgbot.models import GameSequence
 
     seq = GameSequence.objects.filter(
@@ -6215,20 +6246,24 @@ def _advance_game_sequence(game_type, game_id):
         seq.save(update_fields=["completed", "current_index", "updated_at"])
         print(f"_advance_game_sequence: {seq.slot}/{seq.date} sequence complete")
         if seq.slot == GameSequence.SLOT_EVENING:
-            # Celebratory top-5 announcement right after tonight's games wrap
-            # up, instead of only waiting for the fixed 23:00 fallback slot.
             announce_top_game_players()
+            # Immediately trigger VIP Premium Arena after the evening slot completes!
+            start_vip_premium_evening_event.apply_async(countdown=90)
         return
 
     next_type = seq.game_types[next_index]
-    game = _GAME_STARTERS[next_type]()
+    is_vip = seq.slot == GameSequence.SLOT_VIP
+    if is_vip and next_type in _QUIZ_FLAVORS:
+        game = _start_quiz_flavor(next_type, is_vip=True)
+    else:
+        game = _GAME_STARTERS[next_type]()
     seq.current_index = next_index
     seq.current_game_type = next_type
     seq.current_game_id = game.id
     seq.save(update_fields=[
         "current_index", "current_game_type", "current_game_id", "updated_at",
     ])
-    print(f"_advance_game_sequence: {seq.slot}/{seq.date} advancing to {next_type} #{game.id}")
+    print(f"_advance_game_sequence: {seq.slot}/{seq.date} advancing to {next_type} #{game.id} (is_vip={is_vip})")
 
 
 @shared_task

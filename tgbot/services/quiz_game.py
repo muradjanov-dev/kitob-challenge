@@ -65,9 +65,15 @@ TEAM_SIZE_BANDS = [
 TEAM_RANK_BONUS = {0: 40, 1: 25, 2: 10}
 COVER_BLUR_RADIUS = 14
 
+# VIP Premium Arena Rewards & Rules
+VIP_TOP_GAMES = ["king", "duel", "teams", "survival", "mysterybox"]
+VIP_REWARD_TIERS = {0: 500, 1: 300, 2: 200}
+VIP_PREMIUM_DAYS_BONUS = {0: 3, 1: 2, 2: 1}
+VIP_PARTICIPATION = 75
 
-def _dynamic_base(team_size):
-    base = TEAM_BASE_REWARD
+
+def _dynamic_base(team_size, is_vip=False):
+    base = 150 if is_vip else TEAM_BASE_REWARD
     prev = 1
     for upper, step in TEAM_SIZE_BANDS:
         if team_size <= upper:
@@ -329,18 +335,10 @@ def _prep_cover_question(item, pool_titles=None):
     }
 
 
-def _recent_used(flavor, games_back=33):
-    """Identity of each question actually used in recent games. `options[correct]`
-    is the reliable identity for "impostor" since its display text is a fixed
-    string ("Qaysi biri SOXTA...") — the fake statement's own text (which ends
-    up at the `correct` index post-shuffle) is what actually varies. "connection"
-    uses `items` for the same reason its `q` text repeats across puzzles.
-    "cover" reuses the same static `q` for every question, so its identity is
-    the correct title too."""
 from tgbot.services.question_picker import pick_least_recently_used
 
 
-def create_scheduled_quiz(flavor: str, lead_seconds: int = LEAD_SECONDS) -> QuizGame:
+def create_scheduled_quiz(flavor: str, lead_seconds: int = LEAD_SECONDS, is_vip: bool = False) -> QuizGame:
     pool = _raw_pool(flavor)
     num_questions = min(NUM_QUESTIONS[flavor], len(pool))
     recent_games = QuizGame.objects.filter(flavor=flavor).order_by("-starts_at")[:100]
@@ -371,11 +369,13 @@ def create_scheduled_quiz(flavor: str, lead_seconds: int = LEAD_SECONDS) -> Quiz
     now = timezone.now()
     starts = now + timedelta(seconds=lead_seconds)
     total = len(qs) * (ANSWER_SECONDS + REVEAL_SECONDS)
+    title = f"⭐️ {TITLES[flavor]} (VIP Premium)" if is_vip else TITLES[flavor]
     return QuizGame.objects.create(
-        flavor=flavor, title=TITLES[flavor],
+        flavor=flavor, title=title,
         status=QuizGame.STATUS_SCHEDULED,
         starts_at=starts, ends_at=starts + timedelta(seconds=total),
         questions=qs, answer_seconds=ANSWER_SECONDS, reveal_seconds=REVEAL_SECONDS,
+        is_vip=is_vip,
     )
 
 
@@ -389,8 +389,7 @@ def get_or_activate_live_game(flavor):
     if g:
         return g
     pending = (
-        QuizGame.objects
-        .filter(flavor=flavor, status=QuizGame.STATUS_SCHEDULED, starts_at__lte=now, ends_at__gte=now)
+        QuizGame.objects.filter(flavor=flavor, status=QuizGame.STATUS_SCHEDULED, starts_at__lte=now)
         .order_by("starts_at").first()
     )
     if not pending:
@@ -430,6 +429,12 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
     g = QuizGame.objects.filter(id=game_id).first()
     if not g:
         return {"ok": False, "error": "not_live"}
+    if g.is_vip and not (profile and profile.has_active_premium()):
+        return {
+            "ok": False,
+            "error": "premium_required",
+            "message": "⭐️ Ushbu arena faqat VIP Premium a'zolari uchun! Qatnashish uchun Premium obunani faollashtiring.",
+        }
     now = timezone.now()
     status, qi, phase, _ = _phase(g, now)
     if status != "live" or phase != "answer" or qi < 0 or qi >= len(g.questions or []):
@@ -501,10 +506,18 @@ def _finalize_individual(g) -> dict:
         .select_related("user").order_by("-points", "total_time", "created_at")
     )
     winners = []
+    tiers = VIP_REWARD_TIERS if g.is_vip else REWARD_TIERS
+    participation = VIP_PARTICIPATION if g.is_vip else PARTICIPATION
     for i, s in enumerate(scores):
-        reward = REWARD_TIERS[i] if i < 3 else PARTICIPATION
+        reward = tiers[i] if i < 3 else (participation if i < 10 else 25)
         if not s.rewarded:
             applied = _add_ball_reward(s.user, reward)
+            if g.is_vip and i in VIP_PREMIUM_DAYS_BONUS:
+                bonus_days = VIP_PREMIUM_DAYS_BONUS[i]
+                now = timezone.now()
+                base_time = max(s.user.trial_premium_until or now, now)
+                s.user.trial_premium_until = base_time + timedelta(days=bonus_days)
+                s.user.save(update_fields=["trial_premium_until"])
             s.rewarded = True
             s.reward = applied
             s.save(update_fields=["rewarded", "reward", "updated_at"])
@@ -526,49 +539,46 @@ def _finalize_teams(g) -> dict:
     tie = g.team_a_points == g.team_b_points
     team_sizes = {"a": len(g.team_a or []), "b": len(g.team_b or [])}
 
-    # Rank each winning side's own scorers (ties make both sides "winning",
-    # each ranked separately) so the top-3 scorers get a bonus on top of the
-    # size-scaled base, instead of everyone on the team earning the same cut.
     rank_by_score_id = {}
     for team in ("a", "b"):
         if not (tie or team == winning_team):
             continue
-        ranked = sorted(
-            (s for s in scores if s.team == team),
-            key=lambda s: (-s.points, getattr(s, 'total_time', 0.0) or 0.0, s.created_at),
+        team_scores = sorted(
+            [s for s in scores if s.team == team and s.points > 0],
+            key=lambda s: (-s.points, s.total_time or 0.0, s.created_at),
         )
-        for i, s in enumerate(ranked):
-            rank_by_score_id[s.id] = i
+        for r, s in enumerate(team_scores):
+            rank_by_score_id[s.id] = r
 
     winners = []
+    base_calc = _dynamic_base(team_sizes.get(winning_team, 0), is_vip=g.is_vip)
     for s in scores:
-        if not s.team:
-            continue
-        on_winning_side = tie or s.team == winning_team
-        reward = 0
-        if on_winning_side:
-            base = _dynamic_base(team_sizes[s.team])
-            reward = base + TEAM_RANK_BONUS.get(rank_by_score_id.get(s.id), 0)
-        elif s.points > 0:
-            reward = PARTICIPATION
-        if reward and not s.rewarded:
+        if tie or s.team == winning_team:
+            rank = rank_by_score_id.get(s.id)
+            bonus = TEAM_RANK_BONUS.get(rank, 0) if rank is not None else 0
+            if g.is_vip and rank is not None and rank < 3:
+                bonus += 50
+            reward = base_calc + bonus
+        else:
+            reward = VIP_PARTICIPATION if g.is_vip else PARTICIPATION
+        if not s.rewarded:
             applied = _add_ball_reward(s.user, reward)
             s.rewarded = True
             s.reward = applied
             s.save(update_fields=["rewarded", "reward", "updated_at"])
+        else:
+            applied = s.reward or reward
         winners.append({
             "user_id": s.user_id, "telegram_id": s.user.telegram_id,
             "name": s.user.full_name or "Kitobxon", "points": s.points,
-            "team": s.team, "reward": s.reward or 0,
-            "boosted": bool(s.reward) and s.reward != reward,
+            "team": s.team, "reward": applied,
         })
     g.rewarded = True
     g.save(update_fields=["rewarded", "updated_at"])
-    winners.sort(key=lambda w: (-w["points"], getattr(w, 'total_time', 0.0) or 0.0))
     return {
-        "winners": winners, "players": len(scores), "tie": tie,
-        "winning_team": winning_team if not tie else None,
+        "winners": winners, "players": len(scores),
         "team_a_points": g.team_a_points, "team_b_points": g.team_b_points,
+        "winning_team": winning_team if not tie else None, "tie": tie,
     }
 
 
@@ -625,9 +635,13 @@ def state_payload(profile, flavor) -> dict:
     nq = len(g.questions or [])
     finished = status == "finished"
     my = QuizScore.objects.filter(game=g, user=profile).first()
+    has_prem = profile.has_active_premium() if profile else False
     payload = {
         "ok": True, "status": status, "phase": phase, "game_id": g.id,
         "flavor": g.flavor, "title": g.title,
+        "is_vip": g.is_vip,
+        "has_premium": has_prem,
+        "vip_locked": bool(g.is_vip and not has_prem),
         "q_index": qi, "q_number": qi + 1, "q_total": nq, "seconds": secs,
         "leaderboard": _leaderboard(g),
         "your_points": (my.points if my else 0),

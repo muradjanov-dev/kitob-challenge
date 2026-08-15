@@ -188,6 +188,12 @@
 
     function render(s){
       var live=$('live'),info=$('info');
+      if(s.vip_locked){
+        live.classList.add('hidden');info.classList.remove('hidden');
+        $('timerLbl').textContent='VIP';$('subtitle').textContent='⭐️ Faqat Premium';
+        info.innerHTML='<div class="em">👑</div><h2 style="color:#ffd700">VIP Premium Arena</h2><p style="color:#ffcc00;font-weight:600;font-size:15px">Ushbu arena faqat VIP Premium a\'zolari uchun!</p><p style="margin-top:10px;font-size:14px;color:var(--text-muted)">Ishtirok etish hamda <b>500 – 1000 Kitobcha</b> va <b>BEPUL Premium</b> yutib olish uchun Premium obunani faollashtiring.</p><div style="margin-top:18px"><a href="/dokon/" style="display:inline-block;background:linear-gradient(135deg,#ffd700,#ff9900);color:#111;font-weight:800;padding:12px 24px;border-radius:14px;text-decoration:none;box-shadow:0 4px 15px rgba(255,215,0,0.3)">⭐️ Premium Faollashtirish</a></div>'+statsHistoryHtml(s);
+        localSeconds=0;$('timer').textContent='--:--';return;
+      }
       if(s.status==='live'){
         live.classList.remove('hidden');info.classList.add('hidden');
         $('subtitle').textContent='Savol '+s.q_number+' / '+s.q_total;
@@ -257,7 +263,7 @@
           poll();
         } else {
           var t=$('toast');t.className='toast bad';
-          t.textContent=({insufficient_balance:"🪙 Kirish uchun "+M.fee+" Kitobcha kerak — balansingiz yetarli emas.",not_answering:"Hozir javob vaqti emas."})[r.error]||"Qabul qilinmadi.";
+          t.textContent=({premium_required:"👑 Ushbu arena faqat VIP Premium a'zolar uchun!",insufficient_balance:"🪙 Kirish uchun "+M.fee+" Kitobcha kerak — balansingiz yetarli emas.",not_answering:"Hozir javob vaqti emas."})[r.error]||"Qabul qilinmadi.";
         }
       }).catch(function(){}).then(function(){busy=false;});
     }

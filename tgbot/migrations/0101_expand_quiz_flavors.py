@@ -57,6 +57,19 @@ class Migration(migrations.Migration):
                 max_length=32
             ),
         ),
+        migrations.AddField(
+            model_name='quizgame',
+            name='is_vip',
+            field=models.BooleanField(default=False, help_text='True if this game is exclusive to VIP Premium users.'),
+        ),
+        migrations.AlterField(
+            model_name='gamesequence',
+            name='slot',
+            field=models.CharField(
+                choices=[('morning', '10:00'), ('evening', '22:00'), ('vip_2230', '22:30 VIP Premium')],
+                max_length=16
+            ),
+        ),
         migrations.AlterField(
             model_name='gamesequence',
             name='current_game_type',

@@ -1974,6 +1974,7 @@ class QuizGame(BaseModel):
     team_a_points = models.PositiveIntegerField(default=0)
     team_b_points = models.PositiveIntegerField(default=0)
     rewarded = models.BooleanField(default=False)
+    is_vip = models.BooleanField(default=False, help_text="True if this game is exclusive to VIP Premium users.")
 
     class Meta:
         db_table = "quiz_games"
@@ -2020,7 +2021,12 @@ class QuizScore(BaseModel):
 class GameSequence(BaseModel):
     SLOT_MORNING = "morning"
     SLOT_EVENING = "evening"
-    SLOT_CHOICES = [(SLOT_MORNING, "10:00"), (SLOT_EVENING, "22:00")]
+    SLOT_VIP = "vip_2230"
+    SLOT_CHOICES = [
+        (SLOT_MORNING, "10:00"),
+        (SLOT_EVENING, "22:00"),
+        (SLOT_VIP, "22:30 VIP Premium"),
+    ]
     GAME_TYPES = [
         "chain", "feud", "castle", "emoji",
         "wisdom", "detective", "survival",
@@ -2037,7 +2043,7 @@ class GameSequence(BaseModel):
         "worldlit", "mysterybox",
     ]
 
-    slot = models.CharField(max_length=10, choices=SLOT_CHOICES)
+    slot = models.CharField(max_length=16, choices=SLOT_CHOICES)
     date = models.DateField()
     game_types = models.JSONField(
         default=list, help_text="Randomly chosen, non-repeating game types for this slot.",
