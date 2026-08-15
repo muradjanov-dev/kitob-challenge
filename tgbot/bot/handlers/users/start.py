@@ -343,7 +343,7 @@ async def do_start(message: types.Message, state: FSMContext):
         # 10 Sufism, Nafs Purification & Divine Love Games
         "simurgh": ("/simurgh/", "🕊 O'yinni ochish", "🕊 Simurg' Parvozi"),
         "ishq": ("/ishq/", "🕯 O'yinni ochish", "🕯 Parvona va Sham"),
-        "nafs": ("/nafs/", "⚔️ O'yinni ochish", "⚔️ Buyuk Jihod"),
+        "nafs": ("/nafs/", "🛡 O'yinni ochish", "🛡 Nafs Tarbiyasi"),
         "qalb": ("/qalb/", "🪞 O'yinni ochish", "🪞 Qalb Sayqali"),
         "naqshband": ("/naqshband/", "🌾 O'yinni ochish", "🌾 Xalvat dar Anjuman"),
         "yassaviy": ("/yassaviy/", "📜 O'yinni ochish", "📜 Hikmatlar Daryosi"),

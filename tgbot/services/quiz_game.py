@@ -143,7 +143,7 @@ TITLES = {
     # 10 Sufism, Nafs Purification & Divine Love Games
     "simurgh": "🕊 Simurg' Parvozi",
     "ishq": "🕯 Parvona va Sham",
-    "nafs": "⚔️ Buyuk Jihod",
+    "nafs": "🛡 Nafs Tarbiyasi",
     "qalb": "🪞 Qalb Sayqali",
     "naqshband": "🌾 Xalvat dar Anjuman",
     "yassaviy": "📜 Hikmatlar Daryosi",

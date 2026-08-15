@@ -369,7 +369,7 @@ _GAME_LABELS_URLS = {
     # 10 Sufism, Nafs Purification & Divine Love Games
     "simurgh": ("🕊 Simurg' Parvozi", "/simurgh/"),
     "ishq": ("🕯 Parvona va Sham", "/ishq/"),
-    "nafs": ("⚔️ Buyuk Jihod", "/nafs/"),
+    "nafs": ("🛡 Nafs Tarbiyasi", "/nafs/"),
     "qalb": ("🪞 Qalb Sayqali", "/qalb/"),
     "naqshband": ("🌾 Xalvat dar Anjuman", "/naqshband/"),
     "yassaviy": ("📜 Hikmatlar Daryosi", "/yassaviy/"),

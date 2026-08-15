@@ -65,7 +65,7 @@ class Migration(migrations.Migration):
                     ('paradox', '💡 Paradokslar Olami'),
                     ('simurgh', '🕊 Simurg\' Parvozi'),
                     ('ishq', '🕯 Parvona va Sham'),
-                    ('nafs', '⚔️ Buyuk Jihod'),
+                    ('nafs', '🛡 Nafs Tarbiyasi'),
                     ('qalb', '🪞 Qalb Sayqali'),
                     ('naqshband', '🌾 Xalvat dar Anjuman'),
                     ('yassaviy', '📜 Hikmatlar Daryosi'),

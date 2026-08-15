@@ -1,60 +1,60 @@
 # -*- coding: utf-8 -*-
-"""Buyuk Jihod: Nafsni yengish va ma'naviy tarbiya"""
+"""Nafs Tarbiyasi: Nafsni yengish va ma'naviy kamolot"""
 
 QUIZ_NAFS_QUESTIONS = [
     {
-        "q": "[Buyuk Jihod] Payg'ambarimiz (s.a.v.) jangdan qaytgach: «Kichik jihoddan Buyuk Jihodga qaytdik» deganlarida qaysi kurashni nazarda tutganlar?",
-        "options": ["O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurashni", 'Boshqa davlatlar bilan savdo qilishni', 'Uy qurishni', 'Dehqonchilik qilishni'],
+        "q": "[Nafs Tarbiyasi] Hadisi sharifda aytilgan insonning eng katta va og'ir ichki kurashi nima?",
+        "options": ["O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurash (nafs tarbiyasi)", 'Boshqa davlatlar bilan savdo qilish', 'Uy qurish', 'Dehqonchilik qilish'],
         "correct": 0,
     },
     {
-        "q": '[Buyuk Jihod] Insonni faqat yomonlikka, gunoh va buzuqlikka buyuruvchi eng quyi nafs bosqichi qaysi?',
+        "q": '[Nafs Tarbiyasi] Insonni faqat yomonlikka, gunoh va buzuqlikka buyuruvchi eng quyi nafs bosqichi qaysi?',
         "options": ['Nafsi Ammora', 'Nafsi Lavvoma', 'Nafsi Mutmainna', 'Nafsi Roziya'],
         "correct": 0,
     },
     {
-        "q": "[Buyuk Jihod] Qilgan xatosi va gunohidan qattiq pushaymon bo'lib, o'zini malomat qiluvchi (uyaluvchi) nafs qaysi?",
+        "q": "[Nafs Tarbiyasi] Qilgan xatosi va gunohidan qattiq pushaymon bo'lib, o'zini malomat qiluvchi (uyaluvchi) nafs qaysi?",
         "options": ['Nafsi Lavvoma', 'Nafsi Ammora', 'Nafsi Mulhima', 'Nafsi Kamola'],
         "correct": 0,
     },
     {
-        "q": "[Buyuk Jihod] Xotirjamlik, iymoniy halovat va Haqqa to'liq taslim bo'lish maqomiga yetgan pok nafs nima deb ataladi?",
+        "q": "[Nafs Tarbiyasi] Xotirjamlik, iymoniy halovat va Haqqa to'liq taslim bo'lish maqomiga yetgan pok nafs nima deb ataladi?",
         "options": ['Nafsi Mutmainna', 'Nafsi Ammora', 'Nafsi Hayvoniya', 'Nafsi Zohira'],
         "correct": 0,
     },
     {
-        "q": '[Buyuk Jihod] Nafs tarbiyasida «Ujb» illati nima ekanini bildiradi?',
+        "q": '[Nafs Tarbiyasi] Nafs tarbiyasida «Ujb» illati nima ekanini bildiradi?',
         "options": ["O'zining qilgan ibodati va yaxshiliklariga o'zi qoyil qolib, mag'rurlanish", 'Boshqalarga hasad qilish', "Yolg'on gapirish", 'Baxillik qilish'],
         "correct": 0,
     },
     {
-        "q": "[Buyuk Jihod] «Riyo» (Riyokorlik) qanday xavfli ma'naviy kasallik hisoblanadi?",
+        "q": "[Nafs Tarbiyasi] «Riyo» (Riyokorlik) qanday xavfli ma'naviy kasallik hisoblanadi?",
         "options": ["Ezgu amal va ibodatlarni Alloh uchun emas, odamlar ko'rsin va maxtasin deb qilish", "Pulni ko'p sarflash", 'Kam gapirish', 'Kech uxlash'],
         "correct": 0,
     },
     {
-        "q": "[Buyuk Jihod] Nafsni sindirish va jilovlashning eng samarali 4 ta asosiy qoidasi qaysilar (Arba'in)?",
+        "q": "[Nafs Tarbiyasi] Nafsni sindirish va jilovlashning eng samarali 4 ta asosiy qoidasi qaysilar (Arba'in)?",
         "options": ['Qillati taom (kam yeyish), Qillati kalom (kam gapirish), Qillati manom (kam uxlash), Uzlat (yomonlardan uzoqlashish)', "Ko'p uxlash, ko'p ovqatlanish, ko'p kulish, ko'p sayohat", "Boylik to'plash, mashhur bo'lish, qasr qurish, mansab olish", 'Faqat bahslashish'],
         "correct": 0,
     },
     {
-        "q": "[Buyuk Jihod] Boyazid Bistomiy: «Nafsimni 30 yil tarbiya qildim, unga eng og'ir kelgan narsa...» deb nimani aytgan?",
+        "q": "[Nafs Tarbiyasi] Boyazid Bistomiy: «Nafsimni 30 yil tarbiya qildim, unga eng og'ir kelgan narsa...» deb nimani aytgan?",
         "options": ["Ixlos (har bir ishda faqat Alloh roziligini ko'zlash)", 'Och qolish', 'Piyoda yurish', "Kechasi uyg'oq bo'lish"],
         "correct": 0,
     },
     {
-        "q": '[Buyuk Jihod] Hasad qanday halokatli ichki olov hisoblanadi?',
+        "q": '[Nafs Tarbiyasi] Hasad qanday halokatli ichki olov hisoblanadi?',
         "options": ["O't o'tinni kuydirgani kabi barcha savoblarni yeb bitiruvchi qalb zahari", 'Foydali raqobat', 'Tiriklik belgisi', 'Oddiy hissiyot'],
         "correct": 0,
     },
     {
-        "q": "[Buyuk Jihod] Alisher Navoiy: «Nafs itiga har kimki bo'lsa zabun...» deb nimadan ogohlantiradi?",
+        "q": "[Nafs Tarbiyasi] Alisher Navoiy: «Nafs itiga har kimki bo'lsa zabun...» deb nimadan ogohlantiradi?",
         "options": ["Nafsi itiga qul bo'lgan kishi ikki dunyoda xor va sharmanda bo'ladi", 'Itlarni boqish kerak', "Nafs bilan do'st bo'lish lozim", 'Nafsni xursand qilish kerak'],
         "correct": 0,
     },
     {
-        "q": "✨ Tasavvufiy Ma'rifat #11: Payg'ambarimiz (s.a.v.) jangdan qaytgach: «Kichik jihoddan Buyuk Jihodga qaytdik» deganlarida qaysi kurashni nazarda tutganlar?",
-        "options": ['Boshqa davlatlar bilan savdo qilishni', 'Uy qurishni', 'Dehqonchilik qilishni', "O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurashni"],
+        "q": "✨ Tasavvufiy Ma'rifat #11: Hadisi sharifda aytilgan insonning eng katta va og'ir ichki kurashi nima?",
+        "options": ['Boshqa davlatlar bilan savdo qilish', 'Uy qurish', 'Dehqonchilik qilish', "O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurash (nafs tarbiyasi)"],
         "correct": 3,
     },
     {
@@ -103,8 +103,8 @@ QUIZ_NAFS_QUESTIONS = [
         "correct": 3,
     },
     {
-        "q": "✨ Tasavvufiy Ma'rifat #21: Payg'ambarimiz (s.a.v.) jangdan qaytgach: «Kichik jihoddan Buyuk Jihodga qaytdik» deganlarida qaysi kurashni nazarda tutganlar?",
-        "options": ['Uy qurishni', 'Dehqonchilik qilishni', "O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurashni", 'Boshqa davlatlar bilan savdo qilishni'],
+        "q": "✨ Tasavvufiy Ma'rifat #21: Hadisi sharifda aytilgan insonning eng katta va og'ir ichki kurashi nima?",
+        "options": ['Uy qurish', 'Dehqonchilik qilish', "O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurash (nafs tarbiyasi)", 'Boshqa davlatlar bilan savdo qilish'],
         "correct": 2,
     },
     {
@@ -153,8 +153,8 @@ QUIZ_NAFS_QUESTIONS = [
         "correct": 2,
     },
     {
-        "q": "✨ Tasavvufiy Ma'rifat #31: Payg'ambarimiz (s.a.v.) jangdan qaytgach: «Kichik jihoddan Buyuk Jihodga qaytdik» deganlarida qaysi kurashni nazarda tutganlar?",
-        "options": ['Dehqonchilik qilishni', "O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurashni", 'Boshqa davlatlar bilan savdo qilishni', 'Uy qurishni'],
+        "q": "✨ Tasavvufiy Ma'rifat #31: Hadisi sharifda aytilgan insonning eng katta va og'ir ichki kurashi nima?",
+        "options": ['Dehqonchilik qilish', "O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurash (nafs tarbiyasi)", 'Boshqa davlatlar bilan savdo qilish', 'Uy qurish'],
         "correct": 1,
     },
     {
@@ -203,8 +203,8 @@ QUIZ_NAFS_QUESTIONS = [
         "correct": 1,
     },
     {
-        "q": "✨ Tasavvufiy Ma'rifat #41: Payg'ambarimiz (s.a.v.) jangdan qaytgach: «Kichik jihoddan Buyuk Jihodga qaytdik» deganlarida qaysi kurashni nazarda tutganlar?",
-        "options": ["O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurashni", 'Boshqa davlatlar bilan savdo qilishni', 'Uy qurishni', 'Dehqonchilik qilishni'],
+        "q": "✨ Tasavvufiy Ma'rifat #41: Hadisi sharifda aytilgan insonning eng katta va og'ir ichki kurashi nima?",
+        "options": ["O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurash (nafs tarbiyasi)", 'Boshqa davlatlar bilan savdo qilish', 'Uy qurish', 'Dehqonchilik qilish'],
         "correct": 0,
     },
     {
@@ -253,8 +253,8 @@ QUIZ_NAFS_QUESTIONS = [
         "correct": 0,
     },
     {
-        "q": "✨ Tasavvufiy Ma'rifat #51: Payg'ambarimiz (s.a.v.) jangdan qaytgach: «Kichik jihoddan Buyuk Jihodga qaytdik» deganlarida qaysi kurashni nazarda tutganlar?",
-        "options": ['Boshqa davlatlar bilan savdo qilishni', 'Uy qurishni', 'Dehqonchilik qilishni', "O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurashni"],
+        "q": "✨ Tasavvufiy Ma'rifat #51: Hadisi sharifda aytilgan insonning eng katta va og'ir ichki kurashi nima?",
+        "options": ['Boshqa davlatlar bilan savdo qilish', 'Uy qurish', 'Dehqonchilik qilish', "O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurash (nafs tarbiyasi)"],
         "correct": 3,
     },
     {
@@ -303,8 +303,8 @@ QUIZ_NAFS_QUESTIONS = [
         "correct": 3,
     },
     {
-        "q": "✨ Tasavvufiy Ma'rifat #61: Payg'ambarimiz (s.a.v.) jangdan qaytgach: «Kichik jihoddan Buyuk Jihodga qaytdik» deganlarida qaysi kurashni nazarda tutganlar?",
-        "options": ['Uy qurishni', 'Dehqonchilik qilishni', "O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurashni", 'Boshqa davlatlar bilan savdo qilishni'],
+        "q": "✨ Tasavvufiy Ma'rifat #61: Hadisi sharifda aytilgan insonning eng katta va og'ir ichki kurashi nima?",
+        "options": ['Uy qurish', 'Dehqonchilik qilish', "O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurash (nafs tarbiyasi)", 'Boshqa davlatlar bilan savdo qilish'],
         "correct": 2,
     },
     {
@@ -353,8 +353,8 @@ QUIZ_NAFS_QUESTIONS = [
         "correct": 2,
     },
     {
-        "q": "✨ Tasavvufiy Ma'rifat #71: Payg'ambarimiz (s.a.v.) jangdan qaytgach: «Kichik jihoddan Buyuk Jihodga qaytdik» deganlarida qaysi kurashni nazarda tutganlar?",
-        "options": ['Dehqonchilik qilishni', "O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurashni", 'Boshqa davlatlar bilan savdo qilishni', 'Uy qurishni'],
+        "q": "✨ Tasavvufiy Ma'rifat #71: Hadisi sharifda aytilgan insonning eng katta va og'ir ichki kurashi nima?",
+        "options": ['Dehqonchilik qilish', "O'z nafsi va yomon xulqlariga qarshi ichki ma'naviy kurash (nafs tarbiyasi)", 'Boshqa davlatlar bilan savdo qilish', 'Uy qurish'],
         "correct": 1,
     },
     {

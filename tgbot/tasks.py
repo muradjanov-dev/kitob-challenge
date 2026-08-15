@@ -6559,7 +6559,7 @@ def broadcast_major_update_to_all():
         "Hurmatli kitobxonlar! Platformamizda ulkan o'zgarishlar va yangi imkoniyatlar ishga tushirildi:\n\n"
         "🎮 <b>58 xil Jonli Intellektual O'yinlar:</b>\n"
         "• 🧠 <b>Mantiq & Farosat:</b> Fikr Tuzog'i, Ongli Hayot, Podadan Ajral, Axloqiy Dilemma, Sabab va Oqibat...\n"
-        "• ✨ <b>Tasavvuf & Ishqulloh:</b> Simurg' Parvozi (7 vodiy), Parvona va Sham, Buyuk Jihod, Qalb Sayqali, Xalvat dar Anjuman...\n"
+        "• ✨ <b>Tasavvuf & Ishqulloh:</b> Simurg' Parvozi (7 vodiy), Parvona va Sham, Nafs Tarbiyasi, Qalb Sayqali, Xalvat dar Anjuman...\n"
         "• 🎧 <b>Ovozli Iqtibos:</b> Jonli audio eshitib asarni topish.\n\n"
         "👑 <b>VIP Premium Arena (Har kuni 22:30 da):</b>\n"
         "• 5 ta eng zo'r o'yin ketma-ket!\n"
