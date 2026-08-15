@@ -12,10 +12,13 @@ from asgiref.sync import sync_to_async
 from django.core.cache import cache
 from django.db.models import F
 
+from datetime import timedelta
+from django.utils import timezone
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.utils import aget_user
 from tgbot.models import (
     Quiz, QuizQuestion, QuizOption, QuizSession, QuizParticipant, QuizUserAnswer,
+    ScheduledMessageDeletion,
 )
 
 BOT_USERNAME = os.environ.get("BOT_USERNAME", "kitob_challange_bot")
@@ -665,7 +668,8 @@ async def _send_group_question_poll(chat_id: int, session_id: int, q_idx: int):
         return
 
     correct_idx = next((i for i, o in enumerate(opts) if o.is_correct), 0)
-    poll_question = f"❓ {q_idx + 1}/{total}  {question.text}"[:300]
+    book_prefix = f"📖 [{session.quiz.title}] " if session.quiz.title else ""
+    poll_question = f"{book_prefix}❓ {q_idx + 1}/{total}  {question.text}"[:300]
 
     try:
         poll_msg = await bot.send_poll(
@@ -678,13 +682,13 @@ async def _send_group_question_poll(chat_id: int, session_id: int, q_idx: int):
             explanation=(question.hint[:200] if question.hint else None),
             open_period=max(5, min(600, time_limit)),
         )
+        if poll_msg:
+            await sync_to_async(ScheduledMessageDeletion.objects.create)(
+                chat_id=chat_id,
+                message_id=poll_msg.message_id,
+                delete_at=timezone.now() + timedelta(hours=12),
+            )
     except BadRequest as e:
-        # e.g. bot lost admin rights / "can post polls" in this group. Left
-        # unhandled, this raised inside the asyncio.create_task chain that
-        # calls this function (see _group_poll_advance_after_close below),
-        # so the exception was never retrieved and the session just hung
-        # forever instead of ending (2026-08-02 logs). Stop the session
-        # cleanly instead of leaving it stuck mid-quiz.
         print(f"_send_group_question_poll chat={chat_id} session={session_id}: {e}")
         await sync_to_async(QuizSession.objects.filter(id=session_id).update)(status="finished")
         return
@@ -740,7 +744,13 @@ async def _group_poll_advance_after_close(
         if hint:
             reveal_text += f"\n💡 <i>{hint}</i>"
         try:
-            await bot.send_message(chat_id=chat_id, text=reveal_text, parse_mode="HTML")
+            rev_msg = await bot.send_message(chat_id=chat_id, text=reveal_text, parse_mode="HTML")
+            if rev_msg:
+                await sync_to_async(ScheduledMessageDeletion.objects.create)(
+                    chat_id=chat_id,
+                    message_id=rev_msg.message_id,
+                    delete_at=timezone.now() + timedelta(hours=12),
+                )
         except Exception:
             pass
 
@@ -938,7 +948,7 @@ async def start_group_quiz(message: types.Message, quiz_code: str):
     sent = await message.answer(
         f"🎮 <b>GURUH QUIZI</b>\n"
         f"━━━━━━━━━━━━━━━━━\n\n"
-        f"📖 <b>{quiz.title}</b>\n"
+        f"📖 <b>Asar / Test:</b> {quiz.title}\n"
         f"{quiz.description + chr(10) + chr(10) if quiz.description else ''}"
         f"❓ {q_count} ta savol  ·  ⏱ {quiz.time_per_question} son/savol\n\n"
         f"{credit_line}"
@@ -949,6 +959,12 @@ async def start_group_quiz(message: types.Message, quiz_code: str):
         parse_mode="HTML",
         reply_markup=kb,
     )
+    if sent:
+        await sync_to_async(ScheduledMessageDeletion.objects.create)(
+            chat_id=message.chat.id,
+            message_id=sent.message_id,
+            delete_at=timezone.now() + timedelta(hours=12),
+        )
     await sync_to_async(QuizSession.objects.filter(id=session.id).update)(
         join_message_id=sent.message_id,
     )
@@ -966,7 +982,6 @@ async def _send_group_question(chat_id: int, session_id: int, q_idx: int):
             return session, None, None, len(q_ids), 0
         question = QuizQuestion.objects.prefetch_related("options").filter(id=q_ids[q_idx]).first()
         if not question:
-            # Question was deleted after the session started.
             return None, None, None, len(q_ids), 0
         opts = list(question.options.all())
         if session.quiz.shuffle:
@@ -979,12 +994,19 @@ async def _send_group_question(chat_id: int, session_id: int, q_idx: int):
 
     kb = _answer_kb(session_id, question.id, opts)
     initial_bar = _bar(0, time_limit)
+    book_prefix = f"📖 [{session.quiz.title}]\n" if session.quiz.title else ""
     msg = await bot.send_message(
         chat_id=chat_id,
-        text=_q_text(q_idx, total, question.text, initial_bar, opts),
+        text=book_prefix + _q_text(q_idx, total, question.text, initial_bar, opts),
         parse_mode="HTML",
         reply_markup=kb,
     )
+    if msg:
+        await sync_to_async(ScheduledMessageDeletion.objects.create)(
+            chat_id=chat_id,
+            message_id=msg.message_id,
+            delete_at=timezone.now() + timedelta(hours=12),
+        )
     await sync_to_async(QuizSession.objects.filter(id=session_id).update)(
         current_question_idx=q_idx,
     )
@@ -1151,12 +1173,14 @@ async def _finish_group_session(session_id: int, chat_id: int):
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
     winner_name = participants[0].user.full_name or "Kitobxon"
     lines = [
-        "🎊 <b>Quiz yakunlandi!</b>",
-        f"<i>{session.quiz.title}</i>",
-        "",
-        f"🏆 G'olib: <b>{winner_name}</b>",
-        "",
+        "🎊 <b>Quiz natijalari!</b>",
+        f"📖 <b>Asar / Test nomi:</b> <i>{session.quiz.title}</i>",
     ]
+    if session.quiz.description:
+        lines.append(f"ℹ️ <i>{session.quiz.description}</i>")
+    lines.append("")
+    lines.append(f"🏆 G'olib: <b>{winner_name}</b>")
+    lines.append("")
     for i, p in enumerate(participants, 1):
         marker = medals.get(i, f"<code>{i:>2}.</code>")
         pct = int((p.score or 0) * 100 / total) if total else 0

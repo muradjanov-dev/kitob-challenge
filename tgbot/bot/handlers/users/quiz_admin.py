@@ -375,11 +375,15 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
         except Exception:
             pass
 
-    # New quiz — start creation
     elif action == "new":
         await call.answer()
         await state.finish()
-        await call.message.answer("📝 Quiz nomini kiriting:")
+        await call.message.answer(
+            "📖 <b>Quiz qaysi asardan? Asar va muallif nomini kiriting:</b>\n\n"
+            "<i>Misol:</i> <code>Abdulla Qodiriy: O'tkan kunlar</code> yoki <code>Tog'ay Murod: Otamdan qolgan dalalar</code>\n\n"
+            "💡 <i>Mavhum nomlar qo'ymang — aniq kitob nomi qatnashchilarga qiziqroq bo'ladi.</i>",
+            parse_mode="HTML",
+        )
         await QuizCreateState.title.set()
 
     # View

@@ -158,12 +158,8 @@ Make sure options are up to 4 items. correct_index is 0-indexed.
 Do not wrap JSON in markdown block. Just pure JSON.
 
 TITLE / DESCRIPTION RULE:
-- "title" MUST be ONLY the book's name, exactly as found in the source text (its
-  title page, cover, or first mentions) — nothing added, no "quiz", "test",
-  "viktorina", or similar wording. If you genuinely cannot find a book name in
-  the text, use a short topic name instead (still no "quiz"/"test" wording).
-- "description" is a short (one sentence) description of what the quiz covers —
-  this is where any "quiz about..." framing belongs, NOT in the title.
+- "title" MUST be formatted as: "[Muallif]: [Asar nomi]" (masalan: "Abdulla Qodiriy: O'tkan kunlar", "Lev Tolstoy: Urush va tinchlik", "Alisher Navoiy: Xamsa"). Hech qachon mavhum "Adabiyot testi" yoki "Kitob testi" deb qo'ymang! Muallif va aniq asar nomi birinchi o'rinda bo'lsin.
+- "description" is a short (one sentence) description of what chapter, characters or topics the quiz covers — this is where any framing belongs, NOT in the title.
 
 STRICT LENGTH LIMITS (Telegram poll limits — do not exceed, ever):
 - Each question's "text": maximum {MAX_QUESTION_CHARS} characters.

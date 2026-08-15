@@ -5910,6 +5910,10 @@ def chain_game_tick():
 # Ko'pchilik nima dedi? (Feud) + Bilim Qal'asi (Castle) — start & finalize.
 # ────────────────────────────────────────────────────────────────────────
 def _announce_game(text, start_param):
+    from datetime import timedelta
+    from django.utils import timezone
+    from tgbot.models import ScheduledMessageDeletion
+
     username = _get_bot_username()
     rows = []
     if username:
@@ -5924,7 +5928,16 @@ def _announce_game(text, start_param):
         if thread_id:
             data["message_thread_id"] = thread_id
         try:
-            requests.post(url, data=data, timeout=10)
+            resp = requests.post(url, data=data, timeout=10)
+            if resp.status_code == 200:
+                res_data = resp.json().get("result", {})
+                msg_id = res_data.get("message_id")
+                if msg_id:
+                    ScheduledMessageDeletion.objects.create(
+                        chat_id=group_id,
+                        message_id=msg_id,
+                        delete_at=timezone.now() + timedelta(hours=12),
+                    )
         except Exception as e:
             print(f"_announce_game {group_id}: {e}")
 
