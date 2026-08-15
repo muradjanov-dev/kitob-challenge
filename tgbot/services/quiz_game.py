@@ -566,6 +566,9 @@ def _finalize_individual(g) -> dict:
             if g.is_vip and i in VIP_PREMIUM_DAYS_BONUS:
                 bonus_days = VIP_PREMIUM_DAYS_BONUS[i]
                 now = timezone.now()
+                # 1. Extend paid subscription if they have one or grant new paid period
+                Payment.grant_or_extend(s.user, bonus_days, amount=0)
+                # 2. Also extend trial timestamp for complete sync
                 base_time = max(s.user.trial_premium_until or now, now)
                 s.user.trial_premium_until = base_time + timedelta(days=bonus_days)
                 s.user.save(update_fields=["trial_premium_until"])
