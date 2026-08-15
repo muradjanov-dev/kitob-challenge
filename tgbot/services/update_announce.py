@@ -34,9 +34,34 @@ def broadcast_update_announcement():
         "🚀 <i>Заходите в бот прямо сейчас и оцените новинки!</i>"
     )
 
-    keyboard = json.dumps({"inline_keyboard": [[{
-        "text": "🚀 Botga kirish / Открыть бота", "url": bot_url,
-    }]]})
+    from src.settings import WEB_DOMAIN
+    base_domain = WEB_DOMAIN if str(WEB_DOMAIN).startswith("http") else f"https://{WEB_DOMAIN}"
+
+    keyboard_uz = json.dumps({
+        "inline_keyboard": [
+            [
+                {"text": "🎮 Jonli o'yinlar", "url": f"{base_domain}/"},
+                {"text": "📖 Kutubxona (3D)", "url": f"{base_domain}/library/"},
+            ],
+            [
+                {"text": "🛍 Do'kon (Shop)", "url": f"{base_domain}/shop/"},
+                {"text": "🚀 Botga kirish", "url": bot_url},
+            ]
+        ]
+    })
+
+    keyboard_ru = json.dumps({
+        "inline_keyboard": [
+            [
+                {"text": "🎮 Живые игры", "url": f"{base_domain}/"},
+                {"text": "📖 Библиотека (3D)", "url": f"{base_domain}/library/"},
+            ],
+            [
+                {"text": "🛍 Магазин (Shop)", "url": f"{base_domain}/shop/"},
+                {"text": "🚀 Открыть бота", "url": bot_url},
+            ]
+        ]
+    })
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
@@ -44,7 +69,7 @@ def broadcast_update_announcement():
     for group_id, thread_id in _announce_targets():
         try:
             data = {"chat_id": group_id, "text": text_uz, "parse_mode": "HTML",
-                    "reply_markup": keyboard, "disable_web_page_preview": "true"}
+                    "reply_markup": keyboard_uz, "disable_web_page_preview": "true"}
             if thread_id:
                 data["message_thread_id"] = thread_id
             resp = requests.post(url, data=data, timeout=10)
@@ -57,11 +82,12 @@ def broadcast_update_announcement():
     users_sent = 0
     for tg_id, lang in qs.values_list("telegram_id", "language").iterator():
         text = text_ru if lang == "ru" else text_uz
+        kb = keyboard_ru if lang == "ru" else keyboard_uz
         try:
             resp = requests.post(
                 url,
                 data={"chat_id": tg_id, "text": text, "parse_mode": "HTML",
-                      "reply_markup": keyboard, "disable_web_page_preview": "true"},
+                      "reply_markup": kb, "disable_web_page_preview": "true"},
                 timeout=5,
             )
             if resp.ok:
