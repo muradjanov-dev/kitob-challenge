@@ -29,26 +29,19 @@ CLUE_INTERVAL_SECONDS = 15
 POINTS_BY_STAGE = {0: 30, 1: 20, 2: 10}
 
 
-def _recent_used(games_back=33):
-    used = set()
-    for g in DetectiveGame.objects.order_by("-starts_at")[:games_back]:
-        for r in (g.rounds or []):
-            used.add(r.get("display"))
-    return used
+from tgbot.services.question_picker import pick_least_recently_used
 
 
 def create_scheduled_detective(lead_seconds: int = LEAD_SECONDS,
                                num_rounds: int = NUM_ROUNDS) -> DetectiveGame:
-    num_rounds = min(num_rounds, len(DETECTIVE_BOOKS))
-    used = _recent_used()
-    fresh = [b for b in DETECTIVE_BOOKS if b["display"] not in used]
-    random.shuffle(fresh)
-    if len(fresh) < num_rounds:
-        rest = [b for b in DETECTIVE_BOOKS if b["display"] in used]
-        random.shuffle(rest)
-        rounds = (fresh + rest)[:num_rounds]
-    else:
-        rounds = fresh[:num_rounds]
+    recent_games = DetectiveGame.objects.order_by("-starts_at")[:100]
+    rounds = pick_least_recently_used(
+        pool=DETECTIVE_BOOKS,
+        get_key_fn=lambda it: it.get("display"),
+        recent_games=recent_games,
+        get_game_keys_fn=lambda g: [r.get("display") for r in (g.rounds or []) if isinstance(r, dict)],
+        count=num_rounds,
+    )
     now = timezone.now()
     starts = now + timedelta(seconds=lead_seconds)
     total = len(rounds) * ROUND_SECONDS

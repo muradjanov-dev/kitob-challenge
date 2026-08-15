@@ -26,28 +26,19 @@ NUM_QUESTIONS = 8
 MATCH_POINTS = 10  # per person who gave the same answer
 
 
-def _pick_fresh(pool, used, count):
-    """Prefer questions not used in recent games; top up if not enough."""
-    fresh = [x for x in pool if x not in used]
-    random.shuffle(fresh)
-    if len(fresh) >= count:
-        return fresh[:count]
-    rest = [x for x in pool if x in used]
-    random.shuffle(rest)
-    return (fresh + rest)[:count]
-
-
-def _recent_used(games_back=33):
-    used = set()
-    for g in FeudGame.objects.order_by("-starts_at")[:games_back]:
-        for q in (g.questions or []):
-            used.add(q)
-    return used
+from tgbot.services.question_picker import pick_least_recently_used
 
 
 def create_scheduled_feud(lead_seconds: int = LEAD_SECONDS,
                           num_questions: int = NUM_QUESTIONS) -> FeudGame:
-    qs = _pick_fresh(FEUD_QUESTIONS, _recent_used(), min(num_questions, len(FEUD_QUESTIONS)))
+    recent_games = FeudGame.objects.order_by("-starts_at")[:100]
+    qs = pick_least_recently_used(
+        pool=FEUD_QUESTIONS,
+        get_key_fn=lambda it: it,
+        recent_games=recent_games,
+        get_game_keys_fn=lambda g: [q for q in (g.questions or []) if isinstance(q, str)],
+        count=num_questions,
+    )
     now = timezone.now()
     starts = now + timedelta(seconds=lead_seconds)
     answer_s, reveal_s = 25, 8

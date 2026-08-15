@@ -36,26 +36,19 @@ def _prep_questions(raw):
     return out
 
 
-def _recent_used(games_back=33):
-    used = set()
-    for g in WisdomGame.objects.order_by("-starts_at")[:games_back]:
-        for q in (g.questions or []):
-            used.add(q.get("quote"))
-    return used
+from tgbot.services.question_picker import pick_least_recently_used
 
 
 def create_scheduled_wisdom(lead_seconds: int = LEAD_SECONDS,
                             num_questions: int = NUM_QUESTIONS) -> WisdomGame:
-    num_questions = min(num_questions, len(WISDOM_QUESTIONS))
-    used = _recent_used()
-    fresh = [it for it in WISDOM_QUESTIONS if it["quote"] not in used]
-    random.shuffle(fresh)
-    if len(fresh) < num_questions:
-        rest = [it for it in WISDOM_QUESTIONS if it["quote"] in used]
-        random.shuffle(rest)
-        raw = (fresh + rest)[:num_questions]
-    else:
-        raw = fresh[:num_questions]
+    recent_games = WisdomGame.objects.order_by("-starts_at")[:100]
+    raw = pick_least_recently_used(
+        pool=WISDOM_QUESTIONS,
+        get_key_fn=lambda it: it.get("quote"),
+        recent_games=recent_games,
+        get_game_keys_fn=lambda g: [q.get("quote") for q in (g.questions or []) if isinstance(q, dict)],
+        count=num_questions,
+    )
     qs = _prep_questions(raw)
     now = timezone.now()
     starts = now + timedelta(seconds=lead_seconds)

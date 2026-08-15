@@ -209,30 +209,35 @@ def _recent_used(flavor, games_back=33):
     uses `items` for the same reason its `q` text repeats across puzzles.
     "cover" reuses the same static `q` for every question, so its identity is
     the correct title too."""
-    used = set()
-    for g in QuizGame.objects.filter(flavor=flavor).order_by("-starts_at")[:games_back]:
-        for q in (g.questions or []):
-            if flavor == "impostor" or flavor == "cover":
-                used.add(q["options"][q["correct"]])
-            elif flavor == "connection":
-                used.add(str(q.get("items")))
-            else:
-                used.add(q.get("q"))
-    return used
+from tgbot.services.question_picker import pick_least_recently_used
 
 
 def create_scheduled_quiz(flavor: str, lead_seconds: int = LEAD_SECONDS) -> QuizGame:
     pool = _raw_pool(flavor)
     num_questions = min(NUM_QUESTIONS[flavor], len(pool))
-    used_ids = _recent_used(flavor)
-    fresh = [it for it in pool if _identity(flavor, it) not in used_ids]
-    random.shuffle(fresh)
-    if len(fresh) < num_questions:
-        rest = [it for it in pool if _identity(flavor, it) in used_ids]
-        random.shuffle(rest)
-        raw = (fresh + rest)[:num_questions]
-    else:
-        raw = fresh[:num_questions]
+    recent_games = QuizGame.objects.filter(flavor=flavor).order_by("-starts_at")[:100]
+
+    def _extract_game_keys(game):
+        keys = []
+        for q in (game.questions or []):
+            if flavor == "impostor" or flavor == "cover":
+                opts = q.get("options") or []
+                c = q.get("correct", 0)
+                if opts and 0 <= c < len(opts):
+                    keys.append(opts[c])
+            elif flavor == "connection":
+                keys.append(str(q.get("items")))
+            else:
+                keys.append(q.get("q"))
+        return keys
+
+    raw = pick_least_recently_used(
+        pool=pool,
+        get_key_fn=lambda it: _identity(flavor, it),
+        recent_games=recent_games,
+        get_game_keys_fn=_extract_game_keys,
+        count=num_questions,
+    )
     qs = [_prep_one(flavor, it) for it in raw]
 
     now = timezone.now()
