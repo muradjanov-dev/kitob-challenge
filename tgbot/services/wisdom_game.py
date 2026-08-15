@@ -124,9 +124,14 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
     q = g.questions[qi]
     correct = (choice == q.get("correct"))
 
+    span = g.answer_seconds + g.reveal_seconds
+    elapsed = (now - g.starts_at).total_seconds()
+    within = max(0.01, elapsed - qi * span)
+    time_taken = round(within, 3)
+
     hit, created = WisdomAnswer.objects.get_or_create(
         game_id=g.id, user=profile, q_index=qi,
-        defaults={"choice": choice, "is_correct": correct},
+        defaults={"choice": choice, "is_correct": correct, "time_taken": time_taken},
     )
     if not created:
         return {"ok": False, "error": "already_answered",
@@ -134,6 +139,7 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
 
     with transaction.atomic():
         score, _ = WisdomScore.objects.select_for_update().get_or_create(game_id=g.id, user=profile)
+        score.total_time = round((score.total_time or 0.0) + time_taken, 3)
         if correct:
             streak = (score.streak or 0) + 1
             mult = min(streak, STREAK_CAP)
@@ -144,7 +150,7 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
         else:
             gained = 0
             score.streak = 0
-        score.save(update_fields=["points", "streak", "best_streak", "updated_at"])
+        score.save(update_fields=["points", "total_time", "streak", "best_streak", "updated_at"])
 
     return {"ok": True, "correct": correct, "correct_index": q.get("correct"),
             "gained": gained, "streak": score.streak}
@@ -162,7 +168,7 @@ def finalize(game_id: int) -> dict | None:
 
     scores = list(
         WisdomScore.objects.filter(game=g, points__gt=0)
-        .select_related("user").order_by("-points", "created_at")
+        .select_related("user").order_by("-points", "total_time", "created_at")
     )
     winners = []
     for i, s in enumerate(scores):
@@ -197,7 +203,7 @@ def finalize_due_games() -> list:
 def _leaderboard(game, limit=50):
     rows = (
         WisdomScore.objects.filter(game=game, points__gt=0).select_related("user")
-        .order_by("-points", "created_at")[:limit]
+        .order_by("-points", "total_time", "created_at")[:limit]
     )
     return [{"name": r.user.full_name or "Kitobxon", "points": r.points,
              "best_streak": r.best_streak, "reward": r.reward or 0} for r in rows]

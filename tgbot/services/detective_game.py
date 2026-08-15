@@ -144,10 +144,15 @@ def submit_guess(game_id: int, profile, text: str) -> dict:
         g.solved = solved
         g.save(update_fields=["solved", "updated_at"])
 
+        elapsed = (timezone.now() - g.starts_at).total_seconds()
+        within = max(0.01, elapsed - ri * g.round_seconds)
+        time_taken = round(within, 3)
+
         score, _ = DetectiveScore.objects.get_or_create(game=g, user=profile)
         score.points = (score.points or 0) + points
         score.solved_count = (score.solved_count or 0) + 1
-        score.save(update_fields=["points", "solved_count", "updated_at"])
+        score.total_time = round((score.total_time or 0.0) + time_taken, 3)
+        score.save(update_fields=["points", "solved_count", "total_time", "updated_at"])
 
         return {"ok": True, "gained": points, "display": g.rounds[ri]["display"],
                 "your_points": score.points}
@@ -165,7 +170,7 @@ def finalize(game_id: int) -> dict | None:
 
     scores = list(
         DetectiveScore.objects.filter(game=g, points__gt=0)
-        .select_related("user").order_by("-points", "created_at")
+        .select_related("user").order_by("-points", "total_time", "created_at")
     )
     winners = []
     for i, s in enumerate(scores):
@@ -200,7 +205,7 @@ def finalize_due_games() -> list:
 def _leaderboard(game, limit=50):
     rows = (
         DetectiveScore.objects.filter(game=game, points__gt=0).select_related("user")
-        .order_by("-points", "created_at")[:limit]
+        .order_by("-points", "total_time", "created_at")[:limit]
     )
     return [{"name": r.user.full_name or "Kitobxon", "points": r.points,
              "solved_count": r.solved_count, "reward": r.reward or 0} for r in rows]

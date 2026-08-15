@@ -951,6 +951,7 @@ class QuizParticipant(models.Model):
         'TelegramProfile', on_delete=models.CASCADE, related_name='quiz_participations'
     )
     score = models.IntegerField(default=0)
+    total_time = models.FloatField(default=0.0, help_text="Total response time in seconds.")
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -969,6 +970,7 @@ class QuizUserAnswer(models.Model):
         QuizOption, on_delete=models.CASCADE, null=True, blank=True
     )
     is_correct = models.BooleanField(default=False)
+    time_taken = models.FloatField(default=0.0, help_text="Response time for this question in seconds.")
     answered_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -1504,6 +1506,7 @@ class ChainScore(BaseModel):
     )
     points = models.PositiveIntegerField(default=0)
     links = models.PositiveIntegerField(default=0, help_text="Rounds this user solved.")
+    total_time = models.FloatField(default=0.0, help_text="Total solve time in seconds.")
     reward = models.PositiveIntegerField(default=0, help_text="Kitobcha paid at finish.")
     rewarded = models.BooleanField(default=False)
     strikes = models.PositiveIntegerField(
@@ -1522,7 +1525,7 @@ class ChainScore(BaseModel):
         verbose_name = "Kitob Zanjiri — Ball"
         verbose_name_plural = "Kitob Zanjiri — Ballar"
         unique_together = ("game", "user")
-        ordering = ("-points", "created_at")
+        ordering = ("-points", "total_time", "created_at")
 
     def __str__(self):
         return f"{self.user_id} → game {self.game_id}: {self.points}"
@@ -1569,6 +1572,7 @@ class FeudAnswer(BaseModel):
     q_index = models.PositiveSmallIntegerField()
     text = models.CharField(max_length=120)
     norm = models.CharField(max_length=120, db_index=True)
+    time_taken = models.FloatField(default=0.0, help_text="Seconds taken to submit answer.")
 
     class Meta:
         db_table = "feud_answers"
@@ -1580,13 +1584,14 @@ class FeudScore(BaseModel):
     game = models.ForeignKey(FeudGame, on_delete=models.CASCADE, related_name="scores")
     user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="feud_scores")
     points = models.PositiveIntegerField(default=0)
+    total_time = models.FloatField(default=0.0, help_text="Total response time in seconds.")
     reward = models.PositiveIntegerField(default=0)
     rewarded = models.BooleanField(default=False)
 
     class Meta:
         db_table = "feud_scores"
         unique_together = ("game", "user")
-        ordering = ("-points", "created_at")
+        ordering = ("-points", "total_time", "created_at")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1631,6 +1636,7 @@ class CastleHit(BaseModel):
     user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="castle_hits")
     q_index = models.PositiveSmallIntegerField()
     is_correct = models.BooleanField(default=False)
+    time_taken = models.FloatField(default=0.0, help_text="Seconds taken to hit.")
 
     class Meta:
         db_table = "castle_hits"
@@ -1677,6 +1683,7 @@ class EmojiAnswer(BaseModel):
     q_index = models.PositiveSmallIntegerField()
     choice = models.PositiveSmallIntegerField()
     is_correct = models.BooleanField(default=False)
+    time_taken = models.FloatField(default=0.0, help_text="Seconds taken to submit answer.")
 
     class Meta:
         db_table = "emoji_answers"
@@ -1688,13 +1695,14 @@ class EmojiScore(BaseModel):
     game = models.ForeignKey(EmojiGame, on_delete=models.CASCADE, related_name="scores")
     user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="emoji_scores")
     points = models.PositiveIntegerField(default=0)
+    total_time = models.FloatField(default=0.0, help_text="Total response time in seconds.")
     reward = models.PositiveIntegerField(default=0)
     rewarded = models.BooleanField(default=False)
 
     class Meta:
         db_table = "emoji_scores"
         unique_together = ("game", "user")
-        ordering = ("-points", "created_at")
+        ordering = ("-points", "total_time", "created_at")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1742,6 +1750,7 @@ class WisdomAnswer(BaseModel):
     q_index = models.PositiveSmallIntegerField()
     choice = models.PositiveSmallIntegerField()
     is_correct = models.BooleanField(default=False)
+    time_taken = models.FloatField(default=0.0, help_text="Seconds taken to submit answer.")
 
     class Meta:
         db_table = "wisdom_answers"
@@ -1753,6 +1762,7 @@ class WisdomScore(BaseModel):
     game = models.ForeignKey(WisdomGame, on_delete=models.CASCADE, related_name="scores")
     user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="wisdom_scores")
     points = models.PositiveIntegerField(default=0)
+    total_time = models.FloatField(default=0.0, help_text="Total response time in seconds.")
     streak = models.PositiveIntegerField(default=0, help_text="Current consecutive-correct streak.")
     best_streak = models.PositiveIntegerField(default=0)
     reward = models.PositiveIntegerField(default=0)
@@ -1763,7 +1773,7 @@ class WisdomScore(BaseModel):
         verbose_name = "Hikmat Xazinasi — Ball"
         verbose_name_plural = "Hikmat Xazinasi — Ballar"
         unique_together = ("game", "user")
-        ordering = ("-points", "created_at")
+        ordering = ("-points", "total_time", "created_at")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1811,6 +1821,7 @@ class DetectiveScore(BaseModel):
     user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="detective_scores")
     points = models.PositiveIntegerField(default=0)
     solved_count = models.PositiveIntegerField(default=0)
+    total_time = models.FloatField(default=0.0, help_text="Total guess time in seconds.")
     reward = models.PositiveIntegerField(default=0)
     rewarded = models.BooleanField(default=False)
 
@@ -1819,7 +1830,7 @@ class DetectiveScore(BaseModel):
         verbose_name = "Kitob Detektivi — Ball"
         verbose_name_plural = "Kitob Detektivi — Ballar"
         unique_together = ("game", "user")
-        ordering = ("-points", "created_at")
+        ordering = ("-points", "total_time", "created_at")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1861,6 +1872,7 @@ class SurvivalPlayer(BaseModel):
     user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="survival_games")
     lives = models.PositiveSmallIntegerField(default=3)
     correct_count = models.PositiveIntegerField(default=0)
+    total_time = models.FloatField(default=0.0, help_text="Total response time in seconds.")
     eliminated = models.BooleanField(default=False)
     eliminated_at_round = models.PositiveSmallIntegerField(null=True, blank=True)
     reward = models.PositiveIntegerField(default=0)
@@ -1871,7 +1883,7 @@ class SurvivalPlayer(BaseModel):
         verbose_name = "Omon qolish — O'yinchi"
         verbose_name_plural = "Omon qolish — O'yinchilar"
         unique_together = ("game", "user")
-        ordering = ("-correct_count", "created_at")
+        ordering = ("eliminated", "-correct_count", "total_time", "created_at")
 
 
 class SurvivalAnswer(BaseModel):
@@ -1880,6 +1892,7 @@ class SurvivalAnswer(BaseModel):
     q_index = models.PositiveSmallIntegerField()
     choice = models.PositiveSmallIntegerField()
     is_correct = models.BooleanField(default=False)
+    time_taken = models.FloatField(default=0.0, help_text="Seconds taken to submit answer.")
 
     class Meta:
         db_table = "survival_answers"
@@ -1947,6 +1960,7 @@ class QuizAnswer(BaseModel):
     q_index = models.PositiveSmallIntegerField()
     choice = models.PositiveSmallIntegerField()
     is_correct = models.BooleanField(default=False)
+    time_taken = models.FloatField(default=0.0, help_text="Seconds taken to submit answer.")
 
     class Meta:
         db_table = "quiz_answers"
@@ -1958,6 +1972,7 @@ class QuizScore(BaseModel):
     game = models.ForeignKey(QuizGame, on_delete=models.CASCADE, related_name="scores")
     user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="quiz_scores")
     points = models.PositiveIntegerField(default=0)
+    total_time = models.FloatField(default=0.0, help_text="Total response time in seconds.")
     team = models.CharField(max_length=1, blank=True, default="", help_text="'a' or 'b' (teams flavor only).")
     reward = models.PositiveIntegerField(default=0)
     rewarded = models.BooleanField(default=False)
@@ -1967,7 +1982,7 @@ class QuizScore(BaseModel):
         verbose_name = "Bilim O'yini — Ball"
         verbose_name_plural = "Bilim O'yini — Ballar"
         unique_together = ("game", "user")
-        ordering = ("-points", "created_at")
+        ordering = ("-points", "total_time", "created_at")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -39,8 +39,11 @@
                    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       min-height: 100vh;
       overflow-x: hidden;
+      overflow-y: auto;
       max-width: 100vw;
-      overscroll-behavior-y: contain;
+      overscroll-behavior-y: auto;
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
     }
     body {
       background:
@@ -48,6 +51,7 @@
         radial-gradient(900px 700px at 110% 10%, rgba(230,180,80,0.14), transparent 65%),
         linear-gradient(180deg, var(--bg-0), var(--bg-1) 60%, var(--bg-0));
       padding-bottom: 32px;
+      overflow-y: auto;
     }
 
     /* ─── Top bar ───────────────────────────────────────────── */
@@ -197,6 +201,9 @@
       transition: transform .35s cubic-bezier(.16,1,.3,1);
       z-index: 50;
       max-height: 90vh; overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+      touch-action: pan-y;
       padding: 18px 18px calc(22px + env(safe-area-inset-bottom));
       border-top: 1px solid var(--card-border);
     }
@@ -478,7 +485,13 @@
   <script>
     // ─── Telegram WebApp bridge ──────────────────────────────
     const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-    if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+    if (tg) {
+      try {
+        tg.ready();
+        tg.expand();
+        if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+      } catch (e) {}
+    }
 
     // Shop is a real page navigation (not an SPA route) inside the Mini App
     // WebView, which has no URL/back chrome of its own — without this there
@@ -1065,9 +1078,9 @@
     // slight diagonal drift -- normal on a 2-column product grid -- could
     // cross the dx/dy ratio check below and yank the user to another page
     // mid-scroll.
-    const SWIPE_EDGE_ZONE = 28;
+    const SWIPE_EDGE_ZONE = 24;
     let drag = null;
-    document.body.addEventListener('touchstart', (e) => {
+    document.addEventListener('touchstart', (e) => {
       drag = null;
       if (e.touches.length !== 1) return;
       if (_hasHorizontalOverflow(e.target)) return;
@@ -1076,13 +1089,14 @@
       drag = { x: x0, y: e.touches[0].clientY, t: Date.now(), active: false, dx: 0 };
     }, { passive: true });
 
-    document.body.addEventListener('touchmove', (e) => {
+    document.addEventListener('touchmove', (e) => {
       if (!drag || e.touches.length !== 1) return;
       const dx = e.touches[0].clientX - drag.x;
       const dy = e.touches[0].clientY - drag.y;
       if (!drag.active) {
-        if (Math.abs(dx) < 10) return;
-        if (Math.abs(dx) < Math.abs(dy) * 1.3) { drag = null; return; }
+        if (Math.abs(dy) > Math.abs(dx)) { drag = null; return; }
+        if (Math.abs(dx) < 12) return;
+        if (Math.abs(dx) < Math.abs(dy) * 1.4) { drag = null; return; }
         drag.active = true;
       }
       drag.dx = dx;

@@ -172,7 +172,10 @@ def _accept_round(g: ChainGame, round_: dict, profile) -> dict:
     score, _created = ChainScore.objects.get_or_create(game=g, user_id=profile.id)
     score.points = (score.points or 0) + POINTS_PER_ROUND
     score.links = (score.links or 0) + 1
-    score.save(update_fields=["points", "links", "updated_at"])
+    elapsed = (timezone.now() - g.starts_at).total_seconds()
+    time_taken = max(0.01, round(elapsed, 3))
+    score.total_time = round((score.total_time or 0.0) + time_taken, 3)
+    score.save(update_fields=["points", "links", "total_time", "updated_at"])
     return {"title": round_["title"], "gained": POINTS_PER_ROUND}
 
 
@@ -244,7 +247,7 @@ def finalize(game_id: int) -> dict | None:
     scores = list(
         ChainScore.objects.filter(game=g)
         .select_related("user")
-        .order_by("-points", "created_at")
+        .order_by("-points", "total_time", "created_at")
     )
     winners = []
     for i, s in enumerate(scores):
@@ -259,10 +262,8 @@ def finalize(game_id: int) -> dict | None:
             s.rewarded = True
             s.reward = applied
             s.save(update_fields=["rewarded", "reward", "updated_at"])
-        elif reward:
-            applied = s.reward or reward
         else:
-            applied = 0
+            applied = s.reward or reward
         winners.append({
             "rank": i + 1,
             "user_id": s.user_id,
@@ -293,7 +294,7 @@ def _leaderboard(game, limit: int = 10, include_all: bool = False):
     qs = ChainScore.objects.filter(game=game).select_related("user")
     if not include_all:
         qs = qs.filter(points__gt=0)  # live board: only those who've scored
-    rows = qs.order_by("-points", "created_at")[:limit]
+    rows = qs.order_by("-points", "total_time", "created_at")[:limit]
     return [
         {
             "name": r.user.full_name or "Kitobxon",

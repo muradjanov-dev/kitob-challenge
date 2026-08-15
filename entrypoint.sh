@@ -72,6 +72,9 @@ PY
 
   echo "=== Announcing challenge if none active ==="
   python manage.py announce_first_challenge || echo "announce_first_challenge failed (non-fatal)"
+
+  echo "=== Announcing Game Speed & Shop Update ==="
+  python manage.py announce_game_speed_and_shop_update || echo "announce_game_speed_and_shop_update failed (non-fatal)"
 fi
 
 case "$SERVICE_TYPE" in

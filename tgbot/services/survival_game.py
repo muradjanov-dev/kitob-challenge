@@ -156,13 +156,22 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
 
     q = g.questions[qi]
     correct = (choice == q.get("correct"))
+
+    span = g.question_seconds
+    elapsed = (now - g.starts_at).total_seconds()
+    within = max(0.01, elapsed - qi * span)
+    time_taken = round(within, 3)
+
     answer, created_ans = SurvivalAnswer.objects.get_or_create(
         game_id=g.id, user=profile, q_index=qi,
-        defaults={"choice": choice, "is_correct": correct},
+        defaults={"choice": choice, "is_correct": correct, "time_taken": time_taken},
     )
     if not created_ans:
         return {"ok": False, "error": "already_answered",
                 "correct": answer.is_correct, "correct_index": q.get("correct")}
+
+    player.total_time = round((player.total_time or 0.0) + time_taken, 3)
+    player.save(update_fields=["total_time", "updated_at"])
 
     return {"ok": True, "correct": correct, "correct_index": q.get("correct"),
             "lives": player.lives}
@@ -194,6 +203,7 @@ def finalize(game_id: int) -> dict | None:
             winners.append({
                 "user_id": p.user_id, "telegram_id": p.user.telegram_id,
                 "name": p.user.full_name or "Kitobxon", "correct": p.correct_count,
+                "total_time": p.total_time or 0.0,
                 "survived": True, "reward": applied,
             })
         for p in players:
@@ -217,10 +227,11 @@ def finalize(game_id: int) -> dict | None:
                 winners.append({
                     "user_id": p.user_id, "telegram_id": p.user.telegram_id,
                     "name": p.user.full_name or "Kitobxon", "correct": p.correct_count,
+                    "total_time": p.total_time or 0.0,
                     "survived": False, "reward": applied,
                 })
 
-    winners.sort(key=lambda w: (-w["survived"], -w["correct"]))
+    winners.sort(key=lambda w: (-w["survived"], -w["correct"], w.get("total_time", 0.0)))
     g.rewarded = True
     g.save(update_fields=["rewarded", "updated_at"])
     return {"winners": winners, "players": len(players), "survivors": len(survivors)}
@@ -239,7 +250,7 @@ def finalize_due_games() -> list:
 def _leaderboard(game, limit=50):
     rows = (
         SurvivalPlayer.objects.filter(game=game).select_related("user")
-        .order_by("eliminated", "-correct_count")[:limit]
+        .order_by("eliminated", "-correct_count", "total_time", "created_at")[:limit]
     )
     return [{"name": r.user.full_name or "Kitobxon", "lives": r.lives,
              "correct": r.correct_count, "eliminated": r.eliminated,

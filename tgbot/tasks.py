@@ -2233,7 +2233,7 @@ def quiz_finish_session(session_id: int):
         QuizParticipant.objects
         .filter(session_id=session_id)
         .select_related("user")
-        .order_by("-score")
+        .order_by("-score", "total_time", "joined_at")
     )
     total_q = len(session.question_order.replace("[", "").replace("]", "").split(",")) if session.question_order != "[]" else 0
 

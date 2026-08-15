@@ -98,7 +98,8 @@ def _score_question(g, q_index):
         pts = counts[a.norm] * MATCH_POINTS
         score, _ = FeudScore.objects.get_or_create(game=g, user_id=a.user_id)
         score.points = (score.points or 0) + pts
-        score.save(update_fields=["points", "updated_at"])
+        score.total_time = round((score.total_time or 0.0) + (a.time_taken or 0.0), 3)
+        score.save(update_fields=["points", "total_time", "updated_at"])
 
 
 def _ensure_scored(game, closed_count):
@@ -138,9 +139,14 @@ def submit_answer(game_id: int, profile, text: str) -> dict:
     if is_first and not charge_entry_fee(profile):
         return {"ok": False, "error": "insufficient_balance", "need": ENTRY_FEE}
 
+    span = game_id and (g.answer_seconds + g.reveal_seconds)
+    elapsed = (now - g.starts_at).total_seconds()
+    within = max(0.01, elapsed - qi * span)
+    time_taken = round(within, 3)
+
     FeudAnswer.objects.update_or_create(
         game_id=g.id, user=profile, q_index=qi,
-        defaults={"text": text.strip()[:120], "norm": norm},
+        defaults={"text": text.strip()[:120], "norm": norm, "time_taken": time_taken},
     )
     return {"ok": True, "q_index": qi}
 
@@ -157,7 +163,7 @@ def finalize(game_id: int) -> dict | None:
     _ensure_scored(g, len(g.questions or []))  # score any remaining questions
 
     scores = list(
-        FeudScore.objects.filter(game=g).select_related("user").order_by("-points", "created_at")
+        FeudScore.objects.filter(game=g).select_related("user").order_by("-points", "total_time", "created_at")
     )
     winners = []
     for i, s in enumerate(scores):
@@ -205,7 +211,7 @@ def _reveal(game, q_index, limit=6):
 def _leaderboard(game, limit=10, include_all=False):
     rows = (
         FeudScore.objects.filter(game=game).select_related("user")
-        .order_by("-points", "created_at")[:limit]
+        .order_by("-points", "total_time", "created_at")[:limit]
     )
     return [
         {"name": r.user.full_name or "Kitobxon", "points": r.points, "reward": r.reward or 0}

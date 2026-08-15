@@ -589,34 +589,83 @@
     }
     #pdfCanvasWrap.mag-mode #pdfLoading { top: 0; }
 
-    /* PDF.js paginated canvas reader */
+    /* PDF.js paginated canvas reader with 3D folding page curl */
     #pdfCanvasWrap {
       flex: 1; overflow: auto; display: flex; align-items: flex-start;
-      justify-content: center; background: #1a1a1a; padding: 14px 0 90px;
+      justify-content: center; background: #161616; padding: 14px 0 90px;
       -webkit-overflow-scrolling: touch;
-      /* Vertical scroll stays native; pinch-zoom and horizontal swipe are
-         owned entirely by our own touch handlers below, so the browser's
-         built-in page-zoom gesture doesn't fight them mid-pinch. */
+      perspective: 2000px;
+      perspective-origin: center center;
       touch-action: pan-y;
     }
     #pdfCanvas {
-      box-shadow: 0 4px 22px rgba(0,0,0,.5); background: #fff; max-width: 96vw; height: auto;
-      transform-style: preserve-3d; will-change: transform;
+      box-shadow: 0 10px 32px rgba(0,0,0,.65), -2px 0 10px rgba(0,0,0,0.3);
+      background: #fff; max-width: 96vw; height: auto;
+      transform-style: preserve-3d; will-change: transform, filter, box-shadow;
       opacity: 0; transition: opacity .3s ease;
+      border-radius: 2px 8px 8px 2px;
     }
     #pdfCanvas.pdf-canvas-ready { opacity: 1; }
-    @keyframes pdfFlipNext {
-      0%   { transform: perspective(1600px) rotateY(-78deg) scaleX(.86); opacity: .25; }
-      55%  { transform: perspective(1600px) rotateY(-14deg) scaleX(.96); opacity: .9; }
-      100% { transform: perspective(1600px) rotateY(0deg) scaleX(1); opacity: 1; }
+    @keyframes pdfCurlNext {
+      0% {
+        transform: perspective(2000px) rotateY(-84deg) skewY(-3deg) scale(0.92);
+        filter: brightness(0.68) contrast(1.12);
+        box-shadow: -20px 14px 34px rgba(0,0,0,0.7);
+        opacity: 0.25;
+      }
+      40% {
+        transform: perspective(2000px) rotateY(-36deg) skewY(-1.5deg) scale(0.97);
+        filter: brightness(0.88);
+        box-shadow: -12px 10px 26px rgba(0,0,0,0.48);
+        opacity: 0.85;
+      }
+      75% {
+        transform: perspective(2000px) rotateY(-6deg) skewY(-0.3deg) scale(0.995);
+        filter: brightness(0.98);
+        box-shadow: -4px 6px 20px rgba(0,0,0,0.35);
+        opacity: 0.98;
+      }
+      100% {
+        transform: perspective(2000px) rotateY(0deg) skewY(0deg) scale(1);
+        filter: brightness(1);
+        box-shadow: 0 10px 32px rgba(0,0,0,.65), -2px 0 10px rgba(0,0,0,0.3);
+        opacity: 1;
+      }
     }
-    @keyframes pdfFlipPrev {
-      0%   { transform: perspective(1600px) rotateY(78deg) scaleX(.86); opacity: .25; }
-      55%  { transform: perspective(1600px) rotateY(14deg) scaleX(.96); opacity: .9; }
-      100% { transform: perspective(1600px) rotateY(0deg) scaleX(1); opacity: 1; }
+    @keyframes pdfCurlPrev {
+      0% {
+        transform: perspective(2000px) rotateY(84deg) skewY(3deg) scale(0.92);
+        filter: brightness(0.68) contrast(1.12);
+        box-shadow: 20px 14px 34px rgba(0,0,0,0.7);
+        opacity: 0.25;
+      }
+      40% {
+        transform: perspective(2000px) rotateY(36deg) skewY(1.5deg) scale(0.97);
+        filter: brightness(0.88);
+        box-shadow: 12px 10px 26px rgba(0,0,0,0.48);
+        opacity: 0.85;
+      }
+      75% {
+        transform: perspective(2000px) rotateY(6deg) skewY(0.3deg) scale(0.995);
+        filter: brightness(0.98);
+        box-shadow: 4px 6px 20px rgba(0,0,0,0.35);
+        opacity: 0.98;
+      }
+      100% {
+        transform: perspective(2000px) rotateY(0deg) skewY(0deg) scale(1);
+        filter: brightness(1);
+        box-shadow: 0 10px 32px rgba(0,0,0,.65), -2px 0 10px rgba(0,0,0,0.3);
+        opacity: 1;
+      }
     }
-    #pdfCanvas.flip-in-next { animation: pdfFlipNext .46s cubic-bezier(.22,.68,0,1); transform-origin: left center; }
-    #pdfCanvas.flip-in-prev { animation: pdfFlipPrev .46s cubic-bezier(.22,.68,0,1); transform-origin: right center; }
+    #pdfCanvas.flip-in-next {
+      animation: pdfCurlNext .52s cubic-bezier(0.2, 0.75, 0.25, 1);
+      transform-origin: left center;
+    }
+    #pdfCanvas.flip-in-prev {
+      animation: pdfCurlPrev .52s cubic-bezier(0.2, 0.75, 0.25, 1);
+      transform-origin: right center;
+    }
     @media (prefers-reduced-motion: reduce) {
       #pdfCanvas.flip-in-next, #pdfCanvas.flip-in-prev { animation: none; }
     }

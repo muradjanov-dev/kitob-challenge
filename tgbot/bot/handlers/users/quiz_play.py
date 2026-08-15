@@ -161,14 +161,23 @@ def _record_answer(session_id: int, user_id: int, question_id: int, option_id: i
     correct_opt = next((o for o in options if o.is_correct), None)
     is_correct = option.is_correct
 
+    import time as _time
+    now_ts = _time.time()
+    q_start_key = f"quiz_q_start:{session_id}:{question_id}"
+    q_start = cache.get(q_start_key) or now_ts
+    time_taken = max(0.01, round(now_ts - q_start, 3))
+
     QuizUserAnswer.objects.create(
         participant=participant,
         question_id=question_id,
         option=option,
         is_correct=is_correct,
+        time_taken=time_taken,
     )
+    update_kwargs = {"total_time": F("total_time") + time_taken}
     if is_correct:
-        QuizParticipant.objects.filter(id=participant.id).update(score=F("score") + 1)
+        update_kwargs["score"] = F("score") + 1
+    QuizParticipant.objects.filter(id=participant.id).update(**update_kwargs)
 
     return (
         False,
@@ -1110,7 +1119,7 @@ async def _finish_group_session(session_id: int, chat_id: int):
         participants = list(
             QuizParticipant.objects.filter(session_id=session_id)
             .select_related("user")
-            .order_by("-score", "joined_at")
+            .order_by("-score", "total_time", "joined_at")
         )
         total = len(json.loads(session.question_order))
 
@@ -1211,7 +1220,7 @@ async def stop_quiz(message: types.Message, state: FSMContext = None):
         was_active = session.status == "active"
         participants = list(
             QuizParticipant.objects.filter(session_id=session.id)
-            .select_related("user").order_by("-score", "joined_at")
+            .select_related("user").order_by("-score", "total_time", "joined_at")
         ) if was_active else []
         total = len(json.loads(session.question_order))
         QuizSession.objects.filter(id=session.id).update(status="finished")

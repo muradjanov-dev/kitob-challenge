@@ -108,8 +108,14 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
     q = g.questions[qi]
     correct = (choice == q.get("correct"))
 
+    span = g.question_seconds
+    elapsed = (now - g.starts_at).total_seconds()
+    within = max(0.01, elapsed - qi * span)
+    time_taken = round(within, 3)
+
     hit, created = CastleHit.objects.get_or_create(
-        game_id=g.id, user=profile, q_index=qi, defaults={"is_correct": correct},
+        game_id=g.id, user=profile, q_index=qi,
+        defaults={"is_correct": correct, "time_taken": time_taken},
     )
     if not created:
         return {"ok": False, "error": "already_answered",
@@ -142,7 +148,7 @@ def finalize(game_id: int) -> dict | None:
     rows = list(
         CastleHit.objects.filter(game=g)
         .values("user_id")
-        .annotate(correct=Count("id", filter=Q(is_correct=True)))
+        .annotate(correct=Count("id", filter=Q(is_correct=True)), total_time=Sum("time_taken"))
     )
     from tgbot.models import TelegramProfile
     users = {u.id: u for u in TelegramProfile.objects.filter(
@@ -161,12 +167,14 @@ def finalize(game_id: int) -> dict | None:
             contributors += 1
         rewarded.append({
             "user_id": uid, "telegram_id": user.telegram_id,
-            "name": user.full_name or "Kitobxon", "correct": correct, "reward": applied,
+            "name": user.full_name or "Kitobxon", "correct": correct,
+            "total_time": row.get("total_time") or 0.0,
+            "reward": applied,
             "boosted": applied != reward,
         })
     g.rewarded = True
     g.save(update_fields=["rewarded", "updated_at"])
-    rewarded.sort(key=lambda r: r["correct"], reverse=True)
+    rewarded.sort(key=lambda r: (-r["correct"], r.get("total_time", 0.0)))
     return {"victory": victory, "players": len(rewarded), "contributors": contributors,
             "winners": rewarded}
 
@@ -187,8 +195,8 @@ def _leaderboard(game, limit=10):
     rows = (
         CastleHit.objects.filter(game=game, is_correct=True)
         .values("user_id", "user__full_name")
-        .annotate(correct=Count("id"))
-        .order_by("-correct")[:limit]
+        .annotate(correct=Count("id"), total_time=Sum("time_taken"))
+        .order_by("-correct", "total_time")[:limit]
     )
     return [{"name": r["user__full_name"] or "Kitobxon", "correct": r["correct"]} for r in rows]
 

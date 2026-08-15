@@ -320,9 +320,14 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
     q = g.questions[qi]
     correct = (choice == q.get("correct"))
 
+    span = g.answer_seconds + g.reveal_seconds
+    elapsed = (now - g.starts_at).total_seconds()
+    within = max(0.01, elapsed - qi * span)
+    time_taken = round(within, 3)
+
     hit, created = QuizAnswer.objects.get_or_create(
         game_id=g.id, user=profile, q_index=qi,
-        defaults={"choice": choice, "is_correct": correct},
+        defaults={"choice": choice, "is_correct": correct, "time_taken": time_taken},
     )
     if not created:
         return {"ok": False, "error": "already_answered",
@@ -331,13 +336,13 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
     score, score_created = QuizScore.objects.get_or_create(game=g, user=profile)
     if score_created and team:
         score.team = team
-        score.save(update_fields=["team"])
+    score.total_time = round((score.total_time or 0.0) + time_taken, 3)
     if correct:
         score.points = (score.points or 0) + POINTS
-        score.save(update_fields=["points", "updated_at"])
         if g.flavor == "teams" and score.team:
             field = "team_a_points" if score.team == "a" else "team_b_points"
             QuizGame.objects.filter(id=g.id).update(**{field: F(field) + POINTS})
+    score.save(update_fields=["points", "total_time", "team", "updated_at"] if (score_created and team) else ["points", "total_time", "updated_at"])
 
     return {"ok": True, "correct": correct, "correct_index": q.get("correct"), "team": score.team}
 
@@ -360,7 +365,7 @@ def finalize(game_id: int) -> dict | None:
 def _finalize_individual(g) -> dict:
     scores = list(
         QuizScore.objects.filter(game=g, points__gt=0)
-        .select_related("user").order_by("-points", "created_at")
+        .select_related("user").order_by("-points", "total_time", "created_at")
     )
     winners = []
     for i, s in enumerate(scores):
@@ -397,7 +402,7 @@ def _finalize_teams(g) -> dict:
             continue
         ranked = sorted(
             (s for s in scores if s.team == team),
-            key=lambda s: (-s.points, s.created_at),
+            key=lambda s: (-s.points, getattr(s, 'total_time', 0.0) or 0.0, s.created_at),
         )
         for i, s in enumerate(ranked):
             rank_by_score_id[s.id] = i
@@ -426,7 +431,7 @@ def _finalize_teams(g) -> dict:
         })
     g.rewarded = True
     g.save(update_fields=["rewarded", "updated_at"])
-    winners.sort(key=lambda w: -w["points"])
+    winners.sort(key=lambda w: (-w["points"], getattr(w, 'total_time', 0.0) or 0.0))
     return {
         "winners": winners, "players": len(scores), "tie": tie,
         "winning_team": winning_team if not tie else None,
@@ -450,7 +455,7 @@ def finalize_due_games(flavor=None) -> list:
 def _leaderboard(game, limit=50):
     rows = (
         QuizScore.objects.filter(game=game, points__gt=0).select_related("user")
-        .order_by("-points", "created_at")[:limit]
+        .order_by("-points", "total_time", "created_at")[:limit]
     )
     return [{"name": r.user.full_name or "Kitobxon", "points": r.points,
              "team": r.team, "reward": r.reward or 0} for r in rows]
