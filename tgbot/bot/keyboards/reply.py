@@ -211,50 +211,94 @@ back_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True,
 )
 
+# ── COMPACT 5-HUB MODULAR ADMIN PANEL ──
 admin_keyboard = InlineKeyboardMarkup(row_width=2)
 admin_keyboard.row(
+    InlineKeyboardButton(text="👥 Foydalanuvchilar Markazi", callback_data="admin:hub_users"),
+    InlineKeyboardButton(text="🎮 O'yinlar & Quizlar", callback_data="admin:hub_games"),
+)
+admin_keyboard.row(
+    InlineKeyboardButton(text="📢 Xabarnoma & Eslatmalar", callback_data="admin:hub_broadcast"),
+    InlineKeyboardButton(text="📚 Do'kon & Kutubxona", callback_data="admin:hub_content"),
+)
+admin_keyboard.row(
+    InlineKeyboardButton(text="📊 Statistika & Analitika", callback_data="admin:hub_analytics"),
+)
+
+# 1. Hub: Foydalanuvchilar
+admin_users_hub_kb = InlineKeyboardMarkup(row_width=2)
+admin_users_hub_kb.row(
     InlineKeyboardButton(text="👨‍👩‍👦‍👦 Foydalanuvchilar ro'yxati", callback_data="admin:all_users"),
     InlineKeyboardButton(text="🔍 Foydalanuvchi qidirish", callback_data="admin:user_search"),
 )
-admin_keyboard.row(
-    InlineKeyboardButton(text="📊 Statistikani ko'rish", callback_data="admin:stats"),
-    InlineKeyboardButton(text="✉️ Habar yuborish", callback_data="admin:notify"),
-)
-admin_keyboard.row(
-    InlineKeyboardButton(text="📋 Eslatmalar", callback_data="admin:reminders"),
-    InlineKeyboardButton(text="📊 So'rovnoma", callback_data="admin:poll_new"),
-)
-admin_keyboard.row(
-    InlineKeyboardButton(text="📊 So'rovnoma natijalari", callback_data="admin:poll_results"),
-    InlineKeyboardButton(text="📊 Loyiha so'rovnomasi (500 🪙)", callback_data="admin:project_survey"),
-)
-admin_keyboard.row(
-    InlineKeyboardButton(text="🏆 Top kitobxonlar (broadcast)", callback_data="admin:top_readers"),
-    InlineKeyboardButton(text="🏅 Kitobxon nominatsiyalari", callback_data="admin:reader_titles"),
-)
-admin_keyboard.row(
-    InlineKeyboardButton(text="🎁 Sovg'a: 24h Premium (hammaga)", callback_data="admin:founder_gift"),
+admin_users_hub_kb.row(
     InlineKeyboardButton(text="🪙 Kitobcha reytingi", callback_data="admin:kitobcha_top"),
+    InlineKeyboardButton(text="🎁 24h Premium (hammaga)", callback_data="admin:founder_gift"),
 )
-admin_keyboard.row(
-    InlineKeyboardButton(text="📝 Quizlar", callback_data="admin:quizzes"),
+admin_users_hub_kb.row(
+    InlineKeyboardButton(text="🔙 Asosiy Admin menyu", callback_data="admin:main"),
+)
+
+# 2. Hub: O'yinlar & Quizlar
+admin_games_hub_kb = InlineKeyboardMarkup(row_width=2)
+admin_games_hub_kb.row(
+    InlineKeyboardButton(text="🎮 58 ta O'yinni boshqarish", callback_data="admin:games_menu"),
+    InlineKeyboardButton(text="🧪 O'yinlarni sinash", callback_data="admin:games_test_menu"),
+)
+admin_games_hub_kb.row(
+    InlineKeyboardButton(text="📝 Quizlar boshqaruvi", callback_data="admin:quizzes"),
     InlineKeyboardButton(text="🧩 Viktorina yuborish", callback_data="admin:book_quiz"),
 )
-admin_keyboard.row(
-    InlineKeyboardButton(text="🎮 Barcha o'yinlar (14 ta)", callback_data="admin:games_menu"),
-    InlineKeyboardButton(text="🧪 O'yinlarni jimgina sinash", callback_data="admin:games_test_menu"),
+admin_games_hub_kb.row(
+    InlineKeyboardButton(text="🔙 Asosiy Admin menyu", callback_data="admin:main"),
 )
-admin_keyboard.row(
+
+# 3. Hub: Xabarnoma & Eslatmalar
+admin_broadcast_hub_kb = InlineKeyboardMarkup(row_width=2)
+admin_broadcast_hub_kb.row(
+    InlineKeyboardButton(text="✉️ Habar yuborish", callback_data="admin:notify"),
+    InlineKeyboardButton(text="📋 Eslatmalar", callback_data="admin:reminders"),
+)
+admin_broadcast_hub_kb.row(
+    InlineKeyboardButton(text="📊 Yangi so'rovnoma", callback_data="admin:poll_new"),
+    InlineKeyboardButton(text="📊 So'rovnoma natijalari", callback_data="admin:poll_results"),
+)
+admin_broadcast_hub_kb.row(
+    InlineKeyboardButton(text="💡 Loyiha so'rovnomasi (500 🪙)", callback_data="admin:project_survey"),
+)
+admin_broadcast_hub_kb.row(
+    InlineKeyboardButton(text="🔙 Asosiy Admin menyu", callback_data="admin:main"),
+)
+
+# 4. Hub: Do'kon & Kutubxona
+admin_content_hub_kb = InlineKeyboardMarkup(row_width=2)
+admin_content_hub_kb.row(
     InlineKeyboardButton(text="🛒 Do'kon boshqaruvi", callback_data="admin:shop"),
     InlineKeyboardButton(text="📚 Kutubxona boshqaruvi", callback_data="admin:library"),
 )
-admin_keyboard.row(
-    InlineKeyboardButton(text="🖱 Sayt Statistikasi", callback_data="admin:site_stats:7d"),
-    InlineKeyboardButton(text="📊 Yaxshilik ulashuvchi statistikasi", callback_data="admin:boom_stats"),
-)
-admin_keyboard.row(
-    InlineKeyboardButton(text="🚀 Musobaqa boshlash", callback_data="admin:boom"),
+admin_content_hub_kb.row(
     InlineKeyboardButton(text="🎬 Xush kelibsiz video", callback_data="admin:welcome_video"),
+)
+admin_content_hub_kb.row(
+    InlineKeyboardButton(text="🔙 Asosiy Admin menyu", callback_data="admin:main"),
+)
+
+# 5. Hub: Statistika & Analitika
+admin_analytics_hub_kb = InlineKeyboardMarkup(row_width=2)
+admin_analytics_hub_kb.row(
+    InlineKeyboardButton(text="📈 Bot statistikasi", callback_data="admin:stats"),
+    InlineKeyboardButton(text="🖱 Sayt statistikasi", callback_data="admin:site_stats:7d"),
+)
+admin_analytics_hub_kb.row(
+    InlineKeyboardButton(text="🏆 Top kitobxonlar (broadcast)", callback_data="admin:top_readers"),
+    InlineKeyboardButton(text="🏅 Kitobxon nominatsiyalari", callback_data="admin:reader_titles"),
+)
+admin_analytics_hub_kb.row(
+    InlineKeyboardButton(text="🚀 Musobaqa (BOOM) boshlash", callback_data="admin:boom"),
+    InlineKeyboardButton(text="📊 BOOM statistikasi", callback_data="admin:boom_stats"),
+)
+admin_analytics_hub_kb.row(
+    InlineKeyboardButton(text="🔙 Asosiy Admin menyu", callback_data="admin:main"),
 )
 
 # The deprecated reply-keyboard version (kept for any legacy callers).

@@ -2,7 +2,11 @@ from aiogram.utils.markdown import hlink
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from django.utils import timezone
 from asgiref.sync import sync_to_async
-from tgbot.bot.keyboards.reply import admin_keyboard, confirm_markup, main_markup, yes_or_no_markup, back_keyboard
+from tgbot.bot.keyboards.reply import (
+    admin_keyboard, admin_users_hub_kb, admin_games_hub_kb,
+    admin_broadcast_hub_kb, admin_content_hub_kb, admin_analytics_hub_kb,
+    confirm_markup, main_markup, yes_or_no_markup, back_keyboard,
+)
 from aiogram.dispatcher.filters import Text
 from tgbot.bot import dp
 from tgbot.models import TelegramProfile, BookReport, ConfirmationReport, BooksToRead, UserAchievement
@@ -1917,7 +1921,37 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
         pass
 
     admin_id = call.from_user.id
-    if action == "registered":
+    if action in ("main", "home"):
+        try:
+            await call.message.edit_text("👑 <b>Admin boshqaruv paneli</b>\n\nQuyidagi asosiy markazlardan birini tanlang:", parse_mode="HTML", reply_markup=admin_keyboard)
+        except Exception:
+            await call.message.answer("👑 <b>Admin boshqaruv paneli</b>\n\nQuyidagi asosiy markazlardan birini tanlang:", parse_mode="HTML", reply_markup=admin_keyboard)
+    elif action == "hub_users":
+        try:
+            await call.message.edit_text("👥 <b>Foydalanuvchilar Markazi</b>\n\nFoydalanuvchilar ro'yxati, qidiruv, ballar va profil boshqaruvi:", parse_mode="HTML", reply_markup=admin_users_hub_kb)
+        except Exception:
+            await call.message.answer("👥 <b>Foydalanuvchilar Markazi</b>\n\nFoydalanuvchilar ro'yxati, qidiruv, ballar va profil boshqaruvi:", parse_mode="HTML", reply_markup=admin_users_hub_kb)
+    elif action == "hub_games":
+        try:
+            await call.message.edit_text("🎮 <b>O'yinlar & Quizlar Markazi</b>\n\nBarcha 58 ta intellektual o'yinni boshqarish, test qilish va quizlar:", parse_mode="HTML", reply_markup=admin_games_hub_kb)
+        except Exception:
+            await call.message.answer("🎮 <b>O'yinlar & Quizlar Markazi</b>\n\nBarcha 58 ta intellektual o'yinni boshqarish, test qilish va quizlar:", parse_mode="HTML", reply_markup=admin_games_hub_kb)
+    elif action == "hub_broadcast":
+        try:
+            await call.message.edit_text("📢 <b>Xabarnoma & Eslatmalar Markazi</b>\n\nFoydalanuvchilarga xabar tarqatish, eslatmalar va so'rovnomalar:", parse_mode="HTML", reply_markup=admin_broadcast_hub_kb)
+        except Exception:
+            await call.message.answer("📢 <b>Xabarnoma & Eslatmalar Markazi</b>\n\nFoydalanuvchilarga xabar tarqatish, eslatmalar va so'rovnomalar:", parse_mode="HTML", reply_markup=admin_broadcast_hub_kb)
+    elif action == "hub_content":
+        try:
+            await call.message.edit_text("📚 <b>Do'kon & Kutubxona Markazi</b>\n\nKitoblar, mahsulotlar va video qo'llanmalar boshqaruvi:", parse_mode="HTML", reply_markup=admin_content_hub_kb)
+        except Exception:
+            await call.message.answer("📚 <b>Do'kon & Kutubxona Markazi</b>\n\nKitoblar, mahsulotlar va video qo'llanmalar boshqaruvi:", parse_mode="HTML", reply_markup=admin_content_hub_kb)
+    elif action == "hub_analytics":
+        try:
+            await call.message.edit_text("📊 <b>Statistika & Analitika Markazi</b>\n\nBot, Sayt, Top kitobxonlar va Referal BOOM statistikasi:", parse_mode="HTML", reply_markup=admin_analytics_hub_kb)
+        except Exception:
+            await call.message.answer("📊 <b>Statistika & Analitika Markazi</b>\n\nBot, Sayt, Top kitobxonlar va Referal BOOM statistikasi:", parse_mode="HTML", reply_markup=admin_analytics_hub_kb)
+    elif action == "registered":
         await registered_lists(msg)
     elif action == "unregistered":
         await unregistered_lists(msg)
