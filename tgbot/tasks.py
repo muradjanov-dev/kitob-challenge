@@ -6161,8 +6161,27 @@ NEW_GAME_TYPES = [
     "timeline", "matchbook", "reverse",
 ]
 
-# 5 Most Prestigious Games for the Daily VIP Premium Arena
-VIP_5_GAMES = ["king", "duel", "teams", "survival", "mysterybox"]
+# Prestigious Games pool for the Daily VIP Premium Arena (1 random game selected each evening)
+VIP_TOP_GAMES = [
+    "king", "duel", "teams", "mysterybox", "mindtrap", "stoic",
+    "strategy", "simurgh", "masnaviy", "gazzoliy", "blitz", "bracket", "auction"
+]
+
+VIP_GAME_NAMES = {
+    "king": "👑 Qirol Taxti VIP",
+    "duel": "🤺 1v1 Jonli Duel VIP",
+    "teams": "👥 VIP Jamoa Jangi",
+    "mysterybox": "🎁 Sirli Sandiq VIP",
+    "mindtrap": "🧠 Fikr Tuzog'i VIP",
+    "stoic": "🧘‍♂️ Ongli Hayot VIP",
+    "strategy": "♟ Strategik Tafakkur VIP",
+    "simurgh": "🕊 Simurg' Parvozi VIP",
+    "masnaviy": "🪈 Nay Nidosi VIP",
+    "gazzoliy": "🗝 Kimyoi Saodat VIP",
+    "blitz": "⚡️ Blitz 60 VIP",
+    "bracket": "🏆 Haftalik Turnir VIP",
+    "auction": "💰 Kitob Auksioni VIP",
+}
 
 
 @shared_task
@@ -6195,24 +6214,24 @@ def start_game_sequence(slot, count=3, pool=None):
 
 @shared_task
 def start_vip_premium_evening_event():
-    """Daily at ~22:30 (right after 22:00 evening games wrap up):
-    Kicks off the exclusive 5-Game VIP Premium Arena for Premium subscribers only,
+    """Daily right after 22:00 evening games wrap up (3 regular games):
+    Kicks off 1 Random Prestigious VIP Premium Game for Premium subscribers only,
     with massive 500-1000 Kitobcha prizes, free Premium days, and Gold badges!"""
     from tgbot.models import GameSequence
+
+    chosen = random.choice(VIP_TOP_GAMES)
+    game_name = VIP_GAME_NAMES.get(chosen, f"⭐️ {chosen.upper()} VIP")
+
     text = (
-        "⭐️ <b>VIP PREMIUM ARENA BOSHLANMOQDA! (22:30)</b> ⭐️\n\n"
-        "Faqat <b>VIP Premium</b> foydalanuvchilar uchun <b>5 ta ENG ZO'R O'YIN</b> ketma-ket start oladi:\n\n"
-        "👑 1. <b>Qirol Taxti VIP</b>\n"
-        "🤺 2. <b>1v1 Jonli Duel VIP</b>\n"
-        "👥 3. <b>VIP Jamoa Jangi</b>\n"
-        "💀 4. <b>Omon Qolish VIP</b>\n"
-        "🎁 5. <b>Sirli Sandiq VIP</b>\n\n"
+        "⭐️ <b>VIP PREMIUM ARENA (Kechki maxsus super-o'yin)!</b> ⭐️\n\n"
+        f"Kechki 3 ta o'yindan so'ng, faqat <b>VIP Premium</b> a'zolar uchun bugungi maxsus o'yin:\n"
+        f"👑 <b>{game_name}</b>!\n\n"
         "💰 <b>KATTA YUTUQLAR:</b>\n"
         "🥇 1-o'rin: <b>+500 – 1000 Kitobcha + 3 kun BEPUL Premium!</b>\n"
         "🥈 2-o'rin: <b>+300 – 600 Kitobcha + 2 kun BEPUL Premium!</b>\n"
         "🥉 3-o'rin: <b>+200 – 400 Kitobcha + 1 kun BEPUL Premium!</b>\n"
-        "🎖 4-10 o'rinlar: <b>+75 – 150 Kitobcha!</b>\n\n"
-        "<i>⚡️ Hali Premium bo'lmasangiz, hoziroq bot orqali faollashtiring va ulkan yutuqlarga ega bo'ling!</i>"
+        "🎖 Barcha ishtirokchilarga: <b>+75 Kitobcha!</b>\n\n"
+        "<i>⚡️ Hali Premium bo'lmasangiz, hoziroq bot orqali faollashtiring va super yutuqlarga ega bo'ling!</i>"
     )
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     for group_id, thread_id in _game_targets():
@@ -6225,7 +6244,7 @@ def start_vip_premium_evening_event():
         except Exception as e:
             print(f"start_vip_premium_evening_event announce {group_id}: {e}")
 
-    start_game_sequence(GameSequence.SLOT_VIP, count=5, pool=VIP_5_GAMES)
+    start_game_sequence(GameSequence.SLOT_VIP, count=1, pool=[chosen])
 
 
 @shared_task
