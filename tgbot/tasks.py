@@ -6519,3 +6519,64 @@ def _finalize_quiz_flavor(flavor):
             f"{emoji_} {title} — <b>+{w['reward']} Kitobcha</b>! Ball: {w['points']}"
         ))
         _advance_game_sequence(flavor, game.id)
+
+
+@shared_task
+def broadcast_major_update_to_all():
+    """Broadcast a concise, high-impact update message to all groups, channels, and registered users."""
+    import time
+    username = _get_bot_username() or "kitob_challange_bot"
+    text = (
+        "🚀 <b>KITOB CHALLENGE — KATTA YANGILANISHLAR!</b>\n\n"
+        "Hurmatli kitobxonlar! Platformamizda ulkan o'zgarishlar va yangi imkoniyatlar ishga tushirildi:\n\n"
+        "🎮 <b>58 xil Jonli Intellektual O'yinlar:</b>\n"
+        "• 🧠 <b>Mantiq & Farosat:</b> Fikr Tuzog'i, Ongli Hayot, Podadan Ajral, Axloqiy Dilemma, Sabab va Oqibat...\n"
+        "• ✨ <b>Tasavvuf & Ishqulloh:</b> Simurg' Parvozi (7 vodiy), Parvona va Sham, Buyuk Jihod, Qalb Sayqali, Xalvat dar Anjuman...\n"
+        "• 🎧 <b>Ovozli Iqtibos:</b> Jonli audio eshitib asarni topish.\n\n"
+        "👑 <b>VIP Premium Arena (Har kuni 22:30 da):</b>\n"
+        "• 5 ta eng zo'r o'yin ketma-ket!\n"
+        "• 🥇 <b>+500 – 1000 Kitobcha + 3 kun BEPUL Premium!</b>\n\n"
+        "🧹 <b>Guruhlarda toza muhit:</b>\n"
+        "• Test oraliq xabarlari 12 soatdan keyin avtomatik tozalanadi, faqat natijalar qoladi.\n"
+        "• Test qaysi kitobdan ekanligi aniq ko'rsatiladi.\n\n"
+        "👇 <i>Hoziroq botga kiring va yangi o'yinlarni sinab ko'ring:</i>"
+    )
+    kb = json.dumps({"inline_keyboard": [[{"text": "🚀 Botga kirish va o'ynash", "url": f"https://t.me/{username}?start=main"}]]})
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    # 1. Send to all groups and channels
+    target_chats = set()
+    for gid, tid in list(_announce_targets()) + list(_game_targets()):
+        target_chats.add((gid, tid))
+
+    group_sent = 0
+    for gid, tid in target_chats:
+        try:
+            data = {"chat_id": gid, "text": text, "parse_mode": "HTML", "reply_markup": kb, "disable_web_page_preview": "true"}
+            if tid:
+                data["message_thread_id"] = tid
+            resp = requests.post(url, data=data, timeout=8)
+            if resp.status_code == 200:
+                group_sent += 1
+            time.sleep(0.05)
+        except Exception as e:
+            print(f"broadcast group {gid}: {e}")
+
+    # 2. Send to all registered users
+    user_ids = list(TelegramProfile.objects.filter(is_registered=True, is_blocked=False).values_list("telegram_id", flat=True).distinct())
+    user_sent = 0
+    for uid in user_ids:
+        try:
+            data = {"chat_id": uid, "text": text, "parse_mode": "HTML", "reply_markup": kb, "disable_web_page_preview": "true"}
+            resp = requests.post(url, data=data, timeout=8)
+            if resp.status_code == 200:
+                user_sent += 1
+            elif resp.status_code == 403:
+                TelegramProfile.objects.filter(telegram_id=uid).update(is_blocked=True)
+            time.sleep(0.04)
+        except Exception:
+            pass
+
+    print(f"broadcast_major_update_to_all completed: {group_sent} groups, {user_sent} users")
+    return {"groups": group_sent, "users": user_sent}
+
