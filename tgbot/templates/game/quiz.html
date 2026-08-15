@@ -66,6 +66,11 @@
     <div class="card qcard">
       <div class="qn" id="qn">SAVOL</div>
       <div class="qtext" id="qtext">—</div>
+      <div id="audioBox" class="hidden" style="margin:10px 0;text-align:center">
+        <button id="playAudioBtn" type="button" style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#ff5252,#ff7b25);color:#fff;border:0;padding:10px 20px;border-radius:24px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(255,82,82,0.35);transition:all .2s">
+          <span>🔊</span> <span id="audioBtnText">Ovozni tinglash</span>
+        </button>
+      </div>
       <img class="qimg hidden" id="qimg" alt="">
       <div class="items hidden" id="itemsRow"></div>
     </div>
@@ -201,6 +206,21 @@
         $('myPts').textContent=s.your_points||0;$('qnum').textContent=s.q_number+'/'+s.q_total;
         if(s.q_index!==lastQ){lastQ=s.q_index;curAnswered=false;curCorrectIdx=-1;curChoice=-1;$('toast').textContent='';}
         $('qtext').textContent=s.q||'';
+        var audioBox=$('audioBox');
+        if(FLAVOR==='audioquote'||s.audio_url){
+          audioBox.classList.remove('hidden');
+          $('playAudioBtn').onclick=function(){
+            if(s.audio_url){
+              try{var aud=new Audio(s.audio_url);aud.play();}catch(e){}
+            }else if(window.speechSynthesis){
+              window.speechSynthesis.cancel();
+              var clean=(s.q||'').replace(/\[.*?\]/g,'').trim();
+              var u=new SpeechSynthesisUtterance(clean);
+              u.rate=0.9;
+              window.speechSynthesis.speak(u);
+            }
+          };
+        }else{ audioBox.classList.add('hidden'); }
         var itemsRow=$('itemsRow');
         if(s.items&&s.items.length){
           itemsRow.classList.remove('hidden');
