@@ -309,42 +309,137 @@ async def admin_start_emoji_cb(call: types.CallbackQuery, state: FSMContext = No
     await _launch_game(call.message, start_emoji_game, "/emoji/", "Emoji Kitob")
 
 
-# ── All 15 games — one submenu, manual start for any of them ────────────────
-# (key, title, web_path, tasks.py function name). Covers the original 4 (which
-# also still have their own direct top-level buttons above) plus all 10 games
-# built 2026-07-22, so every live game has a manual-start button in one place.
-_GAMES_MENU = [
-    ("chain", "🔗 Kitob Zanjiri", "/zanjir/", "start_chain_game"),
-    ("feud", "🗣 Ko'pchilik nima dedi?", "/kopchilik/", "start_feud_game"),
-    ("castle", "🏰 Bilim Qal'asi", "/qala/", "start_castle_game"),
-    ("emoji", "🎬 Emoji Kitob", "/emoji/", "start_emoji_game"),
-    ("wisdom", "☪️ Hikmat Xazinasi", "/hikmat/", "start_wisdom_game"),
-    ("detective", "📖 Kitob Detektivi", "/detektiv/", "start_detective_game"),
-    ("survival", "💀 Omon qolish", "/omon-qolish/", "start_survival_game"),
-    ("twofacts", "🎭 Ikki haqiqat, bir yolg'on", "/ikki-haqiqat/", "start_quiz_twofacts_game"),
-    ("impostor", "🃏 Kim yolg'onchi?", "/kim-yolgonchi/", "start_quiz_impostor_game"),
-    ("connection", "🧩 Yashirin bog'lanish", "/bog-lanish/", "start_quiz_connection_game"),
-    ("teams", "👥 Jamoa Jangi", "/jamoa-jangi/", "start_quiz_teams_game"),
-    ("timeline", "🕰️ Vaqt Mashinasi", "/vaqt-mashinasi/", "start_quiz_timeline_game"),
-    ("matchbook", "🎯 Muallif-Asar Moslashtirish", "/muallif-asar/", "start_quiz_matchbook_game"),
-    ("reverse", "🔄 Teskari Viktorina", "/teskari-viktorina/", "start_quiz_reverse_game"),
-    ("cover", "🖼 Kitob Muqovasi", "/kitob-muqovasi/", "start_quiz_cover_game"),
+# ── All 65 games registry: (key, title, web_path, category) ─────────────────
+_ALL_GAMES = [
+    # 🌟 Asosiy va Jangovar (7)
+    ("chain", "🔗 Kitob Zanjiri", "/zanjir/", "special"),
+    ("feud", "🗣 Ko'pchilik nima dedi?", "/kopchilik/", "special"),
+    ("castle", "🏰 Bilim Qal'asi", "/qala/", "special"),
+    ("emoji", "🎬 Emoji Kitob", "/emoji/", "special"),
+    ("wisdom", "☪️ Hikmat Xazinasi", "/hikmat/", "special"),
+    ("detective", "📖 Kitob Detektivi", "/detektiv/", "special"),
+    ("survival", "💀 Omon qolish", "/omon-qolish/", "special"),
+
+    # 🎭 Bilim va Mantiq (20)
+    ("twofacts", "🎭 Ikki haqiqat, 1 yolg'on", "/ikki-haqiqat/", "logic"),
+    ("impostor", "🃏 Kim yolg'onchi?", "/kim-yolgonchi/", "logic"),
+    ("connection", "🧩 Yashirin bog'lanish", "/bog-lanish/", "logic"),
+    ("teams", "👥 Jamoa Jangi", "/jamoa-jangi/", "logic"),
+    ("timeline", "🕰️ Vaqt Mashinasi", "/vaqt-mashinasi/", "logic"),
+    ("matchbook", "🎯 Muallif-Asar", "/muallif-asar/", "logic"),
+    ("reverse", "🔄 Teskari Viktorina", "/teskari-viktorina/", "logic"),
+    ("cover", "🖼 Kitob Muqovasi", "/kitob-muqovasi/", "logic"),
+    ("anagram", "🔠 Anagramma Kitob", "/anagram/", "logic"),
+    ("blitz", "⚡️ Blitz 60", "/blitz/", "logic"),
+    ("crossword", "🧩 Mini Krossvord", "/crossword/", "logic"),
+    ("wordle", "🔤 Harfma-Harf", "/wordle/", "logic"),
+    ("cipher", "🔐 Sherlok Kodi", "/cipher/", "logic"),
+    ("acronym", "🎯 Bosh Harflar", "/acronym/", "logic"),
+    ("character", "👤 Qahramonni Top", "/character/", "logic"),
+    ("dialogue", "🗣 Kimning gapi?", "/dialogue/", "logic"),
+    ("plotmap", "🗺 Syujet Xaritasi", "/plotmap/", "logic"),
+    ("sequence", "⏳ Ketma-ketlik", "/sequence/", "logic"),
+    ("oddone", "🔍 Ortiqchasini Top", "/oddone/", "logic"),
+    ("ending", "✍️ Asar Yakuni", "/ending/", "logic"),
+
+    # 🎨 Ijodiy va Vizual (6)
+    ("pixel", "🖼 Piksel Muqova", "/pixel/", "creative"),
+    ("aiart", "🎨 AI Rasmlar", "/aiart/", "creative"),
+    ("scenes", "🎭 Sahna Ko'rinishi", "/scenes/", "creative"),
+    ("audioquote", "🎧 Ovozli Iqtibos", "/audioquote/", "creative"),
+    ("mosaic", "🧩 Kitob Mozaikasi", "/mosaic/", "creative"),
+    ("hiddendetail", "🔎 Yashirin Detal", "/hiddendetail/", "creative"),
+
+    # ⚔️ Arena va Turnirlar (7)
+    ("duel", "🤺 1v1 Jonli Duel", "/duel/", "arena"),
+    ("buzzer", "🔔 Tezkor Qo'ng'iroq", "/buzzer/", "arena"),
+    ("bracket", "🏆 Haftalik Turnir", "/bracket/", "arena"),
+    ("auction", "💰 Kitob Auksioni", "/auction/", "arena"),
+    ("regions", "👥 Viloyatlar Jangi", "/regions/", "arena"),
+    ("king", "👑 Qirol Taxti", "/king/", "arena"),
+    ("mysterybox", "🎁 Sirli Sandiq", "/mysterybox/", "arena"),
+
+    # 📚 Adabiyot va Allomalar (5)
+    ("rhyme", "📜 Bahri-Bayt", "/rhyme/", "lit"),
+    ("scholars", "🕌 Sharq Allomalari", "/scholars/", "lit"),
+    ("genres", "📚 Janrlar Ustasi", "/genres/", "lit"),
+    ("numbers", "🔢 Adabiy Raqamlar", "/numbers/", "lit"),
+    ("worldlit", "🌍 Jahon Adabiyoti", "/worldlit/", "lit"),
+
+    # 🧠 Ongli Hayot & Falsafa (10)
+    ("mindtrap", "🧠 Fikr Tuzog'i", "/mindtrap/", "mind"),
+    ("stoic", "🧘‍♂️ Ongli Hayot", "/stoic/", "mind"),
+    ("antiherd", "🐑 Podadan Ajral", "/antiherd/", "mind"),
+    ("dilemma", "⚖️ Axloqiy Dilemma", "/dilemma/", "mind"),
+    ("causeeffect", "🔮 Sabab va Oqibat", "/causeeffect/", "mind"),
+    ("masks", "🎭 Niqoblar Foshi", "/masks/", "mind"),
+    ("socrates", "🏛 Sokrat Suhbatlari", "/socrates/", "mind"),
+    ("memento", "⌛️ Vaqt Paradoksi", "/memento/", "mind"),
+    ("strategy", "♟ Strategik Tafakkur", "/strategy/", "mind"),
+    ("paradox", "💡 Paradokslar Olami", "/paradox/", "mind"),
+
+    # ✨ Tasavvuf & Qalb (10)
+    ("simurgh", "🕊 Simurg' Parvozi", "/simurgh/", "sufism"),
+    ("ishq", "🕯 Parvona va Sham", "/ishq/", "sufism"),
+    ("nafs", "🛡 Nafs Tarbiyasi", "/nafs/", "sufism"),
+    ("qalb", "🪞 Qalb Sayqali", "/qalb/", "sufism"),
+    ("naqshband", "🌾 Xalvat dar Anjuman", "/naqshband/", "sufism"),
+    ("yassaviy", "📜 Hikmatlar Daryosi", "/yassaviy/", "sufism"),
+    ("masnaviy", "🪈 Nay Nidosi", "/masnaviy/", "sufism"),
+    ("gazzoliy", "🗝 Kimyoi Saodat", "/gazzoliy/", "sufism"),
+    ("fano", "🌊 Fanofilloh", "/fano/", "sufism"),
+    ("marifat", "☀️ Haqiqat Quyoshi", "/marifat/", "sufism"),
 ]
-_GAMES_MENU_BY_KEY = {key: (title, path, task_name) for key, title, path, task_name in _GAMES_MENU}
+_GAMES_MENU = _ALL_GAMES
+_GAMES_MENU_BY_KEY = {key: (title, path, cat) for key, title, path, cat in _ALL_GAMES}
+
+_GAME_CATEGORIES = [
+    ("special", "🌟 Asosiy va Jangovar (7)"),
+    ("logic", "🎭 Bilim va Mantiq (20)"),
+    ("creative", "🎨 Ijodiy va Vizual (6)"),
+    ("arena", "⚔️ Arena va Turnirlar (7)"),
+    ("lit", "📚 Adabiyot va Allomalar (5)"),
+    ("mind", "🧠 Ongli Hayot & Falsafa (10)"),
+    ("sufism", "✨ Tasavvuf & Qalb (10)"),
+]
 
 
-def _games_admin_menu_kb() -> InlineKeyboardMarkup:
+def _games_categories_kb(mode: str) -> InlineKeyboardMarkup:
+    """Return category selector for test ('test') or live ('live') mode."""
     kb = InlineKeyboardMarkup(row_width=2)
-    for key, title, _path, _task_name in _GAMES_MENU:
-        kb.insert(InlineKeyboardButton(title, callback_data=f"adm_game:{key}"))
+    pfx = "adm_tcat" if mode == "test" else "adm_gcat"
+    for cat_key, cat_name in _GAME_CATEGORIES:
+        kb.insert(InlineKeyboardButton(cat_name, callback_data=f"{pfx}:{cat_key}"))
+    all_pfx = "adm_tall" if mode == "test" else "adm_gall"
+    kb.row(InlineKeyboardButton("📋 Barcha 65 ta o'yin ro'yxati", callback_data=all_pfx))
     kb.row(InlineKeyboardButton("🔙 Admin panelga qaytish", callback_data="menu:admin"))
     return kb
 
 
+def _games_in_category_kb(cat_key: str, mode: str) -> InlineKeyboardMarkup:
+    """Return game buttons within a category."""
+    kb = InlineKeyboardMarkup(row_width=2)
+    pfx = "adm_test" if mode == "test" else "adm_game"
+    games = [g for g in _ALL_GAMES if g[3] == cat_key] if cat_key != "all" else _ALL_GAMES
+    for key, title, _path, _cat in games:
+        kb.insert(InlineKeyboardButton(title, callback_data=f"{pfx}:{key}"))
+    back_target = "admin:games_test_menu" if mode == "test" else "admin:games_menu"
+    kb.row(InlineKeyboardButton("🔙 Bo'limlarga qaytish", callback_data=back_target))
+    kb.row(InlineKeyboardButton("🔙 Asosiy Admin menyu", callback_data="menu:admin"))
+    return kb
+
+
+def _games_admin_menu_kb() -> InlineKeyboardMarkup:
+    return _games_categories_kb("live")
+
+
+def _games_test_menu_kb() -> InlineKeyboardMarkup:
+    return _games_categories_kb("test")
+
+
 def _create_game_silent(key):
     """Create a live game instance for `key` WITHOUT any group announcement —
-    used by the admin's silent test-play button. Mirrors what each start_*_game
-    task does internally, minus the `_announce_game()` broadcast."""
+    used by the admin's silent test-play button."""
     if key == "chain":
         from tgbot.services.chain_game import create_scheduled_game, finalize_due_games
         finalize_due_games()
@@ -373,7 +468,7 @@ def _create_game_silent(key):
         from tgbot.services.survival_game import create_scheduled_survival, finalize_due_games
         finalize_due_games()
         return create_scheduled_survival()
-    # The 7 Bilim O'yini flavors all share one engine.
+    # All quiz flavors
     from tgbot.services.quiz_game import create_scheduled_quiz, finalize_due_games
     finalize_due_games(key)
     return create_scheduled_quiz(key)
@@ -383,7 +478,7 @@ async def _launch_game_silent(target_message, key, web_path, title):
     """Create a live game for admin-only testing — no group announcement, no
     public deep link. Only the admin who tapped the button gets an open
     button in their own DM."""
-    await target_message.answer(f"🧪 {title} sinov rejimida yaratilmoqda… (guruhga e'lon qilinmaydi)")
+    await target_message.answer(f"🧪 <b>{title}</b> sinov rejimida yaratilmoqda… (guruhga e'lon qilinmaydi)", parse_mode="HTML")
     try:
         await sync_to_async(_create_game_silent)(key)
     except Exception as e:
@@ -403,14 +498,6 @@ async def _launch_game_silent(target_message, key, web_path, title):
     )
 
 
-def _games_test_menu_kb() -> InlineKeyboardMarkup:
-    kb = InlineKeyboardMarkup(row_width=2)
-    for key, title, _path, _task_name in _GAMES_MENU:
-        kb.insert(InlineKeyboardButton(title, callback_data=f"adm_test:{key}"))
-    kb.row(InlineKeyboardButton("🔙 Admin panelga qaytish", callback_data="menu:admin"))
-    return kb
-
-
 @dp.callback_query_handler(IsPrivate(), lambda c: c.data == "admin:games_test_menu", state="*")
 async def admin_games_test_menu_cb(call: types.CallbackQuery, state: FSMContext = None):
     user = await aget_user(call.from_user.id)
@@ -419,9 +506,39 @@ async def admin_games_test_menu_cb(call: types.CallbackQuery, state: FSMContext 
         return
     await call.answer()
     await call.message.answer(
-        "🧪 <b>Qaysi o'yinni jimgina sinab ko'ramiz?</b>\n\n"
-        "Bu yerda tanlangan o'yin FAQAT sizga ochiladi — guruhga hech qanday e'lon yuborilmaydi.",
+        "🧪 <b>Qaysi toifadagi o'yinni jimgina sinab ko'ramiz?</b>\n\n"
+        "Tanlangan o'yin FAQAT sizga ochiladi — guruhlarga hech qanday e'lon yuborilmaydi.\n"
+        "Bo'limni tanlang 👇",
         parse_mode="HTML", reply_markup=_games_test_menu_kb(),
+    )
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("adm_tcat:"), state="*")
+async def admin_test_cat_cb(call: types.CallbackQuery, state: FSMContext = None):
+    user = await aget_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    cat_key = call.data.split(":", 1)[1]
+    cat_title = dict(_GAME_CATEGORIES).get(cat_key, "O'yinlar")
+    await call.answer()
+    await call.message.answer(
+        f"🧪 <b>{cat_title}</b> — sinov uchun o'yinni tanlang:\n\n"
+        "<i>Faqat sizga ochiladi, guruhlarga xabar bormaydi.</i>",
+        parse_mode="HTML", reply_markup=_games_in_category_kb(cat_key, "test"),
+    )
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data == "adm_tall", state="*")
+async def admin_test_all_cb(call: types.CallbackQuery, state: FSMContext = None):
+    user = await aget_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    await call.answer()
+    await call.message.answer(
+        "🧪 <b>Barcha 65 ta o'yin (Sinov rejimi):</b>\nO'yinni tanlang 👇",
+        parse_mode="HTML", reply_markup=_games_in_category_kb("all", "test"),
     )
 
 
@@ -436,7 +553,7 @@ async def admin_test_any_game_cb(call: types.CallbackQuery, state: FSMContext = 
     if not entry:
         await call.answer("Noma'lum o'yin.", show_alert=True)
         return
-    title, web_path, _task_name = entry
+    title, web_path, _cat = entry
     await call.answer("Sinov rejimida yaratilmoqda…")
     await _launch_game_silent(call.message, key, web_path, title)
 
@@ -449,9 +566,39 @@ async def admin_games_menu_cb(call: types.CallbackQuery, state: FSMContext = Non
         return
     await call.answer()
     await call.message.answer(
-        "🎮 <b>Qaysi o'yinni hozir boshlaymiz?</b>\n\n"
-        "Bosilgan o'yin darhol e'lon qilinadi va 30 soniyadan keyin boshlanadi.",
+        "🎮 <b>Qaysi toifadagi o'yinni boshlaymiz?</b>\n\n"
+        "O'yin tanlangach, darhol guruhlarga e'lon qilinadi va 30 soniyadan keyin jonli boshlanadi.\n"
+        "Bo'limni tanlang 👇",
         parse_mode="HTML", reply_markup=_games_admin_menu_kb(),
+    )
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data and c.data.startswith("adm_gcat:"), state="*")
+async def admin_live_cat_cb(call: types.CallbackQuery, state: FSMContext = None):
+    user = await aget_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    cat_key = call.data.split(":", 1)[1]
+    cat_title = dict(_GAME_CATEGORIES).get(cat_key, "O'yinlar")
+    await call.answer()
+    await call.message.answer(
+        f"🎮 <b>{cat_title}</b> — guruhda boshlash uchun o'yinni tanlang:\n\n"
+        "<i>Bosilgan o'yin guruhlarga e'lon qilinadi va boshlanadi.</i>",
+        parse_mode="HTML", reply_markup=_games_in_category_kb(cat_key, "live"),
+    )
+
+
+@dp.callback_query_handler(IsPrivate(), lambda c: c.data == "adm_gall", state="*")
+async def admin_live_all_cb(call: types.CallbackQuery, state: FSMContext = None):
+    user = await aget_user(call.from_user.id)
+    if not (user and user.is_admin):
+        await call.answer("Siz admin emassiz!", show_alert=True)
+        return
+    await call.answer()
+    await call.message.answer(
+        "🎮 <b>Barcha 65 ta o'yin (Guruhda boshlash):</b>\nO'yinni tanlang 👇",
+        parse_mode="HTML", reply_markup=_games_in_category_kb("all", "live"),
     )
 
 
@@ -466,10 +613,10 @@ async def admin_start_any_game_cb(call: types.CallbackQuery, state: FSMContext =
     if not entry:
         await call.answer("Noma'lum o'yin.", show_alert=True)
         return
-    title, web_path, task_name = entry
+    title, web_path, _cat = entry
     await call.answer("Boshlanmoqda…")
     import tgbot.tasks as _tasks
-    start_task = getattr(_tasks, task_name)
+    start_task = lambda: _tasks.start_any_game(key)
     await _launch_game(call.message, start_task, web_path, title)
 
 

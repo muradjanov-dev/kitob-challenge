@@ -610,66 +610,148 @@ def queue_leaderboard_sponsor(user) -> bool:
         return True
 
 
-_GOLD = (212, 175, 90)
-_GOLD_LIGHT = (238, 210, 140)
-_CREAM = (238, 232, 214)
-_NAVY_DARK = (10, 13, 24)
-_NAVY_MID = (18, 23, 40)
-_MUTED = (150, 155, 175)
+_GOLD = (218, 175, 85)
+_GOLD_LIGHT = (248, 226, 150)
+_GOLD_BRIGHT = (255, 245, 205)
+_GOLD_DARK = (150, 110, 45)
+_CREAM = (245, 240, 228)
+_NAVY_DARK = (8, 12, 24)
+_NAVY_MID = (18, 26, 50)
+_MUTED = (165, 172, 195)
+_GREEN_ACCENT = (70, 210, 140)
 
 
-def _lerp(a, b, t):
-    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+def _get_cert_font(size, bold=False, serif=True):
+    from PIL import ImageFont
+    import os as _os
+
+    font_candidates = []
+    if bold:
+        if serif:
+            font_candidates = [
+                "C:/Windows/Fonts/georgiab.ttf",
+                "C:/Windows/Fonts/timesbd.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
+                "/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf",
+            ]
+        else:
+            font_candidates = [
+                "C:/Windows/Fonts/segoeuib.ttf",
+                "C:/Windows/Fonts/arialbd.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+            ]
+    else:
+        if serif:
+            font_candidates = [
+                "C:/Windows/Fonts/georgia.ttf",
+                "C:/Windows/Fonts/times.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
+                "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
+            ]
+        else:
+            font_candidates = [
+                "C:/Windows/Fonts/segoeui.ttf",
+                "C:/Windows/Fonts/arial.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+            ]
+
+    for path in font_candidates:
+        if _os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except Exception:
+                pass
+    try:
+        return ImageFont.load_default(size=size)
+    except Exception:
+        return ImageFont.load_default()
 
 
 def generate_certificate(user) -> bytes:
-    """Render a shareable, premium-styled PNG certificate with the user's key
-    stats: gold-on-navy, ornamental double border with corner flourishes, a
-    stat-card row, and a wax-seal-style medallion. Uses Pillow's bundled
-    scalable default font (no system/TTF dependency — Pillow >= 10.1's
-    ImageFont.load_default(size=...)).
+    """Render an ultra-premium, museum-quality royal PNG certificate with the user's
+    verified stats: luxury gold-on-navy palette, radial center illumination, security
+    guilloché lattice, triple ornamental borders with corner filigree, royal crest,
+    glassmorphism stat cards, official verification ID, and an embossed 3D Gold Seal.
 
-    Square canvas (1:1) is deliberate: users set this as their Telegram
-    profile photo, and Telegram center-crops any non-square image to a
-    square for the circular avatar -- a landscape certificate (the old
-    1400x900) lost its outer stat cards to that crop. Square means nothing
-    ever needs to be cropped."""
-    from PIL import Image, ImageDraw, ImageFont
-    from tgbot.services.achievements import compute_user_stats
+    Square canvas (1200x1200) is deliberate for crisp Telegram profile avatars
+    and crystal clear social media sharing."""
+    import math
     import os as _os
+    from io import BytesIO
+    from PIL import Image, ImageDraw
+    from tgbot.services.achievements import compute_user_stats
 
     stats = compute_user_stats(user)
-    full_name = user.full_name or "Kitobxon"
+    full_name = getattr(user, "full_name", None) or "Kitobxon"
+    user_id = getattr(user, "id", 0)
 
-    W, H = 1080, 1080
+    W, H = 1200, 1200
     img = Image.new("RGB", (W, H), _NAVY_DARK)
     draw = ImageDraw.Draw(img, "RGBA")
 
-    # Vertical gradient background (subtle — lighter in the middle band).
-    for y in range(H):
-        t = y / H
-        draw.line([(0, y), (W, y)], fill=_lerp(_NAVY_DARK, _NAVY_MID, (0.5 - abs(t - 0.5)) * 2))
+    # 1. Subtle radial center illumination
+    cx, cy = W // 2, H // 2
+    for r in range(650, 0, -15):
+        t = 1 - r / 650
+        alpha = int(40 * t * t)
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(24, 36, 70, alpha))
 
-    # Ornamental double border, rounded, with a small gold diamond at each corner.
-    margin = 36
-    draw.rounded_rectangle([margin, margin, W - margin, H - margin], radius=22, outline=_GOLD, width=4)
-    margin2 = margin + 14
-    draw.rounded_rectangle([margin2, margin2, W - margin2, H - margin2], radius=14, outline=_GOLD, width=1)
+    # Gold ambient glow behind recipient name
+    for r in range(350, 0, -10):
+        t = 1 - r / 350
+        draw.ellipse(
+            [cx - r, 460 - int(r * 0.45), cx + r, 460 + int(r * 0.45)],
+            fill=(212, 175, 90, int(15 * t * t)),
+        )
 
-    def diamond(cx, cy, size, color=_GOLD):
-        draw.polygon([(cx, cy - size), (cx + size, cy), (cx, cy + size), (cx - size, cy)], fill=color)
+    # 2. Geometric security diamond watermark lattice
+    for gx in range(50, W - 50, 32):
+        for gy in range(50, H - 50, 32):
+            draw.point((gx, gy), fill=(*_GOLD, 16))
 
-    for cx_, cy_ in [(margin, margin), (W - margin, margin), (margin, H - margin), (W - margin, H - margin)]:
-        diamond(cx_, cy_, 10)
+    # 3. Triple Luxury Gold Borders
+    m1 = 36
+    draw.rounded_rectangle([m1, m1, W - m1, H - m1], radius=22, outline=_GOLD, width=3)
+    m2 = 48
+    draw.rounded_rectangle([m2, m2, W - m2, H - m2], radius=16, outline=(*_GOLD_DARK, 150), width=1)
+    m3 = 56
+    draw.rounded_rectangle([m3, m3, W - m3, H - m3], radius=12, outline=(*_GOLD_LIGHT, 90), width=1)
 
-    title_font = ImageFont.load_default(size=30)
-    script_font = ImageFont.load_default(size=64)
-    name_font = ImageFont.load_default(size=50)
-    label_font = ImageFont.load_default(size=20)
-    num_font = ImageFont.load_default(size=44)
-    small_font = ImageFont.load_default(size=20)
-    tiny_font = ImageFont.load_default(size=16)
-    seal_font = ImageFont.load_default(size=40)
+    # Corner Flourishes
+    def draw_corner_ornament(ox, oy, flip_x=False, flip_y=False):
+        sx = -1 if flip_x else 1
+        sy = -1 if flip_y else 1
+        dx, dy = ox + 22 * sx, oy + 22 * sy
+        draw.polygon([(dx, dy - 9), (dx + 9, dy), (dx, dy + 9), (dx - 9, dy)], fill=_GOLD_LIGHT)
+        draw.line([(ox + 10 * sx, oy + 10 * sy), (ox + 54 * sx, oy + 10 * sy)], fill=_GOLD, width=2)
+        draw.line([(ox + 10 * sx, oy + 10 * sy), (ox + 10 * sx, oy + 54 * sy)], fill=_GOLD, width=2)
+        draw.ellipse([ox + 54 * sx - 3, oy + 10 * sy - 3, ox + 54 * sx + 3, oy + 10 * sy + 3], fill=_GOLD_LIGHT)
+        draw.ellipse([ox + 10 * sx - 3, oy + 54 * sy - 3, ox + 10 * sx + 3, oy + 54 * sy + 3], fill=_GOLD_LIGHT)
+
+    draw_corner_ornament(m1, m1, False, False)
+    draw_corner_ornament(W - m1, m1, True, False)
+    draw_corner_ornament(m1, H - m1, False, True)
+    draw_corner_ornament(W - m1, H - m1, True, True)
+
+    # Fonts
+    font_brand = _get_cert_font(24, bold=True, serif=False)
+    font_title = _get_cert_font(52, bold=True, serif=True)
+    font_subtitle = _get_cert_font(18, bold=False, serif=False)
+    font_intro = _get_cert_font(20, bold=False, serif=True)
+    font_name = _get_cert_font(46, bold=True, serif=True)
+    font_desc = _get_cert_font(18, bold=False, serif=False)
+    font_stat_num = _get_cert_font(36, bold=True, serif=False)
+    font_stat_lbl = _get_cert_font(15, bold=True, serif=False)
+    font_stat_sub = _get_cert_font(13, bold=False, serif=False)
+    font_seal = _get_cert_font(36, bold=True, serif=True)
+    font_tiny = _get_cert_font(14, bold=False, serif=False)
+    font_small_bold = _get_cert_font(16, bold=True, serif=False)
 
     def center_text(y, text, font, fill=_CREAM):
         bbox = draw.textbbox((0, 0), text, font=font)
@@ -677,7 +759,7 @@ def generate_certificate(user) -> bytes:
         draw.text(((W - w) / 2, y), text, font=font, fill=fill)
         return w
 
-    def center_text_spaced(y, text, font, fill, letter_spacing=8):
+    def center_text_spaced(y, text, font, fill, letter_spacing=6):
         widths = [draw.textbbox((0, 0), ch, font=font)[2] for ch in text]
         total = sum(widths) + letter_spacing * (len(text) - 1)
         x = (W - total) / 2
@@ -685,91 +767,144 @@ def generate_certificate(user) -> bytes:
             draw.text((x, y), ch, font=font, fill=fill)
             x += wch + letter_spacing
 
-    # Header ornament: line – diamond – line.
-    top_y = 100
-    diamond(W // 2, top_y, 7)
-    draw.line([(W // 2 - 160, top_y), (W // 2 - 20, top_y)], fill=_GOLD, width=2)
-    draw.line([(W // 2 + 20, top_y), (W // 2 + 160, top_y)], fill=_GOLD, width=2)
+    # Top Royal Crest & Laurel Flourish
+    top_y = 95
+    draw.polygon([
+        (W // 2 - 20, top_y + 12), (W // 2, top_y + 16), (W // 2 + 20, top_y + 12),
+        (W // 2 + 20, top_y - 8), (W // 2, top_y - 4), (W // 2 - 20, top_y - 8),
+    ], outline=_GOLD_LIGHT, width=2)
+    draw.line([(W // 2, top_y - 4), (W // 2, top_y + 16)], fill=_GOLD_LIGHT, width=2)
+    # 8-point gold star above book
+    draw.polygon([
+        (W // 2, top_y - 18), (W // 2 + 3, top_y - 13), (W // 2 + 8, top_y - 13),
+        (W // 2 + 4, top_y - 9), (W // 2 + 6, top_y - 4), (W // 2, top_y - 7),
+        (W // 2 - 6, top_y - 4), (W // 2 - 4, top_y - 9), (W // 2 - 8, top_y - 13),
+        (W // 2 - 3, top_y - 13),
+    ], fill=_GOLD_BRIGHT)
 
-    center_text_spaced(130, "KITOB CHALLENGE", title_font, _GOLD)
+    # Side decorative flourish lines
+    draw.line([(W // 2 - 240, top_y + 5), (W // 2 - 40, top_y + 5)], fill=_GOLD, width=2)
+    draw.line([(W // 2 + 40, top_y + 5), (W // 2 + 240, top_y + 5)], fill=_GOLD, width=2)
+    draw.ellipse([W // 2 - 240 - 4, top_y + 5 - 4, W // 2 - 240 + 4, top_y + 5 + 4], fill=_GOLD_LIGHT)
+    draw.ellipse([W // 2 + 240 - 4, top_y + 5 - 4, W // 2 + 240 + 4, top_y + 5 + 4], fill=_GOLD_LIGHT)
 
-    title = "SERTIFIKAT"
-    bbox = draw.textbbox((0, 0), title, font=script_font)
+    center_text_spaced(135, "KITOB CHALLENGE", font_brand, _GOLD_LIGHT, letter_spacing=8)
+    center_text(172, "XALQARO KITOBXONLIK VA MAHORAT JAMIYATI", font_subtitle, _MUTED)
+
+    # Main Certificate Title with drop shadow
+    title = "RASMIY SERTIFIKAT"
+    bbox = draw.textbbox((0, 0), title, font=font_title)
     tw = bbox[2] - bbox[0]
-    draw.text(((W - tw) / 2 + 3, 183), title, font=script_font, fill=(0, 0, 0, 90))  # soft shadow
-    draw.text(((W - tw) / 2, 180), title, font=script_font, fill=_CREAM)
+    draw.text(((W - tw) / 2 + 2, 222), title, font=font_title, fill=(0, 0, 0, 160))
+    draw.text(((W - tw) / 2, 220), title, font=font_title, fill=_GOLD_BRIGHT)
 
-    draw.line([(W // 2 - 220, 270), (W // 2 + 220, 270)], fill=_GOLD, width=2)
+    # Divider ribbon with center diamond
+    draw.line([(W // 2 - 260, 290), (W // 2 + 260, 290)], fill=_GOLD, width=2)
+    draw.polygon([(W // 2, 284), (W // 2 + 6, 290), (W // 2, 296), (W // 2 - 6, 290)], fill=_GOLD_BRIGHT)
 
-    center_text(305, "Ushbu sertifikat quyidagi kitobxonga taqdim etiladi:", label_font, _MUTED)
+    center_text(320, "Ushbu faxriy sertifikat rasman taqdim etiladi:", font_intro, _MUTED)
 
-    name_y = 350
-    name_w = center_text(name_y, full_name, name_font, _GOLD_LIGHT)
-    uy = name_y + 68
-    draw.line([(W // 2 - name_w / 2 - 30, uy), (W // 2 + name_w / 2 + 30, uy)], fill=_GOLD, width=2)
-    diamond(W // 2 - name_w / 2 - 40, uy, 5)
-    diamond(W // 2 + name_w / 2 + 40, uy, 5)
+    # Recipient Name Panel
+    name_box_y0 = 360
+    name_box_y1 = 445
+    name_box_w = min(880, max(540, len(full_name) * 26 + 120))
+    nb_x0 = (W - name_box_w) // 2
+    nb_x1 = nb_x0 + name_box_w
 
-    # Stat-card row.
+    draw.rounded_rectangle([nb_x0, name_box_y0, nb_x1, name_box_y1], radius=14, fill=(18, 26, 52, 190), outline=_GOLD, width=2)
+    for nx, ny in [(nb_x0 + 8, name_box_y0 + 8), (nb_x1 - 8, name_box_y0 + 8), (nb_x0 + 8, name_box_y1 - 8), (nb_x1 - 8, name_box_y1 - 8)]:
+        draw.ellipse([nx - 3, ny - 3, nx + 3, ny + 3], fill=_GOLD_LIGHT)
+
+    center_text(376, full_name, font_name, _CREAM)
+
+    # Commendation text
+    center_text(475, "Kitob mutolaasi, ma'naviy tafakkur va ilm yo'lidagi fidoyiligi hamda", font_desc, _MUTED)
+    center_text(502, "erishgan yuksak natijalari e'tirofi sifatida.", font_desc, _MUTED)
+
+    # 4 Glassmorphism Stat Cards
     stat_items = [
-        (str(stats["pages"]), "BET O'QILDI"),
-        (str(stats["books_finished"]), "KITOB TUGALLANDI"),
-        (str(stats["max_streak"]), "KUNLIK STREAK"),
-        (str(stats["referrals"]), "TAKLIF QILINGAN"),
+        (f"{stats.get('pages', 0):,}".replace(",", " "), "BET MUTOLAA", "O'qilgan sahifa"),
+        (str(stats.get("books_finished", 0)), "KITOB", "Tugallangan asar"),
+        (str(stats.get("max_streak", 0)), "KUN STREAK", "Uzluksiz odat"),
+        (str(stats.get("referrals", 0)), "SAFDOSh", "Taklif qilingan"),
     ]
-    n = len(stat_items)
-    card_y0, card_y1 = 470, 620
-    pad_outer = 90
-    col_w = (W - 2 * pad_outer) / n
-    for i, (num, label) in enumerate(stat_items):
-        cx_ = pad_outer + col_w * i + col_w / 2
-        if i > 0:
-            draw.line(
-                [(pad_outer + col_w * i, card_y0 + 10), (pad_outer + col_w * i, card_y1 - 10)],
-                fill=(*_GOLD, 90), width=1,
-            )
-        num_w = draw.textbbox((0, 0), num, font=num_font)[2]
-        draw.text((cx_ - num_w / 2, card_y0), num, font=num_font, fill=_GOLD_LIGHT)
-        lbl_w = draw.textbbox((0, 0), label, font=small_font)[2]
-        draw.text((cx_ - lbl_w / 2, card_y0 + 70), label, font=small_font, fill=_MUTED)
+    card_y0, card_y1 = 560, 715
+    pad_x = 80
+    total_w = W - 2 * pad_x
+    gap = 18
+    card_w = (total_w - gap * 3) / 4
 
-    # Bot link + growth hook, right-aligned in the gap between the stat row
-    # and the seal (avoids the seal's ellipse/ribbon footprint below it).
+    for i, (val, title_lbl, sub_lbl) in enumerate(stat_items):
+        cx0 = pad_x + i * (card_w + gap)
+        cx1 = cx0 + card_w
+        # Card body
+        draw.rounded_rectangle([cx0, card_y0, cx1, card_y1], radius=16, fill=(16, 24, 48, 210), outline=(*_GOLD, 100), width=1)
+        # Top gold highlight
+        draw.rounded_rectangle([cx0 + 15, card_y0 + 1, cx1 - 15, card_y0 + 4], radius=2, fill=_GOLD_LIGHT)
+
+        mid_x = (cx0 + cx1) / 2
+        # Diamond badge
+        draw.polygon([(mid_x, card_y0 + 20), (mid_x + 8, card_y0 + 28), (mid_x, card_y0 + 36), (mid_x - 8, card_y0 + 28)], fill=_GOLD)
+
+        # Value
+        vw = draw.textbbox((0, 0), val, font=font_stat_num)[2]
+        draw.text((mid_x - vw / 2, card_y0 + 52), val, font=font_stat_num, fill=_GOLD_BRIGHT)
+
+        # Label
+        lw = draw.textbbox((0, 0), title_lbl, font=font_stat_lbl)[2]
+        draw.text((mid_x - lw / 2, card_y0 + 104), title_lbl, font=font_stat_lbl, fill=_CREAM)
+
+        # Subtitle
+        sw = draw.textbbox((0, 0), sub_lbl, font=font_stat_sub)[2]
+        draw.text((mid_x - sw / 2, card_y0 + 126), sub_lbl, font=font_stat_sub, fill=_MUTED)
+
+    # Bottom Verification Panel & Seal
+    panel_y = 775
+    # Left side: Verification Details
+    left_x = 90
+    draw.text((left_x, panel_y), "RASMIY TASDIQ:", font=font_small_bold, fill=_GOLD_LIGHT)
+    draw.text((left_x, panel_y + 26), f"ID: KC-2026-CERT-{user_id}", font=font_tiny, fill=_CREAM)
+    draw.text((left_x, panel_y + 48), f"Sana: {timezone.localdate().strftime('%d.%m.%Y')}", font=font_tiny, fill=_MUTED)
+    draw.text((left_x, panel_y + 70), "Holati: ", font=font_tiny, fill=_MUTED)
+    draw.text((left_x + 50, panel_y + 70), "✓ HAQIQIY & TASDIQLANGAN", font=font_tiny, fill=_GREEN_ACCENT)
+
+    # Center: Community & Bot link
     bot_username = _os.environ.get("BOT_USERNAME", "kitob_challange_bot")
-    link_text = f"t.me/{bot_username}"
-    hook_text = "2 000 000+ o'qilgan betlar"
-    right_edge = W - margin2 - 30
-    lw = draw.textbbox((0, 0), link_text, font=small_font)[2]
-    draw.text((right_edge - lw, 690), link_text, font=small_font, fill=_CREAM)
-    hw = draw.textbbox((0, 0), hook_text, font=tiny_font)[2]
-    draw.text((right_edge - hw, 722), hook_text, font=tiny_font, fill=_GOLD_LIGHT)
+    draw.text((W // 2 - 110, panel_y + 15), f"t.me/{bot_username}", font=font_small_bold, fill=_GOLD_LIGHT)
+    draw.text((W // 2 - 145, panel_y + 42), "O'zbekiston Kitobxonlar Jamiyati", font=font_tiny, fill=_MUTED)
+    draw.text((W // 2 - 120, panel_y + 65), "2 000 000+ o'qilgan sahifalar", font=font_tiny, fill=_CREAM)
 
-    # Seal / medallion, bottom-right.
-    seal_cx, seal_cy, seal_r = W - 210, H - 155, 55
-    draw.ellipse([seal_cx - seal_r, seal_cy - seal_r, seal_cx + seal_r, seal_cy + seal_r], outline=_GOLD, width=3)
-    draw.ellipse(
-        [seal_cx - seal_r + 10, seal_cy - seal_r + 10, seal_cx + seal_r - 10, seal_cy + seal_r - 10],
-        outline=_GOLD, width=1,
-    )
-    bbox = draw.textbbox((0, 0), "K", font=seal_font)
-    sw, sh = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    draw.text((seal_cx - sw / 2, seal_cy - sh / 2 - bbox[1]), "K", font=seal_font, fill=_GOLD)
+    # Right: Royal 3D Gold Seal
+    seal_cx, seal_cy, seal_r = W - 180, panel_y + 45, 62
+    num_points = 18
+    pts = []
+    for i in range(num_points * 2):
+        angle = i * math.pi / num_points
+        r_pt = seal_r + 6 if i % 2 == 0 else seal_r - 4
+        pts.append((seal_cx + r_pt * math.cos(angle), seal_cy + r_pt * math.sin(angle)))
+    draw.polygon(pts, fill=_GOLD_DARK, outline=_GOLD_LIGHT)
+
+    # Ribbon tails
     draw.polygon(
-        [(seal_cx - 30, seal_cy + seal_r - 5), (seal_cx - 10, seal_cy + seal_r + 40), (seal_cx - 2, seal_cy + seal_r + 10)],
-        fill=_GOLD,
+        [(seal_cx - 38, seal_cy + seal_r - 2), (seal_cx - 15, seal_cy + seal_r + 48), (seal_cx - 4, seal_cy + seal_r + 14)],
+        fill=_GOLD_DARK, outline=_GOLD,
     )
     draw.polygon(
-        [(seal_cx + 30, seal_cy + seal_r - 5), (seal_cx + 10, seal_cy + seal_r + 40), (seal_cx + 2, seal_cy + seal_r + 10)],
-        fill=_GOLD,
+        [(seal_cx + 38, seal_cy + seal_r - 2), (seal_cx + 15, seal_cy + seal_r + 48), (seal_cx + 4, seal_cy + seal_r + 14)],
+        fill=_GOLD_DARK, outline=_GOLD,
     )
 
-    draw.text((margin2 + 30, H - 175), "KITOB CHALLENGE", font=tiny_font, fill=_MUTED)
-    draw.text((margin2 + 30, H - 150), "Rasmiy Sertifikat", font=small_font, fill=_CREAM)
-    draw.text(
-        (margin2 + 30, H - 100),
-        f"Sana: {timezone.localdate().strftime('%d.%m.%Y')}",
-        font=tiny_font, fill=_MUTED,
-    )
+    # Concentric inner rings
+    draw.ellipse([seal_cx - seal_r + 8, seal_cy - seal_r + 8, seal_cx + seal_r - 8, seal_cy + seal_r - 8], fill=(16, 22, 44, 255), outline=_GOLD_LIGHT, width=2)
+    draw.ellipse([seal_cx - seal_r + 15, seal_cy - seal_r + 15, seal_cx + seal_r - 15, seal_cy + seal_r - 15], outline=_GOLD, width=1)
+
+    # Monogram KC
+    bbox_k = draw.textbbox((0, 0), "KC", font=font_seal)
+    kw, kh = bbox_k[2] - bbox_k[0], bbox_k[3] - bbox_k[1]
+    draw.text((seal_cx - kw / 2, seal_cy - kh / 2 - 2), "KC", font=font_seal, fill=_GOLD_BRIGHT)
+
+    # Bottom tiny copyright bar
+    center_text(H - 68, "KITOB CHALLENGE © 2026 · BARCHA HUQUQLAR HIMOYaLANGAN", font_tiny, _MUTED)
 
     buf = BytesIO()
     img.save(buf, format="PNG")

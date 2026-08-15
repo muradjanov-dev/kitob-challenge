@@ -6156,6 +6156,14 @@ for fl in _QUIZ_FLAVORS:
     _GAME_STARTERS[fl] = (lambda f=fl: _start_quiz_flavor(f))
 
 
+def start_any_game(key, is_vip=False):
+    """Start any of the 65 live games by key, announcing it to groups."""
+    starter = _GAME_STARTERS.get(key)
+    if starter:
+        return starter()
+    return _start_quiz_flavor(key, is_vip=is_vip)
+
+
 NEW_GAME_TYPES = [
     "wisdom", "detective", "survival", "twofacts", "impostor", "connection", "teams",
     "timeline", "matchbook", "reverse",
