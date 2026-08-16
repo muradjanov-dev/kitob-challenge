@@ -58,7 +58,7 @@ from tgbot.services.game_questions import (
 
 LEAD_SECONDS = 30
 ANSWER_SECONDS = 20
-REVEAL_SECONDS = 8
+REVEAL_SECONDS = 0
 POINTS = 10
 TEAM_BASE_REWARD = 60
 TEAM_SIZE_BANDS = [

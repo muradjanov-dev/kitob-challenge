@@ -6165,8 +6165,18 @@ def start_any_game(key, is_vip=False):
 
 
 NEW_GAME_TYPES = [
-    "wisdom", "detective", "survival", "twofacts", "impostor", "connection", "teams",
-    "timeline", "matchbook", "reverse",
+    # 30 New Game Types
+    "anagram", "blitz", "crossword", "wordle", "cipher", "acronym", "character",
+    "dialogue", "plotmap", "sequence", "oddone", "ending", "pixel", "aiart",
+    "scenes", "audioquote", "mosaic", "hiddendetail", "duel", "buzzer",
+    "bracket", "auction", "regions", "king", "rhyme", "scholars", "genres",
+    "numbers", "worldlit", "mysterybox",
+    # 10 Mind & Logic
+    "mindtrap", "stoic", "antiherd", "dilemma", "causeeffect",
+    "masks", "socrates", "memento", "strategy", "paradox",
+    # 10 Tasavvuf
+    "simurgh", "ishq", "nafs", "qalb", "naqshband",
+    "yassaviy", "masnaviy", "gazzoliy", "fano", "marifat",
 ]
 
 # Prestigious Games pool for the Daily VIP Premium Arena (1 random game selected each evening)
@@ -6197,7 +6207,8 @@ def start_game_sequence(slot, count=3, pool=None):
     """Kick off today's `slot` ('morning' 10:00, 'evening' 22:00, or 'vip_2230') sequence."""
     from tgbot.models import GameSequence
 
-    pool = pool or GameSequence.GAME_TYPES
+    if not pool:
+        pool = NEW_GAME_TYPES if slot in ["morning", "evening"] else GameSequence.GAME_TYPES
     today = timezone.localdate()
     count = min(count, len(pool))
     is_vip = slot == GameSequence.SLOT_VIP

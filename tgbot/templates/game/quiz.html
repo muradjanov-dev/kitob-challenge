@@ -227,7 +227,7 @@
         $('qn').textContent='SAVOL '+s.q_number+' / '+s.q_total;
         $('myPts').textContent=s.your_points||0;$('qnum').textContent=s.q_number+'/'+s.q_total;
         if(s.q_index!==lastQ){lastQ=s.q_index;curAnswered=false;curCorrectIdx=-1;curChoice=-1;$('toast').textContent='';}
-        $('qtext').textContent=s.q||'';
+        $('qtext').innerHTML = (s.q||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/&lt;b&gt;/gi,'<b>').replace(/&lt;\/b&gt;/gi,'</b>').replace(/\n/g,'<br>');
         var audioBox=$('audioBox');
         if(FLAVOR==='audioquote'||s.audio_url){
           audioBox.classList.remove('hidden');
