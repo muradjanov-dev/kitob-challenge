@@ -6442,7 +6442,12 @@ def games_finalize_tick():
     _finalize_survival()
     from tgbot.game_views import _QUIZ_FLAVORS
     for flavor in _QUIZ_FLAVORS:
-        _finalize_quiz_flavor(flavor)
+        # Isolate each flavor: one broken flavor must never stop the other 57
+        # from being finalized, announced and advanced in this same tick.
+        try:
+            _finalize_quiz_flavor(flavor)
+        except Exception as e:
+            print(f"games_finalize_tick: {flavor} finalize failed: {e}")
 
 
 def _broadcast_and_dm(header_lines, winners, dm_text_fn):
@@ -6528,18 +6533,37 @@ def _finalize_survival():
         _advance_game_sequence("survival", game.id)
 
 
+# The 8 original flavors' titles carry no emoji, so they keep a hand-picked
+# one; every newer flavor already has its emoji as a title prefix (see
+# quiz_game.TITLES) and gets it split back out by _quiz_headline.
+_LEGACY_QUIZ_EMOJIS = {
+    "twofacts": "🎭", "impostor": "🃏", "connection": "🧩", "teams": "👥",
+    "timeline": "🕰️", "matchbook": "🎯", "reverse": "🔄", "cover": "🖼",
+}
+
+
+def _quiz_headline(flavor):
+    """(emoji, title) for ANY of the 58 quiz flavors — never raises on a newly
+    added one, so a new game's results always get announced."""
+    from tgbot.services import quiz_game
+    title = quiz_game.TITLES.get(flavor, flavor.upper())
+    legacy = _LEGACY_QUIZ_EMOJIS.get(flavor)
+    if legacy:
+        return legacy, title
+    head, _, rest = title.partition(" ")
+    if rest and not head[:1].isalnum():
+        return head, rest
+    return "🎮", title
+
+
 def _finalize_quiz_flavor(flavor):
     from tgbot.services import quiz_game
     medals = ["🥇", "🥈", "🥉"]
-    titles = {"twofacts": "Ikki haqiqat, bir yolg'on", "impostor": "Kim yolg'onchi?",
-              "connection": "Yashirin bog'lanish", "teams": "Jamoa Jangi",
-              "timeline": "Vaqt Mashinasi", "matchbook": "Muallif-Asar Moslashtirish",
-              "reverse": "Teskari Viktorina", "cover": "Kitob Muqovasi"}
-    emojis = {"twofacts": "🎭", "impostor": "🃏", "connection": "🧩", "teams": "👥",
-              "timeline": "🕰️", "matchbook": "🎯", "reverse": "🔄", "cover": "🖼"}
     for game, summary in quiz_game.finalize_due_games(flavor):
         winners = summary.get("winners", [])
-        emoji_, title = emojis[flavor], titles[flavor]
+        emoji_, title = _quiz_headline(flavor)
+        if getattr(game, "is_vip", False):
+            emoji_, title = "⭐️", f"{title} (VIP Premium)"
         if flavor == "teams":
             ap, bp = summary.get("team_a_points", 0), summary.get("team_b_points", 0)
             if summary.get("tie"):
@@ -6562,9 +6586,14 @@ def _finalize_quiz_flavor(flavor):
                     lines.append(f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko{rew}")
             else:
                 lines.append("Bu safar hech kim ochko olmadi 😔")
-        _broadcast_and_dm(lines, winners, lambda w: (
-            f"{emoji_} {title} — <b>+{w['reward']} Kitobcha</b>! Ball: {w['points']}"
-        ))
+        try:
+            _broadcast_and_dm(lines, winners, lambda w: (
+                f"{emoji_} {title} — <b>+{w['reward']} Kitobcha</b>! Ball: {w['points']}"
+            ))
+        except Exception as e:
+            # Rewards are already banked at this point -- a failed announcement
+            # must not strand the daily sequence on this game.
+            print(f"_finalize_quiz_flavor: announce {flavor} #{game.id} failed: {e}")
         _advance_game_sequence(flavor, game.id)
 
 
