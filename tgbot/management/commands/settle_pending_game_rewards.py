@@ -148,11 +148,11 @@ class Command(BaseCommand):
                 requests.post(url, data={
                     "chat_id": s.user.telegram_id,
                     "text": (
-                        "🙏 <b>Kechirim so'raymiz!</b>\n\n"
-                        f"«{game.title}» o'yinida texnik xatolik tufayli mukofotingiz "
-                        "o'z vaqtida berilmagan edi. Endi to'liq hisobingizga qo'shildi:\n"
+                        "🎁 <b>Kechiktirilgan mukofotingiz qo'shildi!</b>\n\n"
+                        f"«{game.title}» o'yinida kirish to'lovi olingan bo'lsa-da, "
+                        "mukofot berilmagan edi. Bu kamchilik to'g'irlandi:\n"
                         f"🪙 <b>+{applied} Kitobcha</b> · Ball: {s.points}\n\n"
-                        "Sabringiz va o'yinda qatnashganingiz uchun rahmat! 📚"
+                        "Noqulaylik uchun uzr so'raymiz, qatnashganingiz uchun rahmat! 📚"
                     ),
                     "parse_mode": "HTML",
                 }, timeout=8)
@@ -181,9 +181,10 @@ class Command(BaseCommand):
         return (
             "🙏 <b>Kechirim so'raymiz — mukofotlar to'liq berildi!</b>\n\n"
             "Yangi qo'shilgan jonli o'yinlarda texnik xatolik tufayli natijalar e'lon "
-            "qilinmay, mukofotlar kechikkan edi. Xatolik butunlay bartaraf etildi.\n\n"
-            f"✅ Barcha ishtirokchilarga ({count} nafar) mukofotlari to'liq qo'shildi.\n"
-            "✅ O'yinlar natijalari e'lon qilindi — g'oliblar tabriklanadi!\n"
+            "qilinmay qolgan edi. Xatolik butunlay bartaraf etildi:\n\n"
+            "✅ Barcha o'yinlar natijasi e'lon qilindi — g'oliblar tabriklanadi! 🏆\n"
+            "✅ Kirish to'lovi olinib, mukofot berilmagan <b>barcha ishtirokchilarga "
+            f"({count} nafar)</b> Kitobcha qo'shildi — shaxsiy xabarni tekshiring! 🪙\n"
             "✅ Bundan buyon <b>barcha 58 ta o'yin</b> natijasi avtomatik e'lon qilinadi.\n\n"
             "Noqulaylik uchun uzr so'raymiz. Har kuni <b>10:00</b> va <b>22:00</b> dagi "
             "o'yinlarda ko'rishguncha! 🎮📚"
