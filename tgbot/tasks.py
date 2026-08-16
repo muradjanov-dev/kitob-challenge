@@ -6440,8 +6440,8 @@ def games_finalize_tick():
     _finalize_wisdom()
     _finalize_detective()
     _finalize_survival()
-    for flavor in ("twofacts", "impostor", "connection", "teams",
-                   "timeline", "matchbook", "reverse", "cover"):
+    from tgbot.game_views import _QUIZ_FLAVORS
+    for flavor in _QUIZ_FLAVORS:
         _finalize_quiz_flavor(flavor)
 
 
