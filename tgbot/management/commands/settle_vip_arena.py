@@ -36,19 +36,43 @@ class Command(BaseCommand):
                             help="Show the payouts and the exact group post, change nothing.")
         parser.add_argument("--no-announce", action="store_true",
                             help="Pay and DM the winners, but post nothing to the groups.")
+        parser.add_argument("--ignore-ledger", action="store_true",
+                            help="Skip the already-credited check and pay every unflagged row "
+                                 "(only if you know the ledger evidence is wrong).")
 
     def handle(self, *args, **options):
         import requests
         from datetime import timedelta
         from django.utils import timezone
         from django.utils.html import escape
-        from tgbot.models import QuizGame, QuizScore
+        from tgbot.models import QuizGame, QuizScore, KitobchaLedger
         from tgbot.services import quiz_game
         from tgbot.services.chain_game import _add_ball_reward
         from tgbot.tasks import (BOT_TOKEN, _game_targets, _quiz_headline, _scoreline,
                                  _answer_key_lines, _trim_telegram)
 
         dry = options["dry_run"]
+
+        def already_credited(score, game, earned):
+            """Kitobcha this row was paid despite `rewarded` never being saved.
+
+            The old crash happened *after* `_add_ball_reward` but *before*
+            `s.save()`, so the highest-placed winner really was paid while the
+            flag says otherwise — settling them again would double-pay. The
+            ledger is the only surviving evidence: look for an `update_ball`
+            entry for exactly the tier amount (or twice it, for a Premium 2x
+            earner) in the minutes around the game ending. Returns the amount
+            found, or 0.
+            """
+            if options["ignore_ledger"]:
+                return 0
+            hit = KitobchaLedger.objects.filter(
+                user_id=score.user_id, reason="update_ball",
+                delta__in=[earned, earned * 2],
+                created_at__range=(game.ends_at - timedelta(minutes=2),
+                                   game.ends_at + timedelta(minutes=3)),
+            ).first()
+            return hit.delta if hit else 0
 
         if options["game_id"]:
             games = list(QuizGame.objects.filter(id=options["game_id"]))
@@ -82,7 +106,8 @@ class Command(BaseCommand):
             for i, s in enumerate(rows):
                 earned = tiers[i] if i < 3 else (quiz_game.VIP_PARTICIPATION if i < 10 else 25)
                 prem_due = quiz_game.VIP_PREMIUM_DAYS_BONUS.get(i, 0)
-                needs_ball = not s.rewarded
+                paid_already = 0 if s.rewarded else already_credited(s, g, earned)
+                needs_ball = not s.rewarded and not paid_already
                 needs_prem = bool(prem_due) and not s.premium_days
 
                 if needs_ball:
@@ -93,6 +118,8 @@ class Command(BaseCommand):
                 flags = []
                 if needs_ball:
                     flags.append(f"+{earned} 🪙 BERILADI")
+                elif paid_already:
+                    flags.append(f"🪙 allaqachon +{paid_already} olingan (ledger) — QAYTA BERILMAYDI")
                 if needs_prem:
                     flags.append(f"+{prem_due} kun Premium BERILADI")
                 if not flags:
@@ -103,10 +130,13 @@ class Command(BaseCommand):
                     f"⏱ {round(s.effective_time, 1)}s → {', '.join(flags)}"
                 )
 
-                applied = s.reward or earned
+                applied = s.reward or paid_already or earned
                 if not dry:
                     if needs_ball:
                         applied = _add_ball_reward(s.user, earned)
+                    if needs_ball or paid_already:
+                        # Close the flag either way, so this row can never be
+                        # settled a second time from any other code path.
                         s.rewarded = True
                         s.reward = applied
                         s.save(update_fields=["rewarded", "reward", "updated_at"])
@@ -119,6 +149,7 @@ class Command(BaseCommand):
                     "q_total": nq, "time": round(s.effective_time, 1),
                     "premium_days": (prem_due if (needs_prem or s.premium_days) else 0),
                     "was_owed": needs_ball or needs_prem,
+                    "ball_was_owed": needs_ball,
                 })
 
             if not dry and not g.rewarded:
@@ -166,9 +197,10 @@ class Command(BaseCommand):
                     continue
                 dm = (
                     f"⭐️ <b>{title} (VIP Premium)</b> — kechiktirilgan mukofotingiz berildi!\n\n"
-                    f"🏅 {w['rank']}-o'rin · <b>{w['points']}</b> ochko"
-                    f"{_scoreline(w)}\n🪙 <b>+{w['reward']} Kitobcha</b>"
+                    f"🏅 {w['rank']}-o'rin · <b>{w['points']}</b> ochko{_scoreline(w)}\n"
                 )
+                dm += (f"🪙 <b>+{w['reward']} Kitobcha</b>" if w.get("ball_was_owed")
+                       else f"🪙 <b>{w['reward']} Kitobcha</b> — allaqachon hisobingizga o'tgan edi")
                 if w.get("premium_days"):
                     dm += (f"\n💎 <b>{w['premium_days']} kun BEPUL Premium</b> faollashtirildi — "
                            "barcha VIP imtiyozlar ochiq!")
