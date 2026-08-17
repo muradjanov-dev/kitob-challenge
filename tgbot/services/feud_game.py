@@ -174,6 +174,7 @@ def finalize(game_id: int) -> dict | None:
             # e.g. a Premium 2nd place earning more than a non-Premium 1st,
             # instead of that just looking like an unexplained inconsistency.
             "boosted": applied != reward,
+            "time": round(s.total_time or 0.0, 1),
         })
     g.rewarded = True
     g.save(update_fields=["rewarded", "updated_at"])

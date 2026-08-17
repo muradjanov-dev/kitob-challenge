@@ -99,11 +99,8 @@ class Command(BaseCommand):
             game = rows[0].game
             # Same ordering _finalize_individual uses, over the WHOLE game, so a
             # late-settled row gets the rank it actually earned that night.
-            ranked = list(
-                QuizScore.objects.filter(game_id=game_id, points__gt=0)
-                .order_by("-points", "total_time", "created_at")
-                .values_list("id", flat=True)
-            )
+            from tgbot.services import quiz_game as _qg
+            ranked = [s.id for s in _qg.ranked_scores(game)]
             for s in rows:
                 if s.points > 0:
                     i = ranked.index(s.id) if s.id in ranked else len(ranked)

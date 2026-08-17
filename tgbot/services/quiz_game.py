@@ -547,6 +547,42 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
     return {"ok": True, "correct": correct, "correct_index": q.get("correct"), "team": score.team}
 
 
+def ranked_scores(game, include_zero=False):
+    """Every QuizScore for `game`, in official finishing order.
+
+    Ordering is points desc, then **effective time** asc, then join order.
+
+    Effective time = time actually spent answering + the full answer window
+    charged for every question left unanswered. Raw `total_time` only counted
+    questions a player attempted, so two players on identical points were
+    separated in favour of whoever answered *fewer* questions: guessing and
+    getting one wrong added seconds, staying silent added none. That punished
+    taking part, which is backwards — with this, skipping is never cheaper
+    than answering, and the time shown in the results post is measured over
+    the same number of questions for everybody.
+
+    Each row is annotated in place with `answered_count` and `effective_time`
+    so callers can display them without a second query.
+    """
+    nq = len(game.questions or [])
+    max_t = float(game.answer_seconds or ANSWER_SECONDS)
+    answered = {
+        row["user_id"]: row["c"]
+        for row in QuizAnswer.objects.filter(game=game).values("user_id").annotate(c=Count("id"))
+    }
+    qs = QuizScore.objects.filter(game=game).select_related("user")
+    if not include_zero:
+        qs = qs.filter(points__gt=0)
+    rows = list(qs)
+    for s in rows:
+        s.answered_count = int(answered.get(s.user_id, 0))
+        s.effective_time = round(
+            (s.total_time or 0.0) + max(0, nq - s.answered_count) * max_t, 3
+        )
+    rows.sort(key=lambda s: (-(s.points or 0), s.effective_time, s.created_at))
+    return rows
+
+
 def finalize(game_id: int) -> dict | None:
     with transaction.atomic():
         g = QuizGame.objects.select_for_update().get(id=game_id)
@@ -562,11 +598,31 @@ def finalize(game_id: int) -> dict | None:
     return _finalize_individual(g)
 
 
+def grant_vip_premium(score, rank: int) -> int:
+    """Hand the VIP arena's top-3 Premium bonus to one winner, exactly once.
+
+    `QuizScore.premium_days` is both the receipt and the idempotency guard, so
+    a re-finalize or a late settle run can never double-grant. Failures are
+    swallowed deliberately: this used to raise (Payment wasn't even imported
+    here), which aborted the whole payout loop — the winner below the crash
+    point got no Kitobcha at all and the daily sequence stalled on the game.
+    """
+    days = VIP_PREMIUM_DAYS_BONUS.get(rank, 0)
+    if not days or score.premium_days:
+        return score.premium_days or 0
+    try:
+        from tgbot.services.premium import grant_premium
+        grant_premium(score.user, days=days)
+    except Exception as e:
+        print(f"grant_vip_premium: score={score.id} rank={rank}: {e}")
+        return 0
+    score.premium_days = days
+    score.save(update_fields=["premium_days", "updated_at"])
+    return days
+
+
 def _finalize_individual(g) -> dict:
-    scores = list(
-        QuizScore.objects.filter(game=g, points__gt=0)
-        .select_related("user").order_by("-points", "total_time", "created_at")
-    )
+    scores = ranked_scores(g)
     winners = []
     tiers = VIP_REWARD_TIERS if g.is_vip else REWARD_TIERS
     participation = VIP_PARTICIPATION if g.is_vip else PARTICIPATION
@@ -574,24 +630,19 @@ def _finalize_individual(g) -> dict:
         reward = tiers[i] if i < 3 else (participation if i < 10 else 25)
         if not s.rewarded:
             applied = _add_ball_reward(s.user, reward)
-            if g.is_vip and i in VIP_PREMIUM_DAYS_BONUS:
-                bonus_days = VIP_PREMIUM_DAYS_BONUS[i]
-                now = timezone.now()
-                # 1. Extend paid subscription if they have one or grant new paid period
-                Payment.grant_or_extend(s.user, bonus_days, amount=0)
-                # 2. Also extend trial timestamp for complete sync
-                base_time = max(s.user.trial_premium_until or now, now)
-                s.user.trial_premium_until = base_time + timedelta(days=bonus_days)
-                s.user.save(update_fields=["trial_premium_until"])
             s.rewarded = True
             s.reward = applied
             s.save(update_fields=["rewarded", "reward", "updated_at"])
         else:
             applied = s.reward or reward
+        prem_days = grant_vip_premium(s, i) if g.is_vip else 0
         winners.append({
             "rank": i + 1, "user_id": s.user_id, "telegram_id": s.user.telegram_id,
             "name": s.user.full_name or "Kitobxon", "points": s.points, "reward": applied,
             "boosted": applied != reward,
+            "correct": s.points // POINTS, "q_total": len(g.questions or []),
+            "time": round(s.effective_time, 1), "answered": s.answered_count,
+            "premium_days": prem_days,
         })
     g.rewarded = True
     g.save(update_fields=["rewarded", "updated_at"])
@@ -599,7 +650,7 @@ def _finalize_individual(g) -> dict:
 
 
 def _finalize_teams(g) -> dict:
-    scores = list(QuizScore.objects.filter(game=g).select_related("user"))
+    scores = ranked_scores(g, include_zero=True)
     winning_team = "a" if g.team_a_points >= g.team_b_points else "b"
     tie = g.team_a_points == g.team_b_points
     team_sizes = {"a": len(g.team_a or []), "b": len(g.team_b or [])}
@@ -608,10 +659,8 @@ def _finalize_teams(g) -> dict:
     for team in ("a", "b"):
         if not (tie or team == winning_team):
             continue
-        team_scores = sorted(
-            [s for s in scores if s.team == team and s.points > 0],
-            key=lambda s: (-s.points, s.total_time or 0.0, s.created_at),
-        )
+        # `scores` is already in official order, so filtering preserves it.
+        team_scores = [s for s in scores if s.team == team and s.points > 0]
         for r, s in enumerate(team_scores):
             rank_by_score_id[s.id] = r
 
@@ -637,6 +686,9 @@ def _finalize_teams(g) -> dict:
             "user_id": s.user_id, "telegram_id": s.user.telegram_id,
             "name": s.user.full_name or "Kitobxon", "points": s.points,
             "team": s.team, "reward": applied,
+            "correct": s.points // POINTS, "q_total": len(g.questions or []),
+            "time": round(s.effective_time, 1), "answered": s.answered_count,
+            "premium_days": 0,
         })
     g.rewarded = True
     g.save(update_fields=["rewarded", "updated_at"])
@@ -661,12 +713,16 @@ def finalize_due_games(flavor=None) -> list:
 
 
 def _leaderboard(game, limit=50):
-    rows = (
-        QuizScore.objects.filter(game=game, points__gt=0).select_related("user")
-        .order_by("-points", "total_time", "created_at")[:limit]
-    )
+    """Public standings. Carries each player's correct-answer count and the
+    exact time the ranking used, so anyone can check the order for themselves
+    instead of taking the points on trust."""
+    nq = len(game.questions or [])
     return [{"name": r.user.full_name or "Kitobxon", "points": r.points,
-             "team": r.team, "reward": r.reward or 0} for r in rows]
+             "team": r.team, "reward": r.reward or 0,
+             "correct": r.points // POINTS, "q_total": nq,
+             "time": round(r.effective_time, 1), "answered": r.answered_count,
+             "premium_days": r.premium_days or 0}
+            for r in ranked_scores(game)[:limit]]
 
 
 def _lifetime(profile, flavor):
@@ -712,9 +768,25 @@ def state_payload(profile, flavor) -> dict:
         "your_points": (my.points if my else 0),
         "your_team": (my.team if my else ""),
         "your_reward": (my.reward if my else 0),
+        "your_premium_days": (my.premium_days if my else 0),
         "lifetime": _lifetime(profile, flavor),
         "history": _history(flavor) if status != "live" else [],
     }
+    if finished:
+        # Full answer key once the game is over — anyone can re-check every
+        # question against what they picked, so the scoring is auditable
+        # rather than something players have to take our word for.
+        payload["answer_key"] = [
+            {"n": i + 1, "q": (q.get("q") or "")[:160],
+             "answer": (q.get("options") or [""])[q.get("correct", 0)]
+             if 0 <= q.get("correct", -1) < len(q.get("options") or []) else ""}
+            for i, q in enumerate(g.questions or [])
+        ]
+        mine = {a.q_index: a for a in QuizAnswer.objects.filter(game=g, user=profile)}
+        for row in payload["answer_key"]:
+            a = mine.get(row["n"] - 1)
+            row["you"] = ("ok" if a.is_correct else "no") if a else "skip"
+            row["secs"] = round(a.time_taken, 1) if a else None
     if flavor == "teams":
         payload["team_a_points"] = g.team_a_points
         payload["team_b_points"] = g.team_b_points

@@ -337,19 +337,73 @@ CREATIVE_TANGIBLE_REWARDS = {
 }
 
 
-def resolve_mystery_box(user):
-    """Apply an immediate random prize (creative letters, titles/badges, game buffs,
-    tickets, shields, VIP subscriptions, AI passes, certificates, or super jackpots).
-    Returns (text, wants_certificate)."""
-    import datetime as _dt
-    from tgbot.models import TelegramProfile, KitobchaLedger, Payment, LeaderboardSponsor
-    from tgbot.tasks import expire_ai_quiz_trial, expire_trial_premium
+CREATIVE_LETTER_KITOBCHA = {"bobur": 180, "gazzoliy": 200}
+CREATIVE_LETTER_DEFAULT_KITOBCHA = 150
+BADGE_KITOBCHA = 100
 
+
+def _prize_payout(pick: str):
+    """(kitobcha, premium_days, premium_hours) this prize hands over — mirrors
+    what _apply_mystery_prize actually credits, for the durable MysteryBoxWin
+    record and the daily transparency report."""
+    label, ptype, val = CREATIVE_TANGIBLE_REWARDS.get(pick, ("", "", 0))
+    if ptype == "ball_direct":
+        return int(val), 0, 0
+    if ptype in ("refund", "free_box"):
+        return ITEMS[MYSTERY_BOX]["price"], 0, 0
+    if ptype == "creative_letter":
+        return CREATIVE_LETTER_KITOBCHA.get(val, CREATIVE_LETTER_DEFAULT_KITOBCHA), 0, 0
+    if ptype == "badge":
+        return BADGE_KITOBCHA, 0, 0
+    if ptype == "premium_days":
+        return 0, int(val), 0
+    if ptype == "premium_hours":
+        return 0, 0, int(val)
+    if ptype in ("gift_pass", "aura"):
+        return 0, 1, 0
+    return 0, 0, 0
+
+
+def _record_mystery_box_win(user, pick: str) -> None:
+    """Durable per-prize record. Wrapped in a bare except on purpose: the prize
+    is already credited by the time this runs, and a bookkeeping failure must
+    never turn into a lost win for the player."""
+    from tgbot.models import MysteryBoxWin
+    label, ptype, val = CREATIVE_TANGIBLE_REWARDS.get(
+        pick, ("🎟 Keyingi jonli o'yinga 1 ta BEPUL chipta", "ticket", 1))
+    kitobcha, prem_days, prem_hours = _prize_payout(pick)
+    try:
+        MysteryBoxWin.objects.create(
+            user=user, prize_key=pick, label=label[:255],
+            reward_type=ptype or "", reward_value=str(val)[:64],
+            kitobcha=kitobcha, premium_days=prem_days, premium_hours=prem_hours,
+        )
+    except Exception as e:
+        print(f"_record_mystery_box_win({user.id}, {pick}): {e}")
+
+
+def resolve_mystery_box(user):
+    """Open one Sirli quti: roll a prize, apply it, and log what came out.
+
+    Returns (text, wants_certificate)."""
     pick = random.choices(
         [k for k, _ in MYSTERY_PRIZES],
         weights=[w for _, w in MYSTERY_PRIZES],
         k=1,
     )[0]
+    text, wants_certificate = _apply_mystery_prize(user, pick)
+    _record_mystery_box_win(user, pick)
+    return text, wants_certificate
+
+
+def _apply_mystery_prize(user, pick: str):
+    """Apply one already-rolled prize (creative letters, titles/badges, game buffs,
+    tickets, shields, VIP subscriptions, AI passes, certificates, or super jackpots).
+    Returns (text, wants_certificate)."""
+    import datetime as _dt
+    from tgbot.models import TelegramProfile, KitobchaLedger, LeaderboardSponsor
+    from tgbot.services.premium import grant_premium
+    from tgbot.tasks import expire_ai_quiz_trial
 
     with transaction.atomic():
         p = TelegramProfile.objects.select_for_update().get(id=user.id)
@@ -364,20 +418,16 @@ def resolve_mystery_box(user):
                 return f"{label}!", False
 
             elif ptype == "premium_hours":
-                until = max(p.trial_premium_until or now, now) + _dt.timedelta(hours=val)
-                p.trial_premium_until = until
-                p.save(update_fields=["trial_premium_until"])
-                try:
-                    expire_trial_premium.apply_async(args=[p.id], countdown=val * 3600)
-                except Exception:
-                    pass
-                return f"{label} — barcha VIP imtiyozlar va o'yinlar faollashtirildi!", False
+                # grant_premium writes a real paid Payment row too, so the ~30
+                # `end_date__gte=today` gates honour this win — setting only
+                # trial_premium_until used to leave the winner locked out of
+                # nearly every feature the prize text promised.
+                until = grant_premium(p, hours=val)
+                return (f"{label} — barcha VIP imtiyozlar va o'yinlar faollashtirildi! "
+                        f"(⏳ {timezone.localtime(until).strftime('%d.%m %H:%M')} gacha)"), False
 
             elif ptype == "premium_days":
-                Payment.grant_or_extend(p, val, amount=0)
-                until = max(p.trial_premium_until or now, now) + _dt.timedelta(days=val)
-                p.trial_premium_until = until
-                p.save(update_fields=["trial_premium_until"])
+                grant_premium(p, days=val)
                 return f"{label} — obunangizga +{val} kun qo'shildi!", False
 
             elif ptype == "survival":
@@ -484,7 +534,7 @@ def resolve_mystery_box(user):
                 return "📣 <b>Adabiy Ilhom:</b> Sizning nomingizdan guruhga hikmatli iqtibos yo'llanadi va <b>+2 ta Bepul Bilet</b> berildi!", False
 
             elif ptype == "gift_pass":
-                Payment.grant_or_extend(p, 1, amount=0)
+                grant_premium(p, days=1)
                 return "🎁 <b>Do'stlik & Saxovat In'omi:</b> Sizga <b>24 soatlik BEPUL Premium</b> faollashtirildi!", False
 
             elif ptype == "gift_ticket":
@@ -493,7 +543,7 @@ def resolve_mystery_box(user):
                 return "🎟 <b>Do'stlik Chiptasi:</b> Jonli o'yinlarga <b>2 ta BEPUL Bilet</b> taqdim etildi!", False
 
             elif ptype == "aura":
-                Payment.grant_or_extend(p, 1, amount=0)
+                grant_premium(p, days=1)
                 return "✨👑 <b>Oltin Kitobxon Aurasi:</b> Profilingiz 24 soatlik VIP Premium maqomiga ega bo'ldi!", False
 
             elif ptype == "badge":
@@ -519,78 +569,6 @@ def apply_streak_freeze_purchase(user) -> int:
     from tgbot.models import TelegramProfile
     with transaction.atomic():
         p = TelegramProfile.objects.select_for_update().get(id=user.id)
-
-        # ── MAXSUS YANGI 100 TALIK MUKOFOTLARNI ISHLATISH ──
-        if pick == "free_game_ticket_3":
-            p.bonus_free_game_entries = (p.bonus_free_game_entries or 0) + 3
-            p.save(update_fields=["bonus_free_game_entries"])
-            return "🎟🎟🎟 OLTIN CHIPTA! Keyingi jonli o'yinlarga <b>3 ta BEPUL bilet</b> yutdingiz!", False
-
-        if pick == "premium_1d":
-            import datetime as _dt
-            from tgbot.models import Payment
-            Payment.grant_or_extend(p, 1, amount=0)
-            until = timezone.now() + _dt.timedelta(days=1)
-            p.trial_premium_until = max(p.trial_premium_until or until, until)
-            p.save(update_fields=["trial_premium_until"])
-            return "💎👑 <b>24 SOATLIK (1 KUN) TO'LIQ BEPUL PREMIUM!</b> Barcha VIP o'yinlar va imtiyozlar siz uchun ochiq!", False
-
-        if pick == "premium_2d":
-            import datetime as _dt
-            from tgbot.models import Payment
-            Payment.grant_or_extend(p, 2, amount=0)
-            until = timezone.now() + _dt.timedelta(days=2)
-            p.trial_premium_until = max(p.trial_premium_until or until, until)
-            p.save(update_fields=["trial_premium_until"])
-            return "💎👑🔥 <b>48 SOATLIK (2 KUN) TO'LIQ BEPUL PREMIUM!</b> Barcha VIP o'yinlar va imtiyozlar siz uchun ochiq!", False
-
-        if pick == "survival_4":
-            p.bonus_survival_lives = (p.bonus_survival_lives or 0) + 4
-            p.save(update_fields=["bonus_survival_lives"])
-            return "🛡🛡 SUPER BRONYA! Keyingi <b>Omon qolish</b> o'yiningizga <b>+4 qo'shimcha jon</b>!", False
-
-        if pick == "survival_5":
-            p.bonus_survival_lives = (p.bonus_survival_lives or 0) + 5
-            p.save(update_fields=["bonus_survival_lives"])
-            return "🛡❤️ AFSONAVIY BRONYA! Keyingi <b>Omon qolish</b> o'yiningizga <b>+5 TA SUPER JON</b>!", False
-
-        if pick == "freeze_3":
-            p.streak_freeze_count = (p.streak_freeze_count or 0) + 3
-            p.save(update_fields=["streak_freeze_count"])
-            return "❄️❄️❄️ QALQON! Bonus <b>3 ta Streak muzlatish</b> tokeni yutdingiz!", False
-
-        if pick == "discount_70":
-            p.next_market_discount_pct = max(int(p.next_market_discount_pct or 0), 70)
-            p.save(update_fields=["next_market_discount_pct"])
-            return "🏷🔥 SUPER CHEGIRMA! Keyingi Market xaridingizga <b>70% CHEGIRMA</b>!", False
-
-        if pick == "discount_30":
-            p.next_market_discount_pct = max(int(p.next_market_discount_pct or 0), 30)
-            p.save(update_fields=["next_market_discount_pct"])
-            return "🏷 Keyingi Market xaridingizga <b>30% chegirma</b> yutdingiz!", False
-
-        if pick == "discount_40":
-            p.next_market_discount_pct = max(int(p.next_market_discount_pct or 0), 40)
-            p.save(update_fields=["next_market_discount_pct"])
-            return "🏷 Keyingi Market xaridingizga <b>40% chegirma</b> yutdingiz!", False
-
-        if pick == "ai_quiz_3h":
-            import datetime as _dt
-            from tgbot.tasks import expire_ai_quiz_trial
-            until = timezone.now() + _dt.timedelta(hours=3)
-            p.trial_ai_quiz_until = until
-            p.save(update_fields=["trial_ai_quiz_until"])
-            expire_ai_quiz_trial.apply_async(args=[p.id], countdown=3 * 3600)
-            return "🤖 <b>3 soatlik BEPUL AI Quiz yaratish</b> imkoniyati yutdingiz!", False
-
-        if pick == "ai_quiz_6h":
-            import datetime as _dt
-            from tgbot.tasks import expire_ai_quiz_trial
-            until = timezone.now() + _dt.timedelta(hours=6)
-            p.trial_ai_quiz_until = until
-            p.save(update_fields=["trial_ai_quiz_until"])
-            expire_ai_quiz_trial.apply_async(args=[p.id], countdown=6 * 3600)
-            return "🤖🔥 <b>6 soatlik CHEKSIZ AI Quiz yaratish</b> imkoniyati yutdingiz!", False
 
         p.streak_freeze_count = (p.streak_freeze_count or 0) + 1
         p.save(update_fields=["streak_freeze_count"])

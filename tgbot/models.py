@@ -1175,6 +1175,41 @@ class MarketPurchase(BaseModel):
         return f"{self.user.full_name} — {self.item_key} ({self.price} 🪙)"
 
 
+class MysteryBoxWin(BaseModel):
+    """One prize handed out by the Market 'Sirli quti' (see
+    tgbot/services/market.py resolve_mystery_box).
+
+    MarketPurchase only records *that* a box was bought, never what came out
+    of it, so there was no way to show players what the box actually pays —
+    and no way to prove a big win really happened. This is that record, and
+    the source for the daily 'Mukofotlar hisoboti' group post
+    (tasks.announce_rewards_report)."""
+    user = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="mystery_box_wins",
+    )
+    prize_key = models.CharField(max_length=40, help_text="market.MYSTERY_PRIZES key, e.g. 'grand_jackpot'.")
+    label = models.CharField(max_length=255, help_text="Human-readable prize text shown to the winner.")
+    reward_type = models.CharField(
+        max_length=24, blank=True, default="",
+        help_text="market.CREATIVE_TANGIBLE_REWARDS type: ball_direct/premium_days/ticket/...",
+    )
+    reward_value = models.CharField(
+        max_length=64, blank=True, default="",
+        help_text="That type's value (hours, days, count, badge name) as text.",
+    )
+    kitobcha = models.PositiveIntegerField(default=0, help_text="Kitobcha this prize credited, if any.")
+    premium_days = models.PositiveSmallIntegerField(default=0, help_text="Whole Premium days granted, if any.")
+    premium_hours = models.PositiveSmallIntegerField(default=0, help_text="Premium hours granted, if any.")
+
+    class Meta:
+        verbose_name = "Sirli quti yutug'i"
+        verbose_name_plural = "Sirli quti yutuqlari"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.user.full_name} — {self.prize_key}"
+
+
 class KitobchaLedger(BaseModel):
     """Signed log of every Kitobcha balance change (positive = earned,
     negative = spent) — `TelegramProfile.ball` is just a running total with
@@ -2030,6 +2065,11 @@ class QuizScore(BaseModel):
     team = models.CharField(max_length=1, blank=True, default="", help_text="'a' or 'b' (teams flavor only).")
     reward = models.PositiveIntegerField(default=0)
     rewarded = models.BooleanField(default=False)
+    premium_days = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Free Premium days actually granted for this placing (VIP arena top-3). "
+                  "Doubles as the idempotency marker so a re-finalize/settle never grants twice.",
+    )
 
     class Meta:
         db_table = "quiz_scores"

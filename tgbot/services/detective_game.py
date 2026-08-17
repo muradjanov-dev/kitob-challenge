@@ -179,6 +179,8 @@ def finalize(game_id: int) -> dict | None:
             "rank": i + 1, "user_id": s.user_id, "telegram_id": s.user.telegram_id,
             "name": s.user.full_name or "Kitobxon", "points": s.points,
             "solved_count": s.solved_count, "reward": applied,
+            "correct": s.solved_count,
+            "time": round(s.total_time or 0.0, 1),
         })
     g.rewarded = True
     g.save(update_fields=["rewarded", "updated_at"])

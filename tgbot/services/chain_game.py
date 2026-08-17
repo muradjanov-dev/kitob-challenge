@@ -272,6 +272,8 @@ def finalize(game_id: int) -> dict | None:
             "points": s.points,
             "links": s.links,
             "reward": applied,
+            "correct": s.links,
+            "time": round(s.total_time or 0.0, 1),
         })
 
     g.rewarded = True

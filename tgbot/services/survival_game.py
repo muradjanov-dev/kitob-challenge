@@ -197,6 +197,7 @@ def finalize(game_id: int) -> dict | None:
                 "user_id": p.user_id, "telegram_id": p.user.telegram_id,
                 "name": p.user.full_name or "Kitobxon", "correct": p.correct_count,
                 "total_time": p.total_time or 0.0,
+                "time": round(p.total_time or 0.0, 1),
                 "survived": True, "reward": applied,
             })
         for p in players:
@@ -221,6 +222,7 @@ def finalize(game_id: int) -> dict | None:
                     "user_id": p.user_id, "telegram_id": p.user.telegram_id,
                     "name": p.user.full_name or "Kitobxon", "correct": p.correct_count,
                     "total_time": p.total_time or 0.0,
+                    "time": round(p.total_time or 0.0, 1),
                     "survived": False, "reward": applied,
                 })
 

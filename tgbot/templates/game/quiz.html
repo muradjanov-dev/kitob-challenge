@@ -190,17 +190,100 @@
     function esc(t){return(t||'').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     function api(path,opts){opts=opts||{};opts.headers=Object.assign({'X-Telegram-Init-Data':INIT},opts.headers||{});return fetch(path,opts).then(function(r){return r.json();});}
 
+    // The exact numbers the ranking is computed from, shown next to every
+    // player: correct answers, then time. Unanswered questions are charged the
+    // full answer window, so the time is comparable across all players.
+    function detail(r){
+      var p=[];
+      if(r.q_total)p.push('✅ '+(r.correct||0)+'/'+r.q_total);
+      if(r.time)p.push('⏱ '+r.time+'s');
+      return p.join(' · ');
+    }
+    function answerKeyHtml(s){
+      if(!s.answer_key||!s.answer_key.length)return '';
+      var h='<div style="text-align:left;margin-top:16px"><div style="font-weight:800;margin-bottom:6px">📋 To\'g\'ri javoblar</div>';
+      s.answer_key.forEach(function(r){
+        var mark=r.you==='ok'?'✅':(r.you==='no'?'❌':'➖');
+        var t=r.secs!=null?' <span class="muted">('+r.secs+'s)</span>':'';
+        h+='<div class="lb"><div class="rank">'+mark+'</div><div class="lb-name">'+esc(r.answer)+t+'</div></div>';
+      });
+      return h+'<div class="muted" style="font-size:11px;margin-top:6px">✅ siz topgan · ❌ xato · ➖ javob bermagan</div></div>';
+    }
+
     function renderOpts(){
       var box=$('opts');box.innerHTML='';
-      curOpts.forEach(function(o,i){
-        var b=document.createElement('button');b.className='opt';b.textContent=(i+1)+'. '+o;
-        if(curAnswered){
-          b.disabled=true;
-          if(i===curCorrectIdx)b.className='opt correct';
-          else if(i===curChoice)b.className='opt wrong';
-        }else{ b.addEventListener('click',function(){answer(i);}); }
-        box.appendChild(b);
-      });
+      var textGames = ['anagram', 'wordle', 'crossword', 'cipher'];
+      if (textGames.indexOf(FLAVOR) !== -1) {
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'opt';
+        input.placeholder = 'Javobni yozing...';
+        input.style.textAlign = 'center';
+        input.style.marginBottom = '10px';
+        input.style.fontWeight = 'bold';
+        
+        var btn = document.createElement('button');
+        btn.className = 'opt';
+        btn.style.background = 'var(--accent)';
+        btn.style.color = '#fff';
+        btn.style.textAlign = 'center';
+        btn.textContent = 'Yuborish';
+
+        if (curAnswered) {
+          input.disabled = true;
+          btn.disabled = true;
+          input.style.display = 'none'; // hide input after answer to just show result
+          if (curCorrectIdx >= 0 && curOpts[curCorrectIdx]) {
+             var res = document.createElement('div');
+             res.style.marginTop = '10px';
+             res.style.fontWeight = 'bold';
+             res.style.fontSize = '16px';
+             res.style.textAlign = 'center';
+             res.style.padding = '12px';
+             res.style.borderRadius = '12px';
+             res.style.background = 'var(--card2)';
+             if (curChoice !== -1 && curCorrectIdx === curChoice) {
+               res.innerHTML = '<span style="color:var(--ok)">✅ To\'g\'ri: ' + curOpts[curCorrectIdx] + '</span>';
+               res.style.border = '1px solid var(--ok)';
+             } else {
+               res.innerHTML = '<span style="color:var(--bad)">❌ Xato!</span><br><span style="color:var(--text);font-size:14px;margin-top:6px;display:inline-block">To\'g\'ri javob: <b>' + curOpts[curCorrectIdx] + '</b></span>';
+               res.style.border = '1px solid var(--bad)';
+             }
+             box.appendChild(res);
+          }
+        } else {
+          btn.addEventListener('click', function(){
+            var val = input.value.trim().toLowerCase();
+            if(!val) return;
+            var matchIdx = -1;
+            for(var i=0; i<curOpts.length; i++){
+              if(curOpts[i].toLowerCase().trim() === val){
+                matchIdx = i; break;
+              }
+            }
+            answer(matchIdx); // sends index if found, else -1 (which backend will mark as wrong)
+          });
+          input.addEventListener('keypress', function(e){
+            if(e.key === 'Enter') btn.click();
+          });
+        }
+        
+        if(!curAnswered) {
+          box.appendChild(input);
+          box.appendChild(btn);
+          setTimeout(function(){ input.focus(); }, 100);
+        }
+      } else {
+        curOpts.forEach(function(o,i){
+          var b=document.createElement('button');b.className='opt';b.textContent=(i+1)+'. '+o;
+          if(curAnswered){
+            b.disabled=true;
+            if(i===curCorrectIdx)b.className='opt correct';
+            else if(i===curChoice)b.className='opt wrong';
+          }else{ b.addEventListener('click',function(){answer(i);}); }
+          box.appendChild(b);
+        });
+      }
     }
 
     function statsHistoryHtml(s){
@@ -267,7 +350,7 @@
           var cls=i===0?'g1':i===1?'g2':i===2?'g3':'';
           var teamCls = r.team==='a' ? ' team-a' : (r.team==='b' ? ' team-b' : '');
           var teamTag = r.team ? (r.team==='a'?' 🔵':' 🔴') : '';
-          b+='<div class="lb"><div class="rank '+cls+'">'+(i+1)+'</div><div class="lb-name'+teamCls+'">'+esc(r.name)+teamTag+'</div><div class="pts">'+r.points+'</div></div>';
+          b+='<div class="lb"><div class="rank '+cls+'">'+(i+1)+'</div><div class="lb-name'+teamCls+'">'+esc(r.name)+teamTag+'<br><span class="muted" style="font-size:11px">'+detail(r)+'</span></div><div class="pts">'+r.points+'</div></div>';
         });
         $('board').innerHTML=b||'<div class="muted" style="padding:6px 0">Hali ball yo\'q.</div>';
         localSeconds=s.seconds;
@@ -279,9 +362,9 @@
           localSeconds=s.seconds;
         }else if(s.status==='finished'){
           $('timerLbl').textContent='TUGADI';$('timer').textContent='00:00';$('subtitle').textContent='Tugadi';
-          var w='';(s.leaderboard||[]).forEach(function(r,i){var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';var rew=r.reward?'<span style="color:var(--accent2);font-weight:800">🪙 +'+r.reward+'</span>':'';w+='<div class="lb"><div class="rank">'+medal+'</div><div class="lb-name">'+esc(r.name)+' <span class="muted">'+r.points+'</span></div><div class="pts">'+rew+'</div></div>';});
-          var mine=s.your_reward?('<div class="stat" style="margin-top:12px"><div class="box"><b>🪙 +'+s.your_reward+'</b><span>Sizning mukofotingiz</span></div></div>'):'';
-          info.innerHTML='<div class="em">🏁</div><h2>O\'yin tugadi!</h2><p>Ochko olganlar mukofot oldi 🎉</p>'+mine+(w?'<div style="text-align:left;margin-top:14px">'+w+'</div>':'')+statsHistoryHtml(s);
+          var w='';(s.leaderboard||[]).forEach(function(r,i){var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';var rew=r.reward?'<span style="color:var(--accent2);font-weight:800">🪙 +'+r.reward+'</span>':'';var prem=r.premium_days?'<br><span style="color:var(--accent2);font-size:11px">💎 '+r.premium_days+' kun</span>':'';w+='<div class="lb"><div class="rank">'+medal+'</div><div class="lb-name">'+esc(r.name)+' <span class="muted">'+r.points+'</span><br><span class="muted" style="font-size:11px">'+detail(r)+'</span></div><div class="pts">'+rew+prem+'</div></div>';});
+          var mine=s.your_reward?('<div class="stat" style="margin-top:12px"><div class="box"><b>🪙 +'+s.your_reward+'</b><span>Sizning mukofotingiz</span></div>'+(s.your_premium_days?'<div class="box"><b>💎 '+s.your_premium_days+' kun</b><span>BEPUL Premium</span></div>':'')+'</div>'):'';
+          info.innerHTML='<div class="em">🏁</div><h2>O\'yin tugadi!</h2><p>Ochko olganlar mukofot oldi 🎉</p>'+mine+(w?'<div style="text-align:left;margin-top:14px">'+w+'</div>':'')+answerKeyHtml(s)+statsHistoryHtml(s);
           localSeconds=0;
         }else{
           $('timerLbl').textContent='—';$('timer').textContent='--:--';$('subtitle').textContent='Kutilmoqda';

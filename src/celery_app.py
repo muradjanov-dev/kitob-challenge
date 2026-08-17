@@ -306,6 +306,16 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=23, minute=0),
     },
 
+    # Public "Mukofotlar hisoboti" — 23:45, after the 22:30 VIP Premium arena
+    # has finished and been settled, before the admin/personal reports. Shows
+    # every Sirli quti prize and every VIP arena payout of the day so players
+    # can see the rewards really were handed over. Silent no-op on days with
+    # no box opens and no VIP game.
+    'announce-rewards-report': {
+        'task': 'tgbot.tasks.announce_rewards_report',
+        'schedule': crontab(hour=23, minute=45),
+    },
+
     # Admin daily summary — 23:55 every day, 2 minutes before the personal
     # reports go out so the admin sees platform totals first.
     'send-admin-daily-report': {

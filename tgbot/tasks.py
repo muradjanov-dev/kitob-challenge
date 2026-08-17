@@ -1195,6 +1195,24 @@ def _category_targets(boys_thread_id, girls_thread_id):
     return out
 
 
+def _timeline(w):
+    """` · ⏱ 47.2s` — the response time a placing was decided on, or ''."""
+    return f" · ⏱ {w['time']}s" if w.get("time") else ""
+
+
+def _scoreline(w):
+    """`· ✅ 8/11 · ⏱ 47.2s` — the two numbers the ranking is actually computed
+    from. Published for every player in every game's results post so the
+    finishing order can be checked from the post itself, rather than being
+    something players have to take on trust."""
+    bits = []
+    if w.get("q_total"):
+        bits.append(f"✅ {w.get('correct', 0)}/{w['q_total']}")
+    if w.get("time"):
+        bits.append(f"⏱ {w['time']}s")
+    return (" · " + " · ".join(bits)) if bits else ""
+
+
 def _announce_targets():
     try:
         from tgbot.bot.consts import ANNOUNCE_BOYS_THREAD_ID, ANNOUNCE_GIRLS_THREAD_ID
@@ -5402,6 +5420,13 @@ def expire_trial_premium(user_id):
     if not profile:
         return
 
+    # A longer Premium window (a Sirli quti prize, a VIP arena placing, a
+    # purchase) may have landed after this countdown was scheduled. Clearing
+    # the timestamp then would cut that grant short and DM a bogus "your trial
+    # has ended" — so only act once the window has genuinely elapsed.
+    if profile.trial_premium_until and profile.trial_premium_until > timezone.now():
+        return
+
     is_real_premium = _Pay.objects.filter(
         user=profile, status="paid", end_date__gte=timezone.localdate()
     ).exists()
@@ -5605,6 +5630,119 @@ def announce_top_game_players():
         cache.set(cache_key, True, 60 * 60 * 6)
     except Exception:
         pass
+
+
+MYSTERY_REPORT_TOP = 8
+VIP_REPORT_TOP = 10
+
+
+def build_rewards_report(for_date=None) -> str | None:
+    """The daily 'Mukofotlar hisoboti' post: everything the Sirli quti paid out
+    that day, and every Kitobcha / Premium day the VIP Premium arena handed to
+    its winners.
+
+    Returns None when there is nothing to report, so the task stays a silent
+    no-op on quiet days instead of posting an empty scoreboard.
+    """
+    from tgbot.models import MysteryBoxWin, QuizGame, QuizScore
+    from tgbot.services import quiz_game as _qg
+
+    day = for_date or timezone.localdate()
+    wins = list(
+        MysteryBoxWin.objects.filter(created_at__date=day)
+        .select_related("user").order_by("-kitobcha", "-premium_days", "-premium_hours")
+    )
+    vip_games = list(
+        QuizGame.objects.filter(is_vip=True, starts_at__date=day, status=QuizGame.STATUS_FINISHED)
+        .order_by("starts_at")
+    )
+    if not wins and not vip_games:
+        return None
+
+    lines = [
+        f"🧾 <b>MUKOFOTLAR HISOBOTI — {day.strftime('%d.%m.%Y')}</b>\n",
+        "<i>Bugun tarqatilgan barcha yutuqlar — ochiq va to'liq. "
+        "Hamma nima yutgani va nima olgani shu yerda ko'rinadi.</i>\n",
+    ]
+
+    # ── Sirli quti ──────────────────────────────────────────────────────────
+    if wins:
+        total_kitobcha = sum(w.kitobcha for w in wins)
+        prem_winners = [w for w in wins if w.premium_days or w.premium_hours]
+        lines.append(f"🎁 <b>SIRLI QUTI</b> — {len(wins)} marta ochildi")
+        lines.append(f"🪙 Jami berilgan Kitobcha: <b>{total_kitobcha}</b>")
+        if prem_winners:
+            lines.append(f"💎 Premium yutganlar: <b>{len(prem_winners)}</b> nafar — hammasiga faollashtirildi ✅")
+        lines.append("")
+        lines.append("<b>Eng katta yutuqlar:</b>")
+        for w in wins[:MYSTERY_REPORT_TOP]:
+            extra = ""
+            if w.kitobcha:
+                extra = f" — <b>+{w.kitobcha} 🪙</b>"
+            elif w.premium_days:
+                extra = f" — <b>{w.premium_days} kun Premium</b> 💎"
+            elif w.premium_hours:
+                extra = f" — <b>{w.premium_hours} soat Premium</b> 💎"
+            lines.append(f"• {_clip(w.user.full_name or 'Kitobxon', 40)} — {_clip(w.label, 80)}{extra}")
+        if len(wins) > MYSTERY_REPORT_TOP:
+            lines.append(f"<i>… va yana {len(wins) - MYSTERY_REPORT_TOP} ta yutuq</i>")
+        lines.append("")
+
+    # ── VIP Premium arena ───────────────────────────────────────────────────
+    medals = ["🥇", "🥈", "🥉"]
+    for g in vip_games:
+        rows = _qg.ranked_scores(g)[:VIP_REPORT_TOP]
+        if not rows:
+            continue
+        lines.append(f"⭐️ <b>VIP PREMIUM ARENA — {escape(g.title)}</b>")
+        nq = len(g.questions or [])
+        for i, s in enumerate(rows):
+            m = medals[i] if i < 3 else f"{i + 1}."
+            prem = f" + <b>{s.premium_days} kun Premium</b> 💎" if s.premium_days else ""
+            lines.append(
+                f"{m} {escape(s.user.full_name or 'Kitobxon')} — "
+                f"✅ {s.points // _qg.POINTS}/{nq} · ⏱ {round(s.effective_time, 1)}s → "
+                f"<b>+{s.reward or 0} 🪙</b>{prem}"
+            )
+        paid = QuizScore.objects.filter(game=g, rewarded=True).count()
+        lines.append(f"<i>Jami {paid} ishtirokchiga mukofot o'tkazildi.</i>")
+        lines.append("")
+
+    lines.append(
+        "✅ Barcha Kitobcha va Premiumlar <b>avtomatik</b> ravishda egalarining "
+        "hisobiga o'tkazildi — hech kim qo'lda tanlanmaydi.\n"
+        "⏱ O'yin reytingi faqat <b>to'g'ri javob soni</b>, keyin esa <b>sarflangan vaqt</b> "
+        "bo'yicha tuziladi. Javob berilmagan savol to'liq vaqt deb hisoblanadi — "
+        "jim turish urinishdan arzon tushmaydi."
+    )
+    return _trim_telegram("\n".join(lines))
+
+
+@shared_task
+def announce_rewards_report():
+    """Post the daily Mukofotlar hisoboti into every group's games topic."""
+    text = build_rewards_report()
+    if not text:
+        print("announce_rewards_report: nothing to report today")
+        return {"sent": 0}
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    sent = 0
+    for group_id, thread_id in _game_targets():
+        try:
+            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                    "disable_web_page_preview": "true"}
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            resp = requests.post(url, data=data, timeout=10)
+            if resp.status_code == 200:
+                sent += 1
+            else:
+                print(f"announce_rewards_report group {group_id}: {resp.text[:200]}")
+        except Exception as e:
+            print(f"announce_rewards_report group {group_id}: {e}")
+    print(f"announce_rewards_report: posted to {sent} groups")
+    return {"sent": sent}
 
 
 @shared_task
@@ -5879,7 +6017,8 @@ def chain_game_tick():
             for i, w in enumerate(scorers[:5]):
                 m = medals[i] if i < 3 else f"{i + 1}."
                 rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
-                lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{rew}")
+                lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko"
+                             f" · 🔗 {w.get('correct', 0)}{_timeline(w)}{rew}")
             lines.append("\n💰 Kirish 25 🪙 · faqat ochko olganlar mukofot oldi. O'ynaganingiz uchun rahmat! 📚")
         else:
             lines.append("Bu safar hech kim ochko olmadi 😔")
@@ -6344,7 +6483,7 @@ def games_finalize_tick():
                 # Flag Premium's 2x boost so e.g. a Premium 2nd place earning
                 # more Kitobcha than a non-Premium 1st doesn't read as a bug.
                 badge = " 💎" if w.get("boosted") else ""
-                lines.append(f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko{rew}")
+                lines.append(f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko{_scoreline(w)}{rew}")
             lines.append("\n🎁 Qatnashgan hammaga <b>+30 🪙</b>!")
         else:
             lines.append("Bu safar hech kim qatnashmadi 😔")
@@ -6412,7 +6551,7 @@ def games_finalize_tick():
                 m = medals[i] if i < 3 else f"{i + 1}."
                 rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
                 badge = " 💎" if w.get("boosted") else ""
-                lines.append(f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko{rew}")
+                lines.append(f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko{_scoreline(w)}{rew}")
         else:
             lines.append("Bu safar hech kim ochko olmadi 😔")
         text = "\n".join(lines)
@@ -6450,11 +6589,21 @@ def games_finalize_tick():
             print(f"games_finalize_tick: {flavor} finalize failed: {e}")
 
 
+def _trim_telegram(text, limit=4000):
+    """Keep a post under Telegram's 4096-char hard limit, cutting at a line
+    break so an HTML tag is never left unclosed mid-message."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    nl = cut.rfind("\n")
+    return (cut[:nl] if nl > limit // 2 else cut) + "\n<i>…</i>"
+
+
 def _broadcast_and_dm(header_lines, winners, dm_text_fn):
     """Post `header_lines` to every group, then DM each rewarded winner via
     `dm_text_fn(winner) -> str`. Shared by the new games' finalize announcements."""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    text = "\n".join(header_lines)
+    text = _trim_telegram("\n".join(header_lines))
     for gid, tid in _game_targets():
         try:
             data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
@@ -6485,7 +6634,7 @@ def _finalize_wisdom():
                 m = medals[i] if i < 3 else f"{i + 1}."
                 rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
                 streak_note = f" · eng uzun ketma-ket: {w['best_streak']}" if w.get("best_streak") else ""
-                lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{rew}{streak_note}")
+                lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko{_scoreline(w)}{rew}{streak_note}")
         else:
             lines.append("Bu safar hech kim ochko olmadi 😔")
         _broadcast_and_dm(lines, winners, lambda w: (
@@ -6505,7 +6654,7 @@ def _finalize_detective():
             for i, w in enumerate(winners[:5]):
                 m = medals[i] if i < 3 else f"{i + 1}."
                 rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
-                lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko ({w['solved_count']} topgan){rew}")
+                lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko ({w['solved_count']} topgan){_scoreline(w)}{rew}")
         else:
             lines.append("Bu safar hech kim topa olmadi 😔")
         _broadcast_and_dm(lines, winners, lambda w: (
@@ -6525,7 +6674,7 @@ def _finalize_survival():
         lines = [head]
         for w in winners[:5]:
             tag = "✅" if w.get("survived") else "🎖"
-            lines.append(f"{tag} {escape(w['name'])} — {w['correct']} to'g'ri (+{w['reward']} 🪙)")
+            lines.append(f"{tag} {escape(w['name'])} — {w['correct']} to'g'ri{_timeline(w)} (+{w['reward']} 🪙)")
         _broadcast_and_dm(lines, winners, lambda w: (
             f"💀 Omon qolish — {'omon qoldingiz!' if w.get('survived') else 'yaxshi harakat!'}\n"
             f"🪙 <b>+{w['reward']} Kitobcha</b> · To'g'ri javoblar: {w['correct']}"
@@ -6556,6 +6705,30 @@ def _quiz_headline(flavor):
     return "🎮", title
 
 
+def _clip(text, limit):
+    """Shorten, then escape — never the other way round: slicing escaped HTML
+    can cut an entity like `&#x27;` in half and make Telegram reject the whole
+    message with a parse error."""
+    text = str(text or "")
+    if len(text) > limit:
+        text = text[:limit - 1].rstrip() + "…"
+    return escape(text)
+
+
+def _answer_key_lines(game):
+    """The correct answer to every question, appended to the results post."""
+    qs = game.questions or []
+    if not qs:
+        return []
+    out = ["\n📋 <b>To'g'ri javoblar:</b>"]
+    for i, q in enumerate(qs):
+        opts = q.get("options") or []
+        ci = q.get("correct", -1)
+        ans = opts[ci] if 0 <= ci < len(opts) else "—"
+        out.append(f"{i + 1}. {_clip(ans, 70)}")
+    return out
+
+
 def _finalize_quiz_flavor(flavor):
     from tgbot.services import quiz_game
     medals = ["🥇", "🥈", "🥉"]
@@ -6575,7 +6748,7 @@ def _finalize_quiz_flavor(flavor):
                 tag = "🔵" if w.get("team") == "a" else "🔴"
                 rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
                 badge = " 💎" if w.get("boosted") else ""
-                lines.append(f"{tag} {escape(w['name'])}{badge} — {w['points']} ochko{rew}")
+                lines.append(f"{tag} {escape(w['name'])}{badge} — {w['points']} ochko{_scoreline(w)}{rew}")
         else:
             lines = [f"{emoji_} <b>{title} — yakun!</b>\n"]
             if winners:
@@ -6583,12 +6756,25 @@ def _finalize_quiz_flavor(flavor):
                     m = medals[i] if i < 3 else f"{i + 1}."
                     rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
                     badge = " 💎" if w.get("boosted") else ""
-                    lines.append(f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko{rew}")
+                    prem = f" + <b>{w['premium_days']} kun Premium</b> 💎" if w.get("premium_days") else ""
+                    lines.append(
+                        f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko"
+                        f"{_scoreline(w)}{rew}{prem}"
+                    )
             else:
                 lines.append("Bu safar hech kim ochko olmadi 😔")
+        lines += _answer_key_lines(game)
+        lines.append(
+            "\n<i>⏱ vaqt — javob bergan soniyalaringiz; javob berilmagan savol "
+            "to'liq vaqt deb hisoblanadi, shunda jim turish urinishdan arzon "
+            "tushmaydi. Ball teng bo'lsa — tezroq javob bergan yuqorida.</i>"
+        )
         try:
             _broadcast_and_dm(lines, winners, lambda w: (
                 f"{emoji_} {title} — <b>+{w['reward']} Kitobcha</b>! Ball: {w['points']}"
+                f"{_scoreline(w)}"
+                + (f"\n💎 Sizga <b>{w['premium_days']} kun BEPUL Premium</b> ham berildi — "
+                   "barcha VIP imtiyozlar faol!" if w.get("premium_days") else "")
             ))
         except Exception as e:
             # Rewards are already banked at this point -- a failed announcement
