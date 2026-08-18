@@ -108,7 +108,7 @@
     body.theme-sufi .qcard { background: linear-gradient(135deg, #4a3b2c, #7a6145); border-bottom: 2px solid #d4af37; color: #f0e6d2; text-shadow: 1px 1px 3px rgba(0,0,0,0.8); }
     body.theme-sufi .opt { background: #3a3229; border-color: #d4af37; color: #f0e6d2; border-radius: 4px; }
     
-    body.theme-visual .qcard { background: transparent; padding: 10px 16px 0; }
+    body.theme-visual .qcard { background: transparent; padding: 10px 16px 0; color: var(--text); }
     body.theme-visual .qimg { max-height: 280px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 100%; object-fit: cover; border-radius: 18px; }
     body.theme-visual .opt { text-align: center; justify-content: center; }
 
@@ -499,9 +499,17 @@
       var optsHost = document.createElement('div');
       optsHost.style.display = 'none';
       curOpts.forEach(function(o, i){
+        var hid = (curHidden||[]).indexOf(i)!==-1;
+        if(hid && !curAnswered) return;
         var b = document.createElement('button');
         b.className = 'opt'; b.textContent = o;
-        b.addEventListener('click', function(){ if (!curAnswered && !busy) answer(i); });
+        if (curAnswered) {
+            b.disabled = true;
+            if (i === curCorrectIdx) b.className = 'opt correct';
+            else if (i === curChoice) b.className = 'opt wrong';
+        } else {
+            b.addEventListener('click', function(){ if (!curAnswered && !busy) answer(i); });
+        }
         optsHost.appendChild(b);
       });
       box.appendChild(optsHost);
