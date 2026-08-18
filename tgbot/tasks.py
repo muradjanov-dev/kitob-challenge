@@ -6510,15 +6510,16 @@ def games_finalize_tick():
         else:
             lines.append("Bu safar hech kim qatnashmadi 😔")
         text = "\n".join(lines)
-        for gid, tid in _game_targets():
-            try:
-                data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
-                        "disable_web_page_preview": "true"}
-                if tid:
-                    data["message_thread_id"] = tid
-                requests.post(url, data=data, timeout=10)
-            except Exception:
-                pass
+        if not _is_admin_only(winners):
+            for gid, tid in _game_targets():
+                try:
+                    data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
+                            "disable_web_page_preview": "true"}
+                    if tid:
+                        data["message_thread_id"] = tid
+                    requests.post(url, data=data, timeout=10)
+                except Exception:
+                    pass
         for w in winners:
             if not w.get("reward"):
                 continue
@@ -6543,15 +6544,16 @@ def games_finalize_tick():
             badge = " 💎" if w.get("boosted") else ""
             lines.append(f"{i + 1}. {escape(w['name'])}{badge} — {w['correct']} ✓ (+{w['reward']} 🪙)")
         text = "\n".join(lines)
-        for gid, tid in _game_targets():
-            try:
-                data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
-                        "disable_web_page_preview": "true"}
-                if tid:
-                    data["message_thread_id"] = tid
-                requests.post(url, data=data, timeout=10)
-            except Exception:
-                pass
+        if not _is_admin_only(winners):
+            for gid, tid in _game_targets():
+                try:
+                    data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
+                            "disable_web_page_preview": "true"}
+                    if tid:
+                        data["message_thread_id"] = tid
+                    requests.post(url, data=data, timeout=10)
+                except Exception:
+                    pass
         for w in winners:
             if not w.get("reward"):
                 continue
@@ -6577,15 +6579,16 @@ def games_finalize_tick():
         else:
             lines.append("Bu safar hech kim ochko olmadi 😔")
         text = "\n".join(lines)
-        for gid, tid in _game_targets():
-            try:
-                data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
-                        "disable_web_page_preview": "true"}
-                if tid:
-                    data["message_thread_id"] = tid
-                requests.post(url, data=data, timeout=10)
-            except Exception:
-                pass
+        if not _is_admin_only(winners):
+            for gid, tid in _game_targets():
+                try:
+                    data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
+                            "disable_web_page_preview": "true"}
+                    if tid:
+                        data["message_thread_id"] = tid
+                    requests.post(url, data=data, timeout=10)
+                except Exception:
+                    pass
         for w in winners:
             if not w.get("reward"):
                 continue
@@ -6621,6 +6624,16 @@ def _trim_telegram(text, limit=4000):
     return (cut[:nl] if nl > limit // 2 else cut) + "\n<i>…</i>"
 
 
+def _is_admin_only(winners) -> bool:
+    if not winners:
+        return False
+    from tgbot.models import TelegramProfile
+    uids = [w["user_id"] for w in winners if w.get("user_id")]
+    if not uids:
+        return False
+    return not TelegramProfile.objects.filter(id__in=uids, is_admin=False).exists()
+
+
 def _broadcast_and_dm(header_lines, winners, dm_text_fn, dm_markup_fn=None):
     """Post `header_lines` to every group, then DM each rewarded winner via
     `dm_text_fn(winner) -> str`. Shared by the new games' finalize announcements.
@@ -6629,15 +6642,16 @@ def _broadcast_and_dm(header_lines, winners, dm_text_fn, dm_markup_fn=None):
     single DM can carry an upsell button without every caller needing one."""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     text = _trim_telegram("\n".join(header_lines))
-    for gid, tid in _game_targets():
-        try:
-            data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
-                    "disable_web_page_preview": "true"}
-            if tid:
-                data["message_thread_id"] = tid
-            requests.post(url, data=data, timeout=10)
-        except Exception:
-            pass
+    if not _is_admin_only(winners):
+        for gid, tid in _game_targets():
+            try:
+                data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
+                        "disable_web_page_preview": "true"}
+                if tid:
+                    data["message_thread_id"] = tid
+                requests.post(url, data=data, timeout=10)
+            except Exception:
+                pass
     for w in winners:
         if not w.get("reward"):
             continue
