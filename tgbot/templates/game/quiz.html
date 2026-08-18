@@ -52,6 +52,37 @@
     .hrow{text-align:left;padding:9px 2px;border-bottom:1px solid var(--line)}.hrow:last-child{border-bottom:0}
     .hrow .hd{font-size:11px;color:var(--muted)}.hrow .hw{font-weight:700}
     .muted{color:var(--muted)}.hidden{display:none}
+
+    /* THEMES */
+    body.theme-hacker { --bg: #0a0a0a; --card: #121212; --card2: #1a1a1a; --text: #00ff41; --muted: #008f11; font-family: 'Courier New', Courier, monospace; }
+    body.theme-hacker .card { border: 1px solid #00ff41; box-shadow: 0 0 10px rgba(0,255,65,0.2); }
+    body.theme-hacker .qcard { background: #0a0a0a; border-bottom: 2px solid #00ff41; color: #00ff41; }
+    body.theme-hacker .opt { background: #121212; border-color: #008f11; color: #00ff41; font-family: 'Courier New', Courier, monospace; }
+    body.theme-hacker .opt:hover { background: #00ff41; color: #0a0a0a; }
+
+    body.theme-sufi { --bg: #2a241f; --card: #3a3229; --card2: #4a4134; --text: #f0e6d2; --muted: #a69886; font-family: Georgia, serif; }
+    body.theme-sufi .card { border: 1px solid #a69886; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+    body.theme-sufi .qcard { background: linear-gradient(135deg, #4a3b2c, #7a6145); border-bottom: 2px solid #d4af37; color: #f0e6d2; text-shadow: 1px 1px 3px rgba(0,0,0,0.8); }
+    body.theme-sufi .opt { background: #3a3229; border-color: #d4af37; color: #f0e6d2; border-radius: 4px; }
+    
+    body.theme-visual .qcard { background: transparent; padding: 10px 16px 0; }
+    body.theme-visual .qimg { max-height: 280px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 100%; object-fit: cover; border-radius: 18px; }
+    body.theme-visual .opt { text-align: center; justify-content: center; }
+
+    .grid-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid-opts .opt { text-align: center; height: 100%; min-height: 80px; display: flex; align-items: center; justify-content: center; padding: 15px; font-size: 15px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s, background 0.2s; margin-bottom: 0; }
+    .grid-opts .opt:active { transform: scale(0.95); }
+
+    .flip-card { perspective: 1000px; background: transparent; border: 0; padding: 0; outline: none; margin-bottom: 0; cursor: pointer; }
+    .flip-card-inner { position: relative; width: 100%; height: 100%; min-height: 100px; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
+    .flip-card.answered .flip-card-inner { transform: rotateY(180deg); }
+    .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; border-radius: 16px; padding: 15px; font-weight: 800; font-size: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 2px solid var(--line); }
+    .flip-card-front { background: var(--card2); color: var(--text); }
+    .flip-card-back { transform: rotateY(180deg); color: #fff; }
+    .flip-card-back.correct { background: var(--ok); border-color: var(--ok); }
+    .flip-card-back.wrong { background: var(--bad); border-color: var(--bad); }
+    .flip-card-back.neutral { background: var(--card); border-color: var(--line); color: var(--muted); }
+
   </style>
 </head>
 <body data-flavor="{{ flavor }}">
@@ -168,6 +199,23 @@
       }
     }
     var M = META[FLAVOR] || META.twofacts;
+    
+    // Theme categorization
+    var themeGroups = {
+      hacker: ['cipher', 'mindtrap', 'paradox', 'strategy', 'sequence'],
+      sufi: ['simurgh', 'ishq', 'nafs', 'qalb', 'naqshband', 'yassaviy', 'masnaviy', 'gazzoliy', 'fano', 'marifat'],
+      visual: ['cover', 'pixel', 'aiart', 'mosaic', 'hiddendetail'],
+      cards: ['impostor', 'twofacts', 'oddone', 'matchbook', 'duel']
+    };
+    var activeTheme = 'default';
+    for (var t in themeGroups) {
+      if (themeGroups[t].indexOf(FLAVOR) !== -1) {
+        activeTheme = t;
+        document.body.classList.add('theme-' + t);
+        break;
+      }
+    }
+    
     document.documentElement.style.setProperty('--accent', M.accent);
     document.documentElement.style.setProperty('--accent2', M.accent2);
     document.getElementById('pageTitle').textContent = M.title;
@@ -276,15 +324,41 @@
           setTimeout(function(){ input.focus(); }, 100);
         }
       } else {
-        curOpts.forEach(function(o,i){
-          var b=document.createElement('button');b.className='opt';b.textContent=(i+1)+'. '+o;
-          if(curAnswered){
-            b.disabled=true;
-            if(i===curCorrectIdx)b.className='opt correct';
-            else if(i===curChoice)b.className='opt wrong';
-          }else{ b.addEventListener('click',function(){answer(i);}); }
-          box.appendChild(b);
-        });
+        if (activeTheme === 'visual' || activeTheme === 'cards' || activeTheme === 'sufi' || activeTheme === 'hacker') {
+          box.className = 'grid-opts';
+        } else {
+          box.className = '';
+        }
+
+        if (activeTheme === 'cards') {
+          curOpts.forEach(function(o,i){
+            var fc = document.createElement('div');
+            fc.className = 'flip-card' + (curAnswered ? ' answered' : '');
+            var fci = document.createElement('div'); fci.className = 'flip-card-inner';
+            var fcf = document.createElement('div'); fcf.className = 'flip-card-front'; fcf.textContent = o;
+            var fcb = document.createElement('div'); fcb.className = 'flip-card-back';
+            
+            if(curAnswered){
+              fc.style.cursor = 'default';
+              if(i===curCorrectIdx){ fcb.className += ' correct'; fcb.innerHTML = '✅<br>' + o; }
+              else if(i===curChoice){ fcb.className += ' wrong'; fcb.innerHTML = '❌<br>' + o; }
+              else { fcb.className += ' neutral'; fcb.textContent = o; }
+            }else{ 
+              fc.addEventListener('click',function(){answer(i);}); 
+            }
+            fci.appendChild(fcf); fci.appendChild(fcb); fc.appendChild(fci); box.appendChild(fc);
+          });
+        } else {
+          curOpts.forEach(function(o,i){
+            var b=document.createElement('button');b.className='opt';b.textContent=o;
+            if(curAnswered){
+              b.disabled=true;
+              if(i===curCorrectIdx)b.className='opt correct';
+              else if(i===curChoice)b.className='opt wrong';
+            }else{ b.addEventListener('click',function(){answer(i);}); }
+            box.appendChild(b);
+          });
+        }
       }
     }
 
