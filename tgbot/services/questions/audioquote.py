@@ -801,3 +801,21 @@ QUIZ_AUDIOQUOTE_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: eshitilgan iqtibos qaysi asar/muallifdan ─────────
+QUIZ_AUDIOQUOTE_QUESTIONS += [
+  {"q": "[Ovozli Iqtibos] «Har kimki vafo qilsa, vafo topqusidur» — kimning satri?", "options": ["Bobur", "Navoiy", "Mashrab", "Ogahiy"], "correct": 0},
+  {"q": "[Ovozli Iqtibos] «Ona-Vatan sajdagohdir» — kimning satri?", "options": ["Abdulla Oripov", "Erkin Vohidov", "Zulfiya", "Cho'lpon"], "correct": 0},
+  {"q": "[Ovozli Iqtibos] «Men bilaman-ki, hech narsa bilmayman» — kimning so'zi?", "options": ["Sokrat", "Aflotun", "Aristotel", "Forobiy"], "correct": 0},
+  {"q": "[Ovozli Iqtibos] «Kuch — adolatdadir» shiori kimga tegishli?", "options": ["Amir Temur", "Bobur", "Ulug'bek", "Jaloliddin Manguberdi"], "correct": 0},
+  {"q": "[Ovozli Iqtibos] «Qidirayotgan narsang seni ham qidirmoqda» — kimning hikmati?", "options": ["Jaloliddin Rumiy", "Attor", "Hofiz", "Sa'diy"], "correct": 0},
+  {"q": "[Ovozli Iqtibos] «Bani odam a'zoyi yak digarand» — qaysi asardan?", "options": ["Guliston (Sa'diy)", "Masnaviy (Rumiy)", "Shohnoma (Firdavsiy)", "Xamsa (Navoiy)"], "correct": 0},
+  {"q": "[Ovozli Iqtibos] «Dinlar o'tar, ammo ilm boqiy qolur» — kimga nisbat beriladi?", "options": ["Mirzo Ulug'bek", "Ibn Sino", "Beruniy", "Forobiy"], "correct": 0},
+  {"q": "[Ovozli Iqtibos] «O'z nafsini tanigan Robbini tanidi» — qaysi yo'nalish hikmati?", "options": ["Tasavvuf", "Astronomiya", "Matematika", "Tibbiyot"], "correct": 0},
+  {"q": "[Ovozli Iqtibos] Nayning ayriliqdan nola qilishi bilan boshlanadigan asar qaysi?", "options": ["Masnaviyi ma'naviy", "Guliston", "Shohnoma", "Xamsa"], "correct": 0},
+  {"q": "[Ovozli Iqtibos] «Qorong'ulikni la'natlagandan ko'ra bir sham yoqqan afzal» — kimning hikmati?", "options": ["Konfutsiy", "Sokrat", "Budda", "Aristotel"], "correct": 0},
+  {"q": "[Ovozli Iqtibos] «Ilm — Xitoyda bo'lsa ham izlab boring» — bu nima?", "options": ["Hadis", "Doston satri", "Xalq maqoli", "Falsafiy risola"], "correct": 0},
+  {"q": "[Ovozli Iqtibos] «Ustoz otangdek ulug'» — bu qanday ibora?", "options": ["O'zbek xalq maqoli", "Navoiy bayti", "Hadis", "Bobur she'ri"], "correct": 0},
+  {"q": "[Ovozli Iqtibos] «Yaxshilik qil, daryoga tashla» maqolining davomi qanday?", "options": ["Baliq bilmasa, Xoliq bilar", "Suv oqib ketar", "Kun kelib qaytar", "El bilar"], "correct": 0},
+  {"q": "[Ovozli Iqtibos] «Til — dilning kaliti» iborasi nimani anglatadi?", "options": ["So'z insonning ichki dunyosini ochib beradi", "Chet tili o'rganish shart", "Kalit yo'qolmasin", "Sukut afzal"], "correct": 0},
+]

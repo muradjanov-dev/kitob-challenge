@@ -801,3 +801,21 @@ QUIZ_AUCTION_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: kitob qadri, qo'lyozmalar, noyoblik ──────────────
+QUIZ_AUCTION_QUESTIONS += [
+  {"q": "[Kitob Auksioni] Qo'lyozma kitobning bosma kitobdan asosiy farqi nima?", "options": ["Qo'lda ko'chirilgani uchun har nusxa noyob", "Har doim qalinroq bo'ladi", "Faqat she'r yoziladi", "Rangli bo'ladi"], "correct": 0},
+  {"q": "[Kitob Auksioni] Kitobning qadrini eng ko'p oshiradigan omil qaysi?", "options": ["Noyobligi va tarixiy ahamiyati", "Muqovasining rangi", "Betlar soni", "Og'irligi"], "correct": 0},
+  {"q": "[Kitob Auksioni] Miniatyura nima?", "options": ["Qo'lyozmalarni bezovchi mayda rangli tasvir", "Kitob nomi", "She'r vazni", "Kitob o'lchami"], "correct": 0},
+  {"q": "[Kitob Auksioni] Xattotlik san'ati nima bilan shug'ullanadi?", "options": ["Go'zal husnixat bilan yozish", "Kitob sotish bilan", "Kitob tarjimasi bilan", "Kitob muqovalash bilan"], "correct": 0},
+  {"q": "[Kitob Auksioni] «Inkunabula» atamasi nimani bildiradi?", "options": ["Kitob bosmasining eng dastlabki davri nashrlari", "Qo'lyozma to'plami", "Kutubxona turi", "She'riy janr"], "correct": 0},
+  {"q": "[Kitob Auksioni] Qadimgi kitoblar asosan qaysi materialga yozilgan?", "options": ["Pergament va qog'oz", "Plastmassa", "Shisha", "Metall"], "correct": 0},
+  {"q": "[Kitob Auksioni] Kolofon deb nimaga aytiladi?", "options": ["Qo'lyozma oxiridagi ko'chiruvchi va sana haqidagi yozuv", "Kitob sarlavhasi", "Birinchi bet", "Muqova naqshi"], "correct": 0},
+  {"q": "[Kitob Auksioni] Nima uchun avtograf (muallif qo'li) nusxalar qimmat?", "options": ["Muallif bilan bevosita bog'liqligi va yagonaligi uchun", "Qalinroq bo'lgani uchun", "Yangi bo'lgani uchun", "Rangli bo'lgani uchun"], "correct": 0},
+  {"q": "[Kitob Auksioni] Kitob restavratsiyasi nima?", "options": ["Eskirgan kitobni asl holiga yaqinlashtirib tiklash", "Kitobni qayta yozish", "Kitobni tarjima qilish", "Kitobni sotish"], "correct": 0},
+  {"q": "[Kitob Auksioni] Ex libris nima?", "options": ["Kitob egasini bildiruvchi maxsus belgi/yorliq", "Kitob janri", "Nashriyot nomi", "Muqova turi"], "correct": 0},
+  {"q": "[Kitob Auksioni] Birinchi nashr (first edition) nega qadrlanadi?", "options": ["Asar dunyoga birinchi chiqqan holati bo'lgani uchun", "Eng arzon bo'lgani uchun", "Eng qalin bo'lgani uchun", "Eng yangi bo'lgani uchun"], "correct": 0},
+  {"q": "[Kitob Auksioni] Kutubxonalarda «nodir fond» nima?", "options": ["Ayniqsa qimmatli va kam uchraydigan nashrlar bo'limi", "Yangi kitoblar bo'limi", "Bolalar bo'limi", "Gazetalar bo'limi"], "correct": 0},
+  {"q": "[Kitob Auksioni] Qo'lyozmaning yoshini aniqlashda nimaga qaraladi?", "options": ["Qog'oz, siyoh, xat uslubi va kolofonga", "Faqat og'irligiga", "Faqat rangiga", "Faqat hajmiga"], "correct": 0},
+  {"q": "[Kitob Auksioni] Nusxa ko'chirish (kotiblik) qadimda nima uchun muhim edi?", "options": ["Bosmaxona yo'qligi sababli kitob faqat shunday tarqalgan", "Kitob arzon bo'lgani uchun", "O'qish taqiqlangani uchun", "Qog'oz ko'p bo'lgani uchun"], "correct": 0},
+]

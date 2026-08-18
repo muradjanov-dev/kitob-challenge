@@ -801,3 +801,21 @@ QUIZ_AIART_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: tasvirdagi qahramon/manzarani tanish ─────────────
+QUIZ_AIART_QUESTIONS += [
+  {"q": "[AI Rasmlar] Rasmda: cho'lda sochlari o'sib ketgan, sevgilisi nomini takrorlab yurgan yigit. Kim u?", "options": ["Majnun", "Farhod", "Otabek", "Alpomish"], "correct": 0},
+  {"q": "[AI Rasmlar] Rasmda: tesha bilan tog'ni o'yayotgan bahodir yigit. Kim u?", "options": ["Farhod", "Majnun", "Anvar", "Qoravoy"], "correct": 0},
+  {"q": "[AI Rasmlar] Rasmda: yulduzli osmonni ulkan asboblar bilan kuzatayotgan hukmdor. Kim u?", "options": ["Mirzo Ulug'bek", "Amir Temur", "Bobur", "Navoiy"], "correct": 0},
+  {"q": "[AI Rasmlar] Rasmda: qamish qalam bilan kundalik yozayotgan yosh podshoh. Kim u?", "options": ["Bobur", "Ulug'bek", "Xudoyorxon", "Husayn Boyqaro"], "correct": 0},
+  {"q": "[AI Rasmlar] Rasmda: bemor yonida tomir urishini sanayotgan sharq tabibi. Kim u?", "options": ["Abu Ali ibn Sino", "Al-Xorazmiy", "Farg'oniy", "Buxoriy"], "correct": 0},
+  {"q": "[AI Rasmlar] Rasmda: kichik sayyorada yolg'iz atirgulga qarab turgan bola. Qaysi asar?", "options": ["Kichkina shahzoda", "Oq kema", "Shum bola", "Alpomish"], "correct": 0},
+  {"q": "[AI Rasmlar] Rasmda: qayiqda ulkan baliqni tortayotgan keksa baliqchi. Qaysi asar?", "options": ["Chol va dengiz", "Robinzon Kruzo", "Odisseya", "Oq kema"], "correct": 0},
+  {"q": "[AI Rasmlar] Rasmda: nayzasi bilan shamol tegirmoniga otilayotgan ozg'in ritsar. Kim u?", "options": ["Don Kixot", "Lanselot", "Robin Gud", "Aylvengo"], "correct": 0},
+  {"q": "[AI Rasmlar] Rasmda: yetti vodiy uzra uchayotgan qushlar galasi. Qaysi asar?", "options": ["Mantiq ut-tayr", "Xamsa", "Shohnoma", "Masnaviy"], "correct": 0},
+  {"q": "[AI Rasmlar] Rasmda: qo'lyozmani nafis xat bilan ko'chirayotgan yigit. Qaysi asar qahramoni?", "options": ["Mehrobdan chayon (Anvar)", "O'tkan kunlar (Otabek)", "Shum bola (Qoravoy)", "Sarob"], "correct": 0},
+  {"q": "[AI Rasmlar] Rasmda: yolg'iz orolda echki terisidan kiyim kiygan odam. Kim u?", "options": ["Robinzon Kruzo", "Santyago", "Gulliver", "Sinbad"], "correct": 0},
+  {"q": "[AI Rasmlar] Rasmda: tunda qal'a devorida ruh bilan yuzlashgan shahzoda. Qaysi asar?", "options": ["Hamlet", "Makbet", "Otello", "Qirol Lir"], "correct": 0},
+  {"q": "[AI Rasmlar] Rasmda: Marg'ilon hovlisida ilk bor ko'z urishtirgan yigit va qiz. Qaysi asar?", "options": ["O'tkan kunlar", "Kecha va kunduz", "Mehrobdan chayon", "Sarob"], "correct": 0},
+  {"q": "[AI Rasmlar] Rasmda: kamonini hech kim tortolmagan, yetti yildan keyin qaytgan botir. Kim u?", "options": ["Alpomish", "Go'ro'g'li", "Rustam", "Farhod"], "correct": 0},
+]

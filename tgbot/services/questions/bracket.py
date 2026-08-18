@@ -801,3 +801,21 @@ QUIZ_BRACKET_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: turnir — solishtirish va "eng"lar ────────────────
+QUIZ_BRACKET_QUESTIONS += [
+  {"q": "[Turnir] Qaysi asar birinchi o'zbek romani hisoblanadi?", "options": ["O'tkan kunlar", "Kecha va kunduz", "Sarob", "Shum bola"], "correct": 0},
+  {"q": "[Turnir] Qaysi ikkisi zamondosh: Navoiy va ...?", "options": ["Husayn Boyqaro", "Abdulla Qodiriy", "Ibn Sino", "Cho'lpon"], "correct": 0},
+  {"q": "[Turnir] Qaysi asar hajmi jihatidan eng ulkan o'zbek xalq dostoni?", "options": ["Alpomish", "Shum bola", "Sarob", "Guliston"], "correct": 0},
+  {"q": "[Turnir] Turkiy tilda birinchi to'liq «Xamsa»ni kim yaratgan?", "options": ["Alisher Navoiy", "Nizomiy Ganjaviy", "Jomiy", "Firdavsiy"], "correct": 0},
+  {"q": "[Turnir] Qaysi alloma «Muallimi soniy» — Ikkinchi muallim deb ulug'langan?", "options": ["Abu Nasr Forobiy", "Ibn Sino", "Beruniy", "Xorazmiy"], "correct": 0},
+  {"q": "[Turnir] Qaysi asar eng erta yaratilgan?", "options": ["Devonu lug'otit turk (XI asr)", "Xamsa (XV asr)", "Boburnoma (XVI asr)", "O'tkan kunlar (XX asr)"], "correct": 0},
+  {"q": "[Turnir] Ikkisidan qaysi biri tibbiyot allomasi?", "options": ["Ibn Sino", "Imom Buxoriy", "Mahmud Koshg'ariy", "Yusuf Xos Hojib"], "correct": 0},
+  {"q": "[Turnir] Qaysi asar jahonda eng ko'p tarjima qilingan o'zbek klassikasi sanaladi?", "options": ["Boburnoma", "Shum bola", "Sarob", "Ikki eshik orasi"], "correct": 0},
+  {"q": "[Turnir] Qaysi juftlik to'g'ri: muallif — asar?", "options": ["Firdavsiy — Shohnoma", "Navoiy — Shohnoma", "Sa'diy — Xamsa", "Bobur — Guliston"], "correct": 0},
+  {"q": "[Turnir] Qaysi biri qomusiy (bir necha fanni qamragan) alloma?", "options": ["Abu Rayhon Beruniy", "Imom Termiziy", "Burhoniddin Marg'inoniy", "Ahmad Yassaviy"], "correct": 0},
+  {"q": "[Turnir] Rus adabiyotida «Urush va tinchlik» va «Anna Karenina» — kimning asarlari?", "options": ["Lev Tolstoy", "Dostoyevskiy", "Turgenev", "Chexov"], "correct": 0},
+  {"q": "[Turnir] Qaysi doston Navoiy «Xamsa»sining eng hajmdori hisoblanadi?", "options": ["Saddi Iskandariy", "Hayrat ul-abror", "Layli va Majnun", "Sab'ai sayyor"], "correct": 0},
+  {"q": "[Turnir] Qaysi biri tariqat asoschisi?", "options": ["Bahouddin Naqshband", "Al-Xorazmiy", "Ahmad Farg'oniy", "Ulug'bek"], "correct": 0},
+  {"q": "[Turnir] Qaysi asar memuar janrida yozilgan?", "options": ["Boburnoma", "Alpomish", "Layli va Majnun", "Guliston"], "correct": 0},
+]

@@ -801,3 +801,21 @@ QUIZ_BUZZER_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: tezkor qo'ng'iroq — qisqa va aniq ────────────────
+QUIZ_BUZZER_QUESTIONS += [
+  {"q": "[Tezkor] «Xamsa» muallifi?", "options": ["Alisher Navoiy", "Bobur", "Firdavsiy", "Jomiy"], "correct": 0},
+  {"q": "[Tezkor] «Boburnoma» muallifi?", "options": ["Bobur", "Navoiy", "Ulug'bek", "Temur"], "correct": 0},
+  {"q": "[Tezkor] «O'tkan kunlar» muallifi?", "options": ["Abdulla Qodiriy", "Cho'lpon", "Oybek", "Fitrat"], "correct": 0},
+  {"q": "[Tezkor] «Tib qonunlari» muallifi?", "options": ["Ibn Sino", "Beruniy", "Forobiy", "Xorazmiy"], "correct": 0},
+  {"q": "[Tezkor] «Devoni hikmat» muallifi?", "options": ["Ahmad Yassaviy", "Naqshband", "Mashrab", "Navoiy"], "correct": 0},
+  {"q": "[Tezkor] Ruboiy nechta misra?", "options": ["4", "2", "6", "8"], "correct": 0},
+  {"q": "[Tezkor] Bayt nechta misra?", "options": ["2", "4", "3", "5"], "correct": 0},
+  {"q": "[Tezkor] «Xamsa» nechta doston?", "options": ["5", "3", "7", "4"], "correct": 0},
+  {"q": "[Tezkor] Ulug'bek rasadxonasi qaysi shaharda?", "options": ["Samarqand", "Buxoro", "Xiva", "Termiz"], "correct": 0},
+  {"q": "[Tezkor] «Shohnoma» muallifi?", "options": ["Firdavsiy", "Sa'diy", "Hofiz", "Rumiy"], "correct": 0},
+  {"q": "[Tezkor] «Kecha va kunduz» muallifi?", "options": ["Cho'lpon", "Qodiriy", "Oybek", "Qahhor"], "correct": 0},
+  {"q": "[Tezkor] «Guliston» muallifi?", "options": ["Sa'diy Sheroziy", "Hofiz", "Firdavsiy", "Attor"], "correct": 0},
+  {"q": "[Tezkor] «Alpomish» — qanday asar?", "options": ["Xalq dostoni", "Roman", "Qissa", "Drama"], "correct": 0},
+  {"q": "[Tezkor] «Qutadg'u bilig» muallifi?", "options": ["Yusuf Xos Hojib", "Koshg'ariy", "Navoiy", "Yassaviy"], "correct": 0},
+]

@@ -801,3 +801,21 @@ QUIZ_MOSAIC_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: bo'laklardan butunni yig'ish ─────────────────────
+QUIZ_MOSAIC_QUESTIONS += [
+  {"q": "[Mozaika] Bo'laklar: Otabek + Kumush + Homid + Marg'ilon. Qaysi asar yig'iladi?", "options": ["O'tkan kunlar", "Mehrobdan chayon", "Kecha va kunduz", "Sarob"], "correct": 0},
+  {"q": "[Mozaika] Bo'laklar: Anvar + Ra'no + Xudoyorxon + xattotlik. Qaysi asar?", "options": ["Mehrobdan chayon", "O'tkan kunlar", "Shum bola", "Alpomish"], "correct": 0},
+  {"q": "[Mozaika] Bo'laklar: Hudhud + yetti vodiy + Simurg'. Qaysi asar?", "options": ["Mantiq ut-tayr", "Xamsa", "Masnaviy", "Guliston"], "correct": 0},
+  {"q": "[Mozaika] Bo'laklar: kamon + yetti yil + Barchinoy + Qo'ng'irot. Qaysi asar?", "options": ["Alpomish", "Go'ro'g'li", "Kuntug'mish", "Ravshan"], "correct": 0},
+  {"q": "[Mozaika] Bo'laklar: tesha + tog' + Shirin + yolg'on xabar. Qaysi doston?", "options": ["Farhod va Shirin", "Layli va Majnun", "Sab'ai sayyor", "Saddi Iskandariy"], "correct": 0},
+  {"q": "[Mozaika] Bo'laklar: rasadxona + yulduzlar jadvali + Samarqand. Kim haqida?", "options": ["Mirzo Ulug'bek", "Beruniy", "Farg'oniy", "Xorazmiy"], "correct": 0},
+  {"q": "[Mozaika] Bo'laklar: Farg'ona + Samarqand + Kobul + Hindiston. Kimning yo'li?", "options": ["Bobur", "Amir Temur", "Ulug'bek", "Jaloliddin"], "correct": 0},
+  {"q": "[Mozaika] Bo'laklar: qayiq + marlin + akulalar + skelet. Qaysi asar?", "options": ["Chol va dengiz", "Robinzon Kruzo", "Odisseya", "Oq kema"], "correct": 0},
+  {"q": "[Mozaika] Bo'laklar: hasharot + Gregor + oila + xona. Qaysi asar?", "options": ["Evrilish", "Jinoyat va jazo", "Faust", "Hamlet"], "correct": 0},
+  {"q": "[Mozaika] Bo'laklar: Zebi + qishloq + nohaqlik + fojia. Qaysi asar?", "options": ["Kecha va kunduz", "O'tkan kunlar", "Sarob", "Shum bola"], "correct": 0},
+  {"q": "[Mozaika] Bo'laklar: hadis + 16 yil + qat'iy mezon + Buxoro. Kim haqida?", "options": ["Imom Buxoriy", "Imom Termiziy", "Imom G'azzoliy", "Marg'inoniy"], "correct": 0},
+  {"q": "[Mozaika] Bo'laklar: algebra + algoritm + Xorazm. Kim haqida?", "options": ["Al-Xorazmiy", "Beruniy", "Ibn Sino", "Forobiy"], "correct": 0},
+  {"q": "[Mozaika] Bo'laklar: turkiy so'zlar + lug'at + xarita + XI asr. Qaysi asar?", "options": ["Devonu lug'otit turk", "Qutadg'u bilig", "Xamsa", "Boburnoma"], "correct": 0},
+  {"q": "[Mozaika] Bo'laklar: shamol tegirmoni + nayza + Sancho + ritsarlik. Qaysi asar?", "options": ["Don Kixot", "Uch mushketyor", "Ilohiy komediya", "Faust"], "correct": 0},
+]

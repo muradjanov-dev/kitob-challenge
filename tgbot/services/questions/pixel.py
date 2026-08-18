@@ -801,3 +801,21 @@ QUIZ_PIXEL_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: muqova va ramziy tasvirdan asarni topish ─────────
+QUIZ_PIXEL_QUESTIONS += [
+  {"q": "[Piksel Muqova] Muqovada besh dostonli to'plam ramzi — qaysi asar?", "options": ["Xamsa", "Boburnoma", "Guliston", "Shohnoma"], "correct": 0},
+  {"q": "[Piksel Muqova] Muqovada Simurg' qushi tasviri — qaysi asar?", "options": ["Mantiq ut-tayr", "Alpomish", "O'tkan kunlar", "Sarob"], "correct": 0},
+  {"q": "[Piksel Muqova] Muqovada tesha va tog' — qaysi doston?", "options": ["Farhod va Shirin", "Layli va Majnun", "Sab'ai sayyor", "Hayrat ul-abror"], "correct": 0},
+  {"q": "[Piksel Muqova] Muqovada rasadxona va yulduzlar jadvali — kim haqida?", "options": ["Mirzo Ulug'bek", "Ibn Sino", "Navoiy", "Bobur"], "correct": 0},
+  {"q": "[Piksel Muqova] Muqovada nay va uning nolasi — qaysi asar?", "options": ["Masnaviyi ma'naviy", "Xamsa", "Guliston", "Shohnoma"], "correct": 0},
+  {"q": "[Piksel Muqova] Muqovada kamon va yetti yil kutgan yor — qaysi doston?", "options": ["Alpomish", "Go'ro'g'li", "Kuntug'mish", "Ravshan"], "correct": 0},
+  {"q": "[Piksel Muqova] Muqovada tibbiy asboblar va qomusiy kitob — qaysi asar?", "options": ["Tib qonunlari", "Devoni hikmat", "Qutadg'u bilig", "Boburnoma"], "correct": 0},
+  {"q": "[Piksel Muqova] Muqovada gulzor va hikoyatlar to'plami — qaysi asar?", "options": ["Guliston", "Xamsa", "Shohnoma", "Masnaviy"], "correct": 0},
+  {"q": "[Piksel Muqova] Muqovada turkiy so'zlar lug'ati va xarita — qaysi asar?", "options": ["Devonu lug'otit turk", "Qutadg'u bilig", "Xamsa", "Boburnoma"], "correct": 0},
+  {"q": "[Piksel Muqova] Muqovada Marg'ilon va Toshkent manzarasi, XIX asr — qaysi roman?", "options": ["O'tkan kunlar", "Sarob", "Shum bola", "Oq kema"], "correct": 0},
+  {"q": "[Piksel Muqova] Muqovada shohlar va pahlavonlar jangi, fors eposi — qaysi asar?", "options": ["Shohnoma", "Xamsa", "Guliston", "Masnaviy"], "correct": 0},
+  {"q": "[Piksel Muqova] Muqovada yolg'iz orol, kema qoldig'i va izlar — qaysi asar?", "options": ["Robinzon Kruzo", "Chol va dengiz", "Odisseya", "Kichkina shahzoda"], "correct": 0},
+  {"q": "[Piksel Muqova] Muqovada hukmdorning shaxsiy kundaligi va Hindiston yurishlari — qaysi asar?", "options": ["Boburnoma", "Temur tuzuklari", "Xamsa", "Devoni hikmat"], "correct": 0},
+  {"q": "[Piksel Muqova] Muqovada hikmatli to'rtliklar va tasavvuf ramzlari — qaysi asar?", "options": ["Devoni hikmat", "Shohnoma", "Boburnoma", "Sarob"], "correct": 0},
+]
