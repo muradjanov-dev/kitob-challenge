@@ -540,4 +540,20 @@ CROSSWORD_QUESTIONS = [
       "ITALIYA"
     ]
   }
+,
+  {"answer": "MUBOLAG'A", "clue": "Adabiyotda biror narsani o'ta bo'rttirib tasvirlash san'ati (Hyperbole)", "distractors": ["TAJBIS", "METAFORA", "TASHBEH"]},
+  {"answer": "ALXIMIK", "clue": "Paulo Koelyo yozgan, Ispaniyadan Misrga sayohat qilgan Santyago kasbi", "distractors": ["SAYYOH", "CHOPON", "SOTUVCHI"]},
+  {"answer": "ZUMRAD", "clue": "O'gay ona tomonidan xo'rlangan va o'rmonga haydalgan ertak qahramoni", "distractors": ["QIMMAT", "KUNDUZ", "GULNOR"]},
+  {"answer": "SAMAN", "clue": "Alpomishning sadioq otining rangi (Boychibor qanday ot?)", "distractors": ["QORA", "OQ", "QASHQA"]},
+  {"answer": "G'IJDUVON", "clue": "Ayniyning 'Doxunda' asarida va Buxoro inqilobida tilga olinadigan mashhur tuman", "distractors": ["VOBKENT", "KOGON", "SHOFIRKON"]},
+  {"answer": "MAHKUM", "clue": "Alber Kamyuning 'Begona' asarida Merso qanday jazoga tortiladi? (U kimga aylanadi?)", "distractors": ["OQLANGAN", "QURBON", "QOCHQIN"]},
+  {"answer": "TILSIM", "clue": "Ertaklarda qulflangan sandiqni yoki g'orni ochish uchun kerak bo'ladigan sirli so'z", "distractors": ["KALIT", "PAROL", "DUO"]},
+  {"answer": "BEMOR", "clue": "Abdulla Qahhorning xotini uchun o'zini qurbon qilgan, tabiblarga aldanadigan qahramoni", "distractors": ["SOTIVOLDI", "O'G'RI", "BOY"]},
+  {"answer": "O'RGIMCHAK", "clue": "Dostoyevskiy romanlarida gunohkorning ruhiyatini ifodalovchi qo'rqinchli hasharot (xona burchagidagi...)", "distractors": ["CHAYON", "TARAKAN", "QO'NG'IZ"]},
+  {"answer": "ZARTHUSHT", "clue": "Fridrix Nitshe kitobida 'Shunday dedi...' kim?", "distractors": ["SOKRAT", "PAYG'AMBAR", "BUDDA"]},
+  {"answer": "DORBOZ", "clue": "Xudoyberdi To'xtaboyevning 'Sariq devni minib' asarida Hoshimjon ko'radi, sirkdagi eng xavfli kasb", "distractors": ["MASXARABOZ", "SEHRGAR", "CHAVANDOZ"]},
+  {"answer": "MUZEY", "clue": "O'rxon Pamukning 'Ma'sumiyat ...' nomli mashhur asari", "distractors": ["BOG'I", "SAROYI", "KITOBLARI"]},
+  {"answer": "SHOHMOT", "clue": "Stefan Sveygning kema ichida kechadigan eng mashhur novellasi qaysi o'yin haqida?", "distractors": ["QARTA", "NARD", "SHASHKA"]},
+  {"answer": "KAFAN", "clue": "Adabiyotda o'lim ramzi; A.Qahhor hikoyasida o'g'ri nima o'g'irlaydi?", "distractors": ["OT", "PUL", "SANDIQ"]},
+  {"answer": "O'TINCHI", "clue": "Alibobo va qirq qaroqchi ertagida Aliboboning kasbi nima edi?", "distractors": ["QASSOB", "TIKUVCHI", "SAYYOH"]}
 ]

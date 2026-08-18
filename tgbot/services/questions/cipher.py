@@ -720,4 +720,15 @@ CIPHER_QUESTIONS = [
       "Ahmad Yassaviy"
     ]
   }
+,
+  {"code": "«E V R I L I S H»", "decoded": "Evrilish (Metamorfoza)", "author": "Frans Kafka", "distractors": ["Nabijon Boqiy", "Asqad Muxtor", "Tog'ay Murod"]},
+  {"code": "«Z U L M A T  I C H I D A  N U R»", "decoded": "Zulmat ichida nur", "author": "Oybek", "distractors": ["Abdulla Qodiriy", "G'afur G'ulom", "Cho'lpon"]},
+  {"code": "«Y U Z  Y I L L I K  T A N H O L I K»", "decoded": "Yuz yillik tanholik", "author": "Gabriel Garsiya Markes", "distractors": ["Xulio Kortasar", "Borxes", "Mario Vargas Losa"]},
+  {"code": "«O' L A K S A  G U L I»", "decoded": "Yovuzlik gullari (Baudelaire) yoxud O'laksa guli", "author": "Sharl Bodler", "distractors": ["Artur Rembo", "Pol Verlen", "V.Gyugo"]},
+  {"code": "«Q U S H  T I L I»", "decoded": "Qush tili (Lison ut-tayr / Mantiq ut-tayr)", "author": "Navoiy / Attor", "distractors": ["Fuzuliy", "Jaloliddin Rumiy", "Hofiz Sheroziy"]},
+  {"code": "«U R S H U R A K»", "decoded": "It yuragi (Sobache serdtse)", "author": "Mixail Bulgakov", "distractors": ["F.Dostoyevskiy", "L.Tolstoy", "A.Chexov"]},
+  {"code": "«T A X T  O ' Y I N I»", "decoded": "Taxtlar o'yini (A Game of Thrones)", "author": "Jorj R.R. Martin", "distractors": ["J.R.R. Tolkin", "K.S. Lyuis", "J.K. Rouling"]},
+  {"code": "«A J I N A L A R  D A R A S I»", "decoded": "Ajinalar darasi (Yoki Jinlar darasi)", "author": "O'zbek xalq ertaklari", "distractors": ["Rus ertaklari", "Arab ertaklari", "Eron afsonalari"]},
+  {"code": "«I S M I G U L»", "decoded": "Atirgul nomi (Il nome della rosa)", "author": "Umberto Eko", "distractors": ["O'rxon Pamuk", "Den Braun", "Paulo Koelyo"]},
+  {"code": "«Q O R A  S O B N E Q A S O B»", "decoded": "Qora qon (Yoki qora qasr)", "author": "Stendal (Qizil va Qora)", "distractors": ["O.Balzak", "V.Gyugo", "A.Dyuma"]}
 ]
