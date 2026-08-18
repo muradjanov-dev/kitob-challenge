@@ -12,7 +12,7 @@ env.read_env(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 
 # Set the default Django settings module for the 'celery' program.
 os.environ.setdefault("DJANGO_SETTINGS_MODULE",
-                      env.str("DJANGO_SETTINGS_MODULE"))
+                      env.str("DJANGO_SETTINGS_MODULE", default="src.settings"))
 
 app = Celery('src')
 
