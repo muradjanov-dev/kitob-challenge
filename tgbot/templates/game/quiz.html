@@ -60,6 +60,30 @@
     body.theme-hacker .opt { background: #121212; border-color: #008f11; color: #00ff41; font-family: 'Courier New', Courier, monospace; }
     body.theme-hacker .opt:hover { background: #00ff41; color: #0a0a0a; }
 
+
+    body.theme-arcade { --bg: #1a0b2e; --card: #2d1b4e; --card2: #3c2469; --text: #00ffff; --muted: #a78bfa; font-family: 'Impact', sans-serif; letter-spacing: 1px; }
+    body.theme-arcade .card { border: 2px solid #00ffff; box-shadow: 0 0 15px rgba(0,255,255,0.4); }
+    body.theme-arcade .qcard { background: linear-gradient(135deg, #ff00ff, #00ffff); border: none; color: #fff; text-shadow: 2px 2px 0 #000; }
+    body.theme-arcade .opt { background: #ff0055; border: 3px solid #ff00ff; color: #fff; font-size: 18px; border-radius: 8px; box-shadow: 0 6px 0 #990033; transition: all 0.1s; margin-bottom: 12px; }
+    body.theme-arcade .opt:active { transform: translateY(6px); box-shadow: 0 0 0 #990033; }
+    body.theme-arcade .opt.correct { background: #00ff00; border-color: #00cc00; box-shadow: 0 6px 0 #006600; color: #000; }
+    body.theme-arcade .opt.wrong { background: #333; border-color: #111; box-shadow: 0 6px 0 #000; color: #666; }
+
+    body.theme-classic { --bg: #f4ecd8; --card: #e8dcc4; --card2: #dfd1b3; --text: #3e2723; --muted: #795548; font-family: 'Courier New', Courier, monospace; }
+    body.theme-classic .card { border: 1px dashed #a1887f; border-radius: 2px; }
+    body.theme-classic .qcard { background: transparent; border-bottom: 2px solid #5d4037; color: #3e2723; font-weight: bold; }
+    body.theme-classic .opt { background: #fdfaf3; border: 1px solid #d7ccc8; color: #3e2723; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); border-radius: 0; position: relative; }
+    body.theme-classic .opt:hover { background: #f5f0e1; }
+
+    .equalizer { display: flex; justify-content: center; align-items: flex-end; gap: 4px; height: 60px; margin: 20px 0; }
+    .eq-bar { width: 8px; background: var(--accent); border-radius: 4px; animation: eq 1s ease-in-out infinite alternate; }
+    .eq-bar:nth-child(1) { animation-delay: 0.1s; height: 20%; }
+    .eq-bar:nth-child(2) { animation-delay: 0.3s; height: 60%; }
+    .eq-bar:nth-child(3) { animation-delay: 0.0s; height: 100%; }
+    .eq-bar:nth-child(4) { animation-delay: 0.4s; height: 50%; }
+    .eq-bar:nth-child(5) { animation-delay: 0.2s; height: 80%; }
+    @keyframes eq { 0% { transform: scaleY(0.3); } 100% { transform: scaleY(1); } }
+
     body.theme-sufi { --bg: #2a241f; --card: #3a3229; --card2: #4a4134; --text: #f0e6d2; --muted: #a69886; font-family: Georgia, serif; }
     body.theme-sufi .card { border: 1px solid #a69886; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
     body.theme-sufi .qcard { background: linear-gradient(135deg, #4a3b2c, #7a6145); border-bottom: 2px solid #d4af37; color: #f0e6d2; text-shadow: 1px 1px 3px rgba(0,0,0,0.8); }
@@ -210,10 +234,12 @@
     
     // Theme categorization
     var themeGroups = {
-      hacker: ['cipher', 'mindtrap', 'paradox', 'strategy', 'sequence'],
+      hacker: ['cipher', 'mindtrap', 'paradox', 'strategy', 'sequence', 'stoic', 'antiherd', 'dilemma', 'causeeffect', 'masks', 'socrates', 'memento'],
       sufi: ['simurgh', 'ishq', 'nafs', 'qalb', 'naqshband', 'yassaviy', 'masnaviy', 'gazzoliy', 'fano', 'marifat'],
       visual: ['cover', 'pixel', 'aiart', 'mosaic', 'hiddendetail'],
-      cards: ['impostor', 'twofacts', 'oddone', 'matchbook', 'duel']
+      cards: ['impostor', 'twofacts', 'oddone', 'matchbook', 'duel'],
+      arcade: ['auction', 'buzzer', 'bracket', 'king', 'mysterybox', 'numbers', 'ending', 'rhyme', 'audioquote'],
+      classic: ['worldlit', 'genres', 'scholars', 'character', 'dialogue', 'plotmap', 'scenes', 'regions']
     };
     var activeTheme = 'default';
     for (var t in themeGroups) {
@@ -451,6 +477,12 @@
           box.appendChild(deck);
           box.appendChild(controls);
         } else {
+          if (FLAVOR === 'audioquote' && !curAnswered) {
+             var eq = document.createElement('div');
+             eq.className = 'equalizer';
+             eq.innerHTML = '<div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div>';
+             box.appendChild(eq);
+          }
           curOpts.forEach(function(o,i){
             var b=document.createElement('button');b.className='opt';b.textContent=o;
             if(curAnswered){
