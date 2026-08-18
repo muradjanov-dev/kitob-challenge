@@ -82,6 +82,14 @@
     .flip-card-back.correct { background: var(--ok); border-color: var(--ok); }
     .flip-card-back.wrong { background: var(--bad); border-color: var(--bad); }
     .flip-card-back.neutral { background: var(--card); border-color: var(--line); color: var(--muted); }
+    .swipe-deck { position: relative; width: 100%; height: 280px; margin-bottom: 20px; perspective: 1000px; }
+    .tinder-card { position: absolute; width: 100%; height: 100%; background: var(--card2); border: 3px solid var(--line); border-radius: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; padding: 20px; text-align: center; cursor: grab; transition: transform 0.3s ease, opacity 0.3s; transform-origin: 50% 100%; color: var(--text); }
+    .tinder-card.dragging { transition: none; cursor: grabbing; }
+    .swipe-controls { display: flex; gap: 15px; justify-content: center; margin-bottom: 10px; }
+    .swipe-controls button { flex: 1; padding: 18px; border-radius: 18px; font-size: 18px; font-weight: 900; border: none; cursor: pointer; color: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    #btnNo { background: var(--bad); }
+    #btnYes { background: var(--ok); }
+
 
   </style>
 </head>
@@ -331,23 +339,117 @@
         }
 
         if (activeTheme === 'cards') {
-          curOpts.forEach(function(o,i){
-            var fc = document.createElement('div');
-            fc.className = 'flip-card' + (curAnswered ? ' answered' : '');
-            var fci = document.createElement('div'); fci.className = 'flip-card-inner';
-            var fcf = document.createElement('div'); fcf.className = 'flip-card-front'; fcf.textContent = o;
-            var fcb = document.createElement('div'); fcb.className = 'flip-card-back';
-            
-            if(curAnswered){
+          if (curAnswered) {
+            box.className = 'grid-opts';
+            curOpts.forEach(function(o,i){
+              var fc = document.createElement('div');
+              fc.className = 'flip-card answered';
+              var fci = document.createElement('div'); fci.className = 'flip-card-inner';
+              var fcf = document.createElement('div'); fcf.className = 'flip-card-front'; fcf.textContent = o;
+              var fcb = document.createElement('div'); fcb.className = 'flip-card-back';
               fc.style.cursor = 'default';
               if(i===curCorrectIdx){ fcb.className += ' correct'; fcb.innerHTML = '✅<br>' + o; }
               else if(i===curChoice){ fcb.className += ' wrong'; fcb.innerHTML = '❌<br>' + o; }
               else { fcb.className += ' neutral'; fcb.textContent = o; }
-            }else{ 
-              fc.addEventListener('click',function(){answer(i);}); 
-            }
-            fci.appendChild(fcf); fci.appendChild(fcb); fc.appendChild(fci); box.appendChild(fc);
-          });
+              fci.appendChild(fcf); fci.appendChild(fcb); fc.appendChild(fci); box.appendChild(fc);
+            });
+            return;
+          }
+          
+          box.className = '';
+          var instructions = document.createElement('div');
+          instructions.innerHTML = '<span style="color:var(--muted);font-size:14px;font-weight:700">👈 Noto'g'ri &nbsp; &nbsp; &nbsp; &nbsp; To'g'ri 👉</span>';
+          instructions.style.textAlign = 'center'; instructions.style.marginBottom = '10px';
+          
+          var deck = document.createElement('div'); deck.className = 'swipe-deck';
+          var controls = document.createElement('div'); controls.className = 'swipe-controls';
+          var btnNo = document.createElement('button'); btnNo.id = 'btnNo'; btnNo.innerHTML = "❌ Noto'g'ri";
+          var btnYes = document.createElement('button'); btnYes.id = 'btnYes'; btnYes.innerHTML = "✅ To'g'ri";
+          controls.appendChild(btnNo); controls.appendChild(btnYes);
+          
+          var cards = [];
+          var activeIndex = 0;
+          
+          for(var i=curOpts.length-1; i>=0; i--) {
+            var c = document.createElement('div');
+            c.className = 'tinder-card';
+            c.textContent = curOpts[i];
+            c.dataset.idx = i;
+            cards.unshift(c); 
+            deck.appendChild(c);
+          }
+          
+          function initCards() {
+             for(var i=activeIndex; i<cards.length; i++){
+                var offset = i - activeIndex;
+                cards[i].style.transform = 'scale('+(1 - offset*0.05)+') translateY('+(offset*15)+'px)';
+                cards[i].style.zIndex = cards.length - offset;
+                cards[i].style.opacity = 1;
+             }
+          }
+          initCards();
+          
+          function handleSwipe(isYes) {
+             if(activeIndex >= cards.length || busy) return;
+             var topCard = cards[activeIndex];
+             topCard.style.transition = 'transform 0.4s ease, opacity 0.4s';
+             topCard.style.transform = 'translate('+(isYes ? 200 : -200)+'px, -50px) rotate('+(isYes ? 30 : -30)+'deg)';
+             topCard.style.opacity = '0';
+             
+             if (isYes) {
+               var originalIdx = parseInt(topCard.dataset.idx);
+               answer(originalIdx);
+             } else {
+               activeIndex++;
+               if (activeIndex >= cards.length) {
+                 var lastIdx = parseInt(topCard.dataset.idx);
+                 answer(lastIdx);
+               } else {
+                 initCards();
+                 setupDrag(cards[activeIndex]);
+               }
+             }
+          }
+          
+          btnNo.onclick = function(){ handleSwipe(false); };
+          btnYes.onclick = function(){ handleSwipe(true); };
+          
+          var startX = 0, startY = 0, currentX = 0, currentY = 0, isDragging = false;
+          function setupDrag(card) {
+            if(!card) return;
+            card.addEventListener('touchstart', function(e){
+              isDragging = true;
+              startX = e.touches[0].clientX;
+              startY = e.touches[0].clientY;
+              card.style.transition = 'none';
+            }, {passive: true});
+            
+            card.addEventListener('touchmove', function(e){
+              if(!isDragging) return;
+              currentX = e.touches[0].clientX - startX;
+              currentY = e.touches[0].clientY - startY;
+              var rotate = currentX * 0.05;
+              card.style.transform = 'translate('+currentX+'px, '+currentY+'px) rotate('+rotate+'deg)';
+            }, {passive: true});
+            
+            card.addEventListener('touchend', function(e){
+              isDragging = false;
+              card.style.transition = 'transform 0.3s ease, opacity 0.3s';
+              if (currentX > 80) {
+                 handleSwipe(true);
+              } else if (currentX < -80) {
+                 handleSwipe(false);
+              } else {
+                 card.style.transform = 'translate(0px, 0px) rotate(0deg)'; 
+              }
+            });
+          }
+          
+          if(cards.length > 0) setupDrag(cards[0]);
+
+          box.appendChild(instructions);
+          box.appendChild(deck);
+          box.appendChild(controls);
         } else {
           curOpts.forEach(function(o,i){
             var b=document.createElement('button');b.className='opt';b.textContent=o;
