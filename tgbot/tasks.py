@@ -6367,9 +6367,21 @@ def start_game_sequence(slot, count=3, pool=None):
     today = timezone.localdate()
     count = min(count, len(pool))
     is_vip = slot == GameSequence.SLOT_VIP
+
+    if slot in ["morning", "evening"] and not is_vip and count >= 3:
+        base_games = ["chain", "feud", "castle", "emoji", "wisdom", "detective", "survival"]
+        quiz_games = NEW_GAME_TYPES
+        base_count = min(count - 1, len(base_games))
+        quiz_count = count - base_count
+        selected = random.sample(base_games, base_count) + random.sample(quiz_games, quiz_count)
+        random.shuffle(selected)
+        defaults_game_types = selected
+    else:
+        defaults_game_types = list(pool[:count]) if is_vip else random.sample(pool, count)
+
     seq, created = GameSequence.objects.get_or_create(
         slot=slot, date=today,
-        defaults={"game_types": list(pool[:count]) if is_vip else random.sample(pool, count)},
+        defaults={"game_types": defaults_game_types},
     )
     if not created:
         print(f"start_game_sequence: {slot}/{today} already started, skipping")

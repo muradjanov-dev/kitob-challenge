@@ -278,91 +278,96 @@ def _identity(flavor, item):
 
 
 def _prep_one(flavor, item):
-    if flavor == "impostor" and "fake" in item:
-        options = list(item["real"]) + [item["fake"]]
-        fake_text = item["fake"]
-        random.shuffle(options)
-        return {"q": "Qaysi biri SOXTA (haqiqiy emas)?", "options": options,
-                "correct": options.index(fake_text)}
-    if flavor == "cover":
-        return _prep_cover_question(item)
-    if flavor == "anagram":
-        options = [item["answer"]] + list(item["distractors"])
-        ans = item["answer"]
-        random.shuffle(options)
-        return {
-            "q": f"🔠 Anagramma: <b>{item['anagram']}</b>\n(Maslahat: {item.get('hint', '')})",
-            "options": options,
-            "correct": options.index(ans),
-        }
-    if flavor == "crossword":
-        options = [item["answer"]] + list(item["distractors"])
-        ans = item["answer"]
-        random.shuffle(options)
-        return {
-            "q": f"🧩 Krossvord katagi:\n<b>{item['clue']}</b>",
-            "options": options,
-            "correct": options.index(ans),
-        }
-    if flavor == "wordle":
-        options = [item["word"]] + list(item["distractors"])
-        ans = item["word"]
-        random.shuffle(options)
-        return {
-            "q": f"🔤 Harfma-harf toping: <b>{item['hint']}</b>",
-            "options": options,
-            "correct": options.index(ans),
-        }
-    if flavor == "cipher":
-        options = [item["author"]] + list(item["distractors"])
-        ans = item["author"]
-        random.shuffle(options)
-        return {
-            "q": f"🔐 Sherlok Kodi: <b>{item['code']}</b>\n({item['decoded']})\nMuallifi / egasi kim?",
-            "options": options,
-            "correct": options.index(ans),
-        }
-    if flavor == "acronym":
-        options = [item["full"]] + list(item["distractors"])
-        ans = item["full"]
-        random.shuffle(options)
-        return {
-            "q": f"🎯 Bosh harflar: <b>{item['acronym']}</b> ({item['author']})\nQaysi asar?",
-            "options": options,
-            "correct": options.index(ans),
-        }
-    if flavor == "character":
-        options = [item["character"]] + list(item["distractors"])
-        ans = item["character"]
-        random.shuffle(options)
-        return {
-            "q": f"👤 Qahramonni toping:\n«{item['desc']}»",
-            "options": options,
-            "correct": options.index(ans),
-        }
-    if flavor == "dialogue":
-        options = [item["speaker"]] + list(item["distractors"])
-        ans = item["speaker"]
-        random.shuffle(options)
-        return {
-            "q": f"🗣 Kimning gapi?\n<b>{item['quote']}</b>\n({item.get('context', '')})",
-            "options": options,
-            "correct": options.index(ans),
-        }
-    # Standard format {"q", "options", "correct"}
-    if "correct" in item and isinstance(item["correct"], str):
-        correct_text = item["correct"]
-        options = [correct_text] + list(item.get("distractors", []))
-    else:
-        opts = list(item["options"])
-        correct_text = opts[item["correct"]]
-        options = opts
+    def _do_prep():
+        if flavor == "impostor" and "fake" in item:
+            options = list(item["real"]) + [item["fake"]]
+            fake_text = item["fake"]
+            random.shuffle(options)
+            return {"q": "Qaysi biri SOXTA (haqiqiy emas)?", "options": options,
+                    "correct": options.index(fake_text)}
+        if flavor == "cover":
+            return _prep_cover_question(item)
+        if flavor == "anagram":
+            options = [item["answer"]] + list(item["distractors"])
+            ans = item["answer"]
+            random.shuffle(options)
+            return {
+                "q": f"🔠 Anagramma: <b>{item['anagram']}</b>\n(Maslahat: {item.get('hint', '')})",
+                "options": options,
+                "correct": options.index(ans),
+            }
+        if flavor == "crossword":
+            options = [item["answer"]] + list(item["distractors"])
+            ans = item["answer"]
+            random.shuffle(options)
+            return {
+                "q": f"🧩 Krossvord katagi:\n<b>{item['clue']}</b>",
+                "options": options,
+                "correct": options.index(ans),
+            }
+        if flavor == "wordle":
+            options = [item["word"]] + list(item["distractors"])
+            ans = item["word"]
+            random.shuffle(options)
+            return {
+                "q": f"🔤 Harfma-harf toping: <b>{item['hint']}</b>",
+                "options": options,
+                "correct": options.index(ans),
+            }
+        if flavor == "cipher":
+            options = [item["author"]] + list(item["distractors"])
+            ans = item["author"]
+            random.shuffle(options)
+            return {
+                "q": f"🔐 Sherlok Kodi: <b>{item['code']}</b>\n({item['decoded']})\nMuallifi / egasi kim?",
+                "options": options,
+                "correct": options.index(ans),
+            }
+        if flavor == "acronym":
+            options = [item["full"]] + list(item["distractors"])
+            ans = item["full"]
+            random.shuffle(options)
+            return {
+                "q": f"🎯 Bosh harflar: <b>{item['acronym']}</b> ({item['author']})\nQaysi asar?",
+                "options": options,
+                "correct": options.index(ans),
+            }
+        if flavor == "character":
+            options = [item["character"]] + list(item["distractors"])
+            ans = item["character"]
+            random.shuffle(options)
+            return {
+                "q": f"👤 Qahramonni toping:\n«{item['desc']}»",
+                "options": options,
+                "correct": options.index(ans),
+            }
+        if flavor == "dialogue":
+            options = [item["speaker"]] + list(item["distractors"])
+            ans = item["speaker"]
+            random.shuffle(options)
+            return {
+                "q": f"🗣 Kimning gapi?\n<b>{item['quote']}</b>\n({item.get('context', '')})",
+                "options": options,
+                "correct": options.index(ans),
+            }
+        # Standard format {"q", "options", "correct"}
+        if "correct" in item and isinstance(item["correct"], str):
+            correct_text = item["correct"]
+            options = [correct_text] + list(item.get("distractors", []))
+        else:
+            opts = list(item["options"])
+            correct_text = opts[item["correct"]]
+            options = opts
 
-    random.shuffle(options)
-    out = {"q": item["q"], "options": options, "correct": options.index(correct_text)}
-    if "items" in item:
-        out["items"] = item["items"]
-    return out
+        random.shuffle(options)
+        out = {"q": item["q"], "options": options, "correct": options.index(correct_text)}
+        if "items" in item:
+            out["items"] = item["items"]
+        return out
+
+    result = _do_prep()
+    result["key"] = _identity(flavor, item)
+    return result
 
 
 def _prep_cover_question(item, pool_titles=None):
@@ -408,6 +413,10 @@ def create_scheduled_quiz(flavor: str, lead_seconds: int = LEAD_SECONDS, is_vip:
     def _extract_game_keys(game):
         keys = []
         for q in (game.questions or []):
+            if "key" in q:
+                keys.append(q["key"])
+                continue
+            # Legacy fallback for old games without "key"
             if flavor == "impostor" or flavor == "cover":
                 opts = q.get("options") or []
                 c = q.get("correct", 0)
