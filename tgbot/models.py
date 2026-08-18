@@ -273,6 +273,17 @@ class TelegramProfile(BaseModel):
         help_text="Percent off the next Market purchase, from a 'Sirli quti' win. "
                   "Consumed (reset to 0) on the next successful market.charge() call.",
     )
+    active_theme = models.CharField(
+        max_length=50, 
+        blank=True, 
+        null=True, 
+        help_text="Faol mini-app mavzusi (masalan: 'dark', 'matrix')"
+    )
+    unlocked_themes = models.JSONField(
+        default=list, 
+        blank=True, 
+        help_text="Foydalanuvchi sotib olgan mavzular ro'yxati"
+    )
 
     def has_active_premium(self) -> bool:
         """True if the user has a paid Payment active today, OR is inside a
