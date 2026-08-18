@@ -656,12 +656,11 @@ def internal_broadcast_update_announcement(request: HttpRequest):
 def internal_broadcast_auction_announcement(request: HttpRequest):
     """One-off trigger for auction_announce.broadcast_auction_announcement.
     POST only, runs in a background thread."""
-    import os as _os
-
     if request.method != "POST":
         return HttpResponse(status=405)
     secret = request.headers.get("X-Internal-Secret", "")
-    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+    from src.settings import API_TOKEN, SECRET_KEY
+    if not secret or secret not in (API_TOKEN, SECRET_KEY):
         return HttpResponse(status=403)
 
     from tgbot.services.auction_announce import broadcast_auction_announcement
@@ -674,6 +673,7 @@ def internal_broadcast_auction_announcement(request: HttpRequest):
 
     threading.Thread(target=_run, daemon=True).start()
     return HttpResponse("started", status=202)
+
 
 
 

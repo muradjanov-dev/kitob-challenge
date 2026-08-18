@@ -6962,3 +6962,11 @@ def settle_finished_auctions():
             print(f"Error settling auction {product.id}: {e}")
 
 
+@app.task
+def task_broadcast_auction_announcement():
+    """Celery task to broadcast the auction announcement to all groups and users."""
+    from tgbot.services.auction_announce import broadcast_auction_announcement
+    return broadcast_auction_announcement()
+
+
+
