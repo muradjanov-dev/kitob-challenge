@@ -30,7 +30,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from tgbot.models import Payment, ShopProduct, ShopPurchase, TelegramProfile, KitobchaLedger
+from tgbot.models import Payment, ShopProduct, ShopPurchase, ShopAuctionBid, TelegramProfile, KitobchaLedger
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -99,11 +99,10 @@ def _resolve_profile(init_data: str) -> tuple[TelegramProfile | None, str | None
     tg_user = _verify_init_data(init_data)
     if not tg_user:
         return None, "invalid_init_data"
-    profile = TelegramProfile.objects.filter(telegram_id=str(tg_user["id"])).first()
-    if not profile:
+    try:
+        profile = TelegramProfile.objects.get(telegram_id=tg_user["id"])
+    except TelegramProfile.DoesNotExist:
         return None, "profile_not_found"
-    if profile.is_blocked:
-        return None, "blocked"
     return profile, None
 
 
@@ -149,6 +148,13 @@ def _product_payload(p: ShopProduct, request: HttpRequest) -> dict:
             img = request.build_absolute_uri(p.image.url)
         except Exception:
             img = None
+
+    top_bid = p.auction_bids.first() if p.is_auction else None
+    highest_bid = top_bid.amount if top_bid else (p.min_start_bid or 100)
+
+    from django.utils import timezone
+    is_ended = bool(p.is_auction and p.auction_end_at and timezone.now() >= p.auction_end_at)
+
     return {
         "id": p.id,
         "name": p.name,
@@ -157,7 +163,150 @@ def _product_payload(p: ShopProduct, request: HttpRequest) -> dict:
         "price": p.price_kitobcha,
         "stock_qty": p.stock_qty,
         "is_available": p.is_available,
+        "is_auction": p.is_auction,
+        "min_start_bid": p.min_start_bid or 100,
+        "auction_end_at": p.auction_end_at.isoformat() if p.auction_end_at else None,
+        "highest_bid": highest_bid,
+        "bids_count": p.auction_bids.count() if p.is_auction else 0,
+        "is_ended": is_ended,
     }
+
+
+@csrf_exempt
+@require_GET
+@_require_authed_admin
+def api_auction_details(request: HttpRequest) -> JsonResponse:
+    try:
+        product_id = int(request.GET.get("product_id", 0))
+    except (ValueError, TypeError):
+        return JsonResponse({"ok": False, "error": "invalid_product_id"}, status=400)
+
+    product = ShopProduct.objects.filter(id=product_id, is_active=True, is_auction=True).first()
+    if not product:
+        return JsonResponse({"ok": False, "error": "auction_not_found"}, status=404)
+
+    # Top 20 bids
+    bids_qs = product.auction_bids.select_related("user").order_by("-amount", "created_at")[:20]
+    top_bids = []
+    for idx, b in enumerate(bids_qs, 1):
+        name = b.user.full_name or f"User #{b.user.telegram_id}"
+        top_bids.append({
+            "rank": idx,
+            "user_id": b.user.id,
+            "name": name,
+            "amount": b.amount,
+            "is_me": b.user_id == request.tg_profile.id,
+        })
+
+    my_bid_obj = product.auction_bids.filter(user=request.tg_profile).first()
+    my_bid = my_bid_obj.amount if my_bid_obj else 0
+    my_rank = None
+    if my_bid_obj:
+        my_rank = product.auction_bids.filter(amount__gt=my_bid_obj.amount).count() + 1
+
+    from django.utils import timezone
+    is_ended = bool(product.auction_end_at and timezone.now() >= product.auction_end_at)
+
+    return JsonResponse({
+        "ok": True,
+        "product": _product_payload(product, request),
+        "top_bids": top_bids,
+        "my_bid": my_bid,
+        "my_rank": my_rank,
+        "is_ended": is_ended,
+        "balance": int(request.tg_profile.ball or 0),
+    })
+
+
+@csrf_exempt
+@require_POST
+@_require_authed_admin
+def api_bid(request: HttpRequest) -> JsonResponse:
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
+
+    product_id = body.get("product_id")
+    bid_amount = body.get("bid_amount")
+    if not isinstance(product_id, int) or not isinstance(bid_amount, int):
+        return JsonResponse({"ok": False, "error": "invalid_params"}, status=400)
+
+    from django.utils import timezone
+    now = timezone.now()
+
+    try:
+        with transaction.atomic():
+            user = TelegramProfile.objects.select_for_update().get(id=request.tg_profile.id)
+            product = ShopProduct.objects.select_for_update().filter(
+                id=product_id, is_active=True, is_auction=True,
+            ).first()
+            if not product:
+                return JsonResponse({"ok": False, "error": "auction_not_found"}, status=404)
+
+            if product.auction_end_at and now >= product.auction_end_at:
+                return JsonResponse({"ok": False, "error": "auction_ended"}, status=400)
+
+            min_start = product.min_start_bid or 100
+            if bid_amount < min_start:
+                return JsonResponse({
+                    "ok": False,
+                    "error": "bid_too_low",
+                    "min_required": min_start,
+                }, status=400)
+
+            # Get user's current existing bid if any
+            existing_bid = ShopAuctionBid.objects.select_for_update().filter(
+                product=product, user=user
+            ).first()
+            old_bid_amount = existing_bid.amount if existing_bid else 0
+
+            if bid_amount <= old_bid_amount:
+                return JsonResponse({
+                    "ok": False,
+                    "error": "must_increase_bid",
+                    "my_current_bid": old_bid_amount,
+                }, status=400)
+
+            diff = bid_amount - old_bid_amount
+            user_balance = int(user.ball or 0)
+            if user_balance < diff:
+                return JsonResponse({
+                    "ok": False,
+                    "error": "insufficient_balance",
+                    "balance": user_balance,
+                    "needed": diff,
+                }, status=400)
+
+            # Deduct the difference from user ball
+            user.ball = (user.ball or Decimal("0")) - Decimal(diff)
+            user.save(update_fields=["ball"])
+            KitobchaLedger.objects.create(
+                user=user, delta=-diff, reason=f"shop_auction_bid:{product.id}"
+            )
+
+            # Save / update the user's bid
+            if existing_bid:
+                existing_bid.amount = bid_amount
+                existing_bid.save(update_fields=["amount", "updated_at"])
+            else:
+                ShopAuctionBid.objects.create(
+                    product=product,
+                    user=user,
+                    amount=bid_amount,
+                )
+
+            new_balance = int(user.ball or 0)
+    except TelegramProfile.DoesNotExist:
+        return JsonResponse({"ok": False, "error": "profile_missing"}, status=403)
+
+    return JsonResponse({
+        "ok": True,
+        "balance": new_balance,
+        "my_bid": bid_amount,
+        "message": "Stavkangiz muvaffaqiyatli qabul qilindi!",
+    })
+
 
 
 @csrf_exempt

@@ -1059,6 +1059,19 @@ class ShopProduct(BaseModel):
                    "3rd-party 'Mutolaa Premium' code).",
     )
 
+    is_auction = models.BooleanField(
+        default=False,
+        help_text="When True, users place bids instead of instant purchase.",
+    )
+    min_start_bid = models.PositiveIntegerField(
+        default=100,
+        help_text="Minimum starting bid amount in Kitobcha (default: 100).",
+    )
+    auction_end_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the auction finishes and winner is decided.",
+    )
+
     class Meta:
         verbose_name = "Shop Product"
         verbose_name_plural = "Shop Products"
@@ -1071,7 +1084,37 @@ class ShopProduct(BaseModel):
     def is_available(self) -> bool:
         if not self.is_active:
             return False
+        if self.is_auction:
+            from django.utils import timezone
+            if self.auction_end_at and timezone.now() >= self.auction_end_at:
+                return False
+            return True
         return self.stock_qty is None or self.stock_qty > 0
+
+
+class ShopAuctionBid(BaseModel):
+    product = models.ForeignKey(
+        ShopProduct, on_delete=models.CASCADE, related_name="auction_bids",
+    )
+    user = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="shop_auction_bids",
+    )
+    amount = models.PositiveIntegerField(
+        help_text="Total active Kitobcha bid placed by this user for this auction.",
+    )
+    is_refunded = models.BooleanField(
+        default=False,
+        help_text="Set to True when auction concludes and this user was not the #1 winner.",
+    )
+
+    class Meta:
+        verbose_name = "Shop Auction Bid"
+        verbose_name_plural = "Shop Auction Bids"
+        unique_together = ("product", "user")
+        ordering = ("-amount", "created_at")
+
+    def __str__(self):
+        return f"{self.user.full_name or self.user.telegram_id} — {self.amount} 🪙 on {self.product.name}"
 
 
 class ShopPurchase(BaseModel):

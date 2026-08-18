@@ -6870,3 +6870,95 @@ def broadcast_major_update_to_all():
     print(f"broadcast_major_update_to_all completed: {group_sent} groups, {user_sent} users")
     return {"groups": group_sent, "users": user_sent}
 
+
+@shared_task
+def settle_finished_auctions():
+    """Checks for auctions whose end date has passed, awards the prize to the #1
+    bidder, and refunds 100% of the Kitobcha back to all other bidders."""
+    from tgbot.models import ShopProduct, ShopPurchase, ShopAuctionBid, KitobchaLedger
+    from tgbot.shop_views import _gen_purchase_code, _notify_admins_of_purchase
+    from decimal import Decimal
+
+    now = timezone.now()
+    finished_auctions = ShopProduct.objects.filter(
+        is_active=True, is_auction=True, auction_end_at__isnull=False, auction_end_at__lte=now
+    )
+
+    for product in finished_auctions:
+        try:
+            bids = list(product.auction_bids.filter(is_refunded=False).select_related("user").order_by("-amount", "created_at"))
+            if bids:
+                winner_bid = bids[0]
+                winner = winner_bid.user
+
+                # Generate unique purchase code
+                for _ in range(5):
+                    code = _gen_purchase_code()
+                    if not ShopPurchase.objects.filter(code=code).exists():
+                        break
+                else:
+                    code = f"KC-AUC-{winner.id}"
+
+                purchase = ShopPurchase.objects.create(
+                    user=winner,
+                    product=product,
+                    product_name_snapshot=product.name,
+                    price_at_purchase=winner_bid.amount,
+                    code=code,
+                    status=ShopPurchase.STATUS_PENDING,
+                )
+
+                # Notify winner
+                text_winner = (
+                    "🎉 <b>Tabriklaymiz, siz auksion g'olibi bo'ldingiz!</b> 🏆\n\n"
+                    f"📚 <b>{product.name}</b> kitobi sizniki bo'ldi!\n"
+                    f"💰 Yakuniy taklifingiz: <b>{winner_bid.amount} Kitobcha</b>\n"
+                    f"🎫 Buyurtma kodingiz: <code>{purchase.code}</code>\n\n"
+                    "📞 Admin tez orada siz bilan bog'lanib kitobni yetkazib beradi."
+                )
+                try:
+                    requests.post(
+                        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                        data={"chat_id": winner.telegram_id, "text": text_winner, "parse_mode": "HTML"},
+                        timeout=5,
+                    )
+                except Exception as e:
+                    print(f"Auction notify winner failed: {e}")
+
+                try:
+                    _notify_admins_of_purchase(purchase, winner)
+                except Exception:
+                    pass
+
+                # Refund all other bidders
+                for other_bid in bids[1:]:
+                    try:
+                        other_user = other_bid.user
+                        other_user.ball = (other_user.ball or Decimal("0")) + Decimal(other_bid.amount)
+                        other_user.save(update_fields=["ball"])
+                        KitobchaLedger.objects.create(
+                            user=other_user, delta=other_bid.amount, reason=f"auction_refund:{product.id}"
+                        )
+                        other_bid.is_refunded = True
+                        other_bid.save(update_fields=["is_refunded"])
+
+                        text_refund = (
+                            f"ℹ️ <b>'{product.name}'</b> kitobi auksioni yakunlandi.\n\n"
+                            f"Siz eng yuqori stavkani qo'ya olmadingiz, lekin tikkan <b>{other_bid.amount} Kitobchangiz</b> to'liq balansingizga qaytarildi! 🪙"
+                        )
+                        requests.post(
+                            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                            data={"chat_id": other_user.telegram_id, "text": text_refund, "parse_mode": "HTML"},
+                            timeout=5,
+                        )
+                    except Exception as e:
+                        print(f"Auction refund for {other_bid.user_id} failed: {e}")
+
+            # Close auction
+            product.is_active = False
+            product.save(update_fields=["is_active"])
+            print(f"Auction settled for {product.name}")
+        except Exception as e:
+            print(f"Error settling auction {product.id}: {e}")
+
+

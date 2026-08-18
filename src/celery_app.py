@@ -322,6 +322,12 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.send_admin_daily_report',
         'schedule': crontab(hour=23, minute=55),
     },
+
+    # Check and settle ended shop auctions every 5 minutes.
+    'settle-finished-auctions': {
+        'task': 'tgbot.tasks.settle_finished_auctions',
+        'schedule': crontab(minute='*/5'),
+    },
 }
 
 # Use Tashkent local time for crontab schedules (matches admin-set HH:MM).

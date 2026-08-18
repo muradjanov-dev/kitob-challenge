@@ -184,6 +184,78 @@
       margin: 80px auto;
     }
 
+
+    /* ─── Auction Badges & Leaderboard ──────────────────────── */
+    .badge-auction {
+      position: absolute; top: 10px; right: 10px;
+      background: linear-gradient(135deg, #ff416c, #ff4b2b);
+      color: #fff; font-size: 10px; font-weight: 800;
+      padding: 4px 10px; border-radius: 999px;
+      letter-spacing: 0.8px; box-shadow: 0 4px 12px rgba(255,75,43,0.45);
+      animation: pulse 1.6s ease infinite;
+    }
+    .auction-timer-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,75,43,0.15); border: 1px solid rgba(255,75,43,0.4);
+      color: #ff7675; padding: 6px 12px; border-radius: 999px;
+      font-size: 12.5px; font-weight: 700; margin-bottom: 12px;
+    }
+    .my-bid-box {
+      background: linear-gradient(135deg, rgba(230,180,80,0.14), rgba(31,107,76,0.14));
+      border: 1px solid rgba(230,180,80,0.35); border-radius: 14px;
+      padding: 12px 14px; margin: 12px 0 16px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .my-bid-box .lbl { font-size: 12px; color: var(--text-dim); }
+    .my-bid-box .val { font-size: 16px; font-weight: 800; color: var(--accent); }
+    .leaderboard-title {
+      font-size: 13px; font-weight: 800; color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: 0.6px; margin: 16px 0 8px;
+    }
+    .leaderboard-list {
+      max-height: 200px; overflow-y: auto;
+      background: var(--bg-2); border-radius: 14px;
+      border: 1px solid var(--card-border);
+      padding: 4px 0; margin-bottom: 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .lb-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 14px; border-bottom: 1px solid var(--card-border);
+      font-size: 13.5px; font-weight: 600;
+    }
+    .lb-row:last-child { border-bottom: 0; }
+    .lb-row.me {
+      background: rgba(230,180,80,0.18); color: #fff; font-weight: 800;
+      border-left: 3px solid var(--accent);
+    }
+    .lb-rank {
+      width: 24px; text-align: center; font-weight: 800; font-size: 13px;
+    }
+    .lb-rank.r1 { color: #f1c40f; }
+    .lb-rank.r2 { color: #bdc3c7; }
+    .lb-rank.r3 { color: #e67e22; }
+    .lb-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lb-amount { color: var(--accent); font-weight: 800; }
+    .bid-input-wrap {
+      display: flex; gap: 8px; margin-top: 10px;
+    }
+    .bid-input {
+      flex: 1; background: var(--bg-2); border: 1px solid var(--card-border);
+      border-radius: 12px; color: #fff; font-size: 17px; font-weight: 800;
+      padding: 12px 14px; text-align: center; outline: none;
+    }
+    .bid-input:focus { border-color: var(--accent); }
+    .quick-bids {
+      display: flex; gap: 6px; margin: 10px 0; flex-wrap: wrap; justify-content: center;
+    }
+    .quick-bid-chip {
+      padding: 6px 12px; border-radius: 999px;
+      background: var(--card); border: 1px solid var(--card-border);
+      font-size: 12px; font-weight: 700; cursor: pointer; color: var(--text);
+    }
+    .quick-bid-chip:active { transform: scale(0.95); background: rgba(230,180,80,0.2); }
+
     /* ─── Sheet (modal) ──────────────────────────────────────── */
     .scrim {
       position: fixed; inset: 0; background: rgba(0,0,0,0.55);
@@ -714,19 +786,33 @@
               : (p.stock_qty <= 3
                   ? '<div class="stock urgent">🔥 Faqat ' + p.stock_qty + ' qoldi!</div>'
                   : '<div class="stock">Mavjud: ' + p.stock_qty + '</div>'));
-        const soldBadge = (p.stock_qty != null && p.stock_qty <= 0)
-          ? '<div class="badge-soldout">TUGADI</div>' : '';
+        let badgeHtml = '';
+        if (p.is_auction) {
+          badgeHtml = '<div class="badge-auction">🔥 AUKSION</div>';
+        } else if (p.stock_qty != null && p.stock_qty <= 0) {
+          badgeHtml = '<div class="badge-soldout">TUGADI</div>';
+        }
+
+        const priceRow = p.is_auction
+          ? '<div class="price-row"><span class="mini-coin"></span>' + (p.highest_bid || p.min_start_bid) + '<span style="font-size:11px;color:var(--text-dim);margin-left:4px">eng yuqori</span></div>'
+          : '<div class="price-row"><span class="mini-coin"></span>' + p.price + '</div>';
+
+        const auctionNote = p.is_auction
+          ? '<div class="stock urgent">⏳ 10 kunlik auksion (' + (p.bids_count || 0) + ' ta taklif)</div>'
+          : stockNote;
+
         const shortfall = p.price - balance;
-        const shortfallNote = (balanceLoaded && p.is_available && shortfall > 0)
+        const shortfallNote = (!p.is_auction && balanceLoaded && p.is_available && shortfall > 0)
           ? '<div class="shortfall">Yana ' + shortfall + ' 🪙 kerak</div>' : '';
+
         card.innerHTML =
-          soldBadge +
+          badgeHtml +
           '<div class="img-wrap">' + img + '</div>' +
           '<div class="body">' +
             '<div class="name">' + escapeHTML(p.name) + '</div>' +
-            '<div class="price-row"><span class="mini-coin"></span>' + p.price + '</div>' +
+            priceRow +
             shortfallNote +
-            stockNote +
+            auctionNote +
           '</div>';
         card.addEventListener("click", () => {
           if (!p.is_available) return;
@@ -757,13 +843,183 @@
       sheet.classList.add("show");
     }
     function hideSheet() {
+      if (typeof auctionTimerInterval !== 'undefined' && auctionTimerInterval) clearInterval(auctionTimerInterval);
       scrim.classList.remove("show");
       sheet.classList.remove("show");
       openProduct = null;
     }
     scrim.addEventListener("click", () => { sound.play("tap"); hideSheet(); });
 
+    let auctionTimerInterval = null;
+
+    function formatCountdown(endAt) {
+      if (!endAt) return "Vaqt belgilanmagan";
+      const total = Date.parse(endAt) - Date.now();
+      if (total <= 0) return "Auksion yakunlandi";
+      const seconds = Math.floor((total / 1000) % 60);
+      const minutes = Math.floor((total / 1000 / 60) % 60);
+      const hours = Math.floor((total / (1000 * 60 * 60)) % 24);
+      const days = Math.floor(total / (1000 * 60 * 60 * 24));
+      return (days > 0 ? days + " kun " : "") + 
+             (hours < 10 ? "0" : "") + hours + ":" + 
+             (minutes < 10 ? "0" : "") + minutes + ":" + 
+             (seconds < 10 ? "0" : "") + seconds;
+    }
+
+    async function openAuctionSheet(p) {
+      if (auctionTimerInterval) clearInterval(auctionTimerInterval);
+      openProduct = p;
+      const img = p.image_url ? '<img src="' + p.image_url + '" alt=""/>' : '🎁';
+
+      showSheet(
+        '<div class="preview">' + img + '</div>' +
+        '<h2>' + escapeHTML(p.name) + '</h2>' +
+        (p.description ? '<div class="desc">' + escapeHTML(p.description) + '</div>' : '') +
+        '<div class="spinner" id="aucSpinner" style="margin:20px auto"></div>' +
+        '<div id="aucContent" style="display:none"></div>' +
+        '<button class="close-btn" id="cancelBtn" style="margin-top:14px">Yopish</button>'
+      );
+      document.getElementById("cancelBtn").addEventListener("click", () => { sound.play("tap"); hideSheet(); });
+
+      const r = await api('/shop/api/auction-details/?product_id=' + p.id);
+      if (!r.ok || !r.data.ok) {
+        document.getElementById("aucSpinner").style.display = "none";
+        document.getElementById("aucContent").style.display = "block";
+        document.getElementById("aucContent").innerHTML = '<div class="err-line">Auksion ma\'lumotlarini yuklab bo\'lmadi.</div>';
+        return;
+      }
+
+      const d = r.data;
+      const prod = d.product;
+      const topBids = d.top_bids || [];
+      const myBid = d.my_bid || 0;
+      const myRank = d.my_rank;
+      const isEnded = d.is_ended;
+
+      let lbHtml = '';
+      if (!topBids.length) {
+        lbHtml = '<div style="padding:14px;text-align:center;color:var(--text-dim);font-size:13px">Hali hech kim taklif bermadi. Birinchi bo\'ling!</div>';
+      } else {
+        topBids.forEach((b) => {
+          const rankClass = b.rank === 1 ? 'r1' : (b.rank === 2 ? 'r2' : (b.rank === 3 ? 'r3' : ''));
+          const medal = b.rank === 1 ? '🥇' : (b.rank === 2 ? '🥈' : (b.rank === 3 ? '🥉' : '#' + b.rank));
+          const isMeClass = b.is_me ? ' me' : '';
+          const nameLabel = escapeHTML(b.name) + (b.is_me ? ' <span style="font-size:11px;color:var(--accent)">(Siz)</span>' : '');
+          lbHtml += '<div class="lb-row' + isMeClass + '">' +
+                      '<div class="lb-rank ' + rankClass + '">' + medal + '</div>' +
+                      '<div class="lb-name">' + nameLabel + '</div>' +
+                      '<div class="lb-amount">' + b.amount + ' 🪙</div>' +
+                    '</div>';
+        });
+      }
+
+      const myBidHtml = myBid > 0
+        ? '<div class="my-bid-box">' +
+            '<div><div class="lbl">Sizning taklifingiz</div><div class="val">' + myBid + ' 🪙</div></div>' +
+            '<div><div class="lbl">Joriy o\'rningiz</div><div class="val" style="color:#fff">#' + (myRank || '-') + '</div></div>' +
+          '</div>'
+        : '<div class="my-bid-box">' +
+            '<div><div class="lbl">Sizning taklifingiz</div><div class="val" style="font-size:14px;color:var(--text-dim)">Hali taklif bermadingiz</div></div>' +
+            '<div style="font-size:12px;color:var(--accent);font-weight:700">Min. 100 🪙</div>' +
+          '</div>';
+
+      const minAllowed = Math.max(prod.min_start_bid || 100, myBid + 10);
+      const suggested1 = Math.max(minAllowed, 100);
+      const suggested2 = suggested1 + 50;
+      const suggested3 = suggested1 + 100;
+
+      const biddingForm = isEnded
+        ? '<div class="err-line" style="color:var(--error);text-align:center;font-weight:700;font-size:15px;margin:16px 0">Ushbu auksion yakunlangan!</div>'
+        : '<div class="leaderboard-title">O\'z taklifingizni bering (kamida 100 🪙):</div>' +
+          '<div class="quick-bids">' +
+            '<button type="button" class="quick-bid-chip" data-val="' + suggested1 + '">' + suggested1 + ' 🪙</button>' +
+            '<button type="button" class="quick-bid-chip" data-val="' + suggested2 + '">' + suggested2 + ' 🪙</button>' +
+            '<button type="button" class="quick-bid-chip" data-val="' + suggested3 + '">' + suggested3 + ' 🪙</button>' +
+          '</div>' +
+          '<div class="bid-input-wrap">' +
+            '<input type="number" id="bidInput" class="bid-input" value="' + suggested1 + '" min="' + minAllowed + '" step="10" placeholder="Miqdor (🪙)" />' +
+          '</div>' +
+          '<button class="buy-btn" id="placeBidBtn" style="margin-top:12px">🪙 Taklifni yuborish</button>' +
+          '<div class="err-line" id="bidErrLine"></div>' +
+          '<div style="font-size:11.5px;color:var(--text-dim);text-align:center;margin-top:6px;line-height:1.4">' +
+            '💡 Agar yutmasangiz, 10 kundan keyin barcha Kitobchalaringiz to\'liq balansingizga qaytariladi!' +
+          '</div>';
+
+      document.getElementById("aucSpinner").style.display = "none";
+      const bodyEl = document.getElementById("aucContent");
+      bodyEl.style.display = "block";
+      bodyEl.innerHTML = 
+        '<div style="text-align:center">' +
+          '<div class="auction-timer-pill" id="liveAuctionTimer">⏳ ' + formatCountdown(prod.auction_end_at) + '</div>' +
+        '</div>' +
+        myBidHtml +
+        '<div class="leaderboard-title">🏆 Top 20 Yetakchilar:</div>' +
+        '<div class="leaderboard-list">' + lbHtml + '</div>' +
+        biddingForm;
+
+      // Update timer live
+      auctionTimerInterval = setInterval(() => {
+        const timerEl = document.getElementById("liveAuctionTimer");
+        if (timerEl) timerEl.textContent = "⏳ " + formatCountdown(prod.auction_end_at);
+      }, 1000);
+
+      // Quick chips
+      document.querySelectorAll(".quick-bid-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+          sound.play("tap");
+          document.getElementById("bidInput").value = chip.dataset.val;
+        });
+      });
+
+      // Submit bid
+      const placeBtn = document.getElementById("placeBidBtn");
+      if (placeBtn) {
+        placeBtn.addEventListener("click", async () => {
+          sound.play("tap");
+          const input = document.getElementById("bidInput");
+          const err = document.getElementById("bidErrLine");
+          err.textContent = "";
+          const val = parseInt(input.value, 10);
+          if (isNaN(val) || val < 100) {
+            err.textContent = "Minimal taklif miqdori — 100 Kitobcha!";
+            sound.play("error");
+            return;
+          }
+          if (val <= myBid) {
+            err.textContent = "Yangi taklif oldingi taklifingizdan (" + myBid + " 🪙) ko\'proq bo\'lishi shart!";
+            sound.play("error");
+            return;
+          }
+          placeBtn.disabled = true;
+          placeBtn.textContent = "Yuborilmoqda…";
+          const res = await api('/shop/api/bid/', { method: 'POST', body: { product_id: p.id, bid_amount: val } });
+          if (!res.ok || !res.data.ok) {
+            placeBtn.disabled = false;
+            placeBtn.textContent = "🪙 Taklifni yuborish";
+            sound.play("error");
+            const msg = ({
+              insufficient_balance: "Balansingizda yetarli Kitobcha yo\'q.",
+              bid_too_low: "Minimal taklif — 100 Kitobcha.",
+              must_increase_bid: "Oldingi taklifingizdan ko\'proq summa kiriting.",
+              auction_ended: "Auksion yakunlangan.",
+            })[res.data.error] || (res.data.error || "Xatolik yuz berdi");
+            err.textContent = msg;
+            return;
+          }
+          balance = res.data.balance;
+          renderBalance(true);
+          sound.play("success");
+          fireConfetti();
+          openAuctionSheet(p); // refresh sheet with new Top 20 and my_bid
+        });
+      }
+    }
+
     function openProductSheet(p) {
+      if (p.is_auction) {
+        openAuctionSheet(p);
+        return;
+      }
       openProduct = p;
       const img = p.image_url
         ? '<img src="' + p.image_url + '" alt=""/>'

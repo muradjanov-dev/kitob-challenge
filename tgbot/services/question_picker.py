@@ -26,6 +26,29 @@ def pick_least_recently_used(pool, get_key_fn, recent_games, get_game_keys_fn, c
     if not pool:
         return []
 
+    # Collapse duplicate rows FIRST. Several question banks contain the same
+    # question copied 4-8 times (e.g. acronym: 80 rows, 10 distinct), and the
+    # history-based lockout below can only tell games apart, not rows -- so
+    # every copy landed in the same bucket and a single game happily drew the
+    # same question up to 6 times. Dedupe by key restores the "never repeated"
+    # guarantee this function advertises, whatever shape the bank is in.
+    # Items whose key is empty can't be compared, so they are all kept.
+    seen = set()
+    deduped = []
+    for item in pool:
+        try:
+            k = get_key_fn(item)
+        except Exception:
+            k = None
+        if not k:
+            deduped.append(item)
+            continue
+        if k in seen:
+            continue
+        seen.add(k)
+        deduped.append(item)
+    pool = deduped
+
     count = min(count, len(pool))
     total_pool_size = len(pool)
 

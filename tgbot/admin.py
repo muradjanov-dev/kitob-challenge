@@ -406,14 +406,15 @@ class QuizSessionAdmin(admin.ModelAdmin):
 @admin.register(models.ShopProduct)
 class ShopProductAdmin(admin.ModelAdmin):
     list_display = (
-        'name', 'price_kitobcha', 'stock_qty', 'is_active',
-        'grants_premium_days', 'sort_order', 'created_at',
+        'name', 'price_kitobcha', 'is_auction', 'min_start_bid', 'auction_end_at',
+        'stock_qty', 'is_active', 'grants_premium_days', 'sort_order', 'created_at',
     )
-    list_filter = ('is_active',)
-    list_editable = ('price_kitobcha', 'stock_qty', 'is_active', 'sort_order')
+    list_filter = ('is_active', 'is_auction')
+    list_editable = ('price_kitobcha', 'is_auction', 'min_start_bid', 'stock_qty', 'is_active', 'sort_order')
     search_fields = ('name', 'description')
     fields = (
         'name', 'description', 'image', 'price_kitobcha',
+        'is_auction', 'min_start_bid', 'auction_end_at',
         'stock_qty', 'sort_order', 'is_active', 'grants_premium_days',
     )
 
@@ -421,6 +422,14 @@ class ShopProductAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
         if not change:
             _announce_new_shop_product(obj)
+
+
+@admin.register(models.ShopAuctionBid)
+class ShopAuctionBidAdmin(admin.ModelAdmin):
+    list_display = ('product', 'user', 'amount', 'is_refunded', 'created_at', 'updated_at')
+    list_filter = ('is_refunded', 'product', 'created_at')
+    search_fields = ('product__name', 'user__full_name', 'user__telegram_id')
+
 
 
 def _announce_new_shop_product(product):
