@@ -514,20 +514,29 @@ Return ONLY valid JSON in the following format:
         # If neither Premium nor an active trial let them in, this must have
         # been their one free lifetime try (see offer_ai_quiz_start's gate) —
         # burn it and pitch Premium for next time.
-        is_premium_now = await sync_to_async(
-            Payment.objects.filter(user=user, status="paid", end_date__gte=timezone.localdate()).exists
-        )()
+        from tgbot.services.premium import is_premium as _is_prem
+        is_premium_now = await sync_to_async(_is_prem)(user)
         has_trial_now = bool(user.trial_ai_quiz_until and user.trial_ai_quiz_until >= timezone.now())
-        if not is_premium_now and not has_trial_now and not user.free_ai_quiz_used:
-            await sync_to_async(
-                lambda: TelegramProfile.objects.filter(id=user.id).update(free_ai_quiz_used=True)
-            )()
-            await message.answer(
-                "🎉 Bepul sinovingizdan foydalandingiz!\n\n"
-                "💎 <b>Premium</b>'ga o'ting — AI yordamida cheklovsiz quiz tuzing, "
-                "×2 Kitobcha va boshqa imkoniyatlarni oching. Asosiy menyu → 💎 Premium.",
-                parse_mode="HTML",
-            )
+        if not is_premium_now and not has_trial_now:
+            if not user.free_ai_quiz_used:
+                await sync_to_async(
+                    lambda: TelegramProfile.objects.filter(id=user.id).update(free_ai_quiz_used=True)
+                )()
+                await message.answer(
+                    "🎉 Bepul sinovingizdan foydalandingiz!\n\n"
+                    "💎 <b>Premium</b>'ga o'ting — AI yordamida kengaytirilgan quiz tuzing "
+                    "yoki navbatdagi AI quiz uchun 3000 Kitobcha to'lang.",
+                    parse_mode="HTML",
+                )
+            else:
+                await sync_to_async(user.update_ball)(True, -3000)
+                from tgbot.models import KitobchaLedger
+                await sync_to_async(KitobchaLedger.objects.create)(user=user, delta=-3000, reason="ai_quiz_creation")
+                await message.answer(
+                    "🤖 <b>AI Quiz yaratildi (3000 Kitobcha yechildi).</b>\n\n"
+                    "💎 <b>Premium</b>'ga o'tib, bu imkoniyatdan ko'proq foydalanishingiz mumkin.",
+                    parse_mode="HTML",
+                )
 
         await state.finish()
 

@@ -207,7 +207,12 @@ def api_my_books(request: HttpRequest):
         for r in started
         if 0 < r["current_page"] < r["total_pages"]
     ]
-    return JsonResponse({"book_ids": book_ids, "in_progress": in_progress})
+    return JsonResponse({
+        "book_ids": book_ids, 
+        "in_progress": in_progress,
+        "active_theme": profile.active_theme,
+        "unlocked_themes": profile.unlocked_themes or [],
+    })
 
 
 def _get_reading_record(profile, book_id, for_update=False):

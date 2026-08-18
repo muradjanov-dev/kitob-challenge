@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Mening Kabinetim — Kitob Challenge</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function(){
+      var t = localStorage.getItem('kc_theme');
+      if (t) document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
   <style>
     :root {
       --bg-0: #0f1714; --bg-1: #14201b; --bg-2: #1b2a23;
@@ -15,6 +21,77 @@
       --radius: 18px; --radius-sm: 12px;
       --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
       --ease-bounce: cubic-bezier(.34, 1.56, .64, 1);
+    }
+    
+    [data-theme="theme_dark"] {
+      --bg-0: #0a0a0a;
+      --bg-1: #141414;
+      --bg-2: #1e1e1e;
+      --card: rgba(255,255,255,0.05);
+      --card-border: rgba(255,255,255,0.1);
+      --text: #e0e0e0;
+      --text-dim: rgba(224,224,224,0.6);
+      --text-faint: rgba(224,224,224,0.4);
+      --accent: #8ba06a;
+      --accent-2: #7a8a5e;
+      --green: #2a8a63;
+      --green-2: #1f6b4c;
+    }
+    [data-theme="theme_matrix"] {
+      --bg-0: #000000;
+      --bg-1: #051405;
+      --bg-2: #0a290a;
+      --card: rgba(0,255,65,0.05);
+      --card-border: rgba(0,255,65,0.2);
+      --text: #00ff41;
+      --text-dim: rgba(0,255,65,0.6);
+      --text-faint: rgba(0,255,65,0.4);
+      --accent: #00ff41;
+      --accent-2: #008f11;
+      --green: #00ff41;
+      --green-2: #008f11;
+    }
+    [data-theme="theme_retro"] {
+      --bg-0: #09021c;
+      --bg-1: #130330;
+      --bg-2: #1c054a;
+      --card: rgba(255,0,255,0.05);
+      --card-border: rgba(255,0,255,0.2);
+      --text: #00ffff;
+      --text-dim: rgba(0,255,255,0.6);
+      --text-faint: rgba(0,255,255,0.4);
+      --accent: #ff00ff;
+      --accent-2: #b300b3;
+      --green: #ff00ff;
+      --green-2: #b300b3;
+    }
+    [data-theme="theme_neon"] {
+      --bg-0: #121220;
+      --bg-1: #1a1a2e;
+      --bg-2: #16213e;
+      --card: rgba(233,69,96,0.05);
+      --card-border: rgba(233,69,96,0.2);
+      --text: #e94560;
+      --text-dim: rgba(233,69,96,0.6);
+      --text-faint: rgba(233,69,96,0.4);
+      --accent: #0f3460;
+      --accent-2: #e94560;
+      --green: #e94560;
+      --green-2: #0f3460;
+    }
+    [data-theme="theme_royal"] {
+      --bg-0: #1c0a10;
+      --bg-1: #2b0f19;
+      --bg-2: #421a28;
+      --card: rgba(212,175,55,0.05);
+      --card-border: rgba(212,175,55,0.2);
+      --text: #d4af37;
+      --text-dim: rgba(212,175,55,0.6);
+      --text-faint: rgba(212,175,55,0.4);
+      --accent: #8b0000;
+      --accent-2: #5c0000;
+      --green: #d4af37;
+      --green-2: #aa8c2c;
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; padding: 0; min-height: 100vh; overflow-x: hidden; max-width: 100vw; }
@@ -106,6 +183,21 @@
       color: var(--text); font-size: 13.5px; font-family: inherit; outline: none;
       transition: border-color .18s ease;
     }
+    
+    /* Themes */
+    .theme-list { display: flex; flex-direction: column; gap: 8px; margin: 0 16px 24px; }
+    .theme-item {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--card); padding: 14px 16px; border-radius: 12px;
+      cursor: pointer; border: 1px solid var(--card-border); transition: all 0.2s ease;
+    }
+    .theme-item.active {
+      border-color: var(--accent);
+      background: rgba(230,180,80,0.1);
+    }
+    .theme-item-name { font-weight: 600; font-size: 15px; }
+    .theme-item-check { color: var(--accent); display: none; font-size: 18px; font-weight: bold; }
+    .theme-item.active .theme-item-check { display: block; }
     .rf-input::placeholder { color: var(--text-faint); }
     .rf-input:focus { border-color: rgba(230,180,80,.45); }
     .rf-textarea { resize: vertical; min-height: 60px; }
@@ -301,6 +393,9 @@
       <div class="overtake" id="cabOvertake" style="display:none"></div>
     </div>
 
+    <div class="sec-title" id="themeSectionTitle" style="display:none;">Mini-App Dizayni (Mavzular)</div>
+    <div class="theme-list" id="cabThemes" style="display:none;"></div>
+
     <div class="sec-title">To'liq statistika</div>
     <div class="stat-grid" id="cabFullStats">
       <div class="stat-card">
@@ -484,6 +579,54 @@
           document.getElementById('cabGames').textContent = `${fs.live_games_played} (${fs.live_games_won} 🏆)`;
           document.getElementById('cabPurchases').textContent = fs.shop_purchases + fs.market_purchases;
           document.getElementById('cabAccountAge').textContent = fs.account_age_days;
+        }
+
+        if (d.unlocked_themes && d.unlocked_themes.length > 0) {
+          const themes = {
+            "theme_dark": "🎨 Tun Makoni (Dark Mode)",
+            "theme_matrix": "🎨 Raqamli Dunyo (Matrix)",
+            "theme_retro": "🎨 Retro / Kiberpank",
+            "theme_neon": "🎨 Neon Nurlari (Cyber)",
+            "theme_royal": "🎨 Shohona (Royal Gold)",
+          };
+          const themeContainer = document.getElementById('cabThemes');
+          document.getElementById('themeSectionTitle').style.display = 'block';
+          themeContainer.style.display = 'flex';
+          let html = `
+            <div class="theme-item ${!d.active_theme ? 'active' : ''}" data-theme="">
+              <div class="theme-item-name">Kunduzgi (Oddiy)</div>
+              <div class="theme-item-check">✓</div>
+            </div>
+          `;
+          d.unlocked_themes.forEach(t => {
+            if (!themes[t]) return;
+            html += `
+              <div class="theme-item ${d.active_theme === t ? 'active' : ''}" data-theme="${t}">
+                <div class="theme-item-name">${themes[t]}</div>
+                <div class="theme-item-check">✓</div>
+              </div>
+            `;
+          });
+          themeContainer.innerHTML = html;
+
+          themeContainer.querySelectorAll('.theme-item').forEach(el => {
+            el.addEventListener('click', () => {
+              const theme = el.dataset.theme;
+              themeContainer.querySelectorAll('.theme-item').forEach(x => x.classList.remove('active'));
+              el.classList.add('active');
+              if (theme) {
+                document.documentElement.setAttribute('data-theme', theme);
+                localStorage.setItem('kc_theme', theme);
+              } else {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.removeItem('kc_theme');
+              }
+              fetch('/kabinet/api/set-theme/', {
+                method: 'POST',
+                body: JSON.stringify({ initData, theme: theme || null })
+              });
+            });
+          });
         }
       })
       .catch(() => {

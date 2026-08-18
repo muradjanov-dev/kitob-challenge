@@ -12,7 +12,7 @@ from django.db.models import Avg, Count, F, Sum
 from django.db.models.functions import ExtractHour, ExtractWeekDay
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 
 from tgbot.models import (
     BookQuizAnswer, BookReport, BooksToRead, ConfirmationReport,
@@ -184,6 +184,8 @@ def api_cabinet_me(request: HttpRequest) -> JsonResponse:
         "full_name": profile.full_name or "Kitobxon",
         "is_premium": is_premium,
         "balance": int(profile.ball or 0),
+        "active_theme": profile.active_theme,
+        "unlocked_themes": profile.unlocked_themes or [],
         "completed_books": completed_books_count,
         "completed_audio": completed_audio_count,
         "total_pages_read": total_pages_read,
@@ -212,3 +214,26 @@ def api_cabinet_me(request: HttpRequest) -> JsonResponse:
             "achievements_total": len(ACHIEVEMENTS),
         },
     })
+
+
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
+@require_POST
+def api_set_theme(request: HttpRequest) -> JsonResponse:
+    try:
+        data = json.loads(request.body)
+        theme = data.get("theme")
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"})
+
+    profile, err = _resolve_profile(_read_init_data(request))
+    if err:
+        return JsonResponse({"ok": False, "error": err})
+    
+    if theme and theme not in (profile.unlocked_themes or []):
+        return JsonResponse({"ok": False, "error": "Siz bu mavzuni sotib olmagansiz."})
+        
+    profile.active_theme = theme if theme else None
+    profile.save(update_fields=["active_theme"])
+    return JsonResponse({"ok": True, "active_theme": profile.active_theme})

@@ -170,7 +170,7 @@ async def market_show_stash(call: types.CallbackQuery):
 
     # 2. AI Quiz Pass
     if data["prem_type"] == "paid":
-        lines.append("🤖 <b>AI Viktorina Yaratish:</b> 👑 <b>Cheksiz</b> (Premium hisobidan)\n")
+        lines.append("🤖 <b>AI Viktorina Yaratish:</b> 👑 <b>Kengaytirilgan</b> (Premium hisobidan)\n")
     elif data["is_ai_trial"]:
         lines.append(f"🤖 <b>AI Viktorina Yaratish (Pass):</b> ⚡️ <b>Faol</b> (Qolgan vaqt: {data['ai_until']})\n<i>Istalgan kitobingiz bo'yicha sun'iy intellekt orqali test tuzishingiz mumkin!</i>\n")
 
@@ -202,7 +202,7 @@ async def market_show_stash(call: types.CallbackQuery):
         )
 
     kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(InlineKeyboardButton(text="🎁 Sirli qutini ochish (200 🪙)", callback_data="market:view:mystery_box"))
+    kb.add(InlineKeyboardButton(text="🎁 Sirli qutini ochish (Bepul)", callback_data="market:view:mystery_box"))
     kb.add(InlineKeyboardButton(text="📜 Shaxsiy sertifikat olish (150 🪙)", callback_data="market:view:certificate"))
     kb.add(InlineKeyboardButton(text="🔙 Marketga qaytish", callback_data="menu:market"))
     await call.message.answer("\n".join(lines), parse_mode="HTML", reply_markup=kb)
@@ -252,6 +252,7 @@ async def market_view_item(call: types.CallbackQuery):
     )
 
     sold_out = False
+    already_owned = False
     if key == market_service.LEADERBOARD_SPONSOR:
         slots = await sync_to_async(
             market_service.leaderboard_sponsor_slots_left_today, thread_sensitive=True
@@ -261,9 +262,13 @@ async def market_view_item(call: types.CallbackQuery):
             text += "\n\n🚫 <b>Bugungi 7 ta joy tugadi</b> — ertaga urinib ko'ring!"
         else:
             text += f"\n\n🔥 Bugun qolgan joy: <b>{slots}/7</b>"
+    elif key.startswith("theme_"):
+        if key in (user.unlocked_themes or []):
+            already_owned = True
+            text += "\n\n✅ <b>Bu mavzuni allaqachon sotib olgansiz!</b> Mini-App (Kabinet) orqali faollashtiring."
 
     kb = InlineKeyboardMarkup(row_width=1)
-    if balance >= item["price"] and not sold_out:
+    if balance >= item["price"] and not sold_out and not already_owned:
         kb.add(InlineKeyboardButton(text="✅ Sotib olish", callback_data=f"market:confirm:{key}"))
     kb.add(InlineKeyboardButton(text="🔙 Marketga qaytish", callback_data="menu:market"))
     await call.message.answer(text, parse_mode="HTML", reply_markup=kb)
@@ -342,6 +347,12 @@ async def market_buy_item(call: types.CallbackQuery):
         )
 
     elif key == market_service.MYSTERY_BOX:
+        can_open, err_msg = await sync_to_async(market_service.can_open_mystery_box, thread_sensitive=True)(user)
+        if not can_open:
+            await call.message.answer(err_msg, parse_mode="HTML")
+            await call.answer("Kitob o'qish yetarli emas!", show_alert=True)
+            return
+
         result, wants_certificate = await sync_to_async(
             market_service.resolve_mystery_box, thread_sensitive=True
         )(user)
@@ -393,14 +404,25 @@ async def market_buy_item(call: types.CallbackQuery):
         if queued:
             await sync_to_async(market_service.log_purchase, thread_sensitive=True)(user, key, item["price"])
             await call.message.answer(
-                "🏷 Ajoyib! Keyingi \"Top kitobxonlar\" e'lonida ismingiz sponsor "
-                "sifatida ko'rsatiladi."
+                "🏷 <b>Reyting sponsorligi</b> qabul qilindi!\n"
+                "Sizning ismingiz keyingi 'Top kitobxonlar' ro'yxatining pastida "
+                "sponsor sifatida ko'rsatiladi."
             )
         else:
-            # Lost the race against another buyer in the instant between the
-            # slots check above and this insert — refund immediately.
+            # Race condition lost (somebody else tapped right before this)
             await sync_to_async(market_service.charge, thread_sensitive=True)(user, -item["price"])
+            await call.answer("Biroz kechikdingiz, bugungi joylar tugadi! Kitobcha qaytarildi.", show_alert=True)
+            
+    elif key.startswith("theme_"):
+        unlocked = user.unlocked_themes or []
+        if key not in unlocked:
+            unlocked.append(key)
+            from tgbot.models import TelegramProfile
+            await sync_to_async(TelegramProfile.objects.filter(id=user.id).update)(
+                unlocked_themes=unlocked, active_theme=key
+            )
             await call.message.answer(
-                "😔 Afsuski, bugungi 7 ta joy siz tasdiqlayotgan payt tugab qoldi. "
-                "Kitobchangiz qaytarildi — ertaga urinib ko'ring!"
+                f"🎨 <b>{item['title']}</b> sotib olindi va avtomat faollashtirildi!\n"
+                "Endi Mini-App ga kirsangiz dizayn o'zgarganini ko'rasiz. Kabinet sahifasi orqali boshqa mavzularga o'tishingiz mumkin.",
+                parse_mode="HTML"
             )

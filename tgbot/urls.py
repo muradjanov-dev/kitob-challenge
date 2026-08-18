@@ -19,7 +19,7 @@ from tgbot.library_views import (
     api_get_progress, api_save_progress, api_start_reading, api_premium_access,
     api_top_active_readers,
 )
-from tgbot.cabinet_views import cabinet_index, api_cabinet_me
+from tgbot.cabinet_views import cabinet_index, api_cabinet_me, api_set_theme
 from tgbot.report_views import api_submit_report, api_my_report_books
 from tgbot.analytics_views import api_track_event
 from tgbot.game_views import (
@@ -77,6 +77,7 @@ urlpatterns = [
     path("kabinet/api/me/", api_cabinet_me, name="cabinet-api-me"),
     path("kabinet/api/report/", api_submit_report, name="cabinet-api-submit-report"),
     path("kabinet/api/report/books/", api_my_report_books, name="cabinet-api-report-books"),
+    path("kabinet/api/set-theme/", api_set_theme, name="cabinet-api-set-theme"),
     path("zanjir/", chain_index, name="chain"),
     path("zanjir/api/state/", api_chain_state, name="chain-api-state"),
     path("zanjir/api/submit/", api_chain_submit, name="chain-api-submit"),

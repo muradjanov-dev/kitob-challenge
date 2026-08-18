@@ -4,6 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Kitob Challenge Kutubxonasi</title>
+  <script>
+    (function(){
+      var t = localStorage.getItem('kc_theme');
+      if (t) document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -29,6 +35,87 @@
       --radius:   14px;
       --fh:       'Caprasimo', cursive;
       --fb:       'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    
+    [data-theme="theme_dark"] {
+      --bg:       #121212;
+      --bg2:      #1e1e1e;
+      --accent:   #7a8a5e;
+      --accent-h: #8ba06a;
+      --accent2:  #c67139;
+      --wood-dk:  #2a2a2a;
+      --wood-md:  #3a3a3a;
+      --wood-lt:  #505050;
+      --text:     #e0e0e0;
+      --text-dim: rgba(224,224,224,.62);
+      --text-faint:rgba(224,224,224,.38);
+      --border:   rgba(255,255,255,.1);
+      --card:     #1a1a1a;
+      --shadow:   0 8px 28px rgba(0,0,0,.4);
+    }
+    [data-theme="theme_matrix"] {
+      --bg:       #000000;
+      --bg2:      #0a0a0a;
+      --accent:   #00ff41;
+      --accent-h: #008f11;
+      --accent2:  #003b00;
+      --wood-dk:  #001a00;
+      --wood-md:  #002b00;
+      --wood-lt:  #004000;
+      --text:     #00ff41;
+      --text-dim: rgba(0,255,65,.62);
+      --text-faint:rgba(0,255,65,.38);
+      --border:   rgba(0,255,65,.2);
+      --card:     #030303;
+      --shadow:   0 8px 28px rgba(0,255,65,.14);
+    }
+    [data-theme="theme_retro"] {
+      --bg:       #0d0221;
+      --bg2:      #190440;
+      --accent:   #ff00ff;
+      --accent-h: #b300b3;
+      --accent2:  #00ffff;
+      --wood-dk:  #000033;
+      --wood-md:  #000066;
+      --wood-lt:  #000099;
+      --text:     #00ffff;
+      --text-dim: rgba(0,255,255,.62);
+      --text-faint:rgba(0,255,255,.38);
+      --border:   rgba(255,0,255,.3);
+      --card:     #130330;
+      --shadow:   0 8px 28px rgba(255,0,255,.2);
+    }
+    [data-theme="theme_neon"] {
+      --bg:       #1a1a2e;
+      --bg2:      #16213e;
+      --accent:   #0f3460;
+      --accent-h: #e94560;
+      --accent2:  #e94560;
+      --wood-dk:  #0f3460;
+      --wood-md:  #16213e;
+      --wood-lt:  #1a1a2e;
+      --text:     #e94560;
+      --text-dim: rgba(233,69,96,.62);
+      --text-faint:rgba(233,69,96,.38);
+      --border:   rgba(233,69,96,.3);
+      --card:     #131a2f;
+      --shadow:   0 8px 28px rgba(233,69,96,.2);
+    }
+    [data-theme="theme_royal"] {
+      --bg:       #2b0f19;
+      --bg2:      #421a28;
+      --accent:   #d4af37;
+      --accent-h: #aa8c2c;
+      --accent2:  #8b0000;
+      --wood-dk:  #2b0f19;
+      --wood-md:  #421a28;
+      --wood-lt:  #5c2438;
+      --text:     #d4af37;
+      --text-dim: rgba(212,175,55,.62);
+      --text-faint:rgba(212,175,55,.38);
+      --border:   rgba(212,175,55,.2);
+      --card:     #351421;
+      --shadow:   0 8px 28px rgba(0,0,0,.5);
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html { scroll-behavior: smooth; font-size: 16px; overflow-x: hidden; max-width: 100vw; transition: opacity .12s ease; }

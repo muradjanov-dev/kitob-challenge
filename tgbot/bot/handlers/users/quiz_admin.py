@@ -27,9 +27,8 @@ def _is_active_premium(user) -> bool:
     from tgbot.models import Payment
     if not user:
         return False
-    return Payment.objects.filter(
-        user=user, status="paid", end_date__gte=_tz.localdate(),
-    ).exists()
+    from tgbot.services.premium import is_premium
+    return is_premium(user)
 
 
 async def _can_manage_quizzes(user) -> bool:
@@ -110,20 +109,20 @@ async def offer_ai_quiz_start(target_message, user, state: FSMContext):
     from tgbot.models import Payment
     from tgbot.bot.states.main import AIQuizCreateState
 
-    is_premium = await sync_to_async(
-        Payment.objects.filter(user=user, status="paid", end_date__gte=timezone.localdate()).exists
-    )()
+    from tgbot.services.premium import is_premium as _is_prem
+    is_premium = await sync_to_async(_is_prem)(user)
     has_trial = bool(user.trial_ai_quiz_until and user.trial_ai_quiz_until >= timezone.now())
     has_free_try = not user.free_ai_quiz_used
 
     if not is_premium and not has_trial and not has_free_try:
-        await target_message.answer(
-            "⭐ <b>Bepul sinovingiz allaqachon ishlatilgan!</b>\n\n"
-            "AI yordamida yana quiz tuzish uchun 💎 Premium kerak — cheklovsiz "
-            "foydalaning va boshqa imkoniyatlarni ham oching.",
-            parse_mode="HTML",
-        )
-        return
+        if int(user.ball or 0) < 3000:
+            await target_message.answer(
+                "⭐ <b>Hisobingizda Kitobcha yetarli emas!</b>\n\n"
+                "AI yordamida yana bitta quiz tuzish narxi: <b>3000 Kitobcha</b>. "
+                "Yoki 💎 Premium xarid qilib, ko'proq foydalanishingiz mumkin.",
+                parse_mode="HTML",
+            )
+            return
 
     await state.finish()
 
@@ -337,11 +336,23 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
     # target (see _owns_target) or by its own admin check — so a trial user
     # who just generated an AI quiz can still edit, share and delete that
     # quiz, which the post-creation message explicitly invites them to do.
-    if action == "new" and not await _can_manage_quizzes(user):
-        await call.answer(
-            "Quiz yaratish va boshqarish — admin yoki 💎 Premium foydalanuvchilar uchun.",
-            show_alert=True,
+    if action == "new":
+        if not await _can_manage_quizzes(user):
+            if int(user.ball or 0) < 1500:
+                await call.answer(
+                    "📝 Quiz yaratish narxi: 1500 Kitobcha (yoki 💎 Premium).\nHisobingizda yetarli emas.",
+                    show_alert=True,
+                )
+                return
+        await call.answer()
+        await state.finish()
+        await call.message.answer(
+            "📖 <b>Quiz qaysi asardan? Asar va muallif nomini kiriting:</b>\n\n"
+            "<i>Misol:</i> <code>Abdulla Qodiriy: O'tkan kunlar</code> yoki <code>Tog'ay Murod: Otamdan qolgan dalalar</code>\n\n"
+            "💡 <i>Mavhum nomlar qo'ymang — aniq kitob nomi qatnashchilarga qiziqroq bo'ladi.</i>",
+            parse_mode="HTML",
         )
+        await QuizCreateState.title.set()
         return
 
     if action in _ID_ACTIONS and len(parts) > 2:
@@ -378,6 +389,10 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "new":
         await call.answer()
         await state.finish()
+        if not await _can_manage_quizzes(user):
+            if int(user.ball or 0) < 1500:
+                await call.message.answer("📝 Quiz yaratish narxi: 1500 Kitobcha (yoki 💎 Premium).\nHisobingizda yetarli emas.")
+                return
         await call.message.answer(
             "📖 <b>Quiz qaysi asardan? Asar va muallif nomini kiriting:</b>\n\n"
             "<i>Misol:</i> <code>Abdulla Qodiriy: O'tkan kunlar</code> yoki <code>Tog'ay Murod: Otamdan qolgan dalalar</code>\n\n"
@@ -648,6 +663,16 @@ async def qz_got_desc(message: types.Message, state: FSMContext):
             title=data["qz_title"],
             description=desc,
         )
+
+    is_premium = await _can_manage_quizzes(user)
+    if not is_premium:
+        if int(user.ball or 0) < 1500:
+            await message.answer("Sizda yetarli Kitobcha yo'q (1500 Kitobcha kerak). Amaliyot bekor qilindi.")
+            await state.finish()
+            return
+        await sync_to_async(user.update_ball)(True, -1500)
+        from tgbot.models import KitobchaLedger
+        await sync_to_async(KitobchaLedger.objects.create)(user=user, delta=-1500, reason="manual_quiz_creation")
 
     quiz = await _save()
     await state.update_data(qz_id=quiz.id, q_count=0)

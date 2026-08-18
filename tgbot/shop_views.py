@@ -408,6 +408,8 @@ def api_products(request: HttpRequest) -> JsonResponse:
             "telegram_id": request.tg_profile.telegram_id,
             "full_name": request.tg_profile.full_name or "",
             "balance": int(request.tg_profile.ball or 0),
+            "active_theme": request.tg_profile.active_theme,
+            "unlocked_themes": request.tg_profile.unlocked_themes or [],
         },
     })
 
@@ -421,6 +423,8 @@ def api_me(request: HttpRequest) -> JsonResponse:
         "telegram_id": request.tg_profile.telegram_id,
         "full_name": request.tg_profile.full_name or "",
         "balance": int(request.tg_profile.ball or 0),
+        "active_theme": request.tg_profile.active_theme,
+        "unlocked_themes": request.tg_profile.unlocked_themes or [],
     })
 
 

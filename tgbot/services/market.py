@@ -32,13 +32,12 @@ ITEMS = {
     MYSTERY_BOX: {
         "emoji": "🎁",
         "title": "Sirli quti",
-        "price": 200,
+        "price": 0,
         "description": (
-            "Tasodifiy mukofot: turli xil va miqdorlarda Kitobcha (hattoki ULTRA "
-            "MEGA yutuq!), Omon qolish o'yiniga qo'shimcha jon, bonus streak-"
-            "muzlatish, bepul Shaxsiy sertifikat, BEPUL jonli o'yin biletlari, "
-            "1 soatlik AI Quiz, 3 soatlik Premium, Market chegirmasi va yana "
-            "ko'plab syurprizlar — 140 dan ortiq xil ajoyib natijalar va yangi 100 xil unikal yutuqlar bor!"
+            "Kitob o'qish orqali Bepul ochiladigan quti! "
+            "Har 50 bet matn yoki har 60 daqiqa audio = 1 ta bepul quti. "
+            "Tasodifiy mukofotlar: turli xil Kitobcha (hattoki ULTRA MEGA yutuq!), Omon qolish "
+            "o'yiniga jon, muzlatish, bepul Sertifikat, Premium, va boshqalar!"
         ),
     },
     CERTIFICATE: {
@@ -61,6 +60,36 @@ ITEMS = {
             "Keyingi \"Top kitobxonlar\" e'lonida ismingiz sponsor sifatida "
             "ko'rsatiladi. Kuniga faqat 7 ta joy bor!"
         ),
+    },
+    "theme_dark": {
+        "emoji": "🎨",
+        "title": "Tun Makoni (Dark Mode)",
+        "price": 1000,
+        "description": "Mini-App uchun qop-qora fon va oq/kulrang matnlar. Tunda o'qish uchun juda qulay.",
+    },
+    "theme_matrix": {
+        "emoji": "🎨",
+        "title": "Raqamli Dunyo (Matrix)",
+        "price": 2000,
+        "description": "Mini-App uchun qora fon va yorqin yashil matnlar. Xakkerona uslub.",
+    },
+    "theme_retro": {
+        "emoji": "🎨",
+        "title": "Retro / Kiberpank",
+        "price": 3000,
+        "description": "Mini-App uchun to'q ko'k, pushti va binafsha neon ranglar uyg'unligi.",
+    },
+    "theme_neon": {
+        "emoji": "🎨",
+        "title": "Neon Nurlari (Cyber)",
+        "price": 4000,
+        "description": "Mini-App uchun to'q kulrang fon va chaqnovchi zangori/feruza (cyan) ranglar.",
+    },
+    "theme_royal": {
+        "emoji": "🎨",
+        "title": "Shohona (Royal Gold)",
+        "price": 5000,
+        "description": "Mini-App uchun to'q baxmal (burgundy) fon va sof tilla rang elementlar. Hashamatli uslub.",
     },
 }
 
@@ -317,12 +346,12 @@ CREATIVE_TANGIBLE_REWARDS = {
     "ai_2h": ('🤖 2 Soatlik BEPUL AI Quiz Tuzish Imkoniyati', 'ai_quiz', 2),
     "ai_3h": ('🤖 3 Soatlik BEPUL AI Quiz Tuzish Imkoniyati', 'ai_quiz', 3),
     "ai_6h": ('🤖🔥 6 Soatlik Kengaytirilgan AI Quiz Passi', 'ai_quiz', 6),
-    "ai_12h": ('🤖✨ 12 Soatlik Cheksiz AI Quiz Yaratish!', 'ai_quiz', 12),
+    "ai_12h": ('🤖✨ 12 Soatlik Kengaytirilgan AI Quiz Yaratish!', 'ai_quiz', 12),
     "ai_24h": ("🤖👑 24 SOATLIK (1 KUNLIK) TO'LIQ AI QUIZ MASTER PASS!", 'ai_quiz', 24),
     "ai_critic_pass": ('🧠 AI Adabiy Tahlilchi va Quiz Yaratuvchi (2 Soat)', 'ai_quiz', 2),
     "ai_book_architect": ('📚 AI Kitob Arxitektori Passi (3 Soat)', 'ai_quiz', 3),
     "ai_exam_creator": ('📝 AI Sinov va Test Yaratuvchi Passi (4 Soat)', 'ai_quiz', 4),
-    "ai_omnipotent": ('⚡️👑 Cheksiz AI Imkoniyatlari Passi (12 Soat)', 'ai_quiz', 12),
+    "ai_omnipotent": ('⚡️👑 Kengaytirilgan AI Imkoniyatlari Passi (12 Soat)', 'ai_quiz', 12),
     "discount_20": ('🏷 Keyingi Market xaridingizga 20% Chegirma', 'discount', 20),
     "discount_30": ('🏷 Keyingi Market xaridingizga 30% Chegirma', 'discount', 30),
     "discount_50": ('🏷🔥 KATTA CHEGIRMA! Keyingi xaridga 50% Chegirma!', 'discount', 50),
@@ -380,6 +409,44 @@ def _record_mystery_box_win(user, pick: str) -> None:
         )
     except Exception as e:
         print(f"_record_mystery_box_win({user.id}, {pick}): {e}")
+
+
+def can_open_mystery_box(user) -> tuple[bool, str]:
+    from tgbot.models import ConfirmationReport, MysteryBoxWin
+    from django.db.models import Sum
+    from django.utils import timezone
+
+    today = timezone.localtime().date()
+    
+    # Calculate earned boxes from today's reading
+    reports_today = ConfirmationReport.objects.filter(user_id=user.id, date__date=today)
+    
+    # 50 pages = 1 box
+    pages_today = reports_today.filter(is_audio=False).aggregate(s=Sum("pages_read"))["s"] or 0
+    earned_from_pages = pages_today // 50
+    
+    # 60 mins = 1 box
+    audio_today = reports_today.filter(is_audio=True).aggregate(s=Sum("minutes_listened"))["s"] or 0
+    earned_from_audio = audio_today // 60
+    
+    total_earned = earned_from_pages + earned_from_audio
+    
+    # Calculate opened boxes today
+    opened_today = MysteryBoxWin.objects.filter(user_id=user.id, created_at__date=today).count()
+    
+    if opened_today < total_earned:
+        return True, ""
+        
+    # Build error message
+    pages_needed = 50 - (pages_today % 50)
+    audio_needed = 60 - (audio_today % 60)
+    
+    msg = (f"Siz bugungi barcha bepul qutilarni ochib bo'lgansiz!\n\n"
+           f"Yangi quti ochish uchun bugun yana:\n"
+           f"📖 <b>{pages_needed}</b> bet matnli kitob o'qing\n"
+           f"<i>yoki</i>\n"
+           f"🎧 <b>{audio_needed}</b> daqiqa audio kitob tinglang.")
+    return False, msg
 
 
 def resolve_mystery_box(user):
