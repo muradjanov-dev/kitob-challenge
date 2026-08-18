@@ -19,7 +19,7 @@ from tgbot.library_views import (
     api_get_progress, api_save_progress, api_start_reading, api_premium_access,
     api_top_active_readers,
 )
-from tgbot.cabinet_views import cabinet_index, api_cabinet_me, api_set_theme
+from tgbot.cabinet_views import cabinet_index, api_cabinet_me
 from tgbot.report_views import api_submit_report, api_my_report_books
 from tgbot.analytics_views import api_track_event
 from tgbot.game_views import (
@@ -67,7 +67,6 @@ urlpatterns = [
     path("health-check/redis/", health_check_redis, name="health-check-redis"),
     path("health-check/celery/", health_check_celery, name="health-check-celery"),
     path('api/cabinet/me/', api_cabinet_me, name='api-cabinet-me'),
-    path('api/cabinet/set-theme/', api_set_theme, name='api-cabinet-set-theme'),
     path('api/shop/products/', api_products, name='api-products'),
     path("shop/api/products-public/", api_products_public, name="shop-api-products-public"),
     path("shop/api/me/", api_me, name="shop-api-me"),
@@ -76,7 +75,6 @@ urlpatterns = [
     path("shop/api/bid/", api_bid, name="shop-api-bid"),
     path("kabinet/", cabinet_index, name="cabinet"),
     path("kabinet/api/me/", api_cabinet_me, name="cabinet-api-me"),
-    path("kabinet/api/set-theme/", api_set_theme, name="cabinet-api-set-theme"),
     path("kabinet/api/report/", api_submit_report, name="cabinet-api-submit-report"),
     path("kabinet/api/report/books/", api_my_report_books, name="cabinet-api-report-books"),
     path("zanjir/", chain_index, name="chain"),
