@@ -403,3 +403,25 @@ QUIZ_STRATEGY_QUESTIONS = [
         "correct": 1,
     },
 ]
+
+# ── 2026-08 qo'shimcha: strategik va farosat talab qiladigan savollar ─────
+QUIZ_STRATEGY_QUESTIONS += [
+  {"q": "[Strategik Tafakkur] 300 betli kitobni 10 kunda tugatmoqchisiz, 3 kun o'tib 60 bet o'qidingiz. Qolgan kunlarda kuniga nechtadan o'qish kerak?", "options": ["Kuniga ~34 bet", "Kuniga 30 bet", "Kuniga 24 bet", "Kuniga 60 bet"], "correct": 0},
+  {"q": "[Strategik Tafakkur] Bir vaqtda 5 ta kitobni boshlash o'rniga bittasini tugatish nega samaraliroq?", "options": ["Diqqat bo'linmaydi va tugallash hissi keyingi kitobga turtki beradi", "Kitoblar arzonlashadi", "Sahifalar tez o'qiladi", "Muallif ko'proq yozadi"], "correct": 0},
+  {"q": "[Strategik Tafakkur] Qalin ilmiy kitobni o'qishdan oldin eng foydali qadam qaysi?", "options": ["Mundarija va xulosani ko'rib, tuzilmani tushunib olish", "Oxirgi betdan boshlash", "Faqat rasmlarni ko'rish", "Kitobni ikkiga bo'lib tashlash"], "correct": 0},
+  {"q": "[Strategik Tafakkur] Har kuni 20 daqiqa o'qish bilan haftada bir marta 2 soat o'qishning farqi nimada?", "options": ["Kundalik o'qish odat hosil qiladi va esda saqlash yaxshilanadi", "Farqi yo'q", "Haftalik usul doim afzal", "Kundalik usul ko'proq vaqt oladi"], "correct": 0},
+  {"q": "[Strategik Tafakkur] Kitob tanlashda «birinchi 20 bet qoidasi» nimani anglatadi?", "options": ["20 bet o'qib, mos kelmasa vaqtni behuda sarflamay qo'yish", "Faqat 20 bet o'qish kerak", "20-betdan boshlash kerak", "Har kuni 20 bet shart"], "correct": 0},
+  {"q": "[Strategik Tafakkur] O'qiganini yaxshiroq eslab qolishning eng samarali yo'li qaysi?", "options": ["O'z so'zlari bilan qisqacha bayon qilib berish", "Bir necha bor ko'z yugurtirish", "Faqat sarlavhalarni yodlash", "Tez o'qib chiqish"], "correct": 0},
+  {"q": "[Strategik Tafakkur] Ikki kitobxon bir xil kitobni o'qidi, biri ko'proq eslab qoldi. Eng ehtimolli sabab qaysi?", "options": ["U o'qiyotib savol berib, bog'lanish qurgan", "U tezroq o'qigan", "Uning kitobi yangiroq edi", "U kechqurun o'qigan"], "correct": 0},
+  {"q": "[Strategik Tafakkur] Murakkab asarni tushunish uchun eng to'g'ri strategiya qaysi?", "options": ["Avval muallif davri va sharoiti bilan tanishish", "Faqat oxirgi bobni o'qish", "Tarjimani o'qimaslik", "Qahramonlar ismini yodlash"], "correct": 0},
+  {"q": "[Strategik Tafakkur] Kuniga 15 bet o'qisangiz, 450 betli asarni necha kunda tugatasiz?", "options": ["30 kun", "45 kun", "25 kun", "15 kun"], "correct": 0},
+  {"q": "[Strategik Tafakkur] Kutubxonada vaqt cheklangan bo'lsa, qaysi tanlov oqilona?", "options": ["Maqsadga mos bitta kitobni chuqur o'qish", "O'ntasini yuzaki varaqlash", "Eng qalinini tanlash", "Eng yangi muqovalisini olish"], "correct": 0},
+  {"q": "[Strategik Tafakkur] «Xamsa»ni o'qishni qaysi tartibda boshlash mantiqan qulay?", "options": ["Muallif belgilagan tartibda — «Hayrat ul-abror»dan", "Oxirgi dostondan", "Eng qisqasidan", "Tasodifiy tanlab"], "correct": 0},
+  {"q": "[Strategik Tafakkur] Kitobdagi muhim fikrni belgilashning maqsadi nima?", "options": ["Keyin tez topib, takrorlash imkonini berish", "Kitobni chiroyli qilish", "Sahifalarni ko'paytirish", "O'qish tezligini oshirish"], "correct": 0},
+  {"q": "[Strategik Tafakkur] Bir oyda 4 ta kitob o'qish maqsadi qo'yildi. Qaysi yondashuv real?", "options": ["Kuniga aniq bet miqdorini belgilash", "Oy oxirida hammasini o'qish", "Faqat qisqa kitob tanlash", "Kunni belgilamay o'qish"], "correct": 0},
+  {"q": "[Strategik Tafakkur] Asar qahramonining xatosidan saboq olish nimani rivojlantiradi?", "options": ["Tajribasiz ham xulosa chiqarish — farosatni", "Faqat xotirani", "O'qish tezligini", "Yozuv husnini"], "correct": 0},
+  {"q": "[Strategik Tafakkur] Ikki xil manbada bir voqea har xil bayon qilingan. To'g'ri yo'l qaysi?", "options": ["Uchinchi mustaqil manbaga solishtirib ko'rish", "Birinchisiga ishonish", "Ikkalasini rad etish", "Qaysi qisqa bo'lsa, shuni olish"], "correct": 0},
+  {"q": "[Strategik Tafakkur] «Sekin o'qish» (chuqur mutolaa) qachon afzal?", "options": ["Falsafiy va ma'noli matnlarda", "Gazeta xabarida", "Reklama matnida", "Ro'yxatlarda"], "correct": 0},
+  {"q": "[Strategik Tafakkur] 7 kunda 140 bet o'qigan kitobxon tezligini 2 barobar oshirsa, keyingi hafta nechta o'qiydi?", "options": ["280 bet", "140 bet", "210 bet", "70 bet"], "correct": 0},
+  {"q": "[Strategik Tafakkur] O'qishni tashlab qo'ymaslik uchun eng ishonchli usul qaysi?", "options": ["Kichik, bajarilishi oson kunlik maqsad qo'yish", "Katta maqsad qo'yib, bir kunda bajarish", "Faqat kayfiyat bo'lganda o'qish", "Kitobni ochiq qoldirish"], "correct": 0},
+]

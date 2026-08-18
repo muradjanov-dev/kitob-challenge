@@ -801,3 +801,27 @@ QUIZ_ODDONE_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: haqiqiy "ortiqchasini top" savollari ──────────────
+# Ilgari bu bank 22 ta o'yin bilan bir xil umumiy 20 savolni bo'lishardi.
+# Bular o'yin nomiga mos: har birida mantiqiy guruh va bitta begona a'zo bor.
+QUIZ_ODDONE_QUESTIONS += [
+  {"q": "[Ortiqchasini Top] Qaysi biri Alisher Navoiyning «Xamsa»siga KIRMAYDI?", "options": ["Hayrat ul-abror", "Farhod va Shirin", "Lison ut-tayr", "Sab'ai sayyor"], "correct": 2},
+  {"q": "[Ortiqchasini Top] Uchtasi roman, bittasi she'riy doston. Ortiqchasi qaysi?", "options": ["O'tkan kunlar", "Kecha va kunduz", "Sarob", "Farhod va Shirin"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Uchtasi bir muallif qalamiga mansub. Begonasi qaysi?", "options": ["O'tkan kunlar", "Mehrobdan chayon", "Obid ketmon", "Shum bola"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Qaysi biri hadis to'plami EMAS?", "options": ["Sahih al-Buxoriy", "Sunani Termiziy", "Sunani Abu Dovud", "Tib qonunlari"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Uchtasi shoir, bittasi olim. Ortiqchasi kim?", "options": ["Cho'lpon", "Hamid Olimjon", "Abdulla Oripov", "Abu Rayhon Beruniy"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Qaysi biri «O'tkan kunlar» qahramoni EMAS?", "options": ["Otabek", "Kumushbibi", "Homid", "Anvar"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Uchtasi rus adabiyoti, bittasi frantsuz. Ortiqchasi qaysi?", "options": ["Urush va tinchlik", "Jinoyat va jazo", "Anna Karenina", "Uch mushketyor"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Uchtasi XX asr, bittasi XV asr adibi. Begonasi kim?", "options": ["Abdulla Qodiriy", "Cho'lpon", "Oybek", "Alisher Navoiy"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Qaysi biri Bobur qalamiga mansub EMAS?", "options": ["Boburnoma", "Mubayyin", "Aruz risolasi", "Xamsa"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Uchtasi shahar, bittasi asar nomi. Ortiqchasi qaysi?", "options": ["Samarqand", "Buxoro", "Marg'ilon", "Sarob"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Uchtasi tasavvuf allomasi, bittasi tabib. Begonasi kim?", "options": ["Bahouddin Naqshband", "Ahmad Yassaviy", "Imom G'azzoliy", "Abu Ali ibn Sino"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Qaysi biri doston EMAS?", "options": ["Farhod va Shirin", "Layli va Majnun", "Alpomish", "Devoni Foniy"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Uchtasi ayol qahramon, bittasi erkak. Ortiqchasi kim?", "options": ["Kumushbibi", "Zaynab", "Oftoboyim", "Otabek"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Uchtasi o'zbek xalq dostoni, bittasi yozma roman. Begonasi qaysi?", "options": ["Alpomish", "Go'ro'g'li", "Kuntug'mish", "Ikki eshik orasi"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Qaysi biri Ibn Sino asari EMAS?", "options": ["Tib qonunlari", "Kitob ash-shifo", "Donishnoma", "Hikmatlar"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Uchtasi janr nomi, bittasi she'riy o'lchov. Ortiqchasi qaysi?", "options": ["G'azal", "Ruboiy", "Doston", "Aruz"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Uchtasi bir davr — jadidlar avlodi. Begonasi kim?", "options": ["Cho'lpon", "Fitrat", "Behbudiy", "Zulfiya"], "correct": 3},
+  {"q": "[Ortiqchasini Top] Qaysi biri astronomiya bilan shug'ullanmagan?", "options": ["Mirzo Ulug'bek", "Ahmad Farg'oniy", "Abu Rayhon Beruniy", "Abdulla Qodiriy"], "correct": 3},
+]

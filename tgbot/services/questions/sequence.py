@@ -801,3 +801,21 @@ QUIZ_SEQUENCE_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: haqiqiy ketma-ketlik (xronologiya) savollari ──────
+QUIZ_SEQUENCE_QUESTIONS += [
+  {"q": "[Ketma-ketlik] Qaysi biri eng AVVAL yashagan?", "options": ["Abu Rayhon Beruniy", "Alisher Navoiy", "Zahiriddin Bobur", "Abdulla Qodiriy"], "correct": 0},
+  {"q": "[Ketma-ketlik] Qaysi asar eng KEYIN yozilgan?", "options": ["Xamsa (XV asr)", "Boburnoma (XVI asr)", "O'tkan kunlar (1926)", "Tib qonunlari (XI asr)"], "correct": 2},
+  {"q": "[Ketma-ketlik] Amir Temur, Mirzo Ulug'bek, Bobur — bu tartib nimani bildiradi?", "options": ["Hammasi temuriylar sulolasidan", "Bittasi temuriy emas", "Hammasi bir yilda tug'ilgan", "Hammasi shoir bo'lmagan"], "correct": 0},
+  {"q": "[Ketma-ketlik] «O'tkan kunlar»da voqealar qaysi tartibda kechadi?", "options": ["Toshkent safari → sovchilik → nikoh → fojia", "Nikoh → fojia → sovchilik", "Fojia → nikoh → safar", "Sovchilik → fojia → safar"], "correct": 0},
+  {"q": "[Ketma-ketlik] Qaysi voqea eng ERTA sodir bo'lgan?", "options": ["Ulug'bek rasadxonasi qurilishi", "Boburning Hindistonga yurishi", "Jadidchilik harakati", "«O'tkan kunlar» nashri"], "correct": 0},
+  {"q": "[Ketma-ketlik] Kitob o'qishning mantiqiy tartibi qaysi?", "options": ["Muqova → sarlavha → mundarija → matn", "Matn → mundarija → muqova", "Mundarija → muqova → sarlavha", "Matn → muqova → sarlavha"], "correct": 0},
+  {"q": "[Ketma-ketlik] Yozuvchi ishining to'g'ri tartibi qaysi?", "options": ["G'oya → qoralama → tahrir → nashr", "Nashr → tahrir → g'oya", "Tahrir → g'oya → qoralama", "Qoralama → nashr → g'oya"], "correct": 0},
+  {"q": "[Ketma-ketlik] Qaysi asr eng KECH keladi?", "options": ["IX asr", "XV asr", "XVI asr", "XX asr"], "correct": 3},
+  {"q": "[Ketma-ketlik] Navoiy «Xamsa»sining birinchi dostoni qaysi?", "options": ["Hayrat ul-abror", "Farhod va Shirin", "Layli va Majnun", "Saddi Iskandariy"], "correct": 0},
+  {"q": "[Ketma-ketlik] Qaysi biri eng SO'NGGI paydo bo'lgan?", "options": ["Qo'lyozma kitob", "Bosma kitob", "Audiokitob", "Elektron kitob"], "correct": 3},
+  {"q": "[Ketma-ketlik] Bobur hayotidagi to'g'ri tartib qaysi?", "options": ["Farg'ona → Samarqand → Kobul → Hindiston", "Hindiston → Kobul → Farg'ona", "Kobul → Farg'ona → Samarqand", "Samarqand → Hindiston → Kobul"], "correct": 0},
+  {"q": "[Ketma-ketlik] «Alpomish» dostonida qahramon yo'li qanday?", "options": ["Sinov → asirlik → qaytish → g'alaba", "G'alaba → sinov → asirlik", "Asirlik → g'alaba → sinov", "Qaytish → sinov → asirlik"], "correct": 0},
+  {"q": "[Ketma-ketlik] Qaysi ikkisi zamondosh bo'lgan?", "options": ["Navoiy va Husayn Boyqaro", "Navoiy va Qodiriy", "Beruniy va Cho'lpon", "Bobur va Oybek"], "correct": 0},
+  {"q": "[Ketma-ketlik] «Boburnoma» qanday tartibda yozilgan?", "options": ["Kundalik — yil ketma-ketligida", "Alifbo tartibida", "Qahramonlar bo'yicha", "Teskari xronologiyada"], "correct": 0},
+]

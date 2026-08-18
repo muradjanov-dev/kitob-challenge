@@ -801,3 +801,25 @@ QUIZ_NUMBERS_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: haqiqiy "adabiy raqamlar" savollari ───────────────
+QUIZ_NUMBERS_QUESTIONS += [
+  {"q": "[Adabiy Raqamlar] Navoiyning «Xamsa»si nechta dostondan iborat?", "options": ["5", "3", "7", "10"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] «Xamsa» so'zi qaysi tildan olingan va nimani anglatadi?", "options": ["Arabcha — «beshlik»", "Forscha — «yettilik»", "Turkiy — «to'plam»", "Yunoncha — «doston»"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] Attorning «Mantiq ut-tayr»ida qushlar nechta vodiydan o'tadi?", "options": ["7", "5", "3", "12"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] «Ming bir kecha» nomidagi raqam nimani bildiradi?", "options": ["Hikoya aytilgan kechalar soni", "Qahramonlar soni", "Shaharlar soni", "Muallif yoshi"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] «O'tkan kunlar» qachon nashr etilgan?", "options": ["1926", "1905", "1940", "1966"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] Ruboiy nechta misradan iborat?", "options": ["4", "2", "6", "8"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] Bayt nechta misra?", "options": ["2", "4", "3", "1"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] Ulug'bek yulduz jadvalida taxminan nechta yulduz qayd etilgan?", "options": ["1018", "100", "5000", "250"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] Mantiqan: 1 ta kitob 300 bet bo'lsa, kuniga 20 bet o'qisangiz necha kunda tugaydi?", "options": ["15 kun", "10 kun", "30 kun", "6 kun"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] Kuniga 30 bet o'qigan odam bir yilda taxminan necha bet o'qiydi?", "options": ["~11 000", "~3 000", "~500", "~50 000"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] G'azal odatda necha baytdan iborat bo'ladi?", "options": ["5–15", "1–2", "50–60", "100 dan ortiq"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] «Alpomish» dostoni qaysi hajmi bilan mashhur?", "options": ["14 mingdan ortiq misra", "100 misra", "500 misra", "50 misra"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] Bobur necha yoshida Farg'ona taxtiga o'tirgan?", "options": ["12", "25", "30", "18"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] Mantiqiy savol: kitobning 100-betidan 150-betigacha necha bet o'qiladi?", "options": ["51", "50", "49", "150"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] «Sahih al-Buxoriy»ni tuzishga Imom Buxoriy necha yil sarflagan?", "options": ["16 yil", "2 yil", "40 yil", "5 yil"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] Navoiy o'z devonlarini nechta to'plamga jamlagan («Xazoyin ul-maoniy»)?", "options": ["4", "2", "7", "10"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] Bir kitobxon 5 kunda 4 kitob o'qidi. O'rtacha kuniga nechta?", "options": ["0,8", "1,25", "2", "20"], "correct": 0},
+  {"q": "[Adabiy Raqamlar] Tuyuq nechta misradan iborat?", "options": ["4", "2", "8", "6"], "correct": 0},
+]

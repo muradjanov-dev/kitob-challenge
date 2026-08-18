@@ -801,3 +801,25 @@ QUIZ_WORLDLIT_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: haqiqiy jahon adabiyoti savollari ─────────────────
+QUIZ_WORLDLIT_QUESTIONS += [
+  {"q": "[Jahon Adabiyoti] «Urush va tinchlik» romani muallifi kim?", "options": ["Lev Tolstoy", "Fyodor Dostoyevskiy", "Anton Chexov", "Ivan Turgenev"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Jinoyat va jazo» romanini kim yozgan?", "options": ["Fyodor Dostoyevskiy", "Lev Tolstoy", "Nikolay Gogol", "Maksim Gorkiy"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Yuz yillik tanholik» asari muallifi kim?", "options": ["Gabriel Garsiya Markes", "Xorxe Luis Borxes", "Mario Vargas Losa", "Pablo Neruda"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Hamlet» tragediyasini kim yozgan?", "options": ["Uilyam Shekspir", "Jan-Batist Molyer", "Dante", "Gyote"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Ilohiy komediya» muallifi kim?", "options": ["Dante Aligyeri", "Petrarka", "Bokkachcho", "Vergiliy"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Don Kixot» romanini kim yaratgan?", "options": ["Migel de Servantes", "Lope de Vega", "Kalderon", "Gabriel Markes"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Faust» asari muallifi kim?", "options": ["Iogann Volfgang Gyote", "Fridrix Shiller", "Genrix Geyne", "Tomas Mann"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Evrilish» (Metamorfoza) qissasi kimniki?", "options": ["Frans Kafka", "Alber Kamyu", "Jan Pol Sartr", "Tomas Mann"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Chol va dengiz» asari muallifi kim?", "options": ["Ernest Xeminguey", "Jek London", "Mark Tven", "Uilyam Folkner"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Kichkina shahzoda» kitobini kim yozgan?", "options": ["Antuan de Sent-Ekzyuperi", "Jyul Vern", "Viktor Gyugo", "Alber Kamyu"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Baxtsizlar» (Les Misérables) romani muallifi kim?", "options": ["Viktor Gyugo", "Onore de Balzak", "Aleksandr Dyuma", "Emil Zolya"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Uch mushketyor» kimning asari?", "options": ["Aleksandr Dyuma", "Viktor Gyugo", "Jyul Vern", "Stendal"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Odisseya» dostoni kimga nisbat beriladi?", "options": ["Gomer", "Sofokl", "Evripid", "Esxil"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Robinzon Kruzo» muallifi kim?", "options": ["Daniel Defo", "Jonatan Svift", "Charlz Dikkens", "Valter Skott"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Oq kema» qissasi kimniki?", "options": ["Chingiz Aytmatov", "Muxtor Avezov", "Rasul Hamzatov", "Oljas Sulaymonov"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Atirgul nomi» romanini kim yozgan?", "options": ["Umberto Eko", "Paulo Koelyo", "O'rxon Pamuk", "Den Braun"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Ruboiylar» bilan jahonga mashhur fors shoiri kim?", "options": ["Umar Xayyom", "Hofiz Sheroziy", "Sa'diy Sheroziy", "Firdavsiy"], "correct": 0},
+  {"q": "[Jahon Adabiyoti] «Shohnoma» dostonining muallifi kim?", "options": ["Abulqosim Firdavsiy", "Nizomiy Ganjaviy", "Jomiy", "Attor"], "correct": 0},
+]

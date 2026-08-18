@@ -801,3 +801,25 @@ QUIZ_RHYME_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: haqiqiy she'riyat / bahri-bayt savollari ──────────
+QUIZ_RHYME_QUESTIONS += [
+  {"q": "[Bahri-Bayt] Bayt nechta misradan tashkil topadi?", "options": ["2", "4", "3", "1"], "correct": 0},
+  {"q": "[Bahri-Bayt] G'azalning oxirgi baytida shoir nimani keltiradi?", "options": ["O'z taxallusini (maqta')", "Sarlavhani", "Muallif yoshini", "Asar sanasini"], "correct": 0},
+  {"q": "[Bahri-Bayt] G'azalning birinchi bayti qanday ataladi?", "options": ["Matla'", "Maqta'", "Radif", "Qofiya"], "correct": 0},
+  {"q": "[Bahri-Bayt] Radif nima?", "options": ["Qofiyadan keyin takrorlanuvchi so'z yoki ibora", "She'r sarlavhasi", "Shoir taxallusi", "Misralar soni"], "correct": 0},
+  {"q": "[Bahri-Bayt] Aruz nima?", "options": ["Bo'g'inlar cho'ziq-qisqaligiga asoslangan vazn", "She'r janri", "Qofiya turi", "Shoir unvoni"], "correct": 0},
+  {"q": "[Bahri-Bayt] Barmoq vazni nimaga asoslanadi?", "options": ["Misralardagi bo'g'inlar soniga", "Bo'g'in cho'ziqligiga", "Qofiya soniga", "Baytlar soniga"], "correct": 0},
+  {"q": "[Bahri-Bayt] Alisher Navoiy she'riyatda qaysi taxallusda yozgan?", "options": ["Navoiy (turkiy) va Foniy (forsiy)", "Faqat Foniy", "Mashrab", "Ogahiy"], "correct": 0},
+  {"q": "[Bahri-Bayt] Muxammas nechta misrali bandlardan iborat?", "options": ["5", "3", "7", "2"], "correct": 0},
+  {"q": "[Bahri-Bayt] Tuyuq janrining o'ziga xosligi nimada?", "options": ["To'rt misra va tajnis (bir xil yozilib, boshqa ma'no beruvchi so'zlar)", "Nasrda yozilishi", "Faqat sahna uchun", "Yigirma bayt bo'lishi"], "correct": 0},
+  {"q": "[Bahri-Bayt] Qofiya nima?", "options": ["Misra oxiridagi ohangdosh tovushlar", "She'rning mavzusi", "Shoir taxallusi", "Bandlar soni"], "correct": 0},
+  {"q": "[Bahri-Bayt] «Bahri bayt» o'yinining an'anaviy qoidasi qanday?", "options": ["Oldingi baytning oxirgi harfi bilan yangi bayt boshlanadi", "Baytlar teskari o'qiladi", "Faqat nasr aytiladi", "Har kim bir so'z aytadi"], "correct": 0},
+  {"q": "[Bahri-Bayt] Qasida janri asosan nima uchun yozilgan?", "options": ["Madh (maqtov) va ulug'lash uchun", "Kulgi uchun", "Ilmiy bayon uchun", "Sahna uchun"], "correct": 0},
+  {"q": "[Bahri-Bayt] Mustazod she'riy shakli nimasi bilan ajralib turadi?", "options": ["Har baytdan keyin qisqa qo'shimcha misra kelishi", "Faqat ikki misradan iborat bo'lishi", "Qofiyasiz bo'lishi", "Nasrda yozilishi"], "correct": 0},
+  {"q": "[Bahri-Bayt] Zulfiya ijodi asosan qaysi yo'nalishda?", "options": ["Lirika — she'riyat", "Tarixiy roman", "Dramaturgiya", "Ilmiy risola"], "correct": 0},
+  {"q": "[Bahri-Bayt] «Ona-Vatan sajdagohdir» satri qaysi shoirga tegishli?", "options": ["Abdulla Oripov", "Erkin Vohidov", "Cho'lpon", "Hamid Olimjon"], "correct": 0},
+  {"q": "[Bahri-Bayt] Erkin Vohidovning mashhur dostoni qaysi?", "options": ["Ruhlar isyoni", "O'tkan kunlar", "Alpomish", "Sarob"], "correct": 0},
+  {"q": "[Bahri-Bayt] Nazm va nasr orasidagi farq nima?", "options": ["Nazm — she'riy, nasr — oddiy yozma nutq", "Nazm qisqaroq bo'ladi", "Nasrda qofiya shart", "Ikkalasi bir xil"], "correct": 0},
+  {"q": "[Bahri-Bayt] Ruboiyning qofiyalanish tartibi odatda qanday?", "options": ["a-a-b-a", "a-b-a-b", "a-a-a-a", "a-b-b-a"], "correct": 0},
+]

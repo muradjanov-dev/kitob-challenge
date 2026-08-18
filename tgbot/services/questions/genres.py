@@ -801,3 +801,25 @@ QUIZ_GENRES_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: haqiqiy janr savollari ────────────────────────────
+QUIZ_GENRES_QUESTIONS += [
+  {"q": "[Janrlar Ustasi] «O'tkan kunlar» qaysi janrga mansub?", "options": ["Tarixiy roman", "Doston", "Qissa", "Drama"], "correct": 0},
+  {"q": "[Janrlar Ustasi] «Alpomish» qaysi janr namunasi?", "options": ["Xalq dostoni", "Roman", "Hikoya", "Ruboiy"], "correct": 0},
+  {"q": "[Janrlar Ustasi] «Boburnoma» janri qanday ataladi?", "options": ["Memuar (esdalik)", "Roman", "Doston", "Qissa"], "correct": 0},
+  {"q": "[Janrlar Ustasi] G'azal janrining asosiy belgisi nima?", "options": ["Baytlardan iborat, qofiya tizimi aa-ba-ca", "Nasriy hikoya", "Sahna asari", "To'rt misrali yakka she'r"], "correct": 0},
+  {"q": "[Janrlar Ustasi] Ruboiy janrining o'ziga xosligi nimada?", "options": ["To'rt misra, chuqur falsafiy xulosa", "O'n ikki bob", "Nasrda yozilishi", "Dialoglardan iborat bo'lishi"], "correct": 0},
+  {"q": "[Janrlar Ustasi] Qaysi janr sahna uchun yoziladi?", "options": ["Drama", "Roman", "Ruboiy", "Memuar"], "correct": 0},
+  {"q": "[Janrlar Ustasi] «Shum bola» qaysi janrda?", "options": ["Qissa", "Doston", "G'azal", "Tragediya"], "correct": 0},
+  {"q": "[Janrlar Ustasi] Masal janrining maqsadi nima?", "options": ["Ramziy hikoya orqali axloqiy saboq berish", "Tarixni aniq bayon qilish", "Ilmiy dalil keltirish", "Sahna ko'rinishi yaratish"], "correct": 0},
+  {"q": "[Janrlar Ustasi] Tazkira nima?", "options": ["Shoirlar haqidagi hayotnoma-to'plam", "Sevgi dostoni", "Hadis to'plami", "Tarixiy roman"], "correct": 0},
+  {"q": "[Janrlar Ustasi] Qaysi janr eng qisqa nasriy shakl?", "options": ["Hikoya", "Roman", "Qissa", "Doston"], "correct": 0},
+  {"q": "[Janrlar Ustasi] Devon nima?", "options": ["Shoirning she'rlar to'plami", "Nasriy roman", "Tarixiy solnoma", "Sahna asari"], "correct": 0},
+  {"q": "[Janrlar Ustasi] Doston va roman orasidagi asosiy farq nima?", "options": ["Doston she'riy, roman nasriy bo'ladi", "Doston qisqaroq bo'ladi", "Romanda qahramon bo'lmaydi", "Doston faqat bugungi kun haqida"], "correct": 0},
+  {"q": "[Janrlar Ustasi] Qaysi biri lirik janr?", "options": ["G'azal", "Roman", "Qissa", "Memuar"], "correct": 0},
+  {"q": "[Janrlar Ustasi] «Mantiq ut-tayr» qaysi janrda yozilgan?", "options": ["Ramziy-tasavvufiy doston", "Tarixiy roman", "Ilmiy risola", "Hikoyalar to'plami"], "correct": 0},
+  {"q": "[Janrlar Ustasi] Tragediya janrining yakuni odatda qanday?", "options": ["Qahramon halokati bilan", "Doim baxtli yakun", "Yakunsiz qoladi", "Kulgili sahna bilan"], "correct": 0},
+  {"q": "[Janrlar Ustasi] Publitsistika nima haqida yozadi?", "options": ["Dolzarb ijtimoiy masalalar", "Faqat xayoliy voqealar", "Faqat she'riy tasvir", "Faqat qadimgi afsonalar"], "correct": 0},
+  {"q": "[Janrlar Ustasi] Qaysi janr voqeani birinchi shaxs tilidan, o'z hayotidan bayon qiladi?", "options": ["Avtobiografiya", "Masal", "Doston", "Tazkira"], "correct": 0},
+  {"q": "[Janrlar Ustasi] Qissa romandan nimasi bilan farq qiladi?", "options": ["Hajmi kichikroq, voqealar doirasi torroq", "Faqat she'rda yoziladi", "Qahramoni bo'lmaydi", "Doim tarixiy bo'ladi"], "correct": 0},
+]

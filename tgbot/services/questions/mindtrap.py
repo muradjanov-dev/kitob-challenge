@@ -403,3 +403,26 @@ QUIZ_MINDTRAP_QUESTIONS = [
         "correct": 1,
     },
 ]
+
+# ── 2026-08 qo'shimcha: miyani qiynaydigan, adabiyotga bog'langan mantiq ──
+# Har biri xulosa chiqarishni talab qiladi: yodlash bilan yechilmaydi.
+QUIZ_MINDTRAP_QUESTIONS += [
+  {"q": "[Fikr Tuzog'i] «Barcha dostonlar she'riy. Bu asar she'riy emas.» Mantiqan nima kelib chiqadi?", "options": ["Bu asar doston emas", "Bu asar doston", "Bu asar roman", "Hech qanday xulosa chiqmaydi"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] «Ba'zi shoirlar tarjimon. Barcha tarjimonlar kamida ikki til biladi.» Qaysi xulosa TO'G'RI?", "options": ["Ba'zi shoirlar kamida ikki til biladi", "Barcha shoirlar tarjimon", "Hech bir shoir tarjimon emas", "Barcha tarjimonlar shoir"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] Kitobda 200 bet bor. Siz 3-betdan 3-betgacha o'qidingiz. Necha bet o'qidingiz?", "options": ["1", "0", "3", "2"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] Javonda 5 ta kitob yonma-yon. «Xamsa» chetda emas va «Boburnoma»dan chapda. Qaysi xulosa aniq?", "options": ["«Xamsa» 1-o'rinda ham, 5-o'rinda ham emas", "«Xamsa» aynan 3-o'rinda", "«Boburnoma» 1-o'rinda", "«Xamsa» «Boburnoma»dan o'ngda"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] «Agar u kitobni tugatgan bo'lsa, taqrizni yozgan.» Taqriz yozilmagan. Xulosa?", "options": ["U kitobni tugatmagan", "U kitobni tugatgan", "U taqriz yozgan", "Xulosa chiqarib bo'lmaydi"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] Ikki kitobning umumiy narxi 30 000 so'm. Biri ikkinchisidan 10 000 qimmat. Arzoni qancha?", "options": ["10 000", "20 000", "15 000", "5 000"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] «Hech bir tarixiy roman xayoliy emas» — bu gap nimani anglatadi?", "options": ["Har bir tarixiy roman xayoliy", "Hech bir tarixiy roman haqiqiy emas", "Ba'zi tarixiy romanlar xayoliy", "Tarixiy roman mavjud emas"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] Kitobxon har kuni oldingi kundagidan 2 bet ko'p o'qiydi. 1-kuni 10 bet o'qigan. 5-kuni nechta?", "options": ["18", "20", "16", "22"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] Otabekning otasi Yusufbek. Yusufbekning o'g'li kim?", "options": ["Otabek", "Homid", "Ziyo shohichi", "Hasanali"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] «Bu shoir Navoiydan keyin, Qodiriydan oldin yashagan.» Qaysi asr mos keladi?", "options": ["XVIII asr", "XIV asr", "XX asr oxiri", "IX asr"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] 100 betli kitobning yarmini o'qidingiz. Qolganining yarmini ham o'qidingiz. Necha bet qoldi?", "options": ["25", "50", "0", "75"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] «Ba'zi kitoblar qalin. Barcha qalin kitoblar og'ir.» Qaysi xulosa MANTIQAN noto'g'ri?", "options": ["Barcha kitoblar og'ir", "Ba'zi kitoblar og'ir", "Ba'zi og'ir narsalar kitob", "Qalin kitob og'ir bo'ladi"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] Kutubxonachi: «Men aytgan har bir gap yolg'on». Bu gapda qanday muammo bor?", "options": ["Bu o'z-o'zini inkor etuvchi paradoks", "Hech qanday muammo yo'q", "Bu oddiy haqiqat", "Bu matematik xato"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] Uch kitobxon: A B dan ko'p, B C dan ko'p o'qidi. Kim eng kam o'qidi?", "options": ["C", "A", "B", "Aniqlab bo'lmaydi"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] «Xamsa» 5 dostondan iborat. Har dostonni 4 kunda o'qisangiz, necha kun ketadi?", "options": ["20", "9", "25", "15"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] Muallif 1441-yilda tug'ilib, 60 yil yashagan bo'lsa, qaysi yilda vafot etgan?", "options": ["1501", "1499", "1521", "1481"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] «Faqat Premium a'zolar VIP arenada o'ynaydi. Anvar VIP arenada o'ynadi.» Xulosa?", "options": ["Anvar Premium a'zo", "Anvar Premium emas", "Anvar g'olib bo'lgan", "Xulosa chiqmaydi"], "correct": 0},
+  {"q": "[Fikr Tuzog'i] Kitob javonida har qatorda 12 ta kitob, 8 qator bor. 20 tasi olib qo'yildi. Nechta qoldi?", "options": ["76", "96", "80", "68"], "correct": 0},
+]

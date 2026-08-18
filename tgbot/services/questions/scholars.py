@@ -801,3 +801,25 @@ QUIZ_SCHOLARS_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: haqiqiy "Sharq allomalari" savollari ──────────────
+QUIZ_SCHOLARS_QUESTIONS += [
+  {"q": "[Sharq Allomalari] «Tib qonunlari» asari muallifi kim?", "options": ["Abu Ali ibn Sino", "Abu Rayhon Beruniy", "Al-Xorazmiy", "Imom Buxoriy"], "correct": 0},
+  {"q": "[Sharq Allomalari] «Algoritm» atamasi qaysi allomaning nomidan kelib chiqqan?", "options": ["Al-Xorazmiy", "Ibn Sino", "Farg'oniy", "Beruniy"], "correct": 0},
+  {"q": "[Sharq Allomalari] Mirzo Ulug'bek nima bilan jahonga tanilgan?", "options": ["Astronomiya va yulduzlar jadvali", "Tibbiyot", "Hadis ilmi", "Sayyohlik"], "correct": 0},
+  {"q": "[Sharq Allomalari] Imom Buxoriy qaysi soha allomasi?", "options": ["Hadis ilmi", "Astronomiya", "Matematika", "Tibbiyot"], "correct": 0},
+  {"q": "[Sharq Allomalari] Ahmad Farg'oniy qaysi fan bilan shug'ullangan?", "options": ["Astronomiya", "Fiqh", "Adabiyotshunoslik", "Tibbiyot"], "correct": 0},
+  {"q": "[Sharq Allomalari] Abu Rayhon Beruniyning «Hindiston» asari nima haqida?", "options": ["Hind xalqi tarixi, dini va fanlari", "Tibbiy retseptlar", "Hadislar sharhi", "Sevgi dostoni"], "correct": 0},
+  {"q": "[Sharq Allomalari] Bahouddin Naqshband qaysi ta'limot asoschisi?", "options": ["Naqshbandiya tariqati", "Yassaviya tariqati", "Kubroviya tariqati", "Qodiriya tariqati"], "correct": 0},
+  {"q": "[Sharq Allomalari] Ahmad Yassaviyning mashhur asari qaysi?", "options": ["Devoni hikmat", "Xamsa", "Boburnoma", "Qutadg'u bilig"], "correct": 0},
+  {"q": "[Sharq Allomalari] Imom G'azzoliyning «Ihyou ulumid-din» asari nima haqida?", "options": ["Din ilmlarini jonlantirish va qalb tarbiyasi", "Yulduzlar harakati", "Matematik hisoblar", "Sayohat kundaligi"], "correct": 0},
+  {"q": "[Sharq Allomalari] «Al-Hidoya» fiqhiy asarining muallifi kim?", "options": ["Burhoniddin Marg'inoniy", "Imom Buxoriy", "Al-Xorazmiy", "Ibn Sino"], "correct": 0},
+  {"q": "[Sharq Allomalari] Al-Xorazmiy qaysi fanga asos solgan?", "options": ["Algebra", "Geografiya", "Hadis", "Falsafa"], "correct": 0},
+  {"q": "[Sharq Allomalari] Ibn Sinoning «Kitob ash-shifo» asari qaysi sohaga oid?", "options": ["Falsafa va tabiiy fanlar qomusi", "Faqat she'riyat", "Faqat hadis", "Faqat tarix"], "correct": 0},
+  {"q": "[Sharq Allomalari] Abu Nasr Forobiy qanday sharafli nom bilan atalgan?", "options": ["«Muallimi soniy» (Ikkinchi muallim)", "«Shayx ur-rais»", "«Hujjatul-islom»", "«Sultonul-orifin»"], "correct": 0},
+  {"q": "[Sharq Allomalari] Ibn Sino qanday laqab bilan mashhur?", "options": ["Shayx ur-rais", "Muallimi soniy", "Hujjatul-islom", "Bobo Turk"], "correct": 0},
+  {"q": "[Sharq Allomalari] Ulug'bek rasadxonasi qaysi shaharda qurilgan?", "options": ["Samarqand", "Buxoro", "Xiva", "Toshkent"], "correct": 0},
+  {"q": "[Sharq Allomalari] «Qutadg'u bilig» asarining muallifi kim?", "options": ["Yusuf Xos Hojib", "Mahmud Koshg'ariy", "Navoiy", "Yassaviy"], "correct": 0},
+  {"q": "[Sharq Allomalari] Mahmud Koshg'ariyning «Devonu lug'otit turk» asari nima?", "options": ["Turkiy tillar lug'ati va qomusi", "Tibbiy qo'llanma", "Sevgi dostoni", "Hadis to'plami"], "correct": 0},
+  {"q": "[Sharq Allomalari] Imom Moturidiy qaysi soha allomasi?", "options": ["Aqida (kalom) ilmi", "Astronomiya", "Algebra", "Tibbiyot"], "correct": 0},
+]

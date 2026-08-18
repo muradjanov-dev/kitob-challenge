@@ -48,7 +48,7 @@ QUIZ_SOCRATES_QUESTIONS = [
         "correct": 0,
     },
     {
-        "q": "[Sokrat Suhbatlari] Sokrat nega o'zini Afinaning «Sўнаsi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
+        "q": "[Sokrat Suhbatlari] Sokrat nega o'zini Afinaning «So'nasi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
         "options": ["Mudrab yotgan jamiyatni savollar bilan uyg'otib turgani uchun", 'Tez yugurgani uchun', "Kichkina bo'lgani uchun", 'Odamlarni chaqqani uchun'],
         "correct": 0,
     },
@@ -98,7 +98,7 @@ QUIZ_SOCRATES_QUESTIONS = [
         "correct": 3,
     },
     {
-        "q": "💡 Chuqur Tafakkur #20: Sokrat nega o'zini Afinaning «Sўнаsi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
+        "q": "💡 Chuqur Tafakkur #20: Sokrat nega o'zini Afinaning «So'nasi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
         "options": ['Tez yugurgani uchun', "Kichkina bo'lgani uchun", 'Odamlarni chaqqani uchun', "Mudrab yotgan jamiyatni savollar bilan uyg'otib turgani uchun"],
         "correct": 3,
     },
@@ -148,7 +148,7 @@ QUIZ_SOCRATES_QUESTIONS = [
         "correct": 2,
     },
     {
-        "q": "💡 Chuqur Tafakkur #30: Sokrat nega o'zini Afinaning «Sўнаsi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
+        "q": "💡 Chuqur Tafakkur #30: Sokrat nega o'zini Afinaning «So'nasi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
         "options": ["Kichkina bo'lgani uchun", 'Odamlarni chaqqani uchun', "Mudrab yotgan jamiyatni savollar bilan uyg'otib turgani uchun", 'Tez yugurgani uchun'],
         "correct": 2,
     },
@@ -198,7 +198,7 @@ QUIZ_SOCRATES_QUESTIONS = [
         "correct": 1,
     },
     {
-        "q": "💡 Chuqur Tafakkur #40: Sokrat nega o'zini Afinaning «Sўнаsi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
+        "q": "💡 Chuqur Tafakkur #40: Sokrat nega o'zini Afinaning «So'nasi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
         "options": ['Odamlarni chaqqani uchun', "Mudrab yotgan jamiyatni savollar bilan uyg'otib turgani uchun", 'Tez yugurgani uchun', "Kichkina bo'lgani uchun"],
         "correct": 1,
     },
@@ -248,7 +248,7 @@ QUIZ_SOCRATES_QUESTIONS = [
         "correct": 0,
     },
     {
-        "q": "💡 Chuqur Tafakkur #50: Sokrat nega o'zini Afinaning «Sўнаsi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
+        "q": "💡 Chuqur Tafakkur #50: Sokrat nega o'zini Afinaning «So'nasi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
         "options": ["Mudrab yotgan jamiyatni savollar bilan uyg'otib turgani uchun", 'Tez yugurgani uchun', "Kichkina bo'lgani uchun", 'Odamlarni chaqqani uchun'],
         "correct": 0,
     },
@@ -298,7 +298,7 @@ QUIZ_SOCRATES_QUESTIONS = [
         "correct": 3,
     },
     {
-        "q": "💡 Chuqur Tafakkur #60: Sokrat nega o'zini Afinaning «Sўнаsi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
+        "q": "💡 Chuqur Tafakkur #60: Sokrat nega o'zini Afinaning «So'nasi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
         "options": ['Tez yugurgani uchun', "Kichkina bo'lgani uchun", 'Odamlarni chaqqani uchun', "Mudrab yotgan jamiyatni savollar bilan uyg'otib turgani uchun"],
         "correct": 3,
     },
@@ -348,7 +348,7 @@ QUIZ_SOCRATES_QUESTIONS = [
         "correct": 2,
     },
     {
-        "q": "💡 Chuqur Tafakkur #70: Sokrat nega o'zini Afinaning «Sўнаsi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
+        "q": "💡 Chuqur Tafakkur #70: Sokrat nega o'zini Afinaning «So'nasi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
         "options": ["Kichkina bo'lgani uchun", 'Odamlarni chaqqani uchun', "Mudrab yotgan jamiyatni savollar bilan uyg'otib turgani uchun", 'Tez yugurgani uchun'],
         "correct": 2,
     },
@@ -398,7 +398,7 @@ QUIZ_SOCRATES_QUESTIONS = [
         "correct": 1,
     },
     {
-        "q": "💡 Chuqur Tafakkur #80: Sokrat nega o'zini Afinaning «Sўнаsi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
+        "q": "💡 Chuqur Tafakkur #80: Sokrat nega o'zini Afinaning «So'nasi» (Gadfly — bezovta qiluvchi pashshasi) deb atagan?",
         "options": ['Odamlarni chaqqani uchun', "Mudrab yotgan jamiyatni savollar bilan uyg'otib turgani uchun", 'Tez yugurgani uchun', "Kichkina bo'lgani uchun"],
         "correct": 1,
     },
