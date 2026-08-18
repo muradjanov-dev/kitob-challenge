@@ -801,3 +801,22 @@ QUIZ_REGIONS_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: viloyatlar va adabiy geografiya ──────────────────
+QUIZ_REGIONS_QUESTIONS += [
+  {"q": "[Viloyatlar] Alisher Navoiy qaysi shaharda tug'ilgan?", "options": ["Hirot", "Samarqand", "Buxoro", "Toshkent"], "correct": 0},
+  {"q": "[Viloyatlar] Zahiriddin Bobur qaysi viloyatda tug'ilgan?", "options": ["Farg'ona (Andijon)", "Xorazm", "Qashqadaryo", "Surxondaryo"], "correct": 0},
+  {"q": "[Viloyatlar] Imom Buxoriy nomi qaysi shahar bilan bog'liq?", "options": ["Buxoro", "Samarqand", "Xiva", "Termiz"], "correct": 0},
+  {"q": "[Viloyatlar] Al-Xorazmiy nomi qaysi o'lka bilan bog'liq?", "options": ["Xorazm", "Farg'ona", "Kashkadaryo", "Zarafshon"], "correct": 0},
+  {"q": "[Viloyatlar] Ahmad Yassaviy maqbarasi qaysi shaharda?", "options": ["Turkiston", "Samarqand", "Buxoro", "Xiva"], "correct": 0},
+  {"q": "[Viloyatlar] «O'tkan kunlar» voqealari asosan qaysi shaharlarda kechadi?", "options": ["Toshkent va Marg'ilon", "Xiva va Nukus", "Termiz va Denov", "Navoiy va Zarafshon"], "correct": 0},
+  {"q": "[Viloyatlar] Bahouddin Naqshband qaysi shahar yaqinida yashagan?", "options": ["Buxoro", "Andijon", "Namangan", "Jizzax"], "correct": 0},
+  {"q": "[Viloyatlar] Ulug'bek rasadxonasi qaysi viloyatda joylashgan?", "options": ["Samarqand", "Toshkent", "Buxoro", "Xorazm"], "correct": 0},
+  {"q": "[Viloyatlar] At-Termiziy nomi qaysi shahar bilan bog'liq?", "options": ["Termiz", "Toshkent", "Qo'qon", "Shahrisabz"], "correct": 0},
+  {"q": "[Viloyatlar] Amir Temur qaysi shaharda tug'ilgan?", "options": ["Shahrisabz (Kesh)", "Samarqand", "Buxoro", "Toshkent"], "correct": 0},
+  {"q": "[Viloyatlar] Ahmad Farg'oniy nomi qaysi vodiy bilan bog'liq?", "options": ["Farg'ona vodiysi", "Zarafshon vodiysi", "Chirchiq vodiysi", "Surxon vodiysi"], "correct": 0},
+  {"q": "[Viloyatlar] Xiva shahri qaysi tarixiy o'lkaning markazi bo'lgan?", "options": ["Xorazm", "Sug'd", "Baqtriya", "Farg'ona"], "correct": 0},
+  {"q": "[Viloyatlar] Burhoniddin Marg'inoniy nomi qaysi shahar bilan bog'liq?", "options": ["Marg'ilon", "Qo'qon", "Andijon", "Namangan"], "correct": 0},
+  {"q": "[Viloyatlar] «Mehrobdan chayon» voqealari qaysi xonlikda kechadi?", "options": ["Qo'qon xonligi", "Buxoro amirligi", "Xiva xonligi", "Toshkent bekligi"], "correct": 0},
+  {"q": "[Viloyatlar] Abu Rayhon Beruniy qaysi o'lkadan chiqqan?", "options": ["Xorazm", "Farg'ona", "Sug'd", "Xuroson"], "correct": 0},
+]

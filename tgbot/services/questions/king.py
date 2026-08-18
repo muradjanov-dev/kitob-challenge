@@ -801,3 +801,22 @@ QUIZ_KING_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: Qirol Taxti — hukmdorlar va saroy adabiyoti ──────
+QUIZ_KING_QUESTIONS += [
+  {"q": "[Qirol Taxti] Alisher Navoiy qaysi hukmdor saroyida faoliyat yuritgan?", "options": ["Husayn Boyqaro", "Amir Temur", "Ulug'bek", "Bobur"], "correct": 0},
+  {"q": "[Qirol Taxti] «Temur tuzuklari» kim haqida va kim nomidan?", "options": ["Amir Temur — davlat boshqaruvi qoidalari", "Bobur — sayohat kundaligi", "Ulug'bek — astronomiya", "Navoiy — she'riyat"], "correct": 0},
+  {"q": "[Qirol Taxti] Bobur qaysi davlatga asos solgan?", "options": ["Boburiylar (Mo'g'ullar) saltanati Hindistonda", "Usmonlilar davlati", "Safaviylar davlati", "Shayboniylar davlati"], "correct": 0},
+  {"q": "[Qirol Taxti] Mirzo Ulug'bek kimning nabirasi?", "options": ["Amir Temurning", "Boburning", "Shayboniyxonning", "Jaloliddinning"], "correct": 0},
+  {"q": "[Qirol Taxti] «Mehrobdan chayon»da qaysi hukmdor saroyi tasvirlangan?", "options": ["Xudoyorxon saroyi", "Amir Temur saroyi", "Bobur saroyi", "Ulug'bek saroyi"], "correct": 0},
+  {"q": "[Qirol Taxti] Navoiy Husayn Boyqaro saroyida qanday lavozimda bo'lgan?", "options": ["Vazir (muhrdor)", "Sarkarda", "Tabib", "Munajjim"], "correct": 0},
+  {"q": "[Qirol Taxti] Jaloliddin Manguberdi nima bilan tarixda qolgan?", "options": ["Mo'g'ul bosqiniga qarshi mardona kurash", "Rasadxona qurish", "Doston yozish", "Lug'at tuzish"], "correct": 0},
+  {"q": "[Qirol Taxti] «Qutadg'u bilig» asari kimga bag'ishlangan va nima haqida?", "options": ["Hukmdorlarga — adolatli boshqaruv haqida", "Tabiblarga — davolash haqida", "Shoirlarga — vazn haqida", "Savdogarlarga — savdo haqida"], "correct": 0},
+  {"q": "[Qirol Taxti] Husayn Boyqaro davri nimasi bilan mashhur?", "options": ["Ilm-fan va adabiyot gullab-yashnagani bilan", "Uzluksiz urushlar bilan", "Ocharchilik bilan", "Savdo taqiqi bilan"], "correct": 0},
+  {"q": "[Qirol Taxti] Bobur o'z asarida o'zini qanday tasvirlaydi?", "options": ["Kamchiliklarini ham yashirmay, samimiy", "Faqat g'alabalarini maqtab", "Boshqa nom ostida", "Umuman tilga olmaydi"], "correct": 0},
+  {"q": "[Qirol Taxti] Ulug'bek nima uchun «taxtdagi olim» deb ataladi?", "options": ["Hukmdor bo'la turib fan bilan jiddiy shug'ullangani uchun", "Faqat urush olib borgani uchun", "Saroyni bezatgani uchun", "Ko'p sayohat qilgani uchun"], "correct": 0},
+  {"q": "[Qirol Taxti] «Saddi Iskandariy» dostoni qaysi hukmdor haqida?", "options": ["Iskandar Zulqarnayn", "Amir Temur", "Xudoyorxon", "Husayn Boyqaro"], "correct": 0},
+  {"q": "[Qirol Taxti] Amir Temur poytaxti qaysi shahar edi?", "options": ["Samarqand", "Buxoro", "Toshkent", "Xiva"], "correct": 0},
+  {"q": "[Qirol Taxti] Navoiy hukmdorga nisbatan qanday fazilatni ulug'lagan?", "options": ["Adolat va xalqparvarlik", "Boylik to'plash", "Qattiqqo'llik", "Jangovarlik"], "correct": 0},
+  {"q": "[Qirol Taxti] Bobur she'riyatda qaysi tilda ham ijod qilgan?", "options": ["Turkiy va forsiy", "Faqat arabcha", "Faqat hindcha", "Faqat yunoncha"], "correct": 0},
+]

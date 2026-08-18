@@ -801,3 +801,22 @@ QUIZ_DUEL_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: 1v1 duel — tez va aniq bilim ─────────────────────
+QUIZ_DUEL_QUESTIONS += [
+  {"q": "[Duel] «O'tkan kunlar» romanining muallifi kim?", "options": ["Abdulla Qodiriy", "Cho'lpon", "Oybek", "G'afur G'ulom"], "correct": 0},
+  {"q": "[Duel] Navoiyning «Xamsa»si nechta dostondan iborat?", "options": ["5", "4", "6", "7"], "correct": 0},
+  {"q": "[Duel] «Boburnoma» qaysi tilda yozilgan?", "options": ["Eski o'zbek (chig'atoy) tilida", "Arab tilida", "Fors tilida", "Rus tilida"], "correct": 0},
+  {"q": "[Duel] Ulug'bek rasadxonasi qaysi shaharda?", "options": ["Samarqand", "Buxoro", "Xiva", "Termiz"], "correct": 0},
+  {"q": "[Duel] «Alpomish» qaysi el dostoni?", "options": ["Qo'ng'irot", "Qipchoq", "Nayman", "Mang'it"], "correct": 0},
+  {"q": "[Duel] «Tib qonunlari» kimniki?", "options": ["Ibn Sino", "Beruniy", "Xorazmiy", "Forobiy"], "correct": 0},
+  {"q": "[Duel] Bayt nechta misra?", "options": ["2", "3", "4", "1"], "correct": 0},
+  {"q": "[Duel] «Kecha va kunduz» muallifi kim?", "options": ["Cho'lpon", "Qodiriy", "Oybek", "Abdulla Qahhor"], "correct": 0},
+  {"q": "[Duel] Imom Buxoriy qaysi ilm sohasida mashhur?", "options": ["Hadis", "Astronomiya", "Algebra", "Tibbiyot"], "correct": 0},
+  {"q": "[Duel] «Shohnoma» muallifi kim?", "options": ["Firdavsiy", "Sa'diy", "Hofiz", "Rumiy"], "correct": 0},
+  {"q": "[Duel] Ruboiy nechta misra?", "options": ["4", "2", "6", "8"], "correct": 0},
+  {"q": "[Duel] Kumushbibi qaysi asar qahramoni?", "options": ["O'tkan kunlar", "Mehrobdan chayon", "Sarob", "Shum bola"], "correct": 0},
+  {"q": "[Duel] «Devonu lug'otit turk» muallifi kim?", "options": ["Mahmud Koshg'ariy", "Yusuf Xos Hojib", "Navoiy", "Yassaviy"], "correct": 0},
+  {"q": "[Duel] «Urush va tinchlik» kimniki?", "options": ["Lev Tolstoy", "Dostoyevskiy", "Chexov", "Gogol"], "correct": 0},
+  {"q": "[Duel] Alisher Navoiy qaysi asrda yashagan?", "options": ["XV asr", "XIII asr", "XVII asr", "XIX asr"], "correct": 0},
+]

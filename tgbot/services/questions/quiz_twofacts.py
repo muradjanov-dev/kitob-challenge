@@ -23,3 +23,22 @@ QUIZ_TWOFACTS_QUESTIONS = [
     {"q": "“Yulduzli tunlar” haqida qaysi gap YOLG'ON?", "options": ["Muallifi Pirimqul Qodirov", "Bosh qahramon Bobur Mirzo", "Asarda Amir Temurning bolaligi tasvirlangan"], "correct": 2},
     {"q": "“Ulug'bek xazinasi” haqida qaysi gap YOLG'ON?", "options": ["Muallifi Odil Yoqubov", "Mirzo Ulug'bek va uning ilmiy merosi haqida", "Asar kulgili komediya pyesasidir"], "correct": 2},
 ]
+
+# ── 2026-08 qo'shimcha: uchta gapdan yolg'onini top (3 variant) ──────────
+QUIZ_TWOFACTS_QUESTIONS += [
+  {"q": "«Boburnoma» haqida qaysi gap YOLG'ON?", "options": ["Muallifi Zahiriddin Muhammad Bobur", "Memuar janrida yozilgan", "Asar arab tilida yozilgan"], "correct": 2},
+  {"q": "Alisher Navoiy haqida qaysi gap YOLG'ON?", "options": ["«Xamsa» muallifi", "Husayn Boyqaro saroyida faoliyat yuritgan", "XX asrda yashagan"], "correct": 2},
+  {"q": "Ibn Sino haqida qaysi gap YOLG'ON?", "options": ["«Tib qonunlari» muallifi", "«Shayx ur-rais» laqabi bilan mashhur", "Ulug'bek rasadxonasini qurdirgan"], "correct": 2},
+  {"q": "«Alpomish» haqida qaysi gap YOLG'ON?", "options": ["O'zbek xalq dostoni", "Baxshilar tomonidan og'zaki ijro etilgan", "Muallifi Abdulla Qodiriy"], "correct": 2},
+  {"q": "Mirzo Ulug'bek haqida qaysi gap YOLG'ON?", "options": ["Amir Temurning nabirasi", "Yulduzlar jadvalini tuzgan", "«O'tkan kunlar» romanini yozgan"], "correct": 2},
+  {"q": "Imom Buxoriy haqida qaysi gap YOLG'ON?", "options": ["Hadis ilmi allomasi", "«Sahih al-Buxoriy» to'plami muallifi", "Algebra faniga asos solgan"], "correct": 2},
+  {"q": "«Kecha va kunduz» haqida qaysi gap YOLG'ON?", "options": ["Muallifi Cho'lpon", "Bosh qahramoni Zebi", "She'riy doston shaklida yozilgan"], "correct": 2},
+  {"q": "Al-Xorazmiy haqida qaysi gap YOLG'ON?", "options": ["«Algoritm» atamasi uning nomidan olingan", "Algebra faniga asos solgan", "Tasavvuf tariqatiga asos solgan"], "correct": 2},
+  {"q": "«Mantiq ut-tayr» haqida qaysi gap YOLG'ON?", "options": ["Ramziy-tasavvufiy doston", "Qushlar yetti vodiydan o'tadi", "Voqealar Hindistonda kechadi"], "correct": 2},
+  {"q": "Abdulla Qodiriy haqida qaysi gap YOLG'ON?", "options": ["«O'tkan kunlar» muallifi", "«Mehrobdan chayon» muallifi", "«Shohnoma» muallifi"], "correct": 2},
+  {"q": "Ahmad Yassaviy haqida qaysi gap YOLG'ON?", "options": ["«Devoni hikmat» muallifi", "Tasavvuf allomasi", "Ulug'bek davrida yashagan"], "correct": 2},
+  {"q": "«Farhod va Shirin» haqida qaysi gap YOLG'ON?", "options": ["Navoiy «Xamsa»siga kiradi", "Farhod tog'ni teshadi", "Asar baxtli yakun topadi"], "correct": 2},
+  {"q": "Beruniy haqida qaysi gap YOLG'ON?", "options": ["«Hindiston» asarini yozgan", "Yer aylanasini hisoblagan", "«Xamsa» dostonlarini yozgan"], "correct": 2},
+  {"q": "«Qutadg'u bilig» haqida qaysi gap YOLG'ON?", "options": ["Muallifi Yusuf Xos Hojib", "Adolatli boshqaruv haqida", "XX asrda yozilgan"], "correct": 2},
+  {"q": "«Chol va dengiz» haqida qaysi gap YOLG'ON?", "options": ["Muallifi Ernest Xeminguey", "Qahramoni Santyago", "Chol butun baliqni uyiga olib keladi"], "correct": 2},
+]

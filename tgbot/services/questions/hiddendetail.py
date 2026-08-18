@@ -801,3 +801,22 @@ QUIZ_HIDDENDETAIL_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: asardagi yashirin detal ──────────────────────────
+QUIZ_HIDDENDETAIL_QUESTIONS += [
+  {"q": "[Yashirin Detal] «O'tkan kunlar»da fojiaga sabab bo'lgan buyum nima?", "options": ["Soxta xat", "Uzuk", "Xanjar", "Kitob"], "correct": 0},
+  {"q": "[Yashirin Detal] «Mantiq ut-tayr»da yo'lboshchi qush qaysi?", "options": ["Hudhud", "Tovus", "Bulbul", "Qarchig'ay"], "correct": 0},
+  {"q": "[Yashirin Detal] «Chol va dengiz»da Santyago nima ushlaydi?", "options": ["Marlin (qilichbaliq)", "Akula", "Kit", "Skat"], "correct": 0},
+  {"q": "[Yashirin Detal] «Kichkina shahzoda»da qahramon eng qadrlagan narsa nima?", "options": ["Atirguli", "Toji", "Qilichi", "Kitobi"], "correct": 0},
+  {"q": "[Yashirin Detal] «Alpomish»da qahramonning kamoni nima bilan ajralib turadi?", "options": ["Uni faqat Alpomish torta olishi bilan", "Oltindan yasalgani bilan", "Sehrli bo'lgani bilan", "Ikki qismdan iboratligi bilan"], "correct": 0},
+  {"q": "[Yashirin Detal] «Boburnoma»da muallif nimalarni ham batafsil yozadi?", "options": ["O'simlik, hayvonot va tabiat tasvirini", "Faqat janglarni", "Faqat she'rlarni", "Faqat oila ishlarini"], "correct": 0},
+  {"q": "[Yashirin Detal] «Farhod va Shirin»da Farhodni halok qilgan narsa nima?", "options": ["Shirin o'ldi degan yolg'on xabar", "Tog' qulashi", "Jang", "Kasallik"], "correct": 0},
+  {"q": "[Yashirin Detal] «Robinzon Kruzo»da qahramonga hamroh bo'lgan kishi kim?", "options": ["Juma (Friday)", "Santyago", "Gulliver", "Toma"], "correct": 0},
+  {"q": "[Yashirin Detal] «Jinoyat va jazo»da Raskolnikovni iqrorga undagan ayol kim?", "options": ["Sonya", "Dunya", "Katerina", "Anna"], "correct": 0},
+  {"q": "[Yashirin Detal] «Evrilish»da Gregorning kasbi nima edi?", "options": ["Sayyor savdo agenti", "O'qituvchi", "Shifokor", "Yozuvchi"], "correct": 0},
+  {"q": "[Yashirin Detal] «Mehrobdan chayon»da Anvarning mahorati nimada?", "options": ["Chiroyli xat yozishda (xattotlik)", "Qilichbozlikda", "Savdoda", "Tabiblikda"], "correct": 0},
+  {"q": "[Yashirin Detal] Navoiy «Xamsa»sining oxirgi dostoni qaysi?", "options": ["Saddi Iskandariy", "Hayrat ul-abror", "Layli va Majnun", "Farhod va Shirin"], "correct": 0},
+  {"q": "[Yashirin Detal] «Devoni hikmat» qaysi she'riy shaklda yozilgan?", "options": ["Hikmat — to'rtlik shaklidagi didaktik she'rlar", "Faqat g'azal", "Faqat qasida", "Nasrda"], "correct": 0},
+  {"q": "[Yashirin Detal] «Hamlet»da qahramon haqiqatni qanday sinab ko'radi?", "options": ["Saroyda maxsus spektakl qo'ydirib", "Qilich jangi orqali", "Xat yozib", "Safarga chiqib"], "correct": 0},
+  {"q": "[Yashirin Detal] «Qutadg'u bilig»da qahramonlar nimani ifodalaydi?", "options": ["Adolat, baxt, aql va qanoat kabi tushunchalarni", "Tarixiy shaxslarni", "Hayvonlarni", "Shaharlarni"], "correct": 0},
+]

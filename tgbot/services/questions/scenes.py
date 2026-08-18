@@ -801,3 +801,22 @@ QUIZ_SCENES_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: sahna ko'rinishidan asarni topish ────────────────
+QUIZ_SCENES_QUESTIONS += [
+  {"q": "[Sahna] Yigit tog'ni teshib, sevgilisi uchun suv yo'li ochmoqda. Qaysi asar?", "options": ["Farhod va Shirin", "Layli va Majnun", "O'tkan kunlar", "Alpomish"], "correct": 0},
+  {"q": "[Sahna] Chol ochiq dengizda ulkan baliq bilan uch kun olishmoqda. Qaysi asar?", "options": ["Chol va dengiz", "Robinzon Kruzo", "Odisseya", "Oq kema"], "correct": 0},
+  {"q": "[Sahna] Yigit uyg'onib, o'zini ulkan hasharotga aylangan holda ko'radi. Qaysi asar?", "options": ["Evrilish", "Jinoyat va jazo", "Faust", "Hamlet"], "correct": 0},
+  {"q": "[Sahna] Ritsar shamol tegirmonlariga nayza bilan hujum qilmoqda. Qaysi asar?", "options": ["Don Kixot", "Uch mushketyor", "Robinzon Kruzo", "Ilohiy komediya"], "correct": 0},
+  {"q": "[Sahna] Qushlar guruhi yetti vodiydan o'tib, Simurg'ni izlab uchmoqda. Qaysi asar?", "options": ["Mantiq ut-tayr", "Xamsa", "Masnaviy", "Guliston"], "correct": 0},
+  {"q": "[Sahna] Marg'ilonda savdogar uyida yigit qizni birinchi bor ko'rib qoladi. Qaysi asar?", "options": ["O'tkan kunlar", "Mehrobdan chayon", "Kecha va kunduz", "Sarob"], "correct": 0},
+  {"q": "[Sahna] Xattot yigit xon saroyida majburan xizmatga olinadi. Qaysi asar?", "options": ["Mehrobdan chayon", "O'tkan kunlar", "Shum bola", "Alpomish"], "correct": 0},
+  {"q": "[Sahna] Botir yetti yillik asirlikdan qaytib, to'yni to'xtatadi. Qaysi asar?", "options": ["Alpomish", "Go'ro'g'li", "Farhod va Shirin", "Kuntug'mish"], "correct": 0},
+  {"q": "[Sahna] Yolg'iz odam orolda o'z qo'li bilan uy va qayiq yasamoqda. Qaysi asar?", "options": ["Robinzon Kruzo", "Chol va dengiz", "Odisseya", "Kichkina shahzoda"], "correct": 0},
+  {"q": "[Sahna] Shahzoda otasining ruhi bilan tunda uchrashadi. Qaysi asar?", "options": ["Hamlet", "Otello", "Makbet", "Qirol Lir"], "correct": 0},
+  {"q": "[Sahna] Bola kichik sayyorada yolg'iz atirguliga suv quymoqda. Qaysi asar?", "options": ["Kichkina shahzoda", "Oq kema", "Shum bola", "Robinzon Kruzo"], "correct": 0},
+  {"q": "[Sahna] Talaba garovxona kampirini o'ldirgach, vijdon azobida qiynaladi. Qaysi asar?", "options": ["Jinoyat va jazo", "Urush va tinchlik", "Anna Karenina", "Evrilish"], "correct": 0},
+  {"q": "[Sahna] Oshiq yigit cho'lda yolg'iz kezib, sevgilisi nomini takrorlaydi. Qaysi asar?", "options": ["Layli va Majnun", "Farhod va Shirin", "O'tkan kunlar", "Guliston"], "correct": 0},
+  {"q": "[Sahna] Shumtaka o'smir bozorda topqirlik bilan tirikchilik qilmoqda. Qaysi asar?", "options": ["Shum bola", "Mehrobdan chayon", "Alpomish", "Oq kema"], "correct": 0},
+  {"q": "[Sahna] Hukmdor o'z kundaligiga yurishlari va tabiat tasvirini yozmoqda. Qaysi asar?", "options": ["Boburnoma", "Temur tuzuklari", "Xamsa", "Devoni hikmat"], "correct": 0},
+]

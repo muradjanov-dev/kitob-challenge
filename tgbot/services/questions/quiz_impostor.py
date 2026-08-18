@@ -18,3 +18,22 @@ QUIZ_IMPOSTOR_QUESTIONS = [
     {"q": "Qaysi biri Odil Yoqubov asari EMAS?", "options": ["Ulug'bek xazinasi", "Diyonat", "Ko'hna dunyo", "Yulduzli tunlar"], "correct": 3},
     {"q": "Qaysi biri Pirimqul Qodirov asari EMAS?", "options": ["Yulduzli tunlar", "Avlodlar dovoni", "Uch ildiz", "Jimjitlik"], "correct": 3},
 ]
+
+# ── 2026-08 qo'shimcha: soxtasini top ────────────────────────────────────
+QUIZ_IMPOSTOR_QUESTIONS += [
+  {"q": "Qaysi biri Alisher Navoiy asari EMAS?", "options": ["Xamsa", "Lison ut-tayr", "Mahbub ul-qulub", "Boburnoma"], "correct": 3},
+  {"q": "Qaysi biri Cho'lpon qalamiga mansub EMAS?", "options": ["Kecha va kunduz", "Buloqlar", "Uyg'onish", "Shum bola"], "correct": 3},
+  {"q": "Qaysi biri Ibn Sino asari EMAS?", "options": ["Tib qonunlari", "Kitob ash-shifo", "Donishnoma", "Devonu lug'otit turk"], "correct": 3},
+  {"q": "Qaysi biri xalq dostoni EMAS?", "options": ["Alpomish", "Go'ro'g'li", "Kuntug'mish", "Sarob"], "correct": 3},
+  {"q": "Qaysi biri Bobur asari EMAS?", "options": ["Boburnoma", "Mubayyin", "Aruz risolasi", "Xamsa"], "correct": 3},
+  {"q": "Qaysi shaxs astronom EMAS?", "options": ["Mirzo Ulug'bek", "Ahmad Farg'oniy", "Abu Rayhon Beruniy", "Imom Buxoriy"], "correct": 3},
+  {"q": "Qaysi biri tasavvuf allomasi EMAS?", "options": ["Bahouddin Naqshband", "Ahmad Yassaviy", "Najmiddin Kubro", "Al-Xorazmiy"], "correct": 3},
+  {"q": "Qaysi biri rus adabiyoti vakili EMAS?", "options": ["Lev Tolstoy", "Fyodor Dostoyevskiy", "Anton Chexov", "Viktor Gyugo"], "correct": 3},
+  {"q": "Qaysi biri «O'tkan kunlar» qahramoni EMAS?", "options": ["Otabek", "Kumushbibi", "Homid", "Ra'no"], "correct": 3},
+  {"q": "Qaysi biri she'riy janr EMAS?", "options": ["G'azal", "Ruboiy", "Muxammas", "Roman"], "correct": 3},
+  {"q": "Qaysi biri jadid namoyandasi EMAS?", "options": ["Mahmudxo'ja Behbudiy", "Abdurauf Fitrat", "Abdulla Avloniy", "Alisher Navoiy"], "correct": 3},
+  {"q": "Qaysi biri hadis to'plami EMAS?", "options": ["Sahih al-Buxoriy", "Sunani Termiziy", "Sunani Abu Dovud", "Qutadg'u bilig"], "correct": 3},
+  {"q": "Qaysi biri fors-tojik adabiyoti vakili EMAS?", "options": ["Firdavsiy", "Sa'diy Sheroziy", "Hofiz Sheroziy", "Mahmud Koshg'ariy"], "correct": 3},
+  {"q": "Qaysi biri Navoiy «Xamsa»siga kirmaydi?", "options": ["Hayrat ul-abror", "Farhod va Shirin", "Sab'ai sayyor", "Mantiq ut-tayr"], "correct": 3},
+  {"q": "Qaysi biri O'tkir Hoshimov asari EMAS?", "options": ["Ikki eshik orasi", "Dunyoning ishlari", "Tushda kechgan umrlar", "Mehrobdan chayon"], "correct": 3},
+]
