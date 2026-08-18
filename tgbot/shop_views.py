@@ -255,6 +255,15 @@ def api_bid(request: HttpRequest) -> JsonResponse:
                     "min_required": min_start,
                 }, status=400)
 
+            # Taklif qabul qilinishidan OLDINGI yetakchi: yangi taklif uni
+            # 1-o'rindan surib chiqarsa, pastda unga xabar yuboriladi.
+            prev_leader_bid = (
+                ShopAuctionBid.objects.filter(product=product)
+                .select_related("user")
+                .order_by("-amount", "created_at")
+                .first()
+            )
+
             # Get user's current existing bid if any
             existing_bid = ShopAuctionBid.objects.select_for_update().filter(
                 product=product, user=user
@@ -297,8 +306,20 @@ def api_bid(request: HttpRequest) -> JsonResponse:
                 )
 
             new_balance = int(user.ball or 0)
+
+            # Yangi taklif yetakchilikni tortib oldimi? Faqat shu holatda va
+            # faqat boshqa odam surib chiqarilganda xabar yuboriladi.
+            outbid_target = None
+            if (prev_leader_bid
+                    and prev_leader_bid.user_id != user.id
+                    and bid_amount > prev_leader_bid.amount):
+                outbid_target = (prev_leader_bid.user, prev_leader_bid.amount)
     except TelegramProfile.DoesNotExist:
         return JsonResponse({"ok": False, "error": "profile_missing"}, status=403)
+
+    # Tranzaksiyadan TASHQARIDA: tarmoq chaqiruvi qulflarni ushlab turmasin.
+    if outbid_target:
+        _notify_outbid(product, outbid_target[0], outbid_target[1], bid_amount)
 
     return JsonResponse({
         "ok": True,
@@ -306,6 +327,49 @@ def api_bid(request: HttpRequest) -> JsonResponse:
         "my_bid": bid_amount,
         "message": "Stavkangiz muvaffaqiyatli qabul qilindi!",
     })
+
+
+def _notify_outbid(product, loser, loser_amount: int, new_amount: int) -> None:
+    """1-o'rinni boy bergan ishtirokchiga darhol xabar + auksionga tugma.
+
+    Eng muhim payt shu: odam yutayotganini bilib turib, sezdirmasdan ortda
+    qolsa, auksionga qaytmaydi. Shuning uchun xabar aynan yetakchilik
+    qo'ldan ketgan lahzada boradi.
+
+    Best-effort: xato bo'lsa yutiladi -- taklif allaqachon qabul qilingan,
+    xabar yuborilmagani uchun so'rov muvaffaqiyatsiz bo'lmasligi kerak.
+    """
+    try:
+        from src.settings import WEB_DOMAIN
+    except Exception:
+        WEB_DOMAIN = ""
+
+    text = (
+        "\u26A0\uFE0F <b>Kitob qo'lingizdan chiqyapti!</b>\n\n"
+        f"\U0001F4DA <b>{_html.escape(product.name)}</b> auksionida sizdan "
+        "ko'proq taklif qilishdi.\n\n"
+        f"\U0001FA99 Sizning taklifingiz: <b>{loser_amount}</b> Kitobcha\n"
+        f"\U0001F525 Hozirgi eng yuqori: <b>{new_amount}</b> Kitobcha\n\n"
+        "<i>Agar yutmasangiz, Kitobchalaringiz to'liq qaytariladi. "
+        "Ammo kitob boshqaga ketadi \u2014 taklifingizni oshirasizmi?</i>"
+    )
+    keyboard = {"inline_keyboard": [[{
+        "text": "\U0001F525 Taklifni oshirish",
+        "web_app": {"url": f"{WEB_DOMAIN}/shop/"},
+    }]]}
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{settings.API_TOKEN}/sendMessage",
+            data={
+                "chat_id": loser.telegram_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "reply_markup": json.dumps(keyboard),
+            },
+            timeout=8,
+        )
+    except Exception as e:
+        print(f"_notify_outbid({loser.telegram_id}): {e}")
 
 
 
