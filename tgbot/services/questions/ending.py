@@ -801,3 +801,21 @@ QUIZ_ENDING_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: asar yakuni ──────────────────────────────────────
+QUIZ_ENDING_QUESTIONS += [
+  {"q": "[Asar Yakuni] «O'tkan kunlar» romani qanday yakunlanadi?", "options": ["Kumushning fojiali o'limi bilan", "Otabek va Kumushning baxtli hayoti bilan", "Homidning tavba qilishi bilan", "Otabekning safarga ketishi bilan"], "correct": 0},
+  {"q": "[Asar Yakuni] «Alpomish» dostoni qanday tugaydi?", "options": ["Alpomish qaytib, elini dushmandan xalos etadi", "Alpomish asirlikda qoladi", "Barchin boshqaga turmushga chiqadi", "Qahramon halok bo'ladi"], "correct": 0},
+  {"q": "[Asar Yakuni] «Layli va Majnun» qanday yakun topadi?", "options": ["Ikki oshiq visolga yetmay, fojiali o'lim bilan", "To'y bilan baxtli yakun", "Majnun boshqaga uylanadi", "Layli shohga turmushga chiqib baxtli bo'ladi"], "correct": 0},
+  {"q": "[Asar Yakuni] «Farhod va Shirin»da Farhodning taqdiri qanday?", "options": ["Yolg'on xabar sababli halok bo'ladi", "Shiringa uylanib baxtli yashaydi", "Taxtga o'tiradi", "Vatanига qaytib ketadi"], "correct": 0},
+  {"q": "[Asar Yakuni] «Chol va dengiz»da Santyago nima bilan qaytadi?", "options": ["Baliqning faqat skeleti bilan", "Butun baliq bilan", "Quruq qo'l bilan", "Yangi qayiq bilan"], "correct": 0},
+  {"q": "[Asar Yakuni] «Jinoyat va jazo» qanday yakunlanadi?", "options": ["Raskolnikov iqror bo'lib, tavba yo'liga kiradi", "U jazodan qutulib ketadi", "U yana jinoyat qiladi", "U boy bo'lib ketadi"], "correct": 0},
+  {"q": "[Asar Yakuni] «Evrilish» qissasi qanday tugaydi?", "options": ["Gregor vafot etadi, oila yengil nafas oladi", "Gregor odam holiga qaytadi", "Oila Gregorni davolaydi", "Gregor uydan ketib boy bo'ladi"], "correct": 0},
+  {"q": "[Asar Yakuni] «Robinzon Kruzo» qanday yakunlanadi?", "options": ["Robinzon oroldan qutqarilib vataniga qaytadi", "U orolda vafot etadi", "U orolda abadiy qoladi", "Uni qaroqchilar asir oladi"], "correct": 0},
+  {"q": "[Asar Yakuni] «Hamlet» tragediyasi qanday tugaydi?", "options": ["Deyarli barcha asosiy qahramonlar halok bo'ladi", "Hamlet taxtga o'tiradi", "Hamlet uylanadi", "Hamlet mamlakatni tark etadi"], "correct": 0},
+  {"q": "[Asar Yakuni] «Mehrobdan chayon»da Anvar va Ra'no taqdiri qanday?", "options": ["Saroy zulmidan qochib, xalos bo'lishadi", "Ikkalasi ham halok bo'ladi", "Anvar saroyda qoladi", "Ra'no xonga xotin bo'ladi"], "correct": 0},
+  {"q": "[Asar Yakuni] «Kecha va kunduz»da Zebi qanday taqdirga uchraydi?", "options": ["Nohaq ayblanib, fojiali holga tushadi", "Baxtli oila quradi", "Boy bo'lib ketadi", "Chet elga ketadi"], "correct": 0},
+  {"q": "[Asar Yakuni] «Kichkina shahzoda» qanday yakunlanadi?", "options": ["Shahzoda o'z sayyorasiga, atirguliga qaytadi", "U Yerda qoladi", "U uchuvchi bilan ketadi", "U yangi sayyora topadi"], "correct": 0},
+  {"q": "[Asar Yakuni] «Mantiq ut-tayr»da qushlar Simurg'ni topgach nimani anglaydi?", "options": ["Simurg' — ularning o'zi ekanini", "Simurg' boshqa yurtda ekanini", "Simurg' yo'q ekanini", "Simurg' ularni rad etganini"], "correct": 0},
+  {"q": "[Asar Yakuni] «Don Kixot» qanday yakun topadi?", "options": ["Aql-hushiga qaytib, ritsarlik xayolidan voz kechadi", "U haqiqiy ritsar bo'ladi", "U devlarni yengadi", "U shoh bo'ladi"], "correct": 0},
+]

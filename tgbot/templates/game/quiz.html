@@ -111,6 +111,40 @@
     .tinder-card.dragging { transition: none; cursor: grabbing; }
     .swipe-controls { display: flex; gap: 15px; justify-content: center; margin-bottom: 10px; }
     .swipe-controls button { flex: 1; padding: 18px; border-radius: 18px; font-size: 18px; font-weight: 900; border: none; cursor: pointer; color: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+
+    /* ── QO'L HARAKATI MEXANIKALARI ─────────────────────────────────────
+       Barmoq bilan o'ynaladigan 3 ta qo'shimcha usul: tortib tashlash,
+       surgich va tirnab ochish. Uchalasi ham oxirida oddiy javob indeksini
+       yuboradi, shuning uchun backend o'zgarmaydi. */
+    .drop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .drop-slot { background: var(--card2); border: 2px dashed var(--line); border-radius: 16px; padding: 16px 10px;
+                 min-height: 74px; display: flex; align-items: center; justify-content: center; text-align: center;
+                 font-weight: 700; font-size: 14px; transition: all .15s; }
+    .drop-slot.hot { border-color: var(--accent); background: var(--accent); color: #fff; transform: scale(1.05); }
+    .drag-token { width: 76px; height: 76px; border-radius: 50%; margin: 0 auto;
+                  background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff;
+                  display: flex; align-items: center; justify-content: center; font-size: 32px;
+                  box-shadow: 0 8px 22px rgba(0,0,0,.35); touch-action: none; cursor: grab; position: relative; z-index: 5; }
+    .drag-token.grabbing { cursor: grabbing; transition: none; }
+    .drag-hint { text-align: center; color: var(--muted); font-size: 13px; font-weight: 700; margin: 10px 0; }
+
+    .slider-wrap { padding: 6px 4px 0; }
+    .slider-track { position: relative; height: 12px; border-radius: 8px; background: var(--card2);
+                    border: 1px solid var(--line); margin: 46px 12px 12px; touch-action: none; }
+    .slider-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 8px;
+                   background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+    .slider-knob { position: absolute; top: 50%; width: 42px; height: 42px; margin-left: -21px; border-radius: 50%;
+                   background: var(--accent); border: 3px solid #fff; box-shadow: 0 4px 14px rgba(0,0,0,.4);
+                   transform: translateY(-50%); touch-action: none; }
+    .slider-stops { display: flex; justify-content: space-between; margin: 0 12px 14px; }
+    .slider-stops span { flex: 1; text-align: center; font-size: 11px; color: var(--muted); font-weight: 700; }
+    .slider-value { text-align: center; font-size: 17px; font-weight: 900; color: var(--accent); min-height: 26px; margin-bottom: 10px; }
+
+    .scratch-wrap { position: relative; border-radius: 18px; overflow: hidden; margin-bottom: 12px; }
+    .scratch-canvas { display: block; width: 100%; touch-action: none; }
+    .scratch-under { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+                     padding: 18px; text-align: center; font-weight: 800; font-size: 16px;
+                     background: var(--card2); color: var(--text); z-index: -1; }
     #btnNo { background: var(--bad); }
     #btnYes { background: var(--ok); }
 
@@ -241,6 +275,20 @@
       arcade: ['auction', 'buzzer', 'bracket', 'king', 'mysterybox', 'numbers', 'ending', 'rhyme', 'audioquote'],
       classic: ['worldlit', 'genres', 'scholars', 'character', 'dialogue', 'plotmap', 'scenes', 'regions']
     };
+    // ── Qo'l bilan o'ynaladigan 25 ta o'yin ────────────────────────────
+    // Oddiy tugma bosish o'rniga barmoq harakati. Har biri baribir javob
+    // indeksini yuboradi, shuning uchun backend va ball hisobi o'zgarmaydi.
+    var inputModes = {
+      swipe:   ['impostor','twofacts','oddone','matchbook','duel','dialogue','character','scholars','worldlit','genres'],
+      drag:    ['king','buzzer','bracket','auction','regions','mysterybox','ending','plotmap'],
+      slider:  ['timeline','numbers','sequence','rhyme'],
+      scratch: ['pixel','mosaic','hiddendetail']
+    };
+    var INPUT_MODE = '';
+    for (var im in inputModes) {
+      if (inputModes[im].indexOf(FLAVOR) !== -1) { INPUT_MODE = im; break; }
+    }
+
     var activeTheme = 'default';
     for (var t in themeGroups) {
       if (themeGroups[t].indexOf(FLAVOR) !== -1) {
@@ -290,6 +338,170 @@
         h+='<div class="lb"><div class="rank">'+mark+'</div><div class="lb-name">'+esc(r.answer)+t+'</div></div>';
       });
       return h+'<div class="muted" style="font-size:11px;margin-top:6px">✅ siz topgan · ❌ xato · ➖ javob bermagan</div></div>';
+    }
+
+    // ── 1) TORTIB TASHLASH: kitobchani javob katagiga sudrang ─────────
+    function renderDrag(box){
+      box.className = '';
+      var hint = document.createElement('div');
+      hint.className = 'drag-hint';
+      hint.textContent = '📖 Kitobchani javob katagiga sudrab tashlang';
+      box.appendChild(hint);
+
+      var grid = document.createElement('div'); grid.className = 'drop-grid';
+      var slots = [];
+      curOpts.forEach(function(o, i){
+        var sl = document.createElement('div');
+        sl.className = 'drop-slot';
+        sl.textContent = o;
+        sl.addEventListener('click', function(){ if (!curAnswered && !busy) answer(i); });
+        slots.push(sl); grid.appendChild(sl);
+      });
+      box.appendChild(grid);
+
+      var token = document.createElement('div');
+      token.className = 'drag-token';
+      token.textContent = '📖';
+      box.appendChild(token);
+
+      var dx = 0, dy = 0, active = false;
+      function slotUnder(x, y){
+        for (var i = 0; i < slots.length; i++) {
+          var r = slots[i].getBoundingClientRect();
+          if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return i;
+        }
+        return -1;
+      }
+      function highlight(idx){
+        for (var i = 0; i < slots.length; i++) {
+          if (i === idx) { slots[i].classList.add('hot'); } else { slots[i].classList.remove('hot'); }
+        }
+      }
+      function start(x, y){
+        if (curAnswered || busy) return;
+        var r = token.getBoundingClientRect();
+        dx = x - (r.left + r.width / 2); dy = y - (r.top + r.height / 2);
+        active = true; token.classList.add('grabbing');
+      }
+      function move(x, y){
+        if (!active) return;
+        token.style.position = 'fixed';
+        token.style.left = (x - dx - 38) + 'px';
+        token.style.top  = (y - dy - 38) + 'px';
+        highlight(slotUnder(x, y));
+      }
+      function end(x, y){
+        if (!active) return;
+        active = false; token.classList.remove('grabbing');
+        var idx = slotUnder(x, y);
+        highlight(-1);
+        token.style.position = ''; token.style.left = ''; token.style.top = '';
+        if (idx >= 0) answer(idx);
+      }
+      token.addEventListener('touchstart', function(e){ var t = e.touches[0]; start(t.clientX, t.clientY); }, {passive:true});
+      token.addEventListener('touchmove',  function(e){ var t = e.touches[0]; move(t.clientX, t.clientY); }, {passive:true});
+      token.addEventListener('touchend',   function(e){ var t = e.changedTouches[0]; end(t.clientX, t.clientY); });
+      token.addEventListener('mousedown',  function(e){ start(e.clientX, e.clientY); });
+      document.addEventListener('mousemove', function(e){ move(e.clientX, e.clientY); });
+      document.addEventListener('mouseup',   function(e){ end(e.clientX, e.clientY); });
+    }
+
+    // ── 2) SURGICH: javobni shkala bo'ylab surib tanlang ──────────────
+    function renderSlider(box){
+      box.className = '';
+      var wrap = document.createElement('div'); wrap.className = 'slider-wrap';
+      var val = document.createElement('div'); val.className = 'slider-value';
+      var track = document.createElement('div'); track.className = 'slider-track';
+      var fill = document.createElement('div'); fill.className = 'slider-fill';
+      var knob = document.createElement('div'); knob.className = 'slider-knob';
+      track.appendChild(fill); track.appendChild(knob);
+      var stops = document.createElement('div'); stops.className = 'slider-stops';
+      for (var i = 0; i < curOpts.length; i++) {
+        var sp = document.createElement('span'); sp.textContent = (i + 1); stops.appendChild(sp);
+      }
+      var btn = document.createElement('button');
+      btn.className = 'opt';
+      btn.style.background = 'var(--accent)'; btn.style.color = '#fff'; btn.style.textAlign = 'center';
+      btn.textContent = '✅ Tasdiqlash';
+
+      var sel = 0;
+      function place(i){
+        sel = Math.max(0, Math.min(curOpts.length - 1, i));
+        var pct = curOpts.length > 1 ? (sel / (curOpts.length - 1)) * 100 : 0;
+        knob.style.left = pct + '%'; fill.style.width = pct + '%';
+        val.textContent = curOpts[sel];
+      }
+      function fromX(clientX){
+        var r = track.getBoundingClientRect();
+        if (r.width <= 0) return;
+        place(Math.round(((clientX - r.left) / r.width) * (curOpts.length - 1)));
+      }
+      var dragging = false;
+      function down(x){ if (curAnswered || busy) return; dragging = true; fromX(x); }
+      knob.addEventListener('touchstart', function(e){ down(e.touches[0].clientX); }, {passive:true});
+      track.addEventListener('touchstart', function(e){ down(e.touches[0].clientX); }, {passive:true});
+      document.addEventListener('touchmove', function(e){ if (dragging) fromX(e.touches[0].clientX); }, {passive:true});
+      document.addEventListener('touchend', function(){ dragging = false; });
+      knob.addEventListener('mousedown', function(e){ down(e.clientX); });
+      track.addEventListener('mousedown', function(e){ down(e.clientX); });
+      document.addEventListener('mousemove', function(e){ if (dragging) fromX(e.clientX); });
+      document.addEventListener('mouseup', function(){ dragging = false; });
+      btn.addEventListener('click', function(){ if (!curAnswered && !busy) answer(sel); });
+
+      wrap.appendChild(val); wrap.appendChild(track); wrap.appendChild(stops);
+      box.appendChild(wrap); box.appendChild(btn);
+      place(0);
+    }
+
+    // ── 3) TIRNAB OCHISH: ishqalab oching, keyin tanlang ──────────────
+    function renderScratch(box){
+      box.className = '';
+      var wrap = document.createElement('div'); wrap.className = 'scratch-wrap';
+      var under = document.createElement('div'); under.className = 'scratch-under';
+      under.textContent = '🔍 Ochildi — endi javobni tanlang!';
+      var cv = document.createElement('canvas'); cv.className = 'scratch-canvas';
+      wrap.appendChild(under); wrap.appendChild(cv);
+      box.appendChild(wrap);
+
+      var optsHost = document.createElement('div');
+      optsHost.style.display = 'none';
+      curOpts.forEach(function(o, i){
+        var b = document.createElement('button');
+        b.className = 'opt'; b.textContent = o;
+        b.addEventListener('click', function(){ if (!curAnswered && !busy) answer(i); });
+        optsHost.appendChild(b);
+      });
+      box.appendChild(optsHost);
+
+      var W = wrap.clientWidth || 320, H = 150;
+      cv.width = W; cv.height = H; cv.style.height = H + 'px';
+      var ctx = cv.getContext('2d');
+      ctx.fillStyle = '#6b7280'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#e5e7eb'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('👆 Barmoq bilan ishqalang', W / 2, H / 2);
+      ctx.globalCompositeOperation = 'destination-out';
+
+      var revealed = false, painting = false;
+      function rub(x, y){
+        var r = cv.getBoundingClientRect();
+        ctx.beginPath();
+        ctx.arc(x - r.left, y - r.top, 22, 0, Math.PI * 2);
+        ctx.fill();
+        if (revealed) return;
+        var d = ctx.getImageData(0, 0, W, H).data, clear = 0, seen = 0;
+        for (var i = 3; i < d.length; i += 160) { seen++; if (d[i] === 0) clear++; }
+        if (seen && clear / seen > 0.4) {
+          revealed = true;
+          wrap.style.display = 'none';
+          optsHost.style.display = '';
+        }
+      }
+      cv.addEventListener('touchstart', function(e){ painting = true; var t = e.touches[0]; rub(t.clientX, t.clientY); }, {passive:true});
+      cv.addEventListener('touchmove',  function(e){ if (painting) { var t = e.touches[0]; rub(t.clientX, t.clientY); } }, {passive:true});
+      cv.addEventListener('touchend',   function(){ painting = false; });
+      cv.addEventListener('mousedown',  function(e){ painting = true; rub(e.clientX, e.clientY); });
+      cv.addEventListener('mousemove',  function(e){ if (painting) rub(e.clientX, e.clientY); });
+      cv.addEventListener('mouseup',    function(){ painting = false; });
     }
 
     function renderOpts(){
@@ -364,7 +576,7 @@
           box.className = '';
         }
 
-        if (activeTheme === 'cards') {
+        if (INPUT_MODE) {
           if (curAnswered) {
             box.className = 'grid-opts';
             curOpts.forEach(function(o,i){
@@ -382,9 +594,16 @@
             return;
           }
           
+          if (INPUT_MODE === 'drag')    { renderDrag(box);    return; }
+          if (INPUT_MODE === 'slider')  { renderSlider(box);  return; }
+          if (INPUT_MODE === 'scratch') { renderScratch(box); return; }
+
           box.className = '';
           var instructions = document.createElement('div');
-          instructions.innerHTML = '<span style="color:var(--muted);font-size:14px;font-weight:700">👈 Noto'g'ri &nbsp; &nbsp; &nbsp; &nbsp; To'g'ri 👉</span>';
+          // Apostroflar qochirilishi SHART: qochirilmagan holda bu satr butun
+          // <script> blokini parse qilinmaydigan qilib qo'yadi va Mini App'dagi
+          // BARCHA o'yin ishlamay qoladi (ed911a7 dan beri shunday edi).
+          instructions.innerHTML = '<span style="color:var(--muted);font-size:14px;font-weight:700">👈 Noto\'g\'ri &nbsp; &nbsp; &nbsp; &nbsp; To\'g\'ri 👉</span>';
           instructions.style.textAlign = 'center'; instructions.style.marginBottom = '10px';
           
           var deck = document.createElement('div'); deck.className = 'swipe-deck';

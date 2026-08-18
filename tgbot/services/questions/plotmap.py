@@ -801,3 +801,21 @@ QUIZ_PLOTMAP_QUESTIONS = [
     "correct": 0
   }
 ]
+
+# ── 2026-08 qo'shimcha: syujet xaritasi ──────────────────────────────────
+QUIZ_PLOTMAP_QUESTIONS += [
+  {"q": "[Syujet Xaritasi] «O'tkan kunlar»da fojianing asosiy sababchisi nima?", "options": ["Homidning fitnasi va soxta xat", "Tabiiy ofat", "Urush", "Otabekning xiyonati"], "correct": 0},
+  {"q": "[Syujet Xaritasi] «O'tkan kunlar»da Otabek Kumushni qayerda birinchi ko'radi?", "options": ["Marg'ilonda, Mirzakarim qutidor uyida", "Toshkentda bozorda", "Buxoroda madrasada", "Samarqandda saroyda"], "correct": 0},
+  {"q": "[Syujet Xaritasi] «Alpomish»da qahramon necha yil asirlikda qoladi?", "options": ["Yetti yil", "Bir yil", "O'n yil", "Uch yil"], "correct": 0},
+  {"q": "[Syujet Xaritasi] «Farhod va Shirin»da Farhodga qanday sinov yuklanadi?", "options": ["Tog'ni teshib, suv yo'li ochish", "Dengizni kesib o'tish", "Ajdarni yengish", "Yetti shaharni zabt etish"], "correct": 0},
+  {"q": "[Syujet Xaritasi] «Mantiq ut-tayr»da qushlarni yo'lga boshlagan qush qaysi?", "options": ["Hudhud", "Tovus", "Bulbul", "Burgut"], "correct": 0},
+  {"q": "[Syujet Xaritasi] «Jinoyat va jazo»da Raskolnikovni iqrorga olib kelgan asosiy kuch nima?", "options": ["Vijdon azobi", "Politsiya dalili", "Do'sti xiyonati", "Pul yo'qligi"], "correct": 0},
+  {"q": "[Syujet Xaritasi] «Chol va dengiz»da Santyagoning kurashi kim bilan?", "options": ["Ulkan marlin baliq va akulalar bilan", "Dengiz qaroqchilari bilan", "Qo'shnilari bilan", "Boshqa baliqchilar bilan"], "correct": 0},
+  {"q": "[Syujet Xaritasi] «Mehrobdan chayon»da Anvar qanday kasb egasi?", "options": ["Xattot (mirza)", "Savdogar", "Tabib", "Dehqon"], "correct": 0},
+  {"q": "[Syujet Xaritasi] «Boburnoma» syujeti nimaga qurilgan?", "options": ["Muallifning haqiqiy hayoti va yurishlariga", "Xayoliy sarguzashtga", "Sevgi afsonasiga", "Ilmiy tajribaga"], "correct": 0},
+  {"q": "[Syujet Xaritasi] «Shum bola» syujetining asosi nima?", "options": ["O'smirning sarguzashtlari va uddaburonligi", "Tarixiy jang", "Sevgi fojiasi", "Ilmiy kashfiyot"], "correct": 0},
+  {"q": "[Syujet Xaritasi] «Layli va Majnun»da oshiqlar visoliga nima to'sqinlik qiladi?", "options": ["Qabila udumlari va ota-onaning qarshiligi", "Urush", "Masofa", "Til bilmaslik"], "correct": 0},
+  {"q": "[Syujet Xaritasi] «Robinzon Kruzo»da qahramonning omon qolish vositasi nima bo'ladi?", "options": ["Kemadan olib chiqqan asboblar va mehnat", "Sehrli kuch", "Boshqa odamlar yordami", "Tasodifiy xazina"], "correct": 0},
+  {"q": "[Syujet Xaritasi] «Kecha va kunduz»da fojia asosan nimadan kelib chiqadi?", "options": ["Jaholat va ijtimoiy adolatsizlik", "Tabiiy ofat", "Chet el bosqini", "Kasallik"], "correct": 0},
+  {"q": "[Syujet Xaritasi] «Hamlet»da voqealarni harakatga keltirgan dastlabki hodisa nima?", "options": ["Otasining ruhi paydo bo'lib, haqiqatni aytishi", "Urush boshlanishi", "To'y", "Sayohat"], "correct": 0},
+]
