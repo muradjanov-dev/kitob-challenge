@@ -5987,7 +5987,7 @@ def start_chain_game():
         f"⏱ O'yin {DEFAULT_DURATION_MIN} daqiqa davom etadi.\n\n"
         "📖 Kitob nomidan tushib qolgan <b>1 yoki 2 ta harfni</b> birinchi bo'lib "
         "topgan ochko oladi — va zanjir darhol yangi kitobga o'tadi!\n\n"
-        "💰 <b>Kirish: 25 Kitobcha.</b>\n"
+        "🎁 <b>Kirish BEPUL!</b>\n"
         "🏆 Ochko olganlar mukofot oladi (1/2/3-o'rin: <b>300/200/100 🪙</b>); "
         "bekorchi kirish haqini yo'qotadi.\n"
         "👇 Hoziroq kiring:"
@@ -6035,7 +6035,7 @@ def chain_game_tick():
                 rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
                 lines.append(f"{m} {escape(w['name'])} — <b>{w['points']}</b> ochko"
                              f" · 🔗 {w.get('correct', 0)}{_timeline(w)}{rew}")
-            lines.append("\n💰 Kirish 25 🪙 · faqat ochko olganlar mukofot oldi. O'ynaganingiz uchun rahmat! 📚")
+            lines.append("\n🎁 Kirish bepul · faqat ochko olganlar mukofot oldi. O'ynaganingiz uchun rahmat! 📚")
         else:
             lines.append("Bu safar hech kim ochko olmadi 😔")
         text = "\n".join(lines)
@@ -6115,7 +6115,7 @@ def start_feud_game():
         "🗣 <b>KO'PCHILIK NIMA DEDI?</b>\n\n"
         f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
         "Har savolga javob bering — <b>ko'pchilik bilan mos</b> javob ko'p ochko beradi!\n\n"
-        "💰 <b>Kirish: 25 Kitobcha.</b>\n"
+        "🎁 <b>Kirish BEPUL!</b>\n"
         "🏆 G'oliblar ko'p Kitobcha, qatnashgan hamma <b>+30 🪙</b>.\n👇 Kiring:"
     )
     _announce_game(text, "kopchilik")
@@ -6133,7 +6133,7 @@ def start_castle_game():
         f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
         "Birgalikda savollarga javob bering, har to'g'ri javob <b>bossni uradi</b>. "
         "Uni yenging — hammamiz Kitobcha yutamiz!\n\n"
-        "💰 <b>Kirish: 25 Kitobcha.</b>\n👇 Kiring:"
+        "🎁 <b>Kirish BEPUL!</b>\n👇 Kiring:"
     )
     _announce_game(text, "qala")
     print(f"start_castle_game: game #{game.id}")
@@ -6150,7 +6150,7 @@ def start_emoji_game():
         f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
         "Emojilarga qarab, 4 variantdan to'g'ri kitobni eng tez tanlang. "
         "To'g'ri javob — ochko!\n\n"
-        "💰 <b>Kirish: 25 Kitobcha.</b>\n"
+        "🎁 <b>Kirish BEPUL!</b>\n"
         "🏆 G'oliblar ko'p Kitobcha oladi.\n👇 Kiring:"
     )
     _announce_game(text, "emoji")
@@ -6168,7 +6168,7 @@ def start_wisdom_game():
         f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
         "Hikmatli gap ko'rsatiladi — qaysi olim yoki ulamo aytganini toping. "
         "Ketma-ket to'g'ri javoblar ochkoni oshiradi (x1→x2→x3)!\n\n"
-        f"💰 <b>Kirish: {ENTRY_FEE} Kitobcha.</b>\n"
+        f"🎁 <b>Kirish BEPUL!</b>\n"
         "🏆 G'oliblar ko'p Kitobcha oladi.\n👇 Kiring:"
     )
     _announce_game(text, "hikmat")
@@ -6186,7 +6186,7 @@ def start_detective_game():
         f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
         "Har raundda maxfiy kitob asta-sekin ipuchlari orqali ochiladi. "
         "Birinchi to'g'ri topgan g'olib — qancha erta, shuncha ko'p ochko!\n\n"
-        f"💰 <b>Kirish: {ENTRY_FEE} Kitobcha.</b>\n"
+        f"🎁 <b>Kirish BEPUL!</b>\n"
         "🏆 G'oliblar ko'p Kitobcha oladi.\n👇 Kiring:"
     )
     _announce_game(text, "detektiv")
@@ -6204,7 +6204,7 @@ def start_survival_game():
         f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
         "Har savolga javob bering — noto'g'ri yoki javobsiz qolsangiz jon yo'qotasiz "
         "(3 jon). Oxirigacha omon qolganlar jackpotni bo'lishadi!\n\n"
-        f"💰 <b>Kirish: {ENTRY_FEE} Kitobcha.</b>\n👇 Kiring:"
+        f"🎁 <b>Kirish BEPUL!</b>\n👇 Kiring:"
     )
     _announce_game(text, "omon-qolish")
     print(f"start_survival_game: game #{game.id}")
@@ -6220,19 +6220,19 @@ def _start_quiz_flavor(flavor, is_vip=False):
             "🎭 <b>IKKI HAQIQAT, BIR YOLG'ON</b>\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
             "3 ta gapdan qaysi biri yolg'on ekanini tez toping!\n\n"
-            f"💰 <b>Kirish: {ENTRY_FEES['twofacts']} Kitobcha.</b>\n👇 Kiring:"
+            f"🎁 <b>Kirish BEPUL!</b>\n👇 Kiring:"
         ),
         "impostor": (
             "🃏 <b>KIM YOLG'ONCHI?</b>\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
             "3 haqiqiy va 1 soxta juftlik orasidan soxtasini toping!\n\n"
-            f"💰 <b>Kirish: {ENTRY_FEES['impostor']} Kitobcha.</b>\n👇 Kiring:"
+            f"🎁 <b>Kirish BEPUL!</b>\n👇 Kiring:"
         ),
         "connection": (
             "🧩 <b>YASHIRIN BOG'LANISH</b>\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
             "4 ta narsani bog'lovchi yashirin mavzuni toping!\n\n"
-            f"💰 <b>Kirish: {ENTRY_FEES['connection']} Kitobcha.</b>\n👇 Kiring:"
+            f"🎁 <b>Kirish BEPUL!</b>\n👇 Kiring:"
         ),
         "teams": (
             "👥 <b>JAMOA JANGI</b> — ikki jamoa bo'lib jang!\n\n"
@@ -6240,31 +6240,31 @@ def _start_quiz_flavor(flavor, is_vip=False):
             "Kirganlaringiz avtomatik ikki jamoaga bo'linadi. Jamoangiz g'olib "
             "chiqsa — HAR BIR a'zo Kitobcha oladi (jamoa kattaroq bo'lsa, ko'proq!), "
             "eng ko'p to'g'ri javob berganlar esa qo'shimcha bonus oladi!\n\n"
-            f"💰 <b>Kirish: {ENTRY_FEES['teams']} Kitobcha.</b>\n👇 Kiring:"
+            f"🎁 <b>Kirish BEPUL!</b>\n👇 Kiring:"
         ),
         "timeline": (
             "🕰️ <b>VAQT MASHINASI</b>\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
             "Kitob yoki mutafakkir qaysi asrga tegishli ekanini toping!\n\n"
-            f"💰 <b>Kirish: {ENTRY_FEES['timeline']} Kitobcha.</b>\n👇 Kiring:"
+            f"🎁 <b>Kirish BEPUL!</b>\n👇 Kiring:"
         ),
         "matchbook": (
             "🎯 <b>MUALLIF-ASAR MOSLASHTIRISH</b>\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
             "Muallifga tegishli haqiqiy asarni 4 variantdan tez toping!\n\n"
-            f"💰 <b>Kirish: {ENTRY_FEES['matchbook']} Kitobcha.</b>\n👇 Kiring:"
+            f"🎁 <b>Kirish BEPUL!</b>\n👇 Kiring:"
         ),
         "reverse": (
             "🔄 <b>TESKARI VIKTORINA</b>\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
             "Javob avval ko'rsatiladi — qaysi savolga mos kelishini toping!\n\n"
-            f"💰 <b>Kirish: {ENTRY_FEES['reverse']} Kitobcha.</b>\n👇 Kiring:"
+            f"🎁 <b>Kirish BEPUL!</b>\n👇 Kiring:"
         ),
         "cover": (
             "🖼 <b>KITOB MUQOVASI</b>\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
             "Xiralashtirilgan muqovadan kitobni 4 variantdan tez toping!\n\n"
-            f"💰 <b>Kirish: {ENTRY_FEES['cover']} Kitobcha.</b>\n👇 Kiring:"
+            f"🎁 <b>Kirish BEPUL!</b>\n👇 Kiring:"
         ),
     }
     deep_link_params = {
@@ -6286,7 +6286,7 @@ def _start_quiz_flavor(flavor, is_vip=False):
             flavor,
             f"🧪 <b>{game_title} (Test / Beta)</b>\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
-            f"💰 <b>Kirish: {ENTRY_FEES.get(flavor, 25)} Kitobcha.</b>\n👇 Kiring:"
+            f"🎁 <b>Kirish BEPUL!</b>\n👇 Kiring:"
         )
     deep_link = deep_link_params.get(flavor, flavor)
     _announce_game(announcement_text, deep_link)

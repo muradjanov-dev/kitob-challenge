@@ -4,8 +4,8 @@ Every question round, any joined (non-eliminated) player who answers wrong OR
 doesn't answer at all loses a life. `max_lives` (default 3) lives; 0 lives =
 eliminated. Whoever is still standing when the rounds run out splits the
 jackpot; if everyone gets eliminated, the highest correct-answer count(s)
-split it instead so there's always a discernible winner. Entry fee is 50
-Kitobcha (the highest of the new games, matching its bigger jackpot format).
+split it instead so there's always a discernible winner. Free to enter
+(every live game became free on 2026-08-19; see chain_game.charge_entry_fee).
 """
 
 import random
@@ -19,7 +19,7 @@ from tgbot.models import SurvivalGame, SurvivalPlayer, SurvivalAnswer, TelegramP
 from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, PARTICIPATION
 from tgbot.services.game_questions import SURVIVAL_QUESTIONS
 
-ENTRY_FEE = 50
+ENTRY_FEE = 0  # bepul (2026-08-19)
 LEAD_SECONDS = 30
 NUM_QUESTIONS = 12
 QUESTION_SECONDS = 15

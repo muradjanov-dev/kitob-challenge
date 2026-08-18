@@ -30,7 +30,7 @@ from django.utils import timezone
 from tgbot.models import ChainGame, ChainScore, TelegramProfile, GlobalBook
 from tgbot.services.chain_text import normalize, is_guessable_letter
 
-ENTRY_FEE = 25  # Kitobcha to join a game (charged once, on first attempt)
+ENTRY_FEE = 0  # Barcha jonli o'yinlar bepul (2026-08-19)
 POINTS_PER_ROUND = 10
 DEFAULT_DURATION_MIN = 10
 LEAD_SECONDS = 30  # lobby countdown after the announcement, so everyone can join
@@ -57,6 +57,14 @@ def charge_entry_fee(profile, amount: int = ENTRY_FEE) -> bool:
     skipping the Kitobcha charge entirely -- one ticket per join, regardless
     of `amount`."""
     from tgbot.models import KitobchaLedger
+
+    # 2026-08-19: har bir jonli o'yin BEPUL bo'ldi -- barcha ENTRY_FEE lar 0.
+    # Shu yerda darhol qaytamiz: balansga tegilmaydi va, eng muhimi, Sirli
+    # qutidan yutilgan bepul bilet ham sarflanmaydi (aks holda o'yin bepul
+    # bo'la turib biletlar bekorga yonib ketardi).
+    if not amount or int(amount) <= 0:
+        return True
+
     with transaction.atomic():
         p = TelegramProfile.objects.select_for_update().get(id=profile.id)
         if int(p.bonus_free_game_entries or 0) > 0:

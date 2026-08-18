@@ -3,7 +3,7 @@
 Each round reveals a mystery book through progressively less vague clues
 (clue 0 = vague, clue N-1 = specific), one clue every `clue_interval_seconds`.
 The FIRST correct free-text guess in a round wins it — the earlier the guess
-(fewer clues seen), the more points. Entry fee is 40 Kitobcha.
+(fewer clues seen), the more points. Free to enter.
 """
 
 import random
@@ -19,7 +19,7 @@ from tgbot.services.chain_text import normalize
 from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, REWARD_TIERS, PARTICIPATION
 from tgbot.services.game_questions import DETECTIVE_BOOKS
 
-ENTRY_FEE = 40
+ENTRY_FEE = 0  # bepul (2026-08-19)
 LEAD_SECONDS = 30
 NUM_ROUNDS = 8
 ROUND_SECONDS = 45

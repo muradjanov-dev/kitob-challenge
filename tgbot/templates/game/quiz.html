@@ -306,7 +306,8 @@
     if (M.isBeta) {
       document.getElementById('subtitle').innerHTML = '<span style="display:inline-block;padding:2px 7px;background:linear-gradient(135deg,#ff9800,#f44336);color:#fff;border-radius:6px;font-size:10px;font-weight:800;letter-spacing:.5px;margin-left:4px">🧪 TEST / BETA</span>';
     }
-    document.getElementById('feeBanner').innerHTML = '💰 <b>Kirish: '+M.fee+' Kitobcha</b> (birinchi javobda).' + (FLAVOR==='teams' ? ' 👥 Jamoangiz g\'olib chiqsa — HAR BIR a\'zo Kitobcha oladi (jamoa kattaroq bo\'lsa, ko\'proq!), eng ko\'p to\'g\'ri javob berganlar esa qo\'shimcha bonus oladi!' : '');
+    // Barcha jonli o'yinlar bepul (2026-08-19) — M.fee endi ishlatilmaydi.
+    document.getElementById('feeBanner').innerHTML = '🎁 <b>Kirish BEPUL!</b> Faqat o\'ynang va Kitobcha yutib oling.' + (FLAVOR==='teams' ? ' 👥 Jamoangiz g\'olib chiqsa — HAR BIR a\'zo Kitobcha oladi (jamoa kattaroq bo\'lsa, ko\'proq!), eng ko\'p to\'g\'ri javob berganlar esa qo\'shimcha bonus oladi!' : '');
     if (FLAVOR === 'teams') { document.getElementById('myPtsLbl').textContent = 'Sizning ballaringiz'; }
 
     var tg=(window.Telegram&&window.Telegram.WebApp)?window.Telegram.WebApp:null;
@@ -817,7 +818,7 @@
           poll();
         } else {
           var t=$('toast');t.className='toast bad';
-          t.textContent=({premium_required:"👑 Ushbu arena faqat VIP Premium a'zolar uchun!",insufficient_balance:"🪙 Kirish uchun "+M.fee+" Kitobcha kerak — balansingiz yetarli emas.",not_answering:"Hozir javob vaqti emas."})[r.error]||"Qabul qilinmadi.";
+          t.textContent=({premium_required:"👑 Ushbu arena faqat VIP Premium a'zolar uchun!",insufficient_balance:"🪙 Balansingiz yetarli emas.",not_answering:"Hozir javob vaqti emas."})[r.error]||"Qabul qilinmadi.";
         }
       }).catch(function(){}).then(function(){busy=false;});
     }

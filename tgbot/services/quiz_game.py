@@ -153,7 +153,7 @@ TITLES = {
     "marifat": "☀️ Haqiqat Quyoshi",
 }
 
-ENTRY_FEES = {k: (30 if k == "teams" else 25) for k in TITLES}
+ENTRY_FEES = {k: 0 for k in TITLES}  # barcha o'yinlar bepul (2026-08-19)
 NUM_QUESTIONS = {k: (10 if k == "cover" else 11) for k in TITLES}
 
 

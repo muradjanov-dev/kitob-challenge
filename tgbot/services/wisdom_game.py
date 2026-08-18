@@ -3,7 +3,7 @@
 Same time-based phases as Emoji Kitob (answer window then reveal window per
 question), but scoring adds a consecutive-correct streak multiplier: 1st
 correct in a streak = 1x, 2nd = 2x, 3rd+ = 3x (capped). A wrong answer resets
-the streak to 0. Entry fee is 30 Kitobcha (see ENTRY_FEE below).
+the streak to 0. Free to enter (see ENTRY_FEE below).
 """
 
 import random
@@ -17,7 +17,7 @@ from tgbot.models import WisdomGame, WisdomAnswer, WisdomScore
 from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, REWARD_TIERS, PARTICIPATION
 from tgbot.services.game_questions import WISDOM_QUESTIONS
 
-ENTRY_FEE = 30
+ENTRY_FEE = 0  # bepul (2026-08-19)
 LEAD_SECONDS = 30
 NUM_QUESTIONS = 10
 ANSWER_SECONDS = 15
