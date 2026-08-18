@@ -522,23 +522,26 @@
       ctx.fillText('👆 Barmoq bilan ishqalang', W / 2, H / 2);
       ctx.globalCompositeOperation = 'destination-out';
 
-      var revealed = false, painting = false;
+      var revealed = false, painting = false, rubCount = 0;
       function rub(x, y){
         var r = cv.getBoundingClientRect();
         ctx.beginPath();
-        ctx.arc(x - r.left, y - r.top, 22, 0, Math.PI * 2);
+        ctx.arc(x - r.left, y - r.top, 35, 0, Math.PI * 2); // Bigger brush
         ctx.fill();
         if (revealed) return;
+        rubCount++;
+        if (rubCount % 4 !== 0) return; // Throttle expensive check
+
         var d = ctx.getImageData(0, 0, W, H).data, clear = 0, seen = 0;
-        for (var i = 3; i < d.length; i += 160) { seen++; if (d[i] === 0) clear++; }
-        if (seen && clear / seen > 0.4) {
+        for (var i = 3; i < d.length; i += 320) { seen++; if (d[i] === 0) clear++; }
+        if (seen && clear / seen > 0.25) { // Lower threshold to 25%
           revealed = true;
           wrap.style.display = 'none';
           optsHost.style.display = '';
         }
       }
-      cv.addEventListener('touchstart', function(e){ painting = true; var t = e.touches[0]; rub(t.clientX, t.clientY); }, {passive:true});
-      cv.addEventListener('touchmove',  function(e){ if (painting) { var t = e.touches[0]; rub(t.clientX, t.clientY); } }, {passive:true});
+      cv.addEventListener('touchstart', function(e){ e.preventDefault(); painting = true; var t = e.touches[0]; rub(t.clientX, t.clientY); }, {passive:false});
+      cv.addEventListener('touchmove',  function(e){ e.preventDefault(); if (painting) { var t = e.touches[0]; rub(t.clientX, t.clientY); } }, {passive:false});
       cv.addEventListener('touchend',   function(){ painting = false; });
       cv.addEventListener('mousedown',  function(e){ painting = true; rub(e.clientX, e.clientY); });
       cv.addEventListener('mousemove',  function(e){ if (painting) rub(e.clientX, e.clientY); });
