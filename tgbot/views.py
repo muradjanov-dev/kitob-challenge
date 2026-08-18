@@ -629,8 +629,8 @@ def internal_broadcast_mystery_box_update(request: HttpRequest):
 
 
 @csrf_exempt
-def internal_broadcast_update_announcement(request: HttpRequest):
-    """One-off trigger for update_announce.broadcast_update_announcement.
+def internal_broadcast_auction_announcement(request: HttpRequest):
+    """One-off trigger for auction_announce.broadcast_auction_announcement.
     POST only, runs in a background thread."""
     import os as _os
 
@@ -640,16 +640,17 @@ def internal_broadcast_update_announcement(request: HttpRequest):
     if not secret or secret != _os.environ.get("API_TOKEN", ""):
         return HttpResponse(status=403)
 
-    from tgbot.services.update_announce import broadcast_update_announcement
+    from tgbot.services.auction_announce import broadcast_auction_announcement
 
     def _run():
         try:
-            broadcast_update_announcement()
+            broadcast_auction_announcement()
         except Exception as e:
-            print(f"internal_broadcast_update_announcement failed: {e}")
+            print(f"internal_broadcast_auction_announcement failed: {e}")
 
     threading.Thread(target=_run, daemon=True).start()
     return HttpResponse("started", status=202)
+
 
 
 @csrf_exempt

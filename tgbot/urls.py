@@ -4,6 +4,7 @@ from .views import (
     internal_diag_challenge_boom_state, internal_retire_challenge_and_launch_boom,
     internal_diag_challenge_reward_history, internal_broadcast_mystery_box_update,
     internal_broadcast_update_announcement,
+    internal_broadcast_auction_announcement,
     internal_diag_achievements, internal_diag_ai_quiz_trial_backlog, internal_fix_ai_quiz_trial_backlog,
     internal_grant_ai_quiz_bonus_everyone, internal_ai_quiz_bonus_status,
 )
@@ -62,6 +63,7 @@ urlpatterns = [
     path("internal/fix/retire-challenge-and-launch-boom/", internal_retire_challenge_and_launch_boom, name="internal-retire-challenge-and-launch-boom"),
     path("internal/broadcast/mystery-box-update/", internal_broadcast_mystery_box_update, name="internal-broadcast-mystery-box-update"),
     path("internal/broadcast/update-announcement/", internal_broadcast_update_announcement, name="internal-broadcast-update-announcement"),
+    path("internal/broadcast/auction-announcement/", internal_broadcast_auction_announcement, name="internal-broadcast-auction-announcement"),
     path("health-check/redis/", health_check_redis, name="health-check-redis"),
     path("health-check/celery/", health_check_celery, name="health-check-celery"),
     path("shop/", shop_index, name="shop"),
