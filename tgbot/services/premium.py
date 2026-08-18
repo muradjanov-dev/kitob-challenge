@@ -91,3 +91,73 @@ def premium_left_text(user) -> str:
             return f"{hrs} soat"
         return "—"
     return f"{(end - today).days + 1} kun ({end.strftime('%d.%m.%Y')} gacha)"
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Bitta yagona darvoza
+#
+# Premium ilgari ikki xil tekshirilardi: ~30 joyda to'g'ridan-to'g'ri
+# `Payment(status="paid", end_date__gte=today)`, atigi ~8 joyda esa trialni
+# ham biladigan `has_active_premium()`. Natijada sinov Premiumi olgan odam
+# "3 soatlik BEPUL Premium" degan xabarni oladi-yu, deyarli har bir
+# imtiyozda "Premium kerak" devoriga urilardi -- ya'ni sinov Premiumning
+# qanchalik yaxshiligini emas, ishlamasligini ko'rsatardi.
+#
+# Quyidagilar hamma imtiyoz eshiklari uchun yagona javob beradi. Hisobot va
+# statistikada ATAYLAB ishlatilmaydi: u yerda "nechta odam pul to'lagan"
+# degan savolga javob kerak, sinovdagilar bu raqamni shishirmasligi lozim.
+# ─────────────────────────────────────────────────────────────────────────
+
+def is_premium(user) -> bool:
+    """Imtiyoz eshigi: pullik obuna YOKI faol sinov oynasi."""
+    if not user:
+        return False
+    return bool(user.has_active_premium())
+
+
+def is_premium_by_id(profile_id) -> bool:
+    """TelegramProfile birlamchi kaliti bo'yicha."""
+    from tgbot.models import TelegramProfile
+    p = TelegramProfile.objects.filter(id=profile_id).only(
+        "id", "trial_premium_until").first()
+    return is_premium(p)
+
+
+def is_premium_by_telegram_id(telegram_id) -> bool:
+    """Telegram ID bo'yicha (handlerlarda ko'pincha faqat shu bo'ladi)."""
+    from tgbot.models import TelegramProfile
+    p = TelegramProfile.objects.filter(telegram_id=telegram_id).only(
+        "id", "trial_premium_until").first()
+    return is_premium(p)
+
+
+def active_premium_user_ids() -> set:
+    """Hozir Premium hisoblanadigan barcha TelegramProfile id lari."""
+    from tgbot.models import Payment, TelegramProfile
+    ids = set(
+        Payment.objects.filter(
+            status="paid", end_date__gte=timezone.localdate(),
+        ).values_list("user_id", flat=True)
+    )
+    ids |= set(
+        TelegramProfile.objects.filter(
+            trial_premium_until__gte=timezone.now(),
+        ).values_list("id", flat=True)
+    )
+    return ids
+
+
+def active_premium_telegram_ids() -> set:
+    """Xuddi shu ro'yxat, lekin telegram_id lar bilan."""
+    from tgbot.models import Payment, TelegramProfile
+    ids = set(
+        Payment.objects.filter(
+            status="paid", end_date__gte=timezone.localdate(),
+        ).values_list("user__telegram_id", flat=True)
+    )
+    ids |= set(
+        TelegramProfile.objects.filter(
+            trial_premium_until__gte=timezone.now(),
+        ).values_list("telegram_id", flat=True)
+    )
+    return ids

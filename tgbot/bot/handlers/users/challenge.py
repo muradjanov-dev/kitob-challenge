@@ -339,10 +339,9 @@ async def challenge_history_handler(call: types.CallbackQuery, state: FSMContext
 
     @sync_to_async
     def _load():
-        from tgbot.models import ChallengeParticipant, Payment
-        is_prem = Payment.objects.filter(
-            user=user, status="paid", end_date__gte=timezone.localdate()
-        ).exists()
+        from tgbot.models import ChallengeParticipant
+        from tgbot.services.premium import is_premium
+        is_prem = is_premium(user)
         if not is_prem:
             return None, []
         parts = list(
@@ -389,9 +388,8 @@ def _load_challenge_for_cabinet(user):
     if not challenge:
         return None, None, False
     participant = ChallengeParticipant.objects.filter(challenge=challenge, user=user).first()
-    is_prem = Payment.objects.filter(
-        user=user, status="paid", end_date__gte=timezone.localdate()
-    ).exists()
+    from tgbot.services.premium import is_premium
+    is_prem = is_premium(user)
     return challenge, participant, is_prem
 
 

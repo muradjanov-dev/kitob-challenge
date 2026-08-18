@@ -15,9 +15,9 @@ _STATS_PROMO = (
 
 
 def _is_premium(user_id: int) -> bool:
-    return Payment.objects.filter(
-        user_id=user_id, status="paid", end_date__gte=timezone.localdate()
-    ).exists()
+    # Sinov Premiumi ham shu eshikdan o'tadi -- tafsilot: services/premium.py
+    from tgbot.services.premium import is_premium_by_id
+    return is_premium_by_id(user_id)
 
 
 def _process_answer(user_id: int, round_id: int, chosen_idx: int) -> str:

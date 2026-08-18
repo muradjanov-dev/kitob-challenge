@@ -247,13 +247,11 @@ async def _daily_top_read_user_action_button():
 
 
 def _get_premium_tg_ids() -> set:
-    """Return set of telegram_ids that currently have an active premium subscription."""
-    from tgbot.models import Payment
-    return set(
-        Payment.objects.filter(
-            status="paid", end_date__gte=timezone.localdate()
-        ).values_list("user__telegram_id", flat=True)
-    )
+    """Hozir Premium hisoblanadigan telegram_id lar -- 💎 belgisi shu ro'yxat
+    bo'yicha qo'yiladi. Sinovdagilar ham kiradi: belgi sinovning e'lon
+    qilingan imtiyozlaridan biri."""
+    from tgbot.services.premium import active_premium_telegram_ids
+    return active_premium_telegram_ids()
 
 
 def _send_period_report(start_date, end_date, limit, period_name):
@@ -2855,11 +2853,8 @@ def send_weekly_ai_report():
     week_end = today
     week_start = today - _dt.timedelta(days=6)
 
-    premium_ids = set(
-        _Pay.objects.filter(
-            status="paid", end_date__gte=today
-        ).values_list("user_id", flat=True)
-    )
+    from tgbot.services.premium import active_premium_user_ids
+    premium_ids = active_premium_user_ids()
     if not premium_ids:
         print("[weekly_ai_report] No premium users found.")
         return
@@ -2929,11 +2924,8 @@ def send_book_recommendations():
 
     today = timezone.localdate()
 
-    premium_user_ids = set(
-        _Pay.objects.filter(
-            status="paid", end_date__gte=today
-        ).values_list("user_id", flat=True)
-    )
+    from tgbot.services.premium import active_premium_user_ids
+    premium_user_ids = active_premium_user_ids()
     if not premium_user_ids:
         print("[book_recs] No premium users found.")
         return
@@ -6474,8 +6466,10 @@ def _advance_game_sequence(game_type, game_id):
         print(f"_advance_game_sequence: {seq.slot}/{seq.date} sequence complete")
         if seq.slot == GameSequence.SLOT_EVENING:
             announce_top_game_players()
-            # Immediately trigger VIP Premium Arena after the evening slot completes!
-            start_vip_premium_evening_event.apply_async(countdown=90)
+            # Kechki 3 ta o'yin tugashi bilan VIP arena DARHOL boshlanadi --
+            # ilgari 90 soniya kutilardi va o'sha tanaffusda odamlar tarqab
+            # ketardi.
+            start_vip_premium_evening_event.delay()
         return
 
     next_type = seq.game_types[next_index]
@@ -6627,9 +6621,12 @@ def _trim_telegram(text, limit=4000):
     return (cut[:nl] if nl > limit // 2 else cut) + "\n<i>…</i>"
 
 
-def _broadcast_and_dm(header_lines, winners, dm_text_fn):
+def _broadcast_and_dm(header_lines, winners, dm_text_fn, dm_markup_fn=None):
     """Post `header_lines` to every group, then DM each rewarded winner via
-    `dm_text_fn(winner) -> str`. Shared by the new games' finalize announcements."""
+    `dm_text_fn(winner) -> str`. Shared by the new games' finalize announcements.
+
+    `dm_markup_fn(winner)` may return a JSON inline keyboard (or None) so a
+    single DM can carry an upsell button without every caller needing one."""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     text = _trim_telegram("\n".join(header_lines))
     for gid, tid in _game_targets():
@@ -6645,8 +6642,13 @@ def _broadcast_and_dm(header_lines, winners, dm_text_fn):
         if not w.get("reward"):
             continue
         try:
-            requests.post(url, data={"chat_id": w["telegram_id"], "text": dm_text_fn(w),
-                                     "parse_mode": "HTML"}, timeout=8)
+            payload = {"chat_id": w["telegram_id"], "text": dm_text_fn(w),
+                       "parse_mode": "HTML"}
+            if dm_markup_fn:
+                markup = dm_markup_fn(w)
+                if markup:
+                    payload["reply_markup"] = markup
+            requests.post(url, data=payload, timeout=8)
         except Exception:
             pass
 
@@ -6756,6 +6758,28 @@ def _answer_key_lines(game):
         out.append(f"{i + 1}. {_clip(ans, 70)}")
     return out
 
+def _premium_ids_safe() -> set:
+    """Hozir Premium hisoblanadigan profil id lari; xato bo'lsa bo'sh to'plam
+    (natijalarni e'lon qilish upsell tufayli to'xtab qolmasin)."""
+    try:
+        from tgbot.services.premium import active_premium_user_ids
+        return active_premium_user_ids()
+    except Exception as e:
+        print(f"_premium_ids_safe: {e}")
+        return set()
+
+
+def _premium_missed_line(w, prem_ids) -> str:
+    """Premium bo'lmagan g'olibga: aynan shu o'yinda qancha boy berdingiz.
+
+    Yutgan lahza -- Premium qiymatini ko'rsatishning eng kuchli payti:
+    mukofot allaqachon qo'lda, farq esa aniq raqamda."""
+    if not w.get("reward") or w.get("user_id") in prem_ids:
+        return ""
+    return (f"\n\n💎 <i>Premium bo'lganingizda bu o'yinda "
+            f"<b>+{w['reward'] * 2} Kitobcha</b> olardingiz — ikki barobar.</i>")
+
+
 def _finalize_quiz_flavor(flavor):
     from tgbot.services import quiz_game
     medals = ["🥇", "🥈", "🥉"]
@@ -6796,12 +6820,29 @@ def _finalize_quiz_flavor(flavor):
             "to'liq vaqt deb hisoblanadi, shunda jim turish urinishdan arzon "
             "tushmaydi. Ball teng bo'lsa — tezroq javob bergan yuqorida.</i>"
         )
+        # G'oya 3 — VIP arena natijasini ko'rgan, lekin kira olmaganlarga
+        # aynan nimadan quruq qolgani ko'rsatiladi.
+        if getattr(game, "is_vip", False) and winners:
+            top = winners[0]
+            lines.append(
+                f"\n⭐️ <i>Bu arenaga faqat Premium a'zolar kira oladi. Bugun "
+                f"{escape(top['name'])} <b>{top['reward']} Kitobcha</b>"
+                + (f" va <b>{top['premium_days']} kun Premium</b>" if top.get("premium_days") else "")
+                + " yutdi — siz esa qatnasha olmadingiz.</i>"
+            )
         try:
+            # G'oya 2 — Premium bo'lmagan g'olibga aynan yutgan payti, qancha
+            # boy berganini ko'rsatamiz. 2x ko'paytirgich update_ball ichida,
+            # shuning uchun mukofotni ikkilantirish aniq raqam beradi.
+            prem_ids = _premium_ids_safe()
             _broadcast_and_dm(lines, winners, lambda w: (
                 f"{emoji_} {title} — <b>+{w['reward']} Kitobcha</b>! Ball: {w['points']}"
                 f"{_scoreline(w)}"
                 + (f"\n💎 Sizga <b>{w['premium_days']} kun BEPUL Premium</b> ham berildi — "
                    "barcha VIP imtiyozlar faol!" if w.get("premium_days") else "")
+                + _premium_missed_line(w, prem_ids)
+            ), dm_markup_fn=lambda w: (
+                None if w.get("user_id") in prem_ids else _trial_premium_expiry_markup()
             ))
         except Exception as e:
             # Rewards are already banked at this point -- a failed announcement

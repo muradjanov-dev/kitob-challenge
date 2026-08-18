@@ -107,11 +107,8 @@ async def cabinet_history(call: types.CallbackQuery):
     from django.utils import timezone as _tz
 
     user_id = call.from_user.id
-    is_prem = Payment.objects.filter(
-        user__telegram_id=user_id,
-        status="paid",
-        end_date__gte=_tz.localdate(),
-    ).exists()
+    from tgbot.services.premium import is_premium_by_telegram_id
+    is_prem = is_premium_by_telegram_id(user_id)
     if not is_prem:
         await call.answer("Bu imkoniyat faqat Premium foydalanuvchilar uchun. 💎", show_alert=True)
         return

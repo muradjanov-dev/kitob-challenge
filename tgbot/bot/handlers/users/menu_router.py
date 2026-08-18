@@ -231,9 +231,7 @@ async def _menu_report(call, user, state: FSMContext):
     already, is_prem = await sync_to_async(
         lambda: (
             ConfirmationReport.objects.filter(user=user, date__date=today).exists(),
-            Payment.objects.filter(
-                user=user, status="paid", end_date__gte=today
-            ).exists(),
+            __import__("tgbot.services.premium", fromlist=["is_premium"]).is_premium(user),
         )
     )()
     if already and not is_prem:
@@ -271,11 +269,8 @@ async def _menu_report(call, user, state: FSMContext):
 # Premium helper.
 # ──────────────────────────────────────────────────────────────────────────
 def _is_premium_user(user) -> bool:
-    if not user:
-        return False
-    return Payment.objects.filter(
-        user=user, status="paid", end_date__gte=timezone.localdate()
-    ).exists()
+    from tgbot.services.premium import is_premium
+    return is_premium(user)
 
 
 def _premium_growth_section(user) -> str:
