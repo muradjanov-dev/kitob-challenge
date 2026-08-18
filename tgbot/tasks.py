@@ -6756,7 +6756,6 @@ def _answer_key_lines(game):
         out.append(f"{i + 1}. {_clip(ans, 70)}")
     return out
 
-
 def _finalize_quiz_flavor(flavor):
     from tgbot.services import quiz_game
     medals = ["🥇", "🥈", "🥉"]
@@ -6962,7 +6961,11 @@ def settle_finished_auctions():
             print(f"Error settling auction {product.id}: {e}")
 
 
-@app.task
+# `app` is not imported in this module -- every other task here uses
+# @shared_task, which binds to the configured Celery app lazily. @app.task
+# raised NameError at import time, which took tgbot.tasks down entirely and
+# with it the worker, the bot handlers and the web views that import it.
+@shared_task
 def task_broadcast_auction_announcement():
     """Celery task to broadcast the auction announcement to all groups and users."""
     from tgbot.services.auction_announce import broadcast_auction_announcement
