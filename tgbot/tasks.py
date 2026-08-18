@@ -472,32 +472,48 @@ def _build_top_readers_message(start_date, end_date, period_label, limit=20):
         message += f"{index}. <b>{badge}{full_name}</b>: {stat}\n"
     total_stat = _format_top_stat(grand_pages, grand_minutes)
     message += f"\n📊 Jami: <b>{total_stat}</b>"
-    sponsor = _consume_leaderboard_sponsor()
-    if sponsor:
-        message += f"\n\n🏷 <i>Ushbu reyting homiysi: {escape(sponsor.full_name or 'Kitobxon')}</i>"
+    sponsors = _consume_leaderboard_sponsors()
+    if len(sponsors) == 1:
+        message += f"\n\n🏷 <i>Ushbu reyting homiysi: {escape(sponsors[0].full_name or 'Kitobxon')}</i>"
+    elif sponsors:
+        message += "\n\n🏷 <i>Ushbu reyting homiylari:</i>"
+        for u in sponsors:
+            message += f"\n   • <b>{escape(u.full_name or 'Kitobxon')}</b>"
     return message
 
 
-def _consume_leaderboard_sponsor():
-    """Atomically claim the oldest unused Market 'Reyting sponsorligi'
-    purchase, mark it used, and return the sponsoring TelegramProfile (or
-    None if no one's queued). Consumed once per call, so at most one
-    broadcast gets credited per purchase."""
+def _consume_leaderboard_sponsors():
+    """Atomically claim every queued Market 'Reyting sponsorligi' purchase and
+    return the sponsoring TelegramProfiles, oldest purchase first.
+
+    Each buyer is promised their name in the *next* Top Kitobxonlar post and up
+    to 7 can buy per day, so claiming only one per broadcast left the rest paid
+    for but invisible until some later post happened to pick them up. All of
+    them are credited on the next post instead.
+
+    One row per person per post: someone who sponsored twice gets named in this
+    post and the next one, rather than having their name printed twice here.
+    """
     from django.db import transaction
     from tgbot.models import LeaderboardSponsor
     with transaction.atomic():
-        sponsor = (
+        pending = list(
             LeaderboardSponsor.objects.select_for_update()
             .filter(used_at__isnull=True)
             .order_by("created_at")
             .select_related("user")
-            .first()
         )
-        if not sponsor:
-            return None
-        sponsor.used_at = timezone.now()
-        sponsor.save(update_fields=["used_at"])
-        return sponsor.user
+        seen, claimed = set(), []
+        for row in pending:
+            if row.user_id in seen:
+                continue
+            seen.add(row.user_id)
+            claimed.append(row)
+        if not claimed:
+            return []
+        LeaderboardSponsor.objects.filter(id__in=[r.id for r in claimed]).update(
+            used_at=timezone.now())
+        return [r.user for r in claimed]
 
 
 def _toplist_congrats_keyboard(period: str, date_str: str) -> str:

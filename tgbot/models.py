@@ -1138,8 +1138,8 @@ class StreakFreezeCoverage(BaseModel):
 
 class LeaderboardSponsor(BaseModel):
     """A Market 'Reyting sponsorligi' purchase, queued to credit the buyer on
-    the next Top Kitobxonlar broadcast (oldest unused first). Consumed by
-    tasks._consume_leaderboard_sponsor."""
+    the next Top Kitobxonlar broadcast. Every queued sponsor is named on that
+    post, not just the oldest one — see tasks._consume_leaderboard_sponsors."""
     user = models.ForeignKey(
         TelegramProfile, on_delete=models.CASCADE, related_name="leaderboard_sponsorships",
     )
