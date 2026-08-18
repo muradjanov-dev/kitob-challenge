@@ -2103,6 +2103,10 @@ class QuizAnswer(BaseModel):
     q_index = models.PositiveSmallIntegerField()
     choice = models.PositiveSmallIntegerField()
     is_correct = models.BooleanField(default=False)
+    shielded = models.BooleanField(
+        default=False,
+        help_text="Javob xato edi, lekin 🛡 Qalqon jokeri uni kechirdi — ochko berildi.",
+    )
     time_taken = models.FloatField(default=0.0, help_text="Seconds taken to submit answer.")
 
     class Meta:
@@ -2131,6 +2135,50 @@ class QuizScore(BaseModel):
         verbose_name_plural = "Bilim O'yini — Ballar"
         unique_together = ("game", "user")
         ordering = ("-points", "total_time", "created_at")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+class GameJoker(BaseModel):
+    """One purchased in-game help ("joker"), paid for in Kitobcha.
+
+    Shared by Bilim O'yini (quiz) and Omon qolish (survival) — `game_type`
+    says which table `game_id` points at, since the two games have separate
+    game tables. The row is also the idempotency key: `unique_together` means
+    a double-tap (or a retry after a dropped response) can never charge twice
+    for the same joker on the same question. That matters most for 50/50 —
+    without it a player could buy it repeatedly on one question and intersect
+    the surviving options to deduce the answer for less than the sniper price.
+    """
+
+    KIND_FIFTY = "fifty"       # 💡 ikkita noto'g'ri variantni yashiradi
+    KIND_SHIELD = "shield"     # ❤️ Omon qolishda +1 jon, Bilim o'yinida qalqon
+    KIND_SNIPER = "sniper"     # 🎯 to'g'ri javobni avtomatik belgilaydi
+    KIND_CHOICES = [
+        (KIND_FIFTY, "50/50"), (KIND_SHIELD, "Qalqon / Qo'shimcha jon"),
+        (KIND_SNIPER, "Snayper"),
+    ]
+
+    TYPE_QUIZ = "quiz"
+    TYPE_SURVIVAL = "survival"
+
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="game_jokers")
+    game_type = models.CharField(max_length=12, help_text="'quiz' yoki 'survival'.")
+    game_id = models.PositiveIntegerField(help_text="QuizGame yoki SurvivalGame id — game_type bo'yicha.")
+    flavor = models.CharField(max_length=24, blank=True, default="", help_text="Quiz uchun flavor.")
+    q_index = models.SmallIntegerField(help_text="Joker sotib olingan savol raqami (0 dan).")
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES)
+    price = models.PositiveIntegerField(default=0, help_text="Yechib olingan Kitobcha.")
+    payload = models.JSONField(default=dict, blank=True, help_text='50/50 uchun {"hidden": [i, j]}.')
+
+    class Meta:
+        db_table = "game_jokers"
+        verbose_name = "O'yin jokeri"
+        verbose_name_plural = "O'yin jokerlari"
+        unique_together = ("user", "game_type", "game_id", "q_index", "kind")
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.user.full_name} — {self.kind} ({self.game_type}#{self.game_id})"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -15,10 +15,16 @@ from django.db import transaction
 
 from django.utils import timezone
 
-from tgbot.models import SurvivalGame, SurvivalPlayer, SurvivalAnswer, TelegramProfile
+from django.db.models import F
+
+from tgbot.models import (
+    SurvivalGame, SurvivalPlayer, SurvivalAnswer, TelegramProfile, GameJoker,
+)
 from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, PARTICIPATION
+from tgbot.services import game_jokers
 from tgbot.services.game_questions import SURVIVAL_QUESTIONS
 
+GAME_TYPE = "survival"  # GameJoker.game_type
 ENTRY_FEE = 0  # bepul (2026-08-19)
 LEAD_SECONDS = 30
 NUM_QUESTIONS = 12
@@ -120,6 +126,29 @@ def _ensure_lives_resolved(game, closed_count):
             g.save(update_fields=["scored_indices", "updated_at"])
 
 
+def _join(game, profile):
+    """O'yinchi qatorini oladi yoki yaratadi. `(player, error)` qaytaradi.
+
+    Birinchi javob ham, birinchi joker ham shu yerdan o'tadi — o'yinga kirish
+    (kirish to'lovi va Market 'Sirli quti' bonus jonlari) faqat bir marta,
+    bir joyda qo'llanishi uchun.
+    """
+    player, created = SurvivalPlayer.objects.get_or_create(
+        game_id=game.id, user=profile, defaults={"lives": game.max_lives},
+    )
+    if created:
+        if not charge_entry_fee(profile, amount=ENTRY_FEE):
+            SurvivalPlayer.objects.filter(id=player.id).delete()
+            return None, "insufficient_balance"
+        # Spend any Market 'Sirli quti' bonus lives (capped at +2) on join.
+        bonus = min(int(getattr(profile, "bonus_survival_lives", 0) or 0), 2)
+        if bonus:
+            TelegramProfile.objects.filter(id=profile.id).update(bonus_survival_lives=0)
+            player.lives = player.lives + bonus
+            player.save(update_fields=["lives"])
+    return player, None
+
+
 def submit_answer(game_id: int, profile, choice: int) -> dict:
     g = SurvivalGame.objects.filter(id=game_id).first()
     if not g:
@@ -131,19 +160,9 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
 
     _ensure_lives_resolved(g, qi)  # resolve any rounds that closed before this one
 
-    player, created = SurvivalPlayer.objects.get_or_create(
-        game_id=g.id, user=profile, defaults={"lives": g.max_lives},
-    )
-    if created:
-        if not charge_entry_fee(profile, amount=ENTRY_FEE):
-            SurvivalPlayer.objects.filter(id=player.id).delete()
-            return {"ok": False, "error": "insufficient_balance", "need": ENTRY_FEE}
-        # Spend any Market 'Sirli quti' bonus lives (capped at +2) on join.
-        bonus = min(int(getattr(profile, "bonus_survival_lives", 0) or 0), 2)
-        if bonus:
-            TelegramProfile.objects.filter(id=profile.id).update(bonus_survival_lives=0)
-            player.lives = player.lives + bonus
-            player.save(update_fields=["lives"])
+    player, err = _join(g, profile)
+    if err:
+        return {"ok": False, "error": err, "need": ENTRY_FEE}
     if player.eliminated:
         return {"ok": False, "error": "eliminated"}
 
@@ -168,6 +187,102 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
 
     return {"ok": True, "correct": correct, "correct_index": q.get("correct"),
             "lives": player.lives}
+
+
+def use_joker(game_id: int, profile, kind: str) -> dict:
+    """💡/❤️/🎯 jokerini sotib olish va qo'llash (Omon qolish).
+
+    ❤️ bu yerda haqiqiy qo'shimcha jon: `SurvivalPlayer.lives` ga +1. Ataylab
+    faqat chetlatilishdan OLDIN olinadi — chetlatilgandan keyin "tirilish"
+    yo'q, aks holda balansi katta o'yinchi umuman yutqazmasdi.
+    """
+    if kind not in game_jokers.KINDS:
+        return {"ok": False, "error": "bad_joker"}
+    g = SurvivalGame.objects.filter(id=game_id).first()
+    if not g:
+        return {"ok": False, "error": "not_live"}
+    now = timezone.now()
+    status, qi, _ = _phase(g, now)
+    if status != "live" or qi < 0 or qi >= len(g.questions or []):
+        return {"ok": False, "error": "not_live"}
+
+    # Avval yopilgan turlarni hisoblab qo'yamiz: aks holda aslida allaqachon
+    # chetlatilgan o'yinchi "tirik" ko'rinib, joker sotib olib yuborardi.
+    _ensure_lives_resolved(g, qi)
+
+    player, err = _join(g, profile)
+    if err:
+        return {"ok": False, "error": err, "need": ENTRY_FEE}
+    player.refresh_from_db()
+    if player.eliminated:
+        return {"ok": False, "error": "eliminated", "balance": int(profile.ball or 0)}
+
+    q = g.questions[qi]
+    price = game_jokers.PRICES[kind]
+    balance = int(profile.ball or 0)
+    answered = SurvivalAnswer.objects.filter(game_id=g.id, user=profile, q_index=qi).exists()
+
+    if kind in (game_jokers.FIFTY, game_jokers.SNIPER) and answered:
+        return {"ok": False, "error": "already_answered", "balance": balance}
+
+    # 50/50 va snayper savolning to'g'ri javob indeksiga tayanadi. Agar u
+    # buzuq bo'lsa (int emas yoki diapazondan tashqarida), 50/50 to'g'ri
+    # javobni yashirib qo'yishi, snayper esa saqlab bo'lmaydigan javob
+    # yozishga urinishi mumkin edi — shuning uchun pul yechilmasdan to'xtaymiz.
+    if kind in (game_jokers.FIFTY, game_jokers.SNIPER):
+        ci = q.get("correct")
+        if not isinstance(ci, int) or not (0 <= ci < len(q.get("options") or [])):
+            return {"ok": False, "error": "joker_unavailable", "balance": balance}
+
+    payload = None
+    if kind == game_jokers.FIFTY:
+        hidden = game_jokers.pick_hidden(q.get("options") or [], q.get("correct", -1))
+        if not hidden:
+            return {"ok": False, "error": "joker_unavailable", "balance": balance}
+        payload = {"hidden": hidden}
+    elif kind == game_jokers.SHIELD:
+        if game_jokers.shield_count(profile, GAME_TYPE, g.id) >= game_jokers.MAX_SHIELDS_PER_GAME:
+            return {"ok": False, "error": "joker_limit", "balance": balance}
+        # Bir turda bitta jon — takroriy so'rov ikkinchi jonni sotib olib
+        # yubormasin. Ikkinchisini keyingi savolda olish mumkin.
+        if game_jokers.find(profile, GAME_TYPE, g.id, qi, game_jokers.SHIELD):
+            return {"ok": False, "error": "joker_round_limit", "balance": balance}
+
+    joker, created, err = game_jokers.buy(
+        profile, game_type=GAME_TYPE, game_id=g.id, q_index=qi, kind=kind,
+        payload=payload,
+    )
+    if err:
+        return {"ok": False, "error": err, "need": price, "balance": balance}
+
+    out = {"ok": True, "kind": kind, "charged": price if created else 0,
+           "balance": int(profile.ball or 0)}
+
+    if kind == game_jokers.FIFTY:
+        out["hidden"] = list((joker.payload or {}).get("hidden") or [])
+    elif kind == game_jokers.SHIELD:
+        if created:
+            # F() bilan — shu payt boshqa tur yopilib jon yechilayotgan
+            # bo'lsa ham qo'shimcha jon yo'qolib ketmasin.
+            SurvivalPlayer.objects.filter(id=player.id, eliminated=False).update(
+                lives=F("lives") + 1,
+            )
+            player.refresh_from_db()
+        out["lives"] = player.lives
+        out["shields_bought"] = game_jokers.shield_count(profile, GAME_TYPE, g.id)
+    elif kind == game_jokers.SNIPER:
+        res = submit_answer(g.id, profile, q.get("correct"))
+        if not res.get("ok") and res.get("error") != "already_answered":
+            if created:
+                GameJoker.objects.filter(id=joker.id).delete()
+                game_jokers.refund(profile, price, f"joker_{kind}_refund")
+            return {"ok": False, "error": res.get("error") or "failed",
+                    "balance": int(profile.ball or 0)}
+        out["choice"] = q.get("correct")
+        out["correct_index"] = q.get("correct")
+        out["correct"] = True
+        out["balance"] = int(profile.ball or 0)
+    return out
 
 
 def finalize(game_id: int) -> dict | None:
@@ -274,7 +389,9 @@ def state_payload(profile) -> dict:
     now = timezone.now()
     g = latest_game()
     if not g:
-        return {"ok": True, "status": "none", "lifetime": _lifetime(profile), "history": _history()}
+        return {"ok": True, "status": "none", "lifetime": _lifetime(profile),
+                "history": _history(), "balance": int(profile.ball or 0),
+                "joker_prices": game_jokers.prices_payload()}
 
     status, qi, left = _phase(g, now)
     nq = len(g.questions or [])
@@ -303,6 +420,8 @@ def state_payload(profile) -> dict:
         "leaderboard": _leaderboard(g),
         "lifetime": _lifetime(profile),
         "history": _history() if status != "live" else [],
+        "balance": int(profile.ball or 0),
+        "joker_prices": game_jokers.prices_payload(),
     }
     if status == "live" and 0 <= qi < nq:
         q = g.questions[qi]
@@ -318,4 +437,7 @@ def state_payload(profile) -> dict:
                 payload["answered"] = False
         else:
             payload["answered"] = False
+        payload["jokers"] = game_jokers.summarize(
+            game_jokers.game_rows(profile, GAME_TYPE, g.id), qi,
+        )
     return payload

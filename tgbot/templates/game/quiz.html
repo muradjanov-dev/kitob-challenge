@@ -53,6 +53,25 @@
     .hrow .hd{font-size:11px;color:var(--muted)}.hrow .hw{font-weight:700}
     .muted{color:var(--muted)}.hidden{display:none}
 
+    /* ── JOKERLAR: o'yin ichida Kitobchaga sotib olinadigan yordamlar ─── */
+    .jokers{display:flex;gap:8px;margin-bottom:12px}
+    .jk{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;
+      padding:9px 6px 8px;text-align:center;cursor:pointer;color:var(--text);
+      font-family:inherit;transition:transform .12s,border-color .12s,opacity .12s}
+    .jk:active{transform:scale(.95)}
+    .jk .ic{display:block;font-size:19px;line-height:1.15}
+    .jk .nm{display:block;font-size:10px;font-weight:800;margin-top:2px}
+    .jk .pr{display:block;font-size:10.5px;font-weight:800;color:var(--accent2);margin-top:2px}
+    .jk[disabled]{opacity:.4;cursor:default}
+    .jk.used{border-color:var(--ok);opacity:.65}
+    .jk.used .pr{color:var(--ok)}
+    .jk.poor .pr{color:var(--bad)}
+    .jkbal{font-size:11px;font-weight:700;color:var(--muted);text-align:center;margin:-4px 0 10px}
+    .jkbal b{color:var(--accent2)}
+    .opt.gone{opacity:0;transform:scale(.9);pointer-events:none;transition:opacity .35s,transform .35s}
+    .shieldtag{display:inline-block;background:rgba(255,93,108,.15);border:1px solid var(--bad);
+      color:var(--bad);border-radius:8px;padding:2px 8px;font-size:11px;font-weight:800;margin-left:6px}
+
     /* THEMES */
     body.theme-hacker { --bg: #0a0a0a; --card: #121212; --card2: #1a1a1a; --text: #00ff41; --muted: #008f11; font-family: 'Courier New', Courier, monospace; }
     body.theme-hacker .card { border: 1px solid #00ff41; box-shadow: 0 0 10px rgba(0,255,65,0.2); }
@@ -171,6 +190,12 @@
       <img class="qimg hidden" id="qimg" alt="">
       <div class="items hidden" id="itemsRow"></div>
     </div>
+    <div class="jokers hidden" id="jokers">
+      <button type="button" class="jk" id="jkFifty"><span class="ic">💡</span><span class="nm">50/50</span><span class="pr">100 🪙</span></button>
+      <button type="button" class="jk" id="jkShield"><span class="ic">❤️</span><span class="nm">Qalqon</span><span class="pr">300 🪙</span></button>
+      <button type="button" class="jk" id="jkSniper"><span class="ic">🎯</span><span class="nm">Snayper</span><span class="pr">500 🪙</span></button>
+    </div>
+    <div class="jkbal hidden" id="jkBal"></div>
     <div class="card" id="optsCard"><div id="opts"></div><div class="toast" id="toast"></div></div>
     <div class="stat">
       <div class="box"><b id="myPts">0</b><span id="myPtsLbl">Ballaringiz</span></div>
@@ -317,6 +342,13 @@
     var $=function(id){return document.getElementById(id);};
     var localSeconds=0,busy=false,lastQ=-1;
     var curOpts=[],curAnswered=false,curCorrectIdx=-1,curChoice=-1;
+    // ── Jokerlar holati ────────────────────────────────────────────────
+    // curHidden — 50/50 yashirgan variant indekslari (serverdan keladi, shu
+    // sababli sahifa yangilansa ham o'sha ikkitasi yashirinligicha qoladi).
+    var curHidden=[],jokerBusy=false,jokerBalance=0,jokerFading=false;
+    var jokerPrices={fifty:100,shield:300,sniper:500};
+    var jokerUsed=[],jokerShields=0,jokerShieldsLeft=2,lastState=null;
+    var TEXT_FLAVORS=['anagram','wordle','crossword','cipher'];
     function fmt(s){s=Math.max(0,s|0);var m=Math.floor(s/60),r=s%60;return(m<10?'0':'')+m+':'+(r<10?'0':'')+r;}
     function esc(t){return(t||'').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     function api(path,opts){opts=opts||{};opts.headers=Object.assign({'X-Telegram-Init-Data':INIT},opts.headers||{});return fetch(path,opts).then(function(r){return r.json();});}
@@ -334,11 +366,11 @@
       if(!s.answer_key||!s.answer_key.length)return '';
       var h='<div style="text-align:left;margin-top:16px"><div style="font-weight:800;margin-bottom:6px">📋 To\'g\'ri javoblar</div>';
       s.answer_key.forEach(function(r){
-        var mark=r.you==='ok'?'✅':(r.you==='no'?'❌':'➖');
+        var mark=r.you==='ok'?'✅':(r.you==='shield'?'🛡':(r.you==='no'?'❌':'➖'));
         var t=r.secs!=null?' <span class="muted">('+r.secs+'s)</span>':'';
         h+='<div class="lb"><div class="rank">'+mark+'</div><div class="lb-name">'+esc(r.answer)+t+'</div></div>';
       });
-      return h+'<div class="muted" style="font-size:11px;margin-top:6px">✅ siz topgan · ❌ xato · ➖ javob bermagan</div></div>';
+      return h+'<div class="muted" style="font-size:11px;margin-top:6px">✅ siz topgan · 🛡 qalqon kechirgan · ❌ xato · ➖ javob bermagan</div></div>';
     }
 
     // ── 1) TORTIB TASHLASH: kitobchani javob katagiga sudrang ─────────
@@ -577,7 +609,11 @@
           box.className = '';
         }
 
-        if (INPUT_MODE) {
+        // 💡 50/50 ishlatilgan bo'lsa, oddiy tugmalarga qaytamiz: surish,
+        // sudrash, surgich va tirnash mexanikalari variantlar to'liq
+        // ro'yxatiga bog'langan, ikkitasi yo'qolganda ular buzilib qolardi.
+        var mode = (curHidden.length && !curAnswered) ? '' : INPUT_MODE;
+        if (mode) {
           if (curAnswered) {
             box.className = 'grid-opts';
             curOpts.forEach(function(o,i){
@@ -595,9 +631,9 @@
             return;
           }
           
-          if (INPUT_MODE === 'drag')    { renderDrag(box);    return; }
-          if (INPUT_MODE === 'slider')  { renderSlider(box);  return; }
-          if (INPUT_MODE === 'scratch') { renderScratch(box); return; }
+          if (mode === 'drag')    { renderDrag(box);    return; }
+          if (mode === 'slider')  { renderSlider(box);  return; }
+          if (mode === 'scratch') { renderScratch(box); return; }
 
           box.className = '';
           var instructions = document.createElement('div');
@@ -703,18 +739,130 @@
              eq.innerHTML = '<div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div>';
              box.appendChild(eq);
           }
+          // `fading` — 50/50 shu lahzada bosildi: yashiriladigan variantlar
+          // avval chiziladi, so'ng animatsiya bilan so'nadi. Undan keyingi
+          // har qanday qayta chizishda ular umuman chizilmaydi (sahifa
+          // yangilansa ham — yashiringan indekslar serverda saqlanadi).
+          var fading = jokerFading;
           curOpts.forEach(function(o,i){
+            var hid = curHidden.indexOf(i)!==-1;
+            // Javob berilgandan keyin hammasi qaytadi — natijani tekshirish uchun.
+            if(hid && !curAnswered && !fading) return;
             var b=document.createElement('button');b.className='opt';b.textContent=o;
             if(curAnswered){
               b.disabled=true;
               if(i===curCorrectIdx)b.className='opt correct';
               else if(i===curChoice)b.className='opt wrong';
+            }else if(hid){
+              b.disabled=true;b.dataset.fade='1';
             }else{ b.addEventListener('click',function(){answer(i);}); }
             box.appendChild(b);
           });
+          if(fading && !curAnswered){
+            jokerFading=false;
+            // Sinf keyingi kadrda qo'shiladi — aks holda element allaqachon
+            // shaffof holda tug'ilib, CSS o'tishi umuman ishlamaydi.
+            setTimeout(function(){
+              var gone=box.querySelectorAll('[data-fade="1"]');
+              for(var i=0;i<gone.length;i++) gone[i].className='opt gone';
+              setTimeout(function(){ if(!curAnswered) renderOpts(); },400);
+            },20);
+          }
         }
       }
     }
+
+    // ── JOKERLAR ────────────────────────────────────────────────────────
+    // Uchta yordam Kitobcha evaziga sotib olinadi. Barcha tekshiruv serverda
+    // (balans, o'yin fazasi, takroriy xarid) — bu yerdagisi faqat tugmalarni
+    // to'g'ri holatda ko'rsatish uchun.
+    var JOKER_LABELS={fifty:'50/50',shield:'Qalqon',sniper:'Snayper'};
+
+    function jokerReason(kind){
+      if(jokerBusy) return 'busy';
+      if(jokerUsed.indexOf(kind)!==-1) return 'used';
+      if(kind==='fifty'){
+        if(TEXT_FLAVORS.indexOf(FLAVOR)!==-1) return 'na';   // javob yoziladi, variantlar ko'rinmaydi
+        if(curAnswered) return 'answered';
+        if(curOpts.length<3) return 'na';
+      }
+      if(kind==='sniper' && curAnswered) return 'answered';
+      if(kind==='shield' && jokerShieldsLeft<=0) return 'limit';
+      if(jokerBalance < jokerPrices[kind]) return 'poor';
+      return '';
+    }
+
+    function renderJokers(s){
+      var bar=$('jokers'), bal=$('jkBal');
+      if(!s || s.status!=='live' || s.phase!=='answer' || s.eliminated){
+        bar.classList.add('hidden'); bal.classList.add('hidden'); return;
+      }
+      bar.classList.remove('hidden'); bal.classList.remove('hidden');
+      ['fifty','shield','sniper'].forEach(function(kind){
+        var el=$('jk'+kind.charAt(0).toUpperCase()+kind.slice(1));
+        if(!el) return;
+        var why=jokerReason(kind);
+        el.className='jk'+(why==='used'?' used':'')+(why==='poor'?' poor':'');
+        el.disabled = !!why;
+        var pr=el.querySelector('.pr');
+        if(why==='used') pr.textContent='✓ olindi';
+        else if(why==='limit') pr.textContent='limit';
+        else if(why==='na') pr.textContent='—';
+        else pr.textContent=jokerPrices[kind]+' 🪙';
+      });
+      // Qalqon zaxirasi bo'lsa, tugmada nechtaligi ko'rinib tursin.
+      var sh=$('jkShield');
+      if(sh) sh.querySelector('.nm').textContent = jokerShields>0 ? ('Qalqon ×'+jokerShields) : 'Qalqon';
+      bal.innerHTML='🪙 Balans: <b>'+jokerBalance+'</b> Kitobcha'+
+        (jokerShields>0?' · ❤️ <b>'+jokerShields+'</b> qalqon tayyor':'');
+    }
+
+    function jokerToast(msg, good){
+      var t=$('toast'); t.className='toast '+(good?'ok':'bad'); t.textContent=msg;
+    }
+
+    function useJoker(kind){
+      if(jokerBusy||jokerReason(kind))return;
+      jokerBusy=true; renderJokers(lastState);
+      api('/api/quiz/'+FLAVOR+'/joker/',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({kind:kind})}).then(function(r){
+        if(r&&r.ok){
+          if(typeof r.balance==='number') jokerBalance=r.balance;
+          if(jokerUsed.indexOf(kind)===-1) jokerUsed.push(kind);
+          if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.impactOccurred('medium')}catch(e){}}
+          if(kind==='fifty'){
+            curHidden=r.hidden||[]; jokerFading=true; renderOpts();
+            jokerToast("💡 Ikkita noto'g'ri variant olib tashlandi!", true);
+          }else if(kind==='shield'){
+            jokerShields=(jokerShields||0)+1;
+            jokerShieldsLeft=Math.max(0,jokerShieldsLeft-1);
+            jokerToast("❤️ Qalqon olindi — bitta xato javob kechiriladi.", true);
+          }else if(kind==='sniper'){
+            curAnswered=true; curChoice=r.choice;
+            curCorrectIdx=(r.correct_index!==undefined?r.correct_index:-1);
+            curHidden=[]; renderOpts();
+            jokerToast("🎯 Snayper to'g'ri javobni belgiladi!", true);
+          }
+          poll();
+        }else{
+          jokerToast(({
+            insufficient_balance:"🪙 Kitobcha yetarli emas.",
+            already_answered:"Siz allaqachon javob berdingiz.",
+            joker_round_limit:"Bu savolda qalqon allaqachon olindi — keyingisida olishingiz mumkin.",
+            joker_limit:"Bu o'yinda qalqon limiti tugadi.",
+            not_answering:"Hozir javob vaqti emas.",
+            eliminated:"Siz chetlatilgansiz.",
+            premium_required:"👑 Bu arena faqat VIP Premium a'zolar uchun.",
+            joker_unavailable:"Bu savolda 50/50 ishlamaydi."
+          })[r&&r.error]||"Joker qabul qilinmadi.", false);
+          if(r&&typeof r.balance==='number') jokerBalance=r.balance;
+        }
+      }).catch(function(){}).then(function(){ jokerBusy=false; renderJokers(lastState); });
+    }
+
+    $('jkFifty').addEventListener('click',function(){useJoker('fifty');});
+    $('jkShield').addEventListener('click',function(){useJoker('shield');});
+    $('jkSniper').addEventListener('click',function(){useJoker('sniper');});
 
     function statsHistoryHtml(s){
       var lt=s.lifetime||{};
@@ -727,9 +875,13 @@
     }
 
     function render(s){
+      lastState=s;
       var live=$('live'),info=$('info');
+      if(typeof s.balance==='number') jokerBalance=s.balance;
+      if(s.joker_prices) jokerPrices=s.joker_prices;
       if(s.vip_locked){
         live.classList.add('hidden');info.classList.remove('hidden');
+        renderJokers(null);
         $('timerLbl').textContent='VIP';$('subtitle').textContent='⭐️ Faqat Premium';
         info.innerHTML='<div class="em">👑</div><h2 style="color:#ffd700">VIP Premium Arena</h2><p style="color:#ffcc00;font-weight:600;font-size:15px">Ushbu arena faqat VIP Premium a\'zolari uchun!</p><p style="margin-top:10px;font-size:14px;color:var(--text-muted)">Ishtirok etish hamda <b>500 – 1000 Kitobcha</b> va <b>BEPUL Premium</b> yutib olish uchun Premium obunani faollashtiring.</p><div style="margin-top:18px"><a href="/dokon/" style="display:inline-block;background:linear-gradient(135deg,#ffd700,#ff9900);color:#111;font-weight:800;padding:12px 24px;border-radius:14px;text-decoration:none;box-shadow:0 4px 15px rgba(255,215,0,0.3)">⭐️ Premium Faollashtirish</a></div>'+statsHistoryHtml(s);
         localSeconds=0;$('timer').textContent='--:--';return;
@@ -739,7 +891,16 @@
         $('subtitle').textContent='Savol '+s.q_number+' / '+s.q_total;
         $('qn').textContent='SAVOL '+s.q_number+' / '+s.q_total;
         $('myPts').textContent=s.your_points||0;$('qnum').textContent=s.q_number+'/'+s.q_total;
-        if(s.q_index!==lastQ){lastQ=s.q_index;curAnswered=false;curCorrectIdx=-1;curChoice=-1;$('toast').textContent='';}
+        if(s.q_index!==lastQ){lastQ=s.q_index;curAnswered=false;curCorrectIdx=-1;curChoice=-1;curHidden=[];jokerUsed=[];$('toast').textContent='';}
+        // Joker holati serverdan keladi: sahifa yangilansa yoki boshqa
+        // qurilmadan ochilsa ham 50/50 o'sha ikkitasini yashirib turadi.
+        var jk=s.jokers||{};
+        if(!jokerBusy){
+          jokerUsed=jk.used||[];
+          if(!jokerFading) curHidden=jk.hidden||[];
+          jokerShields=jk.shields||0;
+          jokerShieldsLeft=(jk.shields_left_to_buy!==undefined?jk.shields_left_to_buy:2);
+        }
         $('qtext').innerHTML = (s.q||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/&lt;b&gt;/gi,'<b>').replace(/&lt;\/b&gt;/gi,'</b>').replace(/\n/g,'<br>');
         var audioBox=$('audioBox');
         if(FLAVOR==='audioquote'||s.audio_url){
@@ -769,6 +930,7 @@
         if(s.phase==='reveal'){curCorrectIdx=(s.correct_index!==undefined?s.correct_index:-1);curAnswered=true;$('timerLbl').textContent='NATIJA';}
         else{$('timerLbl').textContent='JAVOB';}
         renderOpts();
+        renderJokers(s);
         var teamBar=$('teamBar');
         if(FLAVOR==='teams'){
           teamBar.classList.remove('hidden');
@@ -786,6 +948,7 @@
         localSeconds=s.seconds;
       }else{
         live.classList.add('hidden');info.classList.remove('hidden');
+        renderJokers(null);
         if(s.status==='scheduled'){
           $('timerLbl').textContent='BOSHLANISH';$('subtitle').textContent='Tez orada';
           info.innerHTML='<div class="em">'+M.emoji+'</div><h2>O\'yin boshlanmoqda</h2><p>'+M.scheduled+' Tayyor turing!</p>'+statsHistoryHtml(s);
@@ -814,7 +977,11 @@
         if(r.ok||r.error==='already_answered'){
           $('toast').textContent='';
           curAnswered=true;curChoice=choice;curCorrectIdx=(r.correct_index!==undefined?r.correct_index:-1);renderOpts();
-          if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.notificationOccurred(r.correct?'success':'error')}catch(e){}}
+          if(r.shielded){
+            jokerShields=Math.max(0,jokerShields-1);
+            jokerToast("❤️ Qalqon xatoni kechirdi — ochko saqlanib qoldi!", true);
+          }
+          if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.notificationOccurred((r.correct||r.shielded)?'success':'error')}catch(e){}}
           poll();
         } else {
           var t=$('toast');t.className='toast bad';

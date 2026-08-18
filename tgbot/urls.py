@@ -19,7 +19,7 @@ from tgbot.library_views import (
     api_get_progress, api_save_progress, api_start_reading, api_premium_access,
     api_top_active_readers,
 )
-from tgbot.cabinet_views import cabinet_index, api_cabinet_me
+from tgbot.cabinet_views import cabinet_index, api_cabinet_me, api_set_theme
 from tgbot.report_views import api_submit_report, api_my_report_books
 from tgbot.analytics_views import api_track_event
 from tgbot.game_views import (
@@ -29,8 +29,8 @@ from tgbot.game_views import (
     emoji_index, api_emoji_state, api_emoji_submit,
     wisdom_index, api_wisdom_state, api_wisdom_submit,
     detective_index, api_detective_state, api_detective_submit,
-    survival_index, api_survival_state, api_survival_submit,
-    quiz_index, api_quiz_state, api_quiz_submit,
+    survival_index, api_survival_state, api_survival_submit, api_survival_joker,
+    quiz_index, api_quiz_state, api_quiz_submit, api_quiz_joker,
     api_games_status,
 )
 
@@ -66,8 +66,9 @@ urlpatterns = [
     path("internal/broadcast/auction-announcement/", internal_broadcast_auction_announcement, name="internal-broadcast-auction-announcement"),
     path("health-check/redis/", health_check_redis, name="health-check-redis"),
     path("health-check/celery/", health_check_celery, name="health-check-celery"),
-    path("shop/", shop_index, name="shop"),
-    path("shop/api/products/", api_products, name="shop-api-products"),
+    path('api/cabinet/me/', api_cabinet_me, name='api-cabinet-me'),
+    path('api/cabinet/set-theme/', api_set_theme, name='api-cabinet-set-theme'),
+    path('api/shop/products/', api_products, name='api-products'),
     path("shop/api/products-public/", api_products_public, name="shop-api-products-public"),
     path("shop/api/me/", api_me, name="shop-api-me"),
     path("shop/api/buy/", api_buy, name="shop-api-buy"),
@@ -75,6 +76,7 @@ urlpatterns = [
     path("shop/api/bid/", api_bid, name="shop-api-bid"),
     path("kabinet/", cabinet_index, name="cabinet"),
     path("kabinet/api/me/", api_cabinet_me, name="cabinet-api-me"),
+    path("kabinet/api/set-theme/", api_set_theme, name="cabinet-api-set-theme"),
     path("kabinet/api/report/", api_submit_report, name="cabinet-api-submit-report"),
     path("kabinet/api/report/books/", api_my_report_books, name="cabinet-api-report-books"),
     path("zanjir/", chain_index, name="chain"),
@@ -101,6 +103,7 @@ urlpatterns = [
     path("omon-qolish/", survival_index, name="survival"),
     path("omon-qolish/api/state/", api_survival_state, name="survival-api-state"),
     path("omon-qolish/api/submit/", api_survival_submit, name="survival-api-submit"),
+    path("omon-qolish/api/joker/", api_survival_joker, name="survival-api-joker"),
 
     # Bilim O'yini — 4 flavors sharing one engine/template, distinct URLs.
     path("ikki-haqiqat/", quiz_index, {"flavor": "twofacts"}, name="quiz-twofacts"),
@@ -337,6 +340,10 @@ urlpatterns = [
     path("marifat/", quiz_index, {"flavor": "marifat"}, name="quiz-marifat"),
     path("marifat/api/state/", api_quiz_state, {"flavor": "marifat"}, name="quiz-marifat-api-state"),
     path("marifat/api/submit/", api_quiz_submit, {"flavor": "marifat"}, name="quiz-marifat-api-submit"),
+
+    # Bilim O'yinining har bir flavori uchun alohida yo'l ochilmaydi — joker
+    # endpointi bitta, flavor manzilning o'zidan olinadi.
+    path("api/quiz/<str:flavor>/joker/", api_quiz_joker, name="quiz-api-joker"),
 
     path("api/games/status/", api_games_status, name="games-api-status"),
 

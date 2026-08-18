@@ -784,3 +784,26 @@ class SiteEventAdmin(admin.ModelAdmin):
         stats = compute_site_stats(request.GET.get("range", "7d"), top_n=30)
         extra_context.update({**stats, "range_choices": SITE_STATS_RANGE_CHOICES})
         return super().changelist_view(request, extra_context=extra_context)
+
+
+@admin.register(models.GameJoker)
+class GameJokerAdmin(admin.ModelAdmin):
+    """Sotilgan o'yin jokerlari — faqat o'qish uchun (audit jurnali).
+
+    Har bir qator bitta xariddir; Kitobcha harakati esa KitobchaLedger'da
+    `joker_*` sabablari bilan yotadi, shuning uchun bu yerda pul o'zgartirib
+    bo'lmaydi — qo'lda tahrirlash ikkalasini bir-biriga zid qilib qo'yardi.
+    """
+    list_display = ("id", "created_at", "user", "game_type", "flavor", "game_id",
+                    "q_index", "kind", "price")
+    list_filter = ("kind", "game_type", "flavor", "created_at")
+    search_fields = ("user__full_name", "user__username", "user__telegram_id")
+    date_hierarchy = "created_at"
+    readonly_fields = ("user", "game_type", "game_id", "flavor", "q_index",
+                       "kind", "price", "payload", "created_at", "updated_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

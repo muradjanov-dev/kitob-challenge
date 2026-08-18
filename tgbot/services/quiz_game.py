@@ -31,8 +31,9 @@ from django.db import transaction
 from django.db.models import F, Sum, Count, Max
 from django.utils import timezone
 
-from tgbot.models import QuizGame, QuizAnswer, QuizScore
+from tgbot.models import QuizGame, QuizAnswer, QuizScore, GameJoker
 from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, REWARD_TIERS, PARTICIPATION
+from tgbot.services import game_jokers
 from tgbot.services.game_questions import (
     QUIZ_TWOFACTS_QUESTIONS, QUIZ_IMPOSTOR_QUESTIONS, QUIZ_CONNECTION_QUESTIONS,
     QUIZ_TIMELINE_QUESTIONS, QUIZ_MATCHBOOK_QUESTIONS, QUIZ_REVERSE_QUESTIONS,
@@ -56,6 +57,7 @@ from tgbot.services.game_questions import (
     QUIZ_MARIFAT_QUESTIONS,
 )
 
+GAME_TYPE = "quiz"  # GameJoker.game_type — jokerlar qaysi o'yin jadvaliga tegishli
 LEAD_SECONDS = 30
 ANSWER_SECONDS = 20
 REVEAL_SECONDS = 0
@@ -542,18 +544,135 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
         return {"ok": False, "error": "already_answered",
                 "correct": hit.is_correct, "correct_index": q.get("correct")}
 
+    # ❤️ Qalqon: sotib olingan, hali sarflanmagan qalqon bo'lsa, bitta xato
+    # javob kechiriladi va ochko baribir beriladi. Sarflangani javob qatoridagi
+    # `shielded` bayrog'i bilan qayd etiladi — shuning uchun alohida hisoblagich
+    # kerak emas va bir qalqon ikki marta ishlatilib qolmaydi.
+    shielded = False
+    if not correct:
+        shielded = _consume_shield(g, profile)
+        if shielded:
+            hit.shielded = True
+            hit.save(update_fields=["shielded", "updated_at"])
+
     score, score_created = QuizScore.objects.get_or_create(game=g, user=profile)
-    if score_created and team:
+    fields = ["points", "total_time", "updated_at"]
+    if team and not score.team:
         score.team = team
+        fields.append("team")
     score.total_time = round((score.total_time or 0.0) + time_taken, 3)
-    if correct:
+    if correct or shielded:
         score.points = (score.points or 0) + POINTS
         if g.flavor == "teams" and score.team:
             field = "team_a_points" if score.team == "a" else "team_b_points"
             QuizGame.objects.filter(id=g.id).update(**{field: F(field) + POINTS})
-    score.save(update_fields=["points", "total_time", "team", "updated_at"] if (score_created and team) else ["points", "total_time", "updated_at"])
+    score.save(update_fields=fields)
 
-    return {"ok": True, "correct": correct, "correct_index": q.get("correct"), "team": score.team}
+    return {"ok": True, "correct": correct, "shielded": shielded,
+            "correct_index": q.get("correct"), "team": score.team}
+
+
+def _shields_available(game, profile, bought: int | None = None) -> int:
+    """Sotib olingan qalqonlardan nechtasi hali sarflanmaganini qaytaradi.
+
+    Sarflangani alohida hisoblagichda emas, `QuizAnswer.shielded` bayroqlarida
+    turadi — javob qatori bilan bitta tranzaksiyada yozilgani uchun qayta
+    yuborilgan so'rov bitta qalqonni ikki marta sarflay olmaydi.
+    """
+    if bought is None:
+        bought = game_jokers.shield_count(profile, GAME_TYPE, game.id)
+    if not bought:
+        return 0
+    spent = QuizAnswer.objects.filter(game=game, user=profile, shielded=True).count()
+    return max(0, bought - spent)
+
+
+def _consume_shield(game, profile) -> bool:
+    return _shields_available(game, profile) > 0
+
+
+def use_joker(game_id: int, profile, kind: str) -> dict:
+    """💡/❤️/🎯 jokerini sotib olish va qo'llash.
+
+    Har uchala joker faqat javob fazasida ishlaydi. Pul yechilishidan oldin
+    o'yin holati to'liq tekshiriladi, snayperda esa javob yuborilmay qolsa
+    Kitobcha qaytariladi — hech qanday holatda pul "yo'qolib" ketmaydi.
+    """
+    if kind not in game_jokers.KINDS:
+        return {"ok": False, "error": "bad_joker"}
+    g = QuizGame.objects.filter(id=game_id).first()
+    if not g:
+        return {"ok": False, "error": "not_live"}
+    if g.is_vip and not (profile and profile.has_active_premium()):
+        return {"ok": False, "error": "premium_required"}
+
+    status, qi, phase, _ = _phase(g, timezone.now())
+    if status != "live" or phase != "answer" or qi < 0 or qi >= len(g.questions or []):
+        return {"ok": False, "error": "not_answering"}
+
+    q = g.questions[qi]
+    price = game_jokers.PRICES[kind]
+    balance = int(profile.ball or 0)
+    answered = QuizAnswer.objects.filter(game_id=g.id, user=profile, q_index=qi).exists()
+
+    # 50/50 va snayper joriy savolga tegishli — javob berilgandan keyin ular
+    # foydasiz, shuning uchun pul yechilmaydi.
+    if kind in (game_jokers.FIFTY, game_jokers.SNIPER) and answered:
+        return {"ok": False, "error": "already_answered", "balance": balance}
+
+    # 50/50 va snayper savolning to'g'ri javob indeksiga tayanadi. Agar u
+    # buzuq bo'lsa (int emas yoki diapazondan tashqarida), 50/50 to'g'ri
+    # javobni yashirib qo'yishi, snayper esa saqlab bo'lmaydigan javob
+    # yozishga urinishi mumkin edi — shuning uchun pul yechilmasdan to'xtaymiz.
+    if kind in (game_jokers.FIFTY, game_jokers.SNIPER):
+        ci = q.get("correct")
+        if not isinstance(ci, int) or not (0 <= ci < len(q.get("options") or [])):
+            return {"ok": False, "error": "joker_unavailable", "balance": balance}
+
+    payload = None
+    if kind == game_jokers.FIFTY:
+        hidden = game_jokers.pick_hidden(q.get("options") or [], q.get("correct", -1))
+        if not hidden:
+            return {"ok": False, "error": "joker_unavailable", "balance": balance}
+        payload = {"hidden": hidden}
+    elif kind == game_jokers.SHIELD:
+        if game_jokers.shield_count(profile, GAME_TYPE, g.id) >= game_jokers.MAX_SHIELDS_PER_GAME:
+            return {"ok": False, "error": "joker_limit", "balance": balance}
+        # Bir savolda bitta — takroriy so'rov (tarmoq uzilishi, ikki marta
+        # bosish) ikkinchi qalqonni sotib olib yubormasligi uchun. Ikkinchisini
+        # keyingi savolda olish mumkin.
+        if game_jokers.find(profile, GAME_TYPE, g.id, qi, game_jokers.SHIELD):
+            return {"ok": False, "error": "joker_round_limit", "balance": balance}
+
+    joker, created, err = game_jokers.buy(
+        profile, game_type=GAME_TYPE, game_id=g.id, q_index=qi, kind=kind,
+        flavor=g.flavor, payload=payload,
+    )
+    if err:
+        return {"ok": False, "error": err, "need": price, "balance": balance}
+
+    out = {"ok": True, "kind": kind, "charged": price if created else 0,
+           "balance": int(profile.ball or 0)}
+
+    if kind == game_jokers.FIFTY:
+        out["hidden"] = list((joker.payload or {}).get("hidden") or [])
+    elif kind == game_jokers.SHIELD:
+        out["shields"] = _shields_available(g, profile)
+        out["shields_bought"] = game_jokers.shield_count(profile, GAME_TYPE, g.id)
+    elif kind == game_jokers.SNIPER:
+        res = submit_answer(g.id, profile, q.get("correct"))
+        if not res.get("ok") and res.get("error") != "already_answered":
+            # Javob o'tmadi — jokerni bekor qilib, Kitobchani qaytaramiz.
+            if created:
+                GameJoker.objects.filter(id=joker.id).delete()
+                game_jokers.refund(profile, price, f"joker_{kind}_refund")
+            return {"ok": False, "error": res.get("error") or "failed",
+                    "balance": int(profile.ball or 0)}
+        out["choice"] = q.get("correct")
+        out["correct_index"] = q.get("correct")
+        out["correct"] = True
+        out["balance"] = int(profile.ball or 0)
+    return out
 
 
 def ranked_scores(game, include_zero=False):
@@ -759,7 +878,8 @@ def state_payload(profile, flavor) -> dict:
     g = get_or_activate_live_game(flavor) or latest_game(flavor)
     if not g:
         return {"ok": True, "status": "none", "lifetime": _lifetime(profile, flavor),
-                "history": _history(flavor)}
+                "history": _history(flavor), "balance": int(profile.ball or 0),
+                "joker_prices": game_jokers.prices_payload()}
 
     status, qi, phase, secs = _phase(g, now)
     nq = len(g.questions or [])
@@ -780,6 +900,8 @@ def state_payload(profile, flavor) -> dict:
         "your_premium_days": (my.premium_days if my else 0),
         "lifetime": _lifetime(profile, flavor),
         "history": _history(flavor) if status != "live" else [],
+        "balance": int(profile.ball or 0),
+        "joker_prices": game_jokers.prices_payload(),
     }
     if finished:
         # Full answer key once the game is over — anyone can re-check every
@@ -794,7 +916,18 @@ def state_payload(profile, flavor) -> dict:
         mine = {a.q_index: a for a in QuizAnswer.objects.filter(game=g, user=profile)}
         for row in payload["answer_key"]:
             a = mine.get(row["n"] - 1)
-            row["you"] = ("ok" if a.is_correct else "no") if a else "skip"
+            # "shield" — javob xato edi, lekin ❤️ Qalqon jokeri ochkoni saqlab
+            # qoldi. Reytingdagi to'g'ri javoblar soni ochkodan hisoblangani
+            # uchun bu qatorlar ham unda ko'rinadi; kalitda alohida belgi
+            # qo'yilishi shuni tushuntirib turadi.
+            if a is None:
+                row["you"] = "skip"
+            elif a.is_correct:
+                row["you"] = "ok"
+            elif a.shielded:
+                row["you"] = "shield"
+            else:
+                row["you"] = "no"
             row["secs"] = round(a.time_taken, 1) if a else None
     if flavor == "teams":
         payload["team_a_points"] = g.team_a_points
@@ -814,6 +947,12 @@ def state_payload(profile, flavor) -> dict:
         if ans:
             payload["your_choice"] = ans.choice
             payload["your_correct"] = ans.is_correct
+            payload["your_shielded"] = ans.shielded
         if phase == "reveal":
             payload["correct_index"] = q.get("correct")
+        jok = game_jokers.summarize(
+            game_jokers.game_rows(profile, GAME_TYPE, g.id), qi,
+        )
+        jok["shields"] = _shields_available(g, profile, bought=jok["shields_bought"])
+        payload["jokers"] = jok
     return payload

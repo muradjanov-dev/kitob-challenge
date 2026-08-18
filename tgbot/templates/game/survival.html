@@ -44,6 +44,23 @@
     .hrow{text-align:left;padding:9px 2px;border-bottom:1px solid var(--line)}.hrow:last-child{border-bottom:0}
     .hrow .hd{font-size:11px;color:var(--muted)}.hrow .hw{font-weight:700}
     .muted{color:var(--muted)}.hidden{display:none}
+
+    /* ── JOKERLAR: o'yin ichida Kitobchaga sotib olinadigan yordamlar ─── */
+    .jokers{display:flex;gap:8px;margin-bottom:12px}
+    .jk{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;
+      padding:9px 6px 8px;text-align:center;cursor:pointer;color:var(--text);
+      font-family:inherit;transition:transform .12s,border-color .12s,opacity .12s}
+    .jk:active{transform:scale(.95)}
+    .jk .ic{display:block;font-size:19px;line-height:1.15}
+    .jk .nm{display:block;font-size:10px;font-weight:800;margin-top:2px}
+    .jk .pr{display:block;font-size:10.5px;font-weight:800;color:var(--accent2);margin-top:2px}
+    .jk[disabled]{opacity:.4;cursor:default}
+    .jk.used{border-color:var(--ok);opacity:.65}
+    .jk.used .pr{color:var(--ok)}
+    .jk.poor .pr{color:var(--bad)}
+    .jkbal{font-size:11px;font-weight:700;color:var(--muted);text-align:center;margin:-4px 0 10px}
+    .jkbal b{color:var(--accent2)}
+    .opt.gone{opacity:0;transform:scale(.9);pointer-events:none;transition:opacity .35s,transform .35s}
   </style>
 </head>
 <body>
@@ -54,10 +71,16 @@
 
   <div id="live" class="hidden">
     <div class="eliminated-box hidden" id="elimBox">💀 Siz chetlatildingiz — 3 marta noto'g'ri/javobsiz qoldingiz. Reytingda kuzatib boring!</div>
-    <div class="card" style="background:rgba(255,204,77,.12);border:1px solid #ffcc4d;font-size:12.5px;line-height:1.5;padding:10px 12px">💰 <b>Kirish: 50 Kitobcha</b> (birinchi javobda). ❤️ 3 ta jon — noto'g'ri yoki javobsiz qolgan tur jon oladi. Oxirigacha omon qolganlar jackpotni bo'lishadi!</div>
+    <div class="card" style="background:rgba(255,204,77,.12);border:1px solid #ffcc4d;font-size:12.5px;line-height:1.5;padding:10px 12px">🎁 <b>Kirish BEPUL!</b> ❤️ 3 ta jon — noto'g'ri yoki javobsiz qolgan tur jon oladi. Oxirigacha omon qolganlar jackpotni bo'lishadi!<br>💡 Qiynalsangiz — savol tepasidagi <b>jokerlardan</b> foydalaning.</div>
     <div class="card">
       <div class="lives" id="lives">❤️❤️❤️</div>
     </div>
+    <div class="jokers hidden" id="jokers">
+      <button type="button" class="jk" id="jkFifty"><span class="ic">💡</span><span class="nm">50/50</span><span class="pr">100 🪙</span></button>
+      <button type="button" class="jk" id="jkShield"><span class="ic">❤️</span><span class="nm">+1 Jon</span><span class="pr">300 🪙</span></button>
+      <button type="button" class="jk" id="jkSniper"><span class="ic">🎯</span><span class="nm">Snayper</span><span class="pr">500 🪙</span></button>
+    </div>
+    <div class="jkbal hidden" id="jkBal"></div>
     <div class="card" id="qcard">
       <div class="qtext" id="qtext">—</div>
       <div id="opts"></div>
@@ -85,21 +108,124 @@
     function api(path,opts){opts=opts||{};opts.headers=Object.assign({'X-Telegram-Init-Data':INIT},opts.headers||{});return fetch(path,opts).then(function(r){return r.json();});}
 
     var curOpts=[],curAnswered=false,curCorrectIdx=-1,curChoice=-1;
+    // ── Jokerlar holati (server bilan bir xil: 50/50 yashirgan indekslar
+    // serverda saqlanadi, shuning uchun sahifa yangilansa ham qaytmaydi) ──
+    var curHidden=[],jokerBusy=false,jokerBalance=0,jokerFading=false,lastState=null;
+    var jokerPrices={fifty:100,shield:300,sniper:500};
+    var jokerUsed=[],jokerShieldsLeft=2;
 
     function renderOpts(disabled){
       var box=$('opts');box.innerHTML='';
+      var fading=jokerFading;
       curOpts.forEach(function(o,i){
+        var hid=curHidden.indexOf(i)!==-1;
+        // Javob berilgandan keyin yashiringanlar ham qaytadi — natijani
+        // o'zi tekshirib ko'rishi uchun.
+        if(hid && !curAnswered && !fading) return;
         var b=document.createElement('button');b.className='opt';b.textContent=(i+1)+'. '+o;
         if(curAnswered||disabled){
           b.disabled=true;
           if(i===curCorrectIdx)b.className='opt correct';
           else if(i===curChoice)b.className='opt wrong';
+        }else if(hid){
+          b.disabled=true;b.dataset.fade='1';
         }else{
           b.addEventListener('click',function(){answer(i);});
         }
         box.appendChild(b);
       });
+      if(fading && !curAnswered){
+        jokerFading=false;
+        // Sinf keyingi kadrda qo'yiladi, aks holda CSS o'tishi ishlamaydi.
+        setTimeout(function(){
+          var gone=box.querySelectorAll('[data-fade="1"]');
+          for(var i=0;i<gone.length;i++) gone[i].className='opt gone';
+          setTimeout(function(){ if(!curAnswered) renderOpts(disabled); },400);
+        },20);
+      }
     }
+
+    // ── JOKERLAR ────────────────────────────────────────────────────────
+    // Barcha tekshiruv serverda (balans, faza, takroriy xarid, chetlatilganlik);
+    // bu yerda faqat tugmalarning ko'rinishi boshqariladi.
+    function jokerReason(kind){
+      if(jokerBusy) return 'busy';
+      if(jokerUsed.indexOf(kind)!==-1) return 'used';
+      if(kind==='fifty'){
+        if(curAnswered) return 'answered';
+        if(curOpts.length<3) return 'na';
+      }
+      if(kind==='sniper' && curAnswered) return 'answered';
+      if(kind==='shield' && jokerShieldsLeft<=0) return 'limit';
+      if(jokerBalance < jokerPrices[kind]) return 'poor';
+      return '';
+    }
+
+    function renderJokers(s){
+      var bar=$('jokers'), bal=$('jkBal');
+      if(!s || s.status!=='live' || s.eliminated){
+        bar.classList.add('hidden'); bal.classList.add('hidden'); return;
+      }
+      bar.classList.remove('hidden'); bal.classList.remove('hidden');
+      ['fifty','shield','sniper'].forEach(function(kind){
+        var el=$('jk'+kind.charAt(0).toUpperCase()+kind.slice(1));
+        if(!el) return;
+        var why=jokerReason(kind);
+        el.className='jk'+(why==='used'?' used':'')+(why==='poor'?' poor':'');
+        el.disabled=!!why;
+        var pr=el.querySelector('.pr');
+        if(why==='used') pr.textContent='✓ olindi';
+        else if(why==='limit') pr.textContent='limit';
+        else if(why==='na') pr.textContent='—';
+        else pr.textContent=jokerPrices[kind]+' 🪙';
+      });
+      bal.innerHTML='🪙 Balans: <b>'+jokerBalance+'</b> Kitobcha · ❤️ jonni oldindan oling — chetlatilgandan keyin kech!';
+    }
+
+    function jokerToast(msg, good){
+      var t=$('toast'); t.className='toast '+(good?'ok':'bad'); t.textContent=msg;
+    }
+
+    function useJoker(kind){
+      if(jokerBusy||jokerReason(kind))return;
+      jokerBusy=true; renderJokers(lastState);
+      api('/omon-qolish/api/joker/',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({kind:kind})}).then(function(r){
+        if(r&&r.ok){
+          if(typeof r.balance==='number') jokerBalance=r.balance;
+          if(jokerUsed.indexOf(kind)===-1) jokerUsed.push(kind);
+          if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.impactOccurred('medium')}catch(e){}}
+          if(kind==='fifty'){
+            curHidden=r.hidden||[]; jokerFading=true; renderOpts(false);
+            jokerToast("💡 Ikkita noto'g'ri variant olib tashlandi!", true);
+          }else if(kind==='shield'){
+            jokerShieldsLeft=Math.max(0,jokerShieldsLeft-1);
+            jokerToast("❤️ +1 jon qo'shildi! Endi jonlaringiz: "+(r.lives||'?'), true);
+          }else if(kind==='sniper'){
+            curAnswered=true; curChoice=r.choice;
+            curCorrectIdx=(r.correct_index!==undefined?r.correct_index:-1);
+            curHidden=[]; renderOpts(false);
+            jokerToast("🎯 Snayper to'g'ri javobni belgiladi!", true);
+          }
+          poll();
+        }else{
+          jokerToast(({
+            insufficient_balance:"🪙 Kitobcha yetarli emas.",
+            already_answered:"Siz allaqachon javob berdingiz.",
+            joker_round_limit:"Bu turda jon allaqachon olindi — keyingi savolda yana olasiz.",
+            joker_limit:"Bu o'yinda qo'shimcha jon limiti tugadi.",
+            not_live:"O'yin faol emas.",
+            eliminated:"Siz chetlatilgansiz — jonni oldindan olish kerak edi.",
+            joker_unavailable:"Bu savolda 50/50 ishlamaydi."
+          })[r&&r.error]||"Joker qabul qilinmadi.", false);
+          if(r&&typeof r.balance==='number') jokerBalance=r.balance;
+        }
+      }).catch(function(){}).then(function(){ jokerBusy=false; renderJokers(lastState); });
+    }
+
+    $('jkFifty').addEventListener('click',function(){useJoker('fifty');});
+    $('jkShield').addEventListener('click',function(){useJoker('shield');});
+    $('jkSniper').addEventListener('click',function(){useJoker('sniper');});
 
     function statsHistoryHtml(s){
       var lt=s.lifetime||{};
@@ -112,19 +238,32 @@
     }
 
     function render(s){
+      lastState=s;
       var live=$('live'),info=$('info');
+      if(typeof s.balance==='number') jokerBalance=s.balance;
+      if(s.joker_prices) jokerPrices=s.joker_prices;
       if(s.status==='live'){
         live.classList.remove('hidden');info.classList.add('hidden');
         $('subtitle').textContent='Savol '+s.q_number+' / '+s.q_total;
         $('elimBox').classList.toggle('hidden', !s.eliminated);
-        var hearts='';for(var i=0;i<s.max_lives;i++){hearts += i<s.your_lives?'❤️':'🖤';}
+        // Jonlar max_lives dan oshishi mumkin (❤️ jokeri yoki Market 'Sirli
+        // quti' bonusi) — shuning uchun kataklar soni ikkalasining kattasi.
+        var slots=Math.max(s.max_lives||0, s.your_lives||0);
+        var hearts='';for(var i=0;i<slots;i++){hearts += i<s.your_lives?'❤️':'🖤';}
         $('lives').textContent=hearts;
         $('myCorrect').textContent=s.your_correct||0;$('qnum').textContent=s.q_number+'/'+s.q_total;
-        if(s.q_number-1!==lastQ){lastQ=s.q_number-1;curAnswered=false;curCorrectIdx=-1;curChoice=-1;$('toast').textContent='';}
+        if(s.q_number-1!==lastQ){lastQ=s.q_number-1;curAnswered=false;curCorrectIdx=-1;curChoice=-1;curHidden=[];jokerUsed=[];$('toast').textContent='';}
+        var jk=s.jokers||{};
+        if(!jokerBusy){
+          jokerUsed=jk.used||[];
+          if(!jokerFading) curHidden=jk.hidden||[];
+          jokerShieldsLeft=(jk.shields_left_to_buy!==undefined?jk.shields_left_to_buy:2);
+        }
         $('qtext').textContent=s.question||'';
         curOpts=s.options||[];
         if(s.answered){curAnswered=true;curCorrectIdx=(s.correct_index!==undefined?s.correct_index:-1);}
         renderOpts(s.eliminated);
+        renderJokers(s);
         var b='';(s.leaderboard||[]).forEach(function(r,i){
           var cls=r.eliminated?'lb-name out':'lb-name';
           b+='<div class="lb"><div class="rank">'+(r.eliminated?'💀':'❤️'.repeat(0)||(i+1))+'</div><div class="'+cls+'">'+esc(r.name)+'</div><div class="pts">'+r.correct+' ✓</div></div>';
@@ -133,6 +272,7 @@
         localSeconds=s.seconds;$('timerLbl').textContent='SAVOL';
       }else{
         live.classList.add('hidden');info.classList.remove('hidden');
+        renderJokers(null);
         if(s.status==='scheduled'){
           $('timerLbl').textContent='BOSHLANISH';$('subtitle').textContent='Tez orada';
           info.className='card big';

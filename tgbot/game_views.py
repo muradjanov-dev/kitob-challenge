@@ -16,6 +16,7 @@ from tgbot.shop_views import _require_authed
 from tgbot.services import (
     chain_game, feud_game, castle_game, emoji_game,
     wisdom_game, detective_game, survival_game, quiz_game,
+    game_jokers,
 )
 
 
@@ -211,6 +212,17 @@ def api_detective_submit(request: HttpRequest) -> JsonResponse:
     return JsonResponse(detective_game.submit_guess(g.id, request.tg_profile, text))
 
 
+# ── Jokerlar (o'yin ichidagi yordamlar) ──────────────────────────────────────
+def _joker_kind(request: HttpRequest):
+    """POST tanasidan joker turini oladi; noto'g'ri bo'lsa None."""
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return None
+    kind = (body.get("kind") or "").strip()
+    return kind if kind in game_jokers.KINDS else None
+
+
 # ── Omon qolish ──────────────────────────────────────────────────────────────
 def survival_index(request: HttpRequest) -> HttpResponse:
     resp = render(request, "game/survival.html", {})
@@ -241,6 +253,19 @@ def api_survival_submit(request: HttpRequest) -> JsonResponse:
     if not g:
         return JsonResponse({"ok": False, "error": "not_live"})
     return JsonResponse(survival_game.submit_answer(g.id, request.tg_profile, choice))
+
+
+@csrf_exempt
+@require_POST
+@_require_authed
+def api_survival_joker(request: HttpRequest) -> JsonResponse:
+    kind = _joker_kind(request)
+    if kind is None:
+        return JsonResponse({"ok": False, "error": "bad_joker"}, status=400)
+    g = survival_game.latest_game()
+    if not g:
+        return JsonResponse({"ok": False, "error": "not_live"})
+    return JsonResponse(survival_game.use_joker(g.id, request.tg_profile, kind))
 
 
 # ── Bilim O'yini — shared engine + shared template for all flavors ────────────
@@ -302,6 +327,24 @@ def api_quiz_submit(request: HttpRequest, flavor: str) -> JsonResponse:
     if not g:
         return JsonResponse({"ok": False, "error": "not_live"})
     return JsonResponse(quiz_game.submit_answer(g.id, request.tg_profile, choice))
+
+
+@csrf_exempt
+@require_POST
+@_require_authed
+def api_quiz_joker(request: HttpRequest, flavor: str) -> JsonResponse:
+    """Yordam (joker) sotib olish. Har flavor uchun alohida yo'l ochish o'rniga
+    bitta `/api/quiz/<flavor>/joker/` — flavor URL'dan olinadi va ro'yxatga
+    solishtiriladi, shuning uchun yangi o'yin qo'shilganda urls.py o'zgarmaydi."""
+    if flavor not in _QUIZ_FLAVORS:
+        return JsonResponse({"ok": False, "error": "bad_flavor"}, status=404)
+    kind = _joker_kind(request)
+    if kind is None:
+        return JsonResponse({"ok": False, "error": "bad_joker"}, status=400)
+    g = quiz_game.get_or_activate_live_game(flavor)
+    if not g:
+        return JsonResponse({"ok": False, "error": "not_live"})
+    return JsonResponse(quiz_game.use_joker(g.id, request.tg_profile, kind))
 
 
 # ── Homepage "live games" widget: countdown + what's on right now + last
