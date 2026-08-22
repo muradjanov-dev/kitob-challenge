@@ -10,7 +10,7 @@ import random
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import F, Q, Count
+from django.db.models import F, Q, Count, Sum
 from django.db.models.functions import Greatest
 from django.utils import timezone
 
