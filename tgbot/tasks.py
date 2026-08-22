@@ -6828,7 +6828,11 @@ def _finalize_quiz_flavor(flavor):
                     )
             else:
                 lines.append("Bu safar hech kim ochko olmadi 😔")
-        lines += _answer_key_lines(game)
+        # Deliberately NOT appending _answer_key_lines() here any more: this
+        # post goes to the public groups, and the banks reuse each question
+        # many times over (most flavors cycle ~10-38 unique questions), so
+        # publishing the key simply handed everyone the answers to every
+        # future round of the same game.
         lines.append(
             "\n<i>⏱ vaqt — javob bergan soniyalaringiz; javob berilmagan savol "
             "to'liq vaqt deb hisoblanadi, shunda jim turish urinishdan arzon "

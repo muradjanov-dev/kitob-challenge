@@ -6,10 +6,10 @@
   <title id="pageTitle">Bilim O'yini</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    :root{--bg:#0f1115;--card:#171a21;--card2:#1e222b;--text:#eef1f6;--muted:#9aa4b2;
-      --accent:#8a5cff;--accent2:#00c2a8;--ok:#25c26e;--bad:#ff5d6c;--line:#262b36;
-      --teama:#3d7bff;--teamb:#ff5c8a;}
-    @media (prefers-color-scheme: light){:root{--bg:#f4f6fb;--card:#fff;--card2:#f0f2f8;--text:#141821;--muted:#5b6472;--accent:#6f44e0;--accent2:#00a892;--line:#e6e9f2;}}
+    :root{--bg:#15161a;--card:#1c1e23;--card2:#23262c;--text:#e8e6e1;--muted:#9a9a96;
+      --accent:#795cc1;--accent2:#49a296;--ok:#43a470;--bad:#c76b74;--line:#2b2e34;
+      --teama:#6483c4;--teamb:#cd7a91;}
+    @media (prefers-color-scheme: light){:root{--bg:#f2f0ec;--card:#faf9f6;--card2:#efece6;--text:#23252a;--muted:#6b7280;--accent:#785cc1;--accent2:#49a296;--line:#e2ded6;}}
     *{box-sizing:border-box}html,body{margin:0;padding:0}
     body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;padding:14px 12px 28px;max-width:640px;margin:0 auto}
     .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
@@ -73,20 +73,25 @@
       color:var(--bad);border-radius:8px;padding:2px 8px;font-size:11px;font-weight:800;margin-left:6px}
 
     /* THEMES */
-    body.theme-hacker { --bg: #0a0a0a; --card: #121212; --card2: #1a1a1a; --text: #00ff41; --muted: #008f11; font-family: 'Courier New', Courier, monospace; }
-    body.theme-hacker .card { border: 1px solid #00ff41; box-shadow: 0 0 10px rgba(0,255,65,0.2); }
-    body.theme-hacker .qcard { background: #0a0a0a; border-bottom: 2px solid #00ff41; color: #00ff41; }
-    body.theme-hacker .opt { background: #121212; border-color: #008f11; color: #00ff41; font-family: 'Courier New', Courier, monospace; }
-    body.theme-hacker .opt:hover { background: #00ff41; color: #0a0a0a; }
+    /* Terminal feel WITHOUT the retina-burning #00ff41-on-black: a muted
+       sage phosphor on warm charcoal, no glow. Same character, readable for
+       a whole game. */
+    body.theme-hacker { --bg: #16181a; --card: #1c1f21; --card2: #232729; --text: #a8c0a4; --muted: #6f8a70; font-family: 'Courier New', Courier, monospace; }
+    body.theme-hacker .card { border: 1px solid #33413a; }
+    body.theme-hacker .qcard { background: #1c1f21; border-bottom: 2px solid #55705c; color: #b9cdb4; }
+    body.theme-hacker .opt { background: #1c1f21; border-color: #3c4a41; color: #a8c0a4; font-family: 'Courier New', Courier, monospace; }
+    body.theme-hacker .opt:hover { background: #2a322c; color: #cddcc7; }
 
 
-    body.theme-arcade { --bg: #1a0b2e; --card: #2d1b4e; --card2: #3c2469; --text: #00ffff; --muted: #a78bfa; font-family: 'Impact', sans-serif; letter-spacing: 1px; }
-    body.theme-arcade .card { border: 2px solid #00ffff; box-shadow: 0 0 15px rgba(0,255,255,0.4); }
-    body.theme-arcade .qcard { background: linear-gradient(135deg, #ff00ff, #00ffff); border: none; color: #fff; text-shadow: 2px 2px 0 #000; }
-    body.theme-arcade .opt { background: #ff0055; border: 3px solid #ff00ff; color: #fff; font-size: 18px; border-radius: 8px; box-shadow: 0 6px 0 #990033; transition: all 0.1s; margin-bottom: 12px; }
-    body.theme-arcade .opt:active { transform: translateY(6px); box-shadow: 0 0 0 #990033; }
-    body.theme-arcade .opt.correct { background: #00ff00; border-color: #00cc00; box-shadow: 0 6px 0 #006600; color: #000; }
-    body.theme-arcade .opt.wrong { background: #333; border-color: #111; box-shadow: 0 6px 0 #000; color: #666; }
+    /* Keeps the chunky arcade shape (solid offset "button" edge, no gradient
+       glow) but in dusty retro tones instead of #ff00ff / #00ffff neon. */
+    body.theme-arcade { --bg: #221b2e; --card: #2c2439; --card2: #362c46; --text: #e4dced; --muted: #a396b5; font-family: 'Impact', sans-serif; letter-spacing: 1px; }
+    body.theme-arcade .card { border: 2px solid #4a3f5c; }
+    body.theme-arcade .qcard { background: #3a2f4a; border: none; color: #ece5f2; }
+    body.theme-arcade .opt { background: #7d5a72; border: 3px solid #6a4b62; color: #f5eef2; font-size: 18px; border-radius: 8px; box-shadow: 0 6px 0 #4e3648; transition: all 0.1s; margin-bottom: 12px; }
+    body.theme-arcade .opt:active { transform: translateY(6px); box-shadow: 0 0 0 #4e3648; }
+    body.theme-arcade .opt.correct { background: #5f8f6b; border-color: #4c7456; box-shadow: 0 6px 0 #3a5a42; color: #f2f7f3; }
+    body.theme-arcade .opt.wrong { background: #3a3a3f; border-color: #2c2c30; box-shadow: 0 6px 0 #232326; color: #85858c; }
 
     body.theme-classic { --bg: #f4ecd8; --card: #e8dcc4; --card2: #dfd1b3; --text: #3e2723; --muted: #795548; font-family: 'Courier New', Courier, monospace; }
     body.theme-classic .card { border: 1px dashed #a1887f; border-radius: 2px; }
@@ -210,68 +215,68 @@
   <script>
     var FLAVOR = document.body.getAttribute('data-flavor');
     var META = {
-      twofacts:  {emoji:'🎭', title:"Ikki haqiqat, bir yolg'on", fee:25, api:'/ikki-haqiqat/api/', none:"Ikki haqiqat, bir yolg'on tez orada boshlanadi — guruhni kuzating!", scheduled:"3 ta gapdan qaysi biri yolg'on ekanini tez toping!", accent:'#8a5cff', accent2:'#c77dff'},
-      impostor:  {emoji:'🃏', title:"Kim yolg'onchi?", fee:25, api:'/kim-yolgonchi/api/', none:"Kim yolg'onchi? tez orada boshlanadi — guruhni kuzating!", scheduled:"3 haqiqiy va 1 soxta juftlik orasidan soxtasini toping!", accent:'#e0334f', accent2:'#ff8a9d'},
-      connection:{emoji:'🧩', title:"Yashirin bog'lanish", fee:25, api:'/bog-lanish/api/', none:"Yashirin bog'lanish tez orada boshlanadi — guruhni kuzating!", scheduled:"4 ta narsani bog'lovchi yashirin mavzuni toping!", accent:'#00b8a9', accent2:'#5ce1d6'},
-      teams:     {emoji:'👥', title:"Jamoa Jangi", fee:30, api:'/jamoa-jangi/api/', none:"Jamoa Jangi tez orada boshlanadi — guruhni kuzating!", scheduled:"Ikki jamoaga bo'linasiz — jamoangiz ko'proq to'g'ri javob bersin!", accent:'#3d7bff', accent2:'#7ca6ff'},
-      timeline:  {emoji:'🕰️', title:"Vaqt Mashinasi", fee:25, api:'/vaqt-mashinasi/api/', none:"Vaqt Mashinasi tez orada boshlanadi — guruhni kuzating!", scheduled:"Kitob yoki mutafakkir qaysi asrga tegishli ekanini toping!", accent:'#c9962c', accent2:'#ffcc4d'},
-      matchbook: {emoji:'🎯', title:"Muallif-Asar Moslashtirish", fee:25, api:'/muallif-asar/api/', none:"Muallif-Asar Moslashtirish tez orada boshlanadi — guruhni kuzating!", scheduled:"Muallifga tegishli haqiqiy asarni 4 variantdan tez toping!", accent:'#2e9e5b', accent2:'#6fd88a'},
-      reverse:   {emoji:'🔄', title:"Teskari Viktorina", fee:25, api:'/teskari-viktorina/api/', none:"Teskari Viktorina tez orada boshlanadi — guruhni kuzating!", scheduled:"Javob avval ko'rsatiladi — qaysi savolga mos kelishini toping!", accent:'#6a3dbf', accent2:'#e05cc7'},
-      cover:     {emoji:'🖼', title:"Kitob Muqovasi", fee:25, api:'/kitob-muqovasi/api/', none:"Kitob Muqovasi tez orada boshlanadi — guruhni kuzating!", scheduled:"Xiralashtirilgan muqovadan kitobni 4 variantdan tez toping!", accent:'#c9962c', accent2:'#ffcc4d'}
+      twofacts:  {emoji:'🎭', title:"Ikki haqiqat, bir yolg'on", fee:25, api:'/ikki-haqiqat/api/', none:"Ikki haqiqat, bir yolg'on tez orada boshlanadi — guruhni kuzating!", scheduled:"3 ta gapdan qaysi biri yolg'on ekanini tez toping!", accent:'#795cc1', accent2:'#b795d0'},
+      impostor:  {emoji:'🃏', title:"Kim yolg'onchi?", fee:25, api:'/kim-yolgonchi/api/', none:"Kim yolg'onchi? tez orada boshlanadi — guruhni kuzating!", scheduled:"3 haqiqiy va 1 soxta juftlik orasidan soxtasini toping!", accent:'#be5566', accent2:'#d0959f'},
+      connection:{emoji:'🧩', title:"Yashirin bog'lanish", fee:25, api:'/bog-lanish/api/', none:"Yashirin bog'lanish tez orada boshlanadi — guruhni kuzating!", scheduled:"4 ta narsani bog'lovchi yashirin mavzuni toping!", accent:'#3b9b93', accent2:'#7ac3bd'},
+      teams:     {emoji:'👥', title:"Jamoa Jangi", fee:30, api:'/jamoa-jangi/api/', none:"Jamoa Jangi tez orada boshlanadi — guruhni kuzating!", scheduled:"Ikki jamoaga bo'linasiz — jamoangiz ko'proq to'g'ri javob bersin!", accent:'#5c7dc1', accent2:'#95a8d0'},
+      timeline:  {emoji:'🕰️', title:"Vaqt Mashinasi", fee:25, api:'/vaqt-mashinasi/api/', none:"Vaqt Mashinasi tez orada boshlanadi — guruhni kuzating!", scheduled:"Kitob yoki mutafakkir qaysi asrga tegishli ekanini toping!", accent:'#b28e43', accent2:'#c8b484'},
+      matchbook: {emoji:'🎯', title:"Muallif-Asar Moslashtirish", fee:25, api:'/muallif-asar/api/', none:"Muallif-Asar Moslashtirish tez orada boshlanadi — guruhni kuzating!", scheduled:"Muallifga tegishli haqiqiy asarni 4 variantdan tez toping!", accent:'#3b9b62', accent2:'#81c693'},
+      reverse:   {emoji:'🔄', title:"Teskari Viktorina", fee:25, api:'/teskari-viktorina/api/', none:"Teskari Viktorina tez orada boshlanadi — guruhni kuzating!", scheduled:"Javob avval ko'rsatiladi — qaysi savolga mos kelishini toping!", accent:'#6d45b7', accent2:'#c379b5'},
+      cover:     {emoji:'🖼', title:"Kitob Muqovasi", fee:25, api:'/kitob-muqovasi/api/', none:"Kitob Muqovasi tez orada boshlanadi — guruhni kuzating!", scheduled:"Xiralashtirilgan muqovadan kitobni 4 variantdan tez toping!", accent:'#b28e43', accent2:'#c8b484'}
     };
     var BETA_GAMES = {
-      anagram:   {emoji:'🔠', title:"Anagramma Kitob", accent:'#ff5722', accent2:'#ff8a65'},
-      blitz:     {emoji:'⚡️', title:"Blitz 60", accent:'#ffc107', accent2:'#ffe082'},
-      crossword: {emoji:'🧩', title:"Mini Krossvord", accent:'#00bcd4', accent2:'#80deea'},
-      wordle:    {emoji:'🔤', title:"Harfma-Harf", accent:'#4caf50', accent2:'#a5d6a7'},
-      cipher:    {emoji:'🔐', title:"Sherlok Kodi", accent:'#9c27b0', accent2:'#ce93d8'},
-      acronym:   {emoji:'🎯', title:"Bosh Harflar", accent:'#e91e63', accent2:'#f48fb1'},
-      character: {emoji:'👤', title:"Qahramonni Top", accent:'#3f51b5', accent2:'#9fa8da'},
-      dialogue:  {emoji:'🗣', title:"Kimning gapi?", accent:'#009688', accent2:'#80cbc4'},
-      plotmap:   {emoji:'🗺', title:"Syujet Xaritasi", accent:'#795548', accent2:'#bcaaa4'},
-      sequence:  {emoji:'⏳', title:"Ketma-ketlik", accent:'#607d8b', accent2:'#b0bec5'},
-      oddone:    {emoji:'🔍', title:"Ortiqchasini Top", accent:'#f44336', accent2:'#ef9a9a'},
-      ending:    {emoji:'✍️', title:"Asar Yakuni", accent:'#673ab7', accent2:'#b39ddb'},
-      pixel:     {emoji:'🖼', title:"Piksel Muqova", accent:'#2196f3', accent2:'#90caf9'},
-      aiart:     {emoji:'🎨', title:"AI Rasmlar", accent:'#e91e63', accent2:'#f48fb1'},
-      scenes:    {emoji:'🎭', title:"Sahna Ko'rinishi", accent:'#9c27b0', accent2:'#ce93d8'},
-      audioquote:{emoji:'🎧', title:"Ovozli Iqtibos", accent:'#00bcd4', accent2:'#80deea'},
-      mosaic:    {emoji:'🧩', title:"Kitob Mozaikasi", accent:'#4caf50', accent2:'#a5d6a7'},
-      hiddendetail:{emoji:'🔎', title:"Yashirin Detal", accent:'#ff9800', accent2:'#ffcc80'},
-      duel:      {emoji:'🤺', title:"1v1 Jonli Duel", accent:'#d32f2f', accent2:'#ef9a9a'},
-      buzzer:    {emoji:'🔔', title:"Tezkor Qo'ng'iroq", accent:'#fbc02d', accent2:'#fff59d'},
-      bracket:   {emoji:'🏆', title:"Haftalik Turnir", accent:'#f57c00', accent2:'#ffb74d'},
-      auction:   {emoji:'💰', title:"Kitob Auksioni", accent:'#388e3c', accent2:'#a5d6a7'},
-      regions:   {emoji:'👥', title:"Viloyatlar Jangi", accent:'#1976d2', accent2:'#90caf9'},
-      king:      {emoji:'👑', title:"Qirol Taxti", accent:'#7b1fa2', accent2:'#ce93d8'},
-      rhyme:     {emoji:'📜', title:"Bahri-Bayt", accent:'#5d4037', accent2:'#bcaaa4'},
-      scholars:  {emoji:'🕌', title:"Sharq Allomalari", accent:'#00796b', accent2:'#80cbc4'},
-      genres:    {emoji:'📚', title:"Janrlar Ustasi", accent:'#303f9f', accent2:'#9fa8da'},
-      numbers:   {emoji:'🔢', title:"Adabiy Raqamlar", accent:'#c2185b', accent2:'#f48fb1'},
-      worldlit:  {emoji:'🌍', title:"Jahon Adabiyoti", accent:'#0288d1', accent2:'#81d4fa'},
-      mysterybox:{emoji:'🎁', title:"Sirli Sandiq", accent:'#e64a19', accent2:'#ffab91'},
+      anagram:   {emoji:'🔠', title:"Anagramma Kitob", accent:'#c1755c', accent2:'#cfa395'},
+      blitz:     {emoji:'⚡️', title:"Blitz 60", accent:'#bb9f4b', accent2:'#d0c195'},
+      crossword: {emoji:'🧩', title:"Mini Krossvord", accent:'#3b909b', accent2:'#95c9d0'},
+      wordle:    {emoji:'🔤', title:"Harfma-Harf", accent:'#4caf50', accent2:'#96cf98'},
+      cipher:    {emoji:'🔐', title:"Sherlok Kodi", accent:'#8e3b9c', accent2:'#c795d0'},
+      acronym:   {emoji:'🎯', title:"Bosh Harflar", accent:'#bb4c72', accent2:'#d095a9'},
+      character: {emoji:'👤', title:"Qahramonni Top", accent:'#4354b1', accent2:'#959ed0'},
+      dialogue:  {emoji:'🗣', title:"Kimning gapi?", accent:'#3b9b92', accent2:'#83c8c1'},
+      plotmap:   {emoji:'🗺', title:"Syujet Xaritasi", accent:'#865e50', accent2:'#bcaaa4'},
+      sequence:  {emoji:'⏳', title:"Ketma-ketlik", accent:'#607d8b', accent2:'#a7b6be'},
+      oddone:    {emoji:'🔍', title:"Ortiqchasini Top", accent:'#c1635c', accent2:'#d09595'},
+      ending:    {emoji:'✍️', title:"Asar Yakuni", accent:'#6942af', accent2:'#aa95d0'},
+      pixel:     {emoji:'🖼', title:"Piksel Muqova", accent:'#5590bf', accent2:'#95b6d0'},
+      aiart:     {emoji:'🎨', title:"AI Rasmlar", accent:'#bb4c72', accent2:'#d095a9'},
+      scenes:    {emoji:'🎭', title:"Sahna Ko'rinishi", accent:'#8e3b9c', accent2:'#c795d0'},
+      audioquote:{emoji:'🎧', title:"Ovozli Iqtibos", accent:'#3b909b', accent2:'#95c9d0'},
+      mosaic:    {emoji:'🧩', title:"Kitob Mozaikasi", accent:'#4caf50', accent2:'#96cf98'},
+      hiddendetail:{emoji:'🔎', title:"Yashirin Detal", accent:'#b98b46', accent2:'#d0b895'},
+      duel:      {emoji:'🤺', title:"1v1 Jonli Duel", accent:'#ba4848', accent2:'#d09595'},
+      buzzer:    {emoji:'🔔', title:"Tezkor Qo'ng'iroq", accent:'#c1a45c', accent2:'#d0ca95'},
+      bracket:   {emoji:'🏆', title:"Haftalik Turnir", accent:'#b27b43', accent2:'#c8ac84'},
+      auction:   {emoji:'💰', title:"Kitob Auksioni", accent:'#3d9a41', accent2:'#96cf98'},
+      regions:   {emoji:'👥', title:"Viloyatlar Jangi", accent:'#4176aa', accent2:'#95b6d0'},
+      king:      {emoji:'👑', title:"Qirol Taxti", accent:'#7f3b9b', accent2:'#c795d0'},
+      rhyme:     {emoji:'📜', title:"Bahri-Bayt", accent:'#875d50', accent2:'#bcaaa4'},
+      scholars:  {emoji:'🕌', title:"Sharq Allomalari", accent:'#3b9b90', accent2:'#83c8c1'},
+      genres:    {emoji:'📚', title:"Janrlar Ustasi", accent:'#3b489b', accent2:'#959ed0'},
+      numbers:   {emoji:'🔢', title:"Adabiy Raqamlar", accent:'#9e3c63', accent2:'#d095a9'},
+      worldlit:  {emoji:'🌍', title:"Jahon Adabiyoti", accent:'#3b799b', accent2:'#95bdd0'},
+      mysterybox:{emoji:'🎁', title:"Sirli Sandiq", accent:'#b96246', accent2:'#d0a395'},
       // 10 Mind, Logic & Conscious Living Games
-      mindtrap:  {emoji:'🧠', title:"Fikr Tuzog'i", accent:'#6200ea', accent2:'#b388ff'},
-      stoic:     {emoji:'🧘‍♂️', title:"Ongli Hayot", accent:'#00897b', accent2:'#80cbc4'},
-      antiherd:  {emoji:'🐑', title:"Podadan Ajral", accent:'#d81b60', accent2:'#ff80ab'},
-      dilemma:   {emoji:'⚖️', title:"Axloqiy Dilemma", accent:'#f57c00', accent2:'#ffb74d'},
-      causeeffect:{emoji:'🔮', title:"Sabab va Oqibat", accent:'#512da8', accent2:'#9575cd'},
-      masks:     {emoji:'🎭', title:"Niqoblar Foshi", accent:'#c2185b', accent2:'#f48fb1'},
-      socrates:  {emoji:'🏛', title:"Sokrat Suhbatlari", accent:'#3949ab', accent2:'#7986cb'},
-      memento:   {emoji:'⌛️', title:"Vaqt Paradoksi", accent:'#e65100', accent2:'#ffb74d'},
-      strategy:  {emoji:'♟', title:"Strategik Tafakkur", accent:'#212121', accent2:'#9e9e9e'},
-      paradox:   {emoji:'💡', title:"Paradokslar Olami", accent:'#00acc1', accent2:'#80deea'},
+      mindtrap:  {emoji:'🧠', title:"Fikr Tuzog'i", accent:'#6c40aa', accent2:'#aa95d0'},
+      stoic:     {emoji:'🧘‍♂️', title:"Ongli Hayot", accent:'#3b9b91', accent2:'#83c8c1'},
+      antiherd:  {emoji:'🐑', title:"Podadan Ajral", accent:'#b0436b', accent2:'#d095a9'},
+      dilemma:   {emoji:'⚖️', title:"Axloqiy Dilemma", accent:'#b27b43', accent2:'#c8ac84'},
+      causeeffect:{emoji:'🔮', title:"Sabab va Oqibat", accent:'#573b9b', accent2:'#977dc5'},
+      masks:     {emoji:'🎭', title:"Niqoblar Foshi", accent:'#9e3c63', accent2:'#d095a9'},
+      socrates:  {emoji:'🏛', title:"Sokrat Suhbatlari", accent:'#3f4da5', accent2:'#7f8ac5'},
+      memento:   {emoji:'⌛️', title:"Vaqt Paradoksi", accent:'#a7643f', accent2:'#c8ac84'},
+      strategy:  {emoji:'♟', title:"Strategik Tafakkur", accent:'#6b6b6b', accent2:'#9e9e9e'},
+      paradox:   {emoji:'💡', title:"Paradokslar Olami", accent:'#3b919b', accent2:'#95c9d0'},
       // 10 Sufism, Nafs Purification & Divine Love Games
-      simurgh:   {emoji:'🕊', title:"Simurg' Parvozi", accent:'#00838f', accent2:'#4dd0e1'},
-      ishq:      {emoji:'🕯', title:"Parvona va Sham", accent:'#c62828', accent2:'#ef5350'},
-      nafs:      {emoji:'🛡', title:"Nafs Tarbiyasi", accent:'#2e7d32', accent2:'#81c784'},
-      qalb:      {emoji:'🪞', title:"Qalb Sayqali", accent:'#1565c0', accent2:'#64b5f6'},
-      naqshband: {emoji:'🌾', title:"Xalvat dar Anjuman", accent:'#4e342e', accent2:'#a1887f'},
-      yassaviy:  {emoji:'📜', title:"Hikmatlar Daryosi", accent:'#6a1b9a', accent2:'#ba68c8'},
-      masnaviy:  {emoji:'🪈', title:"Nay Nidosi", accent:'#ad1457', accent2:'#f06292'},
-      gazzoliy:  {emoji:'🗝', title:"Kimyoi Saodat", accent:'#f57f17', accent2:'#fff176'},
-      fano:      {emoji:'🌊', title:"Fanofilloh", accent:'#00695c', accent2:'#4db6ac'},
-      marifat:   {emoji:'☀️', title:"Haqiqat Quyoshi", accent:'#e65100', accent2:'#ffb74d'},
+      simurgh:   {emoji:'🕊', title:"Simurg' Parvozi", accent:'#3b939b', accent2:'#6fb5bf'},
+      ishq:      {emoji:'🕯', title:"Parvona va Sham", accent:'#ad4141', accent2:'#c47d7b'},
+      nafs:      {emoji:'🛡', title:"Nafs Tarbiyasi", accent:'#3b9b40', accent2:'#81c784'},
+      qalb:      {emoji:'🪞', title:"Qalb Sayqali", accent:'#3b689b', accent2:'#8eb0cc'},
+      naqshband: {emoji:'🌾', title:"Xalvat dar Anjuman", accent:'#875a4f', accent2:'#a1887f'},
+      yassaviy:  {emoji:'📜', title:"Hikmatlar Daryosi", accent:'#773b9b', accent2:'#b471bf'},
+      masnaviy:  {emoji:'🪈', title:"Nay Nidosi", accent:'#9b3b65', accent2:'#ca889e'},
+      gazzoliy:  {emoji:'🗝', title:"Kimyoi Saodat", accent:'#bc8350', accent2:'#d0ca95'},
+      fano:      {emoji:'🌊', title:"Fanofilloh", accent:'#3b9b8f', accent2:'#61b8b0'},
+      marifat:   {emoji:'☀️', title:"Haqiqat Quyoshi", accent:'#a7643f', accent2:'#c8ac84'},
     };
     for (var k in BETA_GAMES) {
       if (!META[k]) {
