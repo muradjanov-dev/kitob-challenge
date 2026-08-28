@@ -341,6 +341,67 @@ urlpatterns = [
     path("marifat/api/state/", api_quiz_state, {"flavor": "marifat"}, name="quiz-marifat-api-state"),
     path("marifat/api/submit/", api_quiz_submit, {"flavor": "marifat"}, name="quiz-marifat-api-submit"),
 
+    # 10 New Non-Test Interactive Games
+    path("wordlock/", quiz_index, {"flavor": "wordlock"}, name="quiz-wordlock"),
+    path("wordlock/api/state/", api_quiz_state, {"flavor": "wordlock"}, name="quiz-wordlock-api-state"),
+    path("wordlock/api/submit/", api_quiz_submit, {"flavor": "wordlock"}, name="quiz-wordlock-api-submit"),
+
+    path("speedtype/", quiz_index, {"flavor": "speedtype"}, name="quiz-speedtype"),
+    path("speedtype/api/state/", api_quiz_state, {"flavor": "speedtype"}, name="quiz-speedtype-api-state"),
+    path("speedtype/api/submit/", api_quiz_submit, {"flavor": "speedtype"}, name="quiz-speedtype-api-submit"),
+
+    path("tilepuzzle/", quiz_index, {"flavor": "tilepuzzle"}, name="quiz-tilepuzzle"),
+    path("tilepuzzle/api/state/", api_quiz_state, {"flavor": "tilepuzzle"}, name="quiz-tilepuzzle-api-state"),
+    path("tilepuzzle/api/submit/", api_quiz_submit, {"flavor": "tilepuzzle"}, name="quiz-tilepuzzle-api-submit"),
+
+    path("association/", quiz_index, {"flavor": "association"}, name="quiz-association"),
+    path("association/api/state/", api_quiz_state, {"flavor": "association"}, name="quiz-association-api-state"),
+    path("association/api/submit/", api_quiz_submit, {"flavor": "association"}, name="quiz-association-api-submit"),
+
+    path("hangman/", quiz_index, {"flavor": "hangman"}, name="quiz-hangman"),
+    path("hangman/api/state/", api_quiz_state, {"flavor": "hangman"}, name="quiz-hangman-api-state"),
+    path("hangman/api/submit/", api_quiz_submit, {"flavor": "hangman"}, name="quiz-hangman-api-submit"),
+
+    path("bookmemory/", quiz_index, {"flavor": "bookmemory"}, name="quiz-bookmemory"),
+    path("bookmemory/api/state/", api_quiz_state, {"flavor": "bookmemory"}, name="quiz-bookmemory-api-state"),
+    path("bookmemory/api/submit/", api_quiz_submit, {"flavor": "bookmemory"}, name="quiz-bookmemory-api-submit"),
+
+    path("spellcheck/", quiz_index, {"flavor": "spellcheck"}, name="quiz-spellcheck"),
+    path("spellcheck/api/state/", api_quiz_state, {"flavor": "spellcheck"}, name="quiz-spellcheck-api-state"),
+    path("spellcheck/api/submit/", api_quiz_submit, {"flavor": "spellcheck"}, name="quiz-spellcheck-api-submit"),
+
+    path("labyrinth/", quiz_index, {"flavor": "labyrinth"}, name="quiz-labyrinth"),
+    path("labyrinth/api/state/", api_quiz_state, {"flavor": "labyrinth"}, name="quiz-labyrinth-api-state"),
+    path("labyrinth/api/submit/", api_quiz_submit, {"flavor": "labyrinth"}, name="quiz-labyrinth-api-submit"),
+
+    path("bookbidding/", quiz_index, {"flavor": "bookbidding"}, name="quiz-bookbidding"),
+    path("bookbidding/api/state/", api_quiz_state, {"flavor": "bookbidding"}, name="quiz-bookbidding-api-state"),
+    path("bookbidding/api/submit/", api_quiz_submit, {"flavor": "bookbidding"}, name="quiz-bookbidding-api-submit"),
+
+    path("characterclash/", quiz_index, {"flavor": "characterclash"}, name="quiz-characterclash"),
+    path("characterclash/api/state/", api_quiz_state, {"flavor": "characterclash"}, name="quiz-characterclash-api-state"),
+    path("characterclash/api/submit/", api_quiz_submit, {"flavor": "characterclash"}, name="quiz-characterclash-api-submit"),
+
+    path("riddlebox/", quiz_index, {"flavor": "riddlebox"}, name="quiz-riddlebox"),
+    path("riddlebox/api/state/", api_quiz_state, {"flavor": "riddlebox"}, name="quiz-riddlebox-api-state"),
+    path("riddlebox/api/submit/", api_quiz_submit, {"flavor": "riddlebox"}, name="quiz-riddlebox-api-submit"),
+
+    path("quotechain/", quiz_index, {"flavor": "quotechain"}, name="quiz-quotechain"),
+    path("quotechain/api/state/", api_quiz_state, {"flavor": "quotechain"}, name="quiz-quotechain-api-state"),
+    path("quotechain/api/submit/", api_quiz_submit, {"flavor": "quotechain"}, name="quiz-quotechain-api-submit"),
+
+    path("timetraveler/", quiz_index, {"flavor": "timetraveler"}, name="quiz-timetraveler"),
+    path("timetraveler/api/state/", api_quiz_state, {"flavor": "timetraveler"}, name="quiz-timetraveler-api-state"),
+    path("timetraveler/api/submit/", api_quiz_submit, {"flavor": "timetraveler"}, name="quiz-timetraveler-api-submit"),
+
+    path("bluffmaster/", quiz_index, {"flavor": "bluffmaster"}, name="quiz-bluffmaster"),
+    path("bluffmaster/api/state/", api_quiz_state, {"flavor": "bluffmaster"}, name="quiz-bluffmaster-api-state"),
+    path("bluffmaster/api/submit/", api_quiz_submit, {"flavor": "bluffmaster"}, name="quiz-bluffmaster-api-submit"),
+
+    path("symbolmatch/", quiz_index, {"flavor": "symbolmatch"}, name="quiz-symbolmatch"),
+    path("symbolmatch/api/state/", api_quiz_state, {"flavor": "symbolmatch"}, name="quiz-symbolmatch-api-state"),
+    path("symbolmatch/api/submit/", api_quiz_submit, {"flavor": "symbolmatch"}, name="quiz-symbolmatch-api-submit"),
+
     # Bilim O'yinining har bir flavori uchun alohida yo'l ochilmaydi — joker
     # endpointi bitta, flavor manzilning o'zidan olinadi.
     path("api/quiz/<str:flavor>/joker/", api_quiz_joker, name="quiz-api-joker"),

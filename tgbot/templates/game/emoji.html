@@ -6,44 +6,44 @@
   <title>Emoji Kitob</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    :root{--bg:#15161a;--card:#1c1e23;--card2:#23262c;--text:#e8e6e1;--muted:#9a9a96;
-      --accent:#c15c8b;--accent2:#c3ae79;--ok:#43a470;--bad:#c76b74;--line:#2b2e34;}
-    @media (prefers-color-scheme: light){:root{--bg:#f2f0ec;--card:#faf9f6;--card2:#efece6;--text:#23252a;--muted:#6b7280;--accent:#c15c8c;--accent2:#a68f4a;--line:#e2ded6;}}
-    *{box-sizing:border-box}html,body{margin:0;padding:0}
-    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;padding:14px 12px 28px;max-width:640px;margin:0 auto}
-    .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
-    .title{font-weight:800;font-size:18px}.title small{display:block;font-weight:600;font-size:12px;color:var(--muted)}
-    .timer{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-weight:800;font-variant-numeric:tabular-nums;min-width:70px;text-align:center}
-    .timer .lbl{display:block;font-size:10px;color:var(--muted);font-weight:600}
+    :root{--bg:#18181b;--card:#212126;--card2:#28282f;--text:#ece9e2;--muted:#95938d;
+      --accent:#9c5c64;--accent2:#52796f;--ok:#468a68;--bad:#b85d68;--line:#32323a;}
+    @media (prefers-color-scheme: light){:root{--bg:#faf7f2;--card:#f3eee6;--card2:#eae4d8;--text:#2a2723;--muted:#736f68;--accent:#9c5c64;--accent2:#52796f;--line:#dfd7ca;}}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:14px 14px 36px;max-width:620px;margin:0 auto}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+    .title{font-weight:800;font-size:19px;letter-spacing:-0.02em}.title small{display:block;font-weight:600;font-size:12px;color:var(--muted);margin-top:2px}
+    .timer{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 14px;font-weight:800;font-variant-numeric:tabular-nums;min-width:76px;text-align:center}
+    .timer .lbl{display:block;font-size:10px;color:var(--muted);font-weight:700;letter-spacing:0.5px}
     .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:12px}
-    .emojicard{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#151515;text-align:center;padding:26px 16px}
-    .emojicard .qn{font-size:12px;font-weight:800;opacity:.85}
-    .emojicard .em{font-size:46px;line-height:1.25;margin-top:8px;letter-spacing:4px}
-    .opt{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:13px 14px;font-size:15px;font-weight:600;margin-bottom:9px;cursor:pointer}
-    .opt:hover{border-color:var(--accent)}
-    .opt.correct{background:rgba(37,194,110,.18);border-color:var(--ok);color:var(--ok);font-weight:800}
-    .opt.wrong{background:rgba(255,93,108,.15);border-color:var(--bad);color:var(--bad)}
+    .emojicard{background:linear-gradient(145deg,var(--card2),var(--card));color:var(--text);border:1px solid var(--line);text-align:center;padding:24px 16px}
+    .emojicard .qn{display:inline-block;font-size:11px;font-weight:800;color:var(--muted);background:var(--card2);padding:3px 10px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase}
+    .emojicard .em{font-size:48px;line-height:1.25;margin-top:12px;letter-spacing:4px}
+    .opt{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--card2);border:1.5px solid var(--line);color:var(--text);border-radius:16px;padding:14px 16px;font-size:15px;font-weight:600;margin-bottom:10px;cursor:pointer;font-family:inherit;transition:transform .1s,border-color .15s}
+    .opt:active{transform:scale(.985)}
+    .opt.correct{background:rgba(70,138,104,.15);border-color:var(--ok);color:var(--ok);font-weight:800}
+    .opt.wrong{background:rgba(184,93,104,.14);border-color:var(--bad);color:var(--bad)}
     .opt:disabled{cursor:default}
     .opt .cnt{margin-left:auto;font-size:12px;color:var(--muted);font-weight:700}
-    .stat{display:flex;justify-content:space-between;gap:8px;margin-bottom:12px}
-    .stat .box{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center}
+    .stat{display:flex;justify-content:space-between;gap:10px;margin-bottom:12px}
+    .stat .box{flex:1;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;text-align:center}
     .stat .box b{display:block;font-size:20px;color:var(--accent)}
-    .stat .box span{font-size:11px;color:var(--muted)}
+    .stat .box span{font-size:11px;color:var(--muted);font-weight:600}
     .sect{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:2px 0 10px}
     .lb{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
     .lb:last-child{border-bottom:0}.rank{width:26px;text-align:center;font-weight:900}
-    .rank.g1{color:#ffcc4d}.rank.g2{color:#c9d1dc}.rank.g3{color:#e6a56b}
-    .lb-name{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .pts{font-weight:900;color:var(--accent)}
-    .big{text-align:center;padding:26px 16px}.big .em{font-size:46px}.big h2{margin:10px 0 6px;font-size:20px}.big p{color:var(--muted);margin:0;font-size:14px;line-height:1.5}
-    .lifetime{text-align:center;color:var(--muted);font-size:12px;margin-top:14px}
-    .statsgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+    .rank.g1{color:#d4af37}.rank.g2{color:#a8b0ba}.rank.g3{color:#c48c66}
+    .lb-name{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+    .pts{font-weight:800;color:var(--accent);font-size:15px}
+    .big{text-align:center;padding:30px 18px}.big .em{font-size:48px;margin-bottom:8px}.big h2{margin:10px 0 8px;font-size:21px;font-weight:800}.big p{color:var(--muted);margin:0;font-size:14.5px;line-height:1.5}
+    .lifetime{text-align:center;color:var(--muted);font-size:12.5px;margin-top:14px;font-weight:600}
+    .statsgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
     .sbox{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 4px;text-align:center}
-    .sbox b{display:block;font-size:18px;color:var(--accent)}.sbox span{font-size:10px;color:var(--muted)}
-    .hrow{text-align:left;padding:9px 2px;border-bottom:1px solid var(--line)}.hrow:last-child{border-bottom:0}
+    .sbox b{display:block;font-size:18px;color:var(--accent)}.sbox span{font-size:10px;color:var(--muted);font-weight:600}
+    .hrow{text-align:left;padding:10px 2px;border-bottom:1px solid var(--line)}.hrow:last-child{border-bottom:0}
     .hrow .hd{font-size:11px;color:var(--muted)}.hrow .hw{font-weight:700}
-    .muted{color:var(--muted)}.hidden{display:none}
-    .toast{min-height:20px;margin-top:9px;font-size:14px;font-weight:700;text-align:center}
+    .muted{color:var(--muted)}.hidden{display:none !important}
+    .toast{min-height:22px;margin-top:10px;font-size:14px;font-weight:700;text-align:center}
     .toast.ok{color:var(--ok)}.toast.bad{color:var(--bad)}
   </style>
 </head>

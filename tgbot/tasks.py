@@ -5343,9 +5343,9 @@ def send_premium_expiry_reminders():
     print(f"[premium_expiry_reminder] done. sent={sent} failed={failed}")
 
 
-# ── Daily trial Premium giveaway — 10 random users get 3 free hours ──────────
-TRIAL_PREMIUM_HOURS = 3
-TRIAL_PREMIUM_DAILY_COUNT = 10
+# ── Daily trial Premium giveaway — 5 random users get 1 free hour ──────────
+TRIAL_PREMIUM_HOURS = 1
+TRIAL_PREMIUM_DAILY_COUNT = 5
 
 
 def _trial_premium_intro_text() -> str:
@@ -6131,6 +6131,84 @@ def start_castle_game():
     print(f"start_castle_game: game #{game.id}")
     return game
 
+VIP_TOP_GAMES = [
+    "king", "duel", "teams", "survival", "mysterybox", "mindtrap", "stoic",
+    "strategy", "simurgh", "masnaviy", "gazzoliy", "blitz", "bracket",
+    "auction", "wordlock", "speedtype", "association", "hangman",
+    "tilepuzzle", "labyrinth", "characterclash", "riddlebox", "quotechain",
+    "timetraveler", "bluffmaster", "symbolmatch",
+]
+
+VIP_GAME_NAMES = {
+    "king": "👑 Qirol Taxti VIP",
+    "duel": "🤺 1v1 Jonli Duel VIP",
+    "teams": "👥 VIP Jamoa Jangi",
+    "mysterybox": "🎁 Sirli Sandiq VIP",
+    "mindtrap": "🧠 Fikr Tuzog'i VIP",
+    "stoic": "🧘‍♂️ Ongli Hayot VIP",
+    "strategy": "♟ Strategik Tafakkur VIP",
+    "simurgh": "🕊 Simurg' Parvozi VIP",
+    "masnaviy": "🪈 Nay Nidosi VIP",
+    "gazzoliy": "🗝 Kimyoi Saodat VIP",
+    "blitz": "⚡️ Blitz 60 VIP",
+    "bracket": "🏆 Haftalik Turnir VIP",
+    "auction": "💰 Kitob Auksioni VIP",
+    "wordlock": "🗝 So'z Qulfi VIP",
+    "speedtype": "⚡️ Tezkor Terish VIP",
+    "association": "🔗 So'z Assotsiatsiyasi VIP",
+    "hangman": "🪢 Dorboz VIP",
+    "tilepuzzle": "🧩 Adabiy Mozaika VIP",
+    "labyrinth": "🧭 Adabiy Labirint VIP",
+    "characterclash": "🤺 Qahramonlar Jangi VIP",
+    "riddlebox": "🧩 Adabiy Jumboq VIP",
+    "quotechain": "🔗 Iqtiboslar Halqasi VIP",
+    "timetraveler": "⏳ Tarixiy Sayohatchi VIP",
+    "bluffmaster": "🎭 Haqiqatmi yoki Uydirma VIP",
+    "symbolmatch": "🗝 Adabiy Ramzlar VIP",
+}
+
+INTERACTIVE_PRIORITY_GAMES = [
+    # Standalone interactive mechanics
+    "chain", "feud", "castle", "emoji", "wisdom", "detective", "survival",
+    # Novelty interactive typing, puzzle, deduction mechanics
+    "wordlock", "speedtype", "tilepuzzle", "association", "hangman",
+    "bookmemory", "spellcheck", "labyrinth", "bookbidding", "characterclash",
+    "riddlebox", "quotechain", "timetraveler", "bluffmaster", "symbolmatch",
+    # Engaging fast action / visual / audio / logic games
+    "anagram", "wordle", "crossword", "cipher", "audioquote", "pixel",
+    "aiart", "scenes", "hiddendetail", "duel", "buzzer", "bracket", "auction",
+    "king", "teams", "mindtrap", "stoic", "dilemma", "causeeffect",
+    "mysterybox", "simurgh", "masnaviy", "gazzoliy",
+]
+
+
+@shared_task
+def start_game_sequence(slot, count=3, pool=None):
+    """Kick off today's `slot` ('morning' 10:00, 'evening' 22:00, or 'vip_2230') sequence.
+    Heavily prioritizes interactive, non-standard gameplay over repetitive ABCD trivia."""
+    from tgbot.models import GameSequence
+
+    today = timezone.localdate()
+    is_vip = (slot == GameSequence.SLOT_VIP)
+
+    # 1. Stale previous days sequences auto-close
+    GameSequence.objects.filter(completed=False, date__lt=today).update(completed=True)
+
+    if not pool:
+        if is_vip:
+            pool = VIP_TOP_GAMES
+        else:
+            interactive_available = [g for g in INTERACTIVE_PRIORITY_GAMES if g in _GAME_LABELS_URLS]
+            other_quiz = [g for g in _QUIZ_FLAVORS if g not in INTERACTIVE_PRIORITY_GAMES]
+            
+            # Prioritize 85-90% interactive games
+            if random.random() < 0.9 or not other_quiz:
+                pool = random.sample(interactive_available, min(count, len(interactive_available)))
+            else:
+                p_int = random.sample(interactive_available, min(count - 1, len(interactive_available)))
+                p_oth = random.sample(other_quiz, 1)
+                pool = p_int + p_oth
+            random.shuffle(pool)
 
 @shared_task
 def start_emoji_game():
@@ -6271,7 +6349,7 @@ def _start_quiz_flavor(flavor, is_vip=False):
             f"⭐️ <b>VIP PREMIUM ARENA: {game_title}</b> ⭐️\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi!\n"
             f"👑 <b>Faqat VIP Premium a'zolar uchun!</b>\n\n"
-            f"💰 <b>Yutuq: 500 – 1000 Kitobcha + 3 kunlik Premium!</b>\n👇 Kiring:"
+            f"💰 <b>Yutuq: 350 / 200 / 100 Kitobcha + 1 kun / 12 soat / 6 soatlik Premium!</b>\n👇 Kiring:"
         )
     else:
         announcement_text = texts.get(
@@ -6287,10 +6365,12 @@ def _start_quiz_flavor(flavor, is_vip=False):
 
 
 # Maps a game-type slug to the task that starts it (each returns the created
+# Maps a game-type slug to the task that starts it (each returns the created
 # game instance). Shared by start_game_sequence and _advance_game_sequence to
 # run the daily 10:00/22:00 slot: 3 different types, back to back, no repeats.
 from tgbot.game_views import _QUIZ_FLAVORS
-_GAME_STARTERS = {
+
+_BASE_GAME_STARTERS = {
     "chain": start_chain_game,
     "feud": start_feud_game,
     "castle": start_castle_game,
@@ -6299,16 +6379,29 @@ _GAME_STARTERS = {
     "detective": start_detective_game,
     "survival": start_survival_game,
 }
+
+
+def _start_game_safely(game_type, is_vip=False):
+    """Safely start any game type with isolated exception handling."""
+    try:
+        if game_type in _BASE_GAME_STARTERS:
+            return _BASE_GAME_STARTERS[game_type]()
+        return _start_quiz_flavor(game_type, is_vip=is_vip)
+    except Exception as e:
+        print(f"_start_game_safely error for {game_type} (is_vip={is_vip}): {e}")
+        return None
+
+
+_GAME_STARTERS = {}
+for _k, _fn in _BASE_GAME_STARTERS.items():
+    _GAME_STARTERS[_k] = _fn
 for fl in _QUIZ_FLAVORS:
-    _GAME_STARTERS[fl] = (lambda f=fl: _start_quiz_flavor(f))
+    _GAME_STARTERS[fl] = (lambda f=fl: _start_game_safely(f))
 
 
 def start_any_game(key, is_vip=False):
-    """Start any of the 65 live games by key, announcing it to groups."""
-    starter = _GAME_STARTERS.get(key)
-    if starter:
-        return starter()
-    return _start_quiz_flavor(key, is_vip=is_vip)
+    """Start any of the 65+ live games by key, announcing it to groups."""
+    return _start_game_safely(key, is_vip=is_vip)
 
 
 NEW_GAME_TYPES = [
@@ -6324,12 +6417,16 @@ NEW_GAME_TYPES = [
     # 10 Tasavvuf
     "simurgh", "ishq", "nafs", "qalb", "naqshband",
     "yassaviy", "masnaviy", "gazzoliy", "fano", "marifat",
+    # 10 New Non-Test Interactive Games
+    "wordlock", "speedtype", "tilepuzzle", "association", "hangman",
+    "bookmemory", "spellcheck", "labyrinth", "bookbidding", "characterclash",
 ]
 
 # Prestigious Games pool for the Daily VIP Premium Arena (1 random game selected each evening)
 VIP_TOP_GAMES = [
     "king", "duel", "teams", "mysterybox", "mindtrap", "stoic",
-    "strategy", "simurgh", "masnaviy", "gazzoliy", "blitz", "bracket", "auction"
+    "strategy", "simurgh", "masnaviy", "gazzoliy", "blitz", "bracket",
+    "auction", "wordlock", "speedtype", "association", "hangman",
 ]
 
 VIP_GAME_NAMES = {
@@ -6346,6 +6443,10 @@ VIP_GAME_NAMES = {
     "blitz": "⚡️ Blitz 60 VIP",
     "bracket": "🏆 Haftalik Turnir VIP",
     "auction": "💰 Kitob Auksioni VIP",
+    "wordlock": "🗝 So'z Qulfi VIP",
+    "speedtype": "⚡️ Tezkor Terish VIP",
+    "association": "🔗 So'z Assotsiatsiyasi VIP",
+    "hangman": "🪢 Dorboz VIP",
 }
 
 
@@ -6354,74 +6455,62 @@ def start_game_sequence(slot, count=3, pool=None):
     """Kick off today's `slot` ('morning' 10:00, 'evening' 22:00, or 'vip_2230') sequence."""
     from tgbot.models import GameSequence
 
-    if not pool:
-        pool = NEW_GAME_TYPES if slot in ["morning", "evening"] else GameSequence.GAME_TYPES
     today = timezone.localdate()
-    count = min(count, len(pool))
-    is_vip = slot == GameSequence.SLOT_VIP
+    is_vip = (slot == GameSequence.SLOT_VIP)
 
-    if slot in ["morning", "evening"] and not is_vip and count >= 3:
+    # 1. Stale previous days sequences auto-close
+    GameSequence.objects.filter(completed=False, date__lt=today).update(completed=True)
+
+    if not pool:
+        all_quiz = list(_QUIZ_FLAVORS)
         base_games = ["chain", "feud", "castle", "emoji", "wisdom", "detective", "survival"]
-        quiz_games = NEW_GAME_TYPES
-        base_count = min(count - 1, len(base_games))
-        quiz_count = count - base_count
-        selected = random.sample(base_games, base_count) + random.sample(quiz_games, quiz_count)
-        random.shuffle(selected)
-        defaults_game_types = selected
-    else:
-        defaults_game_types = list(pool[:count]) if is_vip else random.sample(pool, count)
+        if is_vip:
+            pool = VIP_TOP_GAMES
+        else:
+            b_sample = random.sample(base_games, min(1, len(base_games)))
+            q_sample = random.sample(all_quiz, min(count - len(b_sample), len(all_quiz)))
+            pool = b_sample + q_sample
+            random.shuffle(pool)
+
+    count = min(count, len(pool))
+    defaults_game_types = list(pool[:count])
 
     seq, created = GameSequence.objects.get_or_create(
         slot=slot, date=today,
-        defaults={"game_types": defaults_game_types},
+        defaults={"game_types": defaults_game_types, "current_index": 0},
     )
     if not created:
-        print(f"start_game_sequence: {slot}/{today} already started, skipping")
-        return
+        if seq.completed:
+            print(f"start_game_sequence: {slot}/{today} already completed, skipping")
+            return
+        if seq.current_game_id:
+            print(f"start_game_sequence: {slot}/{today} already running game #{seq.current_game_id}, skipping")
+            return
 
-    first_type = seq.game_types[0]
-    if is_vip and first_type in _QUIZ_FLAVORS:
-        game = _start_quiz_flavor(first_type, is_vip=True)
+    if not seq.game_types:
+        seq.game_types = defaults_game_types
+        seq.save(update_fields=["game_types", "updated_at"])
+
+    first_type = seq.game_types[seq.current_index] if seq.current_index < len(seq.game_types) else seq.game_types[0]
+    game = _start_game_safely(first_type, is_vip=is_vip)
+    if game:
+        seq.current_game_type = first_type
+        seq.current_game_id = game.id
+        seq.save(update_fields=["current_game_type", "current_game_id", "updated_at"])
+        print(f"start_game_sequence: {slot} sequence {seq.game_types}, starting {first_type} #{game.id} (is_vip={is_vip})")
     else:
-        game = _GAME_STARTERS[first_type]()
-    seq.current_game_type = first_type
-    seq.current_game_id = game.id
-    seq.save(update_fields=["current_game_type", "current_game_id", "updated_at"])
-    print(f"start_game_sequence: {slot} sequence {seq.game_types}, starting {first_type} #{game.id} (is_vip={is_vip})")
+        print(f"start_game_sequence: failed to start {first_type}, auto-advancing...")
+        _advance_game_sequence(first_type, None)
 
 
 @shared_task
 def start_vip_premium_evening_event():
     """Daily right after 22:00 evening games wrap up (3 regular games):
     Kicks off 1 Random Prestigious VIP Premium Game for Premium subscribers only,
-    with massive 500-1000 Kitobcha prizes, free Premium days, and Gold badges!"""
+    with massive 350-500 Kitobcha prizes and Gold badges!"""
     from tgbot.models import GameSequence
 
     chosen = random.choice(VIP_TOP_GAMES)
-    game_name = VIP_GAME_NAMES.get(chosen, f"⭐️ {chosen.upper()} VIP")
-
-    text = (
-        "⭐️ <b>VIP PREMIUM ARENA (Kechki maxsus super-o'yin)!</b> ⭐️\n\n"
-        f"Kechki 3 ta o'yindan so'ng, faqat <b>VIP Premium</b> a'zolar uchun bugungi maxsus o'yin:\n"
-        f"👑 <b>{game_name}</b>!\n\n"
-        "💰 <b>KATTA YUTUQLAR:</b>\n"
-        "🥇 1-o'rin: <b>+500 – 1000 Kitobcha + 3 kun BEPUL Premium!</b>\n"
-        "🥈 2-o'rin: <b>+300 – 600 Kitobcha + 2 kun BEPUL Premium!</b>\n"
-        "🥉 3-o'rin: <b>+200 – 400 Kitobcha + 1 kun BEPUL Premium!</b>\n"
-        "🎖 Barcha ishtirokchilarga: <b>+75 Kitobcha!</b>\n\n"
-        "<i>⚡️ Hali Premium bo'lmasangiz, hoziroq bot orqali faollashtiring va super yutuqlarga ega bo'ling!</i>"
-    )
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    for group_id, thread_id in _game_targets():
-        try:
-            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
-                    "disable_web_page_preview": "true"}
-            if thread_id:
-                data["message_thread_id"] = thread_id
-            requests.post(url, data=data, timeout=10)
-        except Exception as e:
-            print(f"start_vip_premium_evening_event announce {group_id}: {e}")
-
     start_game_sequence(GameSequence.SLOT_VIP, count=1, pool=[chosen])
 
 
@@ -6446,15 +6535,19 @@ def start_special_evening_event(count=5, bonus_count=2):
     start_game_sequence("evening", count=count, pool=NEW_GAME_TYPES)
 
 
-def _advance_game_sequence(game_type, game_id):
+def _advance_game_sequence(game_type, game_id=None):
     """If `game_id` (of `game_type`) was the current step of a live daily
     sequence, start the next game type in line — or mark the sequence
     completed once all have run."""
     from tgbot.models import GameSequence
 
-    seq = GameSequence.objects.filter(
-        completed=False, current_game_type=game_type, current_game_id=game_id,
-    ).first()
+    today = timezone.localdate()
+    qs = GameSequence.objects.filter(completed=False, date=today)
+    if game_id:
+        seq = qs.filter(current_game_type=game_type, current_game_id=game_id).first()
+    else:
+        seq = qs.filter(current_game_type=game_type).first() or qs.first()
+
     if not seq:
         return
 
@@ -6465,153 +6558,253 @@ def _advance_game_sequence(game_type, game_id):
         seq.save(update_fields=["completed", "current_index", "updated_at"])
         print(f"_advance_game_sequence: {seq.slot}/{seq.date} sequence complete")
         if seq.slot == GameSequence.SLOT_EVENING:
-            announce_top_game_players()
-            # Kechki 3 ta o'yin tugashi bilan VIP arena DARHOL boshlanadi --
-            # ilgari 90 soniya kutilardi va o'sha tanaffusda odamlar tarqab
-            # ketardi.
-            start_vip_premium_evening_event.delay()
+            try:
+                announce_top_game_players()
+            except Exception as e:
+                print(f"_advance_game_sequence announce_top_game_players error: {e}")
+            try:
+                start_vip_premium_evening_event.delay()
+            except Exception as e:
+                print(f"_advance_game_sequence start_vip_premium_evening_event delay error: {e}")
+                try:
+                    start_vip_premium_evening_event()
+                except Exception as e2:
+                    print(f"_advance_game_sequence sync start error: {e2}")
         return
 
     next_type = seq.game_types[next_index]
-    is_vip = seq.slot == GameSequence.SLOT_VIP
-    if is_vip and next_type in _QUIZ_FLAVORS:
-        game = _start_quiz_flavor(next_type, is_vip=True)
-    else:
-        game = _GAME_STARTERS[next_type]()
+    is_vip = (seq.slot == GameSequence.SLOT_VIP)
+    game = _start_game_safely(next_type, is_vip=is_vip)
     seq.current_index = next_index
     seq.current_game_type = next_type
-    seq.current_game_id = game.id
+    seq.current_game_id = game.id if game else None
     seq.save(update_fields=[
         "current_index", "current_game_type", "current_game_id", "updated_at",
     ])
-    print(f"_advance_game_sequence: {seq.slot}/{seq.date} advancing to {next_type} #{game.id} (is_vip={is_vip})")
+    print(f"_advance_game_sequence: {seq.slot}/{seq.date} advancing to {next_type} #{getattr(game, 'id', None)} (is_vip={is_vip})")
+
+
+def _auto_recover_game_sequences():
+    """Watchdog running every minute inside games_finalize_tick:
+    Inspects all uncompleted GameSequences. If a sequence is stuck or its current game
+    has already ended past its ends_at timestamp, safely advances it to the next game."""
+    from tgbot.models import (
+        GameSequence, QuizGame, ChainGame, FeudGame, CastleGame,
+        EmojiGame, WisdomGame, DetectiveGame, SurvivalGame
+    )
+    today = timezone.localdate()
+    now = timezone.now()
+
+    # 1. Close stale sequences from previous days
+    GameSequence.objects.filter(completed=False, date__lt=today).update(completed=True)
+
+    # 2. Check today's active sequences
+    active_seqs = list(GameSequence.objects.filter(completed=False, date=today))
+    for seq in active_seqs:
+        if not seq.game_types or seq.current_index >= len(seq.game_types):
+            seq.completed = True
+            seq.save(update_fields=["completed", "updated_at"])
+            continue
+
+        gt = seq.current_game_type
+        gid = seq.current_game_id
+
+        if not gid or not gt:
+            first_type = seq.game_types[seq.current_index]
+            is_vip = (seq.slot == GameSequence.SLOT_VIP)
+            game = _start_game_safely(first_type, is_vip=is_vip)
+            if game:
+                seq.current_game_type = first_type
+                seq.current_game_id = game.id
+                seq.save(update_fields=["current_game_type", "current_game_id", "updated_at"])
+            continue
+
+        # Check if the currently registered game has ended
+        is_finished = False
+        try:
+            if gt == "chain":
+                g = ChainGame.objects.filter(id=gid).first()
+                if not g or g.status == ChainGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
+                    is_finished = True
+            elif gt == "feud":
+                g = FeudGame.objects.filter(id=gid).first()
+                if not g or g.status == FeudGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
+                    is_finished = True
+            elif gt == "castle":
+                g = CastleGame.objects.filter(id=gid).first()
+                if not g or g.status == CastleGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
+                    is_finished = True
+            elif gt == "emoji":
+                g = EmojiGame.objects.filter(id=gid).first()
+                if not g or g.status == EmojiGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
+                    is_finished = True
+            elif gt == "wisdom":
+                g = WisdomGame.objects.filter(id=gid).first()
+                if not g or g.status == WisdomGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
+                    is_finished = True
+            elif gt == "detective":
+                g = DetectiveGame.objects.filter(id=gid).first()
+                if not g or g.status == DetectiveGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
+                    is_finished = True
+            elif gt == "survival":
+                g = SurvivalGame.objects.filter(id=gid).first()
+                if not g or g.status == SurvivalGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
+                    is_finished = True
+            else:
+                g = QuizGame.objects.filter(id=gid).first()
+                if not g or g.status == QuizGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
+                    is_finished = True
+        except Exception as e:
+            print(f"_auto_recover_game_sequences check {gt}#{gid} error: {e}")
+
+        if is_finished:
+            print(f"_auto_recover_game_sequences: {seq.slot} game {gt}#{gid} has ended, advancing sequence...")
+            _advance_game_sequence(gt, gid)
 
 
 @shared_task
 def games_finalize_tick():
-    """Finish + reward any Ko'pchilik / Qal'a game whose time is up; announce
-    results to groups and DM winners. Runs every minute (cheap no-op)."""
-    from tgbot.services import feud_game, castle_game
+    """Finish + reward any live game whose time is up; announce results to
+    groups and DM winners. Runs every minute (cheap no-op)."""
+    from tgbot.services import feud_game, castle_game, emoji_game
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     medals = ["🥇", "🥈", "🥉"]
 
-    for game, summary in feud_game.finalize_due_games():
-        winners = summary.get("winners", [])
-        lines = ["🗣 <b>Ko'pchilik nima dedi? — yakun!</b>\n"]
-        if winners:
+    # 1. Feud
+    try:
+        for game, summary in feud_game.finalize_due_games():
+            winners = summary.get("winners", [])
+            lines = ["🗣 <b>Ko'pchilik nima dedi? — yakun!</b>\n"]
+            if winners:
+                for i, w in enumerate(winners[:5]):
+                    m = medals[i] if i < 3 else f"{i + 1}."
+                    rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
+                    badge = " 💎" if w.get("boosted") else ""
+                    lines.append(f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko{_scoreline(w)}{rew}")
+                lines.append("\n🎁 Qatnashgan hammaga <b>+15 🪙</b>!")
+            else:
+                lines.append("Bu safar hech kim qatnashmadi 😔")
+            text = "\n".join(lines)
+            if not _is_admin_only(winners):
+                for gid, tid in _game_targets():
+                    try:
+                        data = {"chat_id": gid, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"}
+                        if tid:
+                            data["message_thread_id"] = tid
+                        requests.post(url, data=data, timeout=10)
+                    except Exception:
+                        pass
+            for w in winners:
+                if not w.get("reward"):
+                    continue
+                try:
+                    requests.post(url, data={"chat_id": w["telegram_id"],
+                        "text": f"🗣 Ko'pchilik nima dedi? — <b>{w['rank']}-o'rin</b>!\n🪙 <b>+{w['reward']} Kitobcha</b> · Ball: {w['points']}",
+                        "parse_mode": "HTML"}, timeout=8)
+                except Exception:
+                    pass
+            _advance_game_sequence("feud", game.id)
+    except Exception as e:
+        print(f"games_finalize_tick feud error: {e}")
+
+    # 2. Castle
+    try:
+        for game, summary in castle_game.finalize_due_games():
+            victory = summary.get("victory")
+            winners = summary.get("winners", [])
+            head = ("🎉 <b>Bilim Qal'asi — G'ALABA!</b>" if victory else "🛡 <b>Bilim Qal'asi — boss omon qoldi</b>")
+            lines = [head, f"\n⚔️ Qatnashchilar: <b>{summary.get('players', 0)}</b> · Hissa qo'shganlar: <b>{summary.get('contributors', 0)}</b>"]
             for i, w in enumerate(winners[:5]):
-                m = medals[i] if i < 3 else f"{i + 1}."
-                rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
-                # Flag Premium's 2x boost so e.g. a Premium 2nd place earning
-                # more Kitobcha than a non-Premium 1st doesn't read as a bug.
                 badge = " 💎" if w.get("boosted") else ""
-                lines.append(f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko{_scoreline(w)}{rew}")
-            lines.append("\n🎁 Qatnashgan hammaga <b>+30 🪙</b>!")
-        else:
-            lines.append("Bu safar hech kim qatnashmadi 😔")
-        text = "\n".join(lines)
-        if not _is_admin_only(winners):
-            for gid, tid in _game_targets():
+                lines.append(f"{i + 1}. {escape(w['name'])}{badge} — {w['correct']} ✓ (+{w['reward']} 🪙)")
+            text = "\n".join(lines)
+            if not _is_admin_only(winners):
+                for gid, tid in _game_targets():
+                    try:
+                        data = {"chat_id": gid, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"}
+                        if tid:
+                            data["message_thread_id"] = tid
+                        requests.post(url, data=data, timeout=10)
+                    except Exception:
+                        pass
+            for w in winners:
+                if not w.get("reward"):
+                    continue
                 try:
-                    data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
-                            "disable_web_page_preview": "true"}
-                    if tid:
-                        data["message_thread_id"] = tid
-                    requests.post(url, data=data, timeout=10)
+                    requests.post(url, data={"chat_id": w["telegram_id"],
+                        "text": f"🏰 Bilim Qal'asi: <b>+{w['reward']} Kitobcha</b>! To'g'ri javoblar: {w['correct']}",
+                        "parse_mode": "HTML"}, timeout=8)
                 except Exception:
                     pass
-        for w in winners:
-            if not w.get("reward"):
-                continue
-            try:
-                requests.post(url, data={"chat_id": w["telegram_id"],
-                    "text": f"🗣 Ko'pchilik nima dedi? — <b>{w['rank']}-o'rin</b>!\n"
-                            f"🪙 <b>+{w['reward']} Kitobcha</b> · Ball: {w['points']}",
-                    "parse_mode": "HTML"}, timeout=8)
-            except Exception:
-                pass
-        _advance_game_sequence("feud", game.id)
+            _advance_game_sequence("castle", game.id)
+    except Exception as e:
+        print(f"games_finalize_tick castle error: {e}")
 
-    for game, summary in castle_game.finalize_due_games():
-        victory = summary.get("victory")
-        winners = summary.get("winners", [])
-        head = ("🎉 <b>Bilim Qal'asi — G'ALABA!</b>" if victory
-                else "🛡 <b>Bilim Qal'asi — boss omon qoldi</b>")
-        lines = [head,
-                 f"\n⚔️ Qatnashchilar: <b>{summary.get('players', 0)}</b> · "
-                 f"Hissa qo'shganlar: <b>{summary.get('contributors', 0)}</b>"]
-        for i, w in enumerate(winners[:5]):
-            badge = " 💎" if w.get("boosted") else ""
-            lines.append(f"{i + 1}. {escape(w['name'])}{badge} — {w['correct']} ✓ (+{w['reward']} 🪙)")
-        text = "\n".join(lines)
-        if not _is_admin_only(winners):
-            for gid, tid in _game_targets():
+    # 3. Emoji
+    try:
+        for game, summary in emoji_game.finalize_due_games():
+            winners = summary.get("winners", [])
+            lines = ["🎬 <b>Emoji Kitob — yakun!</b>\n"]
+            if winners:
+                for i, w in enumerate(winners[:5]):
+                    m = medals[i] if i < 3 else f"{i + 1}."
+                    rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
+                    badge = " 💎" if w.get("boosted") else ""
+                    lines.append(f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko{_scoreline(w)}{rew}")
+            else:
+                lines.append("Bu safar hech kim ochko olmadi 😔")
+            text = "\n".join(lines)
+            if not _is_admin_only(winners):
+                for gid, tid in _game_targets():
+                    try:
+                        data = {"chat_id": gid, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"}
+                        if tid:
+                            data["message_thread_id"] = tid
+                        requests.post(url, data=data, timeout=10)
+                    except Exception:
+                        pass
+            for w in winners:
+                if not w.get("reward"):
+                    continue
                 try:
-                    data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
-                            "disable_web_page_preview": "true"}
-                    if tid:
-                        data["message_thread_id"] = tid
-                    requests.post(url, data=data, timeout=10)
+                    requests.post(url, data={"chat_id": w["telegram_id"],
+                        "text": f"🎬 Emoji Kitob — <b>{w['rank']}-o'rin</b>!\n🪙 <b>+{w['reward']} Kitobcha</b> · Ball: {w['points']}",
+                        "parse_mode": "HTML"}, timeout=8)
                 except Exception:
                     pass
-        for w in winners:
-            if not w.get("reward"):
-                continue
-            try:
-                requests.post(url, data={"chat_id": w["telegram_id"],
-                    "text": f"🏰 Bilim Qal'asi: <b>+{w['reward']} Kitobcha</b>! "
-                            f"To'g'ri javoblar: {w['correct']}",
-                    "parse_mode": "HTML"}, timeout=8)
-            except Exception:
-                pass
-        _advance_game_sequence("castle", game.id)
+            _advance_game_sequence("emoji", game.id)
+    except Exception as e:
+        print(f"games_finalize_tick emoji error: {e}")
 
-    from tgbot.services import emoji_game
-    for game, summary in emoji_game.finalize_due_games():
-        winners = summary.get("winners", [])
-        lines = ["🎬 <b>Emoji Kitob — yakun!</b>\n"]
-        if winners:
-            for i, w in enumerate(winners[:5]):
-                m = medals[i] if i < 3 else f"{i + 1}."
-                rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
-                badge = " 💎" if w.get("boosted") else ""
-                lines.append(f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko{_scoreline(w)}{rew}")
-        else:
-            lines.append("Bu safar hech kim ochko olmadi 😔")
-        text = "\n".join(lines)
-        if not _is_admin_only(winners):
-            for gid, tid in _game_targets():
-                try:
-                    data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
-                            "disable_web_page_preview": "true"}
-                    if tid:
-                        data["message_thread_id"] = tid
-                    requests.post(url, data=data, timeout=10)
-                except Exception:
-                    pass
-        for w in winners:
-            if not w.get("reward"):
-                continue
-            try:
-                requests.post(url, data={"chat_id": w["telegram_id"],
-                    "text": f"🎬 Emoji Kitob — <b>{w['rank']}-o'rin</b>!\n"
-                            f"🪙 <b>+{w['reward']} Kitobcha</b> · Ball: {w['points']}",
-                    "parse_mode": "HTML"}, timeout=8)
-            except Exception:
-                pass
-        _advance_game_sequence("emoji", game.id)
+    # 4. Wisdom, Detective, Survival
+    try:
+        _finalize_wisdom()
+    except Exception as e:
+        print(f"games_finalize_tick wisdom error: {e}")
 
-    _finalize_wisdom()
-    _finalize_detective()
-    _finalize_survival()
+    try:
+        _finalize_detective()
+    except Exception as e:
+        print(f"games_finalize_tick detective error: {e}")
+
+    try:
+        _finalize_survival()
+    except Exception as e:
+        print(f"games_finalize_tick survival error: {e}")
+
+    # 5. All Quiz flavors
     from tgbot.game_views import _QUIZ_FLAVORS
     for flavor in _QUIZ_FLAVORS:
-        # Isolate each flavor: one broken flavor must never stop the other 57
-        # from being finalized, announced and advanced in this same tick.
         try:
             _finalize_quiz_flavor(flavor)
         except Exception as e:
             print(f"games_finalize_tick: {flavor} finalize failed: {e}")
+
+    # 6. Auto-recovery watchdog for stuck or ended sequences
+    try:
+        _auto_recover_game_sequences()
+    except Exception as e:
+        print(f"games_finalize_tick watchdog error: {e}")
 
 
 def _trim_telegram(text, limit=4000):
@@ -6821,43 +7014,35 @@ def _finalize_quiz_flavor(flavor):
                     m = medals[i] if i < 3 else f"{i + 1}."
                     rew = f" (+{w['reward']} 🪙)" if w.get("reward") else ""
                     badge = " 💎" if w.get("boosted") else ""
-                    prem = f" + <b>{w['premium_days']} kun Premium</b> 💎" if w.get("premium_days") else ""
+                    p_txt = w.get("premium_text") or (f"{w['premium_days']} kun" if w.get("premium_days") else "")
+                    prem = f" + <b>{p_txt} Premium</b> 💎" if p_txt else ""
                     lines.append(
                         f"{m} {escape(w['name'])}{badge} — <b>{w['points']}</b> ochko"
                         f"{_scoreline(w)}{rew}{prem}"
                     )
             else:
                 lines.append("Bu safar hech kim ochko olmadi 😔")
-        # Deliberately NOT appending _answer_key_lines() here any more: this
-        # post goes to the public groups, and the banks reuse each question
-        # many times over (most flavors cycle ~10-38 unique questions), so
-        # publishing the key simply handed everyone the answers to every
-        # future round of the same game.
         lines.append(
             "\n<i>⏱ vaqt — javob bergan soniyalaringiz; javob berilmagan savol "
             "to'liq vaqt deb hisoblanadi, shunda jim turish urinishdan arzon "
             "tushmaydi. Ball teng bo'lsa — tezroq javob bergan yuqorida.</i>"
         )
-        # G'oya 3 — VIP arena natijasini ko'rgan, lekin kira olmaganlarga
-        # aynan nimadan quruq qolgani ko'rsatiladi.
         if getattr(game, "is_vip", False) and winners:
             top = winners[0]
+            p_top = top.get("premium_text") or (f"{top['premium_days']} kun" if top.get("premium_days") else "")
             lines.append(
                 f"\n⭐️ <i>Bu arenaga faqat Premium a'zolar kira oladi. Bugun "
                 f"{escape(top['name'])} <b>{top['reward']} Kitobcha</b>"
-                + (f" va <b>{top['premium_days']} kun Premium</b>" if top.get("premium_days") else "")
+                + (f" va <b>{p_top} Premium</b>" if p_top else "")
                 + " yutdi — siz esa qatnasha olmadingiz.</i>"
             )
         try:
-            # G'oya 2 — Premium bo'lmagan g'olibga aynan yutgan payti, qancha
-            # boy berganini ko'rsatamiz. 2x ko'paytirgich update_ball ichida,
-            # shuning uchun mukofotni ikkilantirish aniq raqam beradi.
             prem_ids = _premium_ids_safe()
             _broadcast_and_dm(lines, winners, lambda w: (
                 f"{emoji_} {title} — <b>+{w['reward']} Kitobcha</b>! Ball: {w['points']}"
                 f"{_scoreline(w)}"
-                + (f"\n💎 Sizga <b>{w['premium_days']} kun BEPUL Premium</b> ham berildi — "
-                   "barcha VIP imtiyozlar faol!" if w.get("premium_days") else "")
+                + (f"\n💎 Sizga <b>{w.get('premium_text') or (str(w.get('premium_days', '')) + ' kun')} BEPUL Premium</b> ham berildi — "
+                   "barcha VIP imtiyozlar faol!" if (w.get("premium_text") or w.get("premium_days")) else "")
                 + _premium_missed_line(w, prem_ids)
             ), dm_markup_fn=lambda w: (
                 None if w.get("user_id") in prem_ids else _trial_premium_expiry_markup()

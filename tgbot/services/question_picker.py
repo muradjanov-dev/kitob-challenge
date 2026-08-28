@@ -52,12 +52,10 @@ def pick_least_recently_used(pool, get_key_fn, recent_games, get_game_keys_fn, c
     count = min(count, len(pool))
     total_pool_size = len(pool)
 
-    # Calculate strict cooldown window size (in games)
-    # A full cycle is total_pool_size // count games.
-    # To ensure 0% repetition until the whole pool is exhausted,
-    # we strictly lock out questions used in the last (cycle_len - 1) games.
+    # Minimum lockout window: at least 10 games without ANY question repeating
+    MIN_LOCKOUT_GAMES = 10
     cycle_len = max(1, total_pool_size // count)
-    strict_lockout_games = max(1, cycle_len - 1)
+    strict_lockout_games = max(MIN_LOCKOUT_GAMES, cycle_len - 1)
 
     # 1. Map each question key to its most recent appearance:
     # game_idx = 0 (most recent game), 1 (2nd most recent), etc.

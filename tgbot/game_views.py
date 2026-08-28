@@ -289,6 +289,13 @@ _QUIZ_FLAVORS = (
     "simurgh", "ishq", "nafs", "qalb",
     "naqshband", "yassaviy", "masnaviy", "gazzoliy",
     "fano", "marifat",
+    # 10 New Non-Test Interactive Games
+    "wordlock", "speedtype", "tilepuzzle", "association",
+    "hangman", "bookmemory", "spellcheck", "labyrinth",
+    "bookbidding", "characterclash",
+    # 5 New Novelty & Deduction Interactive Games
+    "riddlebox", "quotechain", "timetraveler", "bluffmaster",
+    "symbolmatch",
 )
 
 
@@ -420,6 +427,23 @@ _GAME_LABELS_URLS = {
     "gazzoliy": ("🗝 Kimyoi Saodat", "/gazzoliy/"),
     "fano": ("🌊 Fanofilloh", "/fano/"),
     "marifat": ("☀️ Haqiqat Quyoshi", "/marifat/"),
+    # 10 New Non-Test Interactive Games
+    "wordlock": ("🗝 So'z Qulfi", "/wordlock/"),
+    "speedtype": ("⚡️ Tezkor Terish", "/speedtype/"),
+    "tilepuzzle": ("🧩 Adabiy Mozaika", "/tilepuzzle/"),
+    "association": ("🔗 So'z Assotsiatsiyasi", "/association/"),
+    "hangman": ("🪢 Dorboz", "/hangman/"),
+    "bookmemory": ("🃏 Kitob Xotirasi", "/bookmemory/"),
+    "spellcheck": ("✍️ Imlo Saralovchi", "/spellcheck/"),
+    "labyrinth": ("🧭 Adabiy Labirint", "/labyrinth/"),
+    "bookbidding": ("💰 Jonli Auksion", "/bookbidding/"),
+    "characterclash": ("🤺 Qahramonlar Jangi", "/characterclash/"),
+    # 5 New Novelty & Deduction Interactive Games
+    "riddlebox": ("🧩 Adabiy Jumboq", "/riddlebox/"),
+    "quotechain": ("🔗 Iqtiboslar Halqasi", "/quotechain/"),
+    "timetraveler": ("⏳ Tarixiy Sayohatchi", "/timetraveler/"),
+    "bluffmaster": ("🎭 Haqiqatmi yoki Uydirma?", "/bluffmaster/"),
+    "symbolmatch": ("🗝 Adabiy Ramzlar", "/symbolmatch/"),
 }
 _QUIZ_FLAVOR_SET = set(_QUIZ_FLAVORS)
 

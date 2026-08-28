@@ -55,6 +55,14 @@ from tgbot.services.game_questions import (
     QUIZ_QALB_QUESTIONS, QUIZ_NAQSHBAND_QUESTIONS, QUIZ_YASSAVIY_QUESTIONS,
     QUIZ_MASNAVIY_QUESTIONS, QUIZ_GAZZOLIY_QUESTIONS, QUIZ_FANO_QUESTIONS,
     QUIZ_MARIFAT_QUESTIONS,
+    # 10 New Interactive Games
+    WORDLOCK_QUESTIONS, SPEEDTYPE_QUESTIONS, TILEPUZZLE_QUESTIONS,
+    ASSOCIATION_QUESTIONS, HANGMAN_QUESTIONS, BOOKMEMORY_QUESTIONS,
+    SPELLCHECK_QUESTIONS, LABYRINTH_QUESTIONS, BOOKBIDDING_QUESTIONS,
+    CHARACTERCLASH_QUESTIONS,
+    # 5 New Novelty & Deduction Interactive Games
+    RIDDLEBOX_QUESTIONS, QUOTECHAIN_QUESTIONS, TIMETRAVELER_QUESTIONS,
+    BLUFFMASTER_QUESTIONS, SYMBOLMATCH_QUESTIONS,
 )
 
 GAME_TYPE = "quiz"  # GameJoker.game_type — jokerlar qaysi o'yin jadvaliga tegishli
@@ -75,10 +83,15 @@ TEAM_RANK_BONUS = {0: 40, 1: 25, 2: 10}
 COVER_BLUR_RADIUS = 14
 
 # VIP Premium Arena Rewards & Rules
-VIP_TOP_GAMES = ["king", "duel", "teams", "survival", "mysterybox", "mindtrap", "stoic", "strategy", "simurgh", "masnaviy", "gazzoliy"]
-VIP_REWARD_TIERS = {0: 500, 1: 300, 2: 200}
-VIP_PREMIUM_DAYS_BONUS = {0: 3, 1: 2, 2: 1}
-VIP_PARTICIPATION = 75
+VIP_TOP_GAMES = [
+    "king", "duel", "teams", "survival", "mysterybox", "mindtrap", "stoic", "strategy", "simurgh", "masnaviy",
+    "gazzoliy", "wordlock", "speedtype", "association", "tilepuzzle", "labyrinth", "characterclash",
+    "riddlebox", "quotechain", "timetraveler", "bluffmaster", "symbolmatch"
+]
+VIP_REWARD_TIERS = {0: 350, 1: 200, 2: 100}  # Rebalanced Kitobcha rewards
+VIP_PREMIUM_HOURS_BONUS = {0: 24, 1: 12, 2: 6}  # 1-o'rin: 1 kun (24 soat), 2-o'rin: 12 soat, 3-o'rin: 6 soat
+VIP_PREMIUM_DAYS_BONUS = {0: 1, 1: 0, 2: 0}  # legacy backwards compatibility
+VIP_PARTICIPATION = 30
 
 
 def _dynamic_base(team_size, is_vip=False):
@@ -100,7 +113,7 @@ TITLES = {
     "matchbook": "Muallif-Asar Moslashtirish",
     "reverse": "Teskari Viktorina",
     "cover": "Kitob Muqovasi",
-    # 30 New Games (🧪 Test / Beta)
+    # 30 New Games
     "anagram": "🔠 Anagramma Kitob",
     "blitz": "⚡️ Blitz 60",
     "crossword": "🧩 Mini Krossvord",
@@ -153,6 +166,23 @@ TITLES = {
     "gazzoliy": "🗝 Kimyoi Saodat",
     "fano": "🌊 Fanofilloh",
     "marifat": "☀️ Haqiqat Quyoshi",
+    # 10 New Non-Test Interactive Games
+    "wordlock": "🗝 So'z Qulfi",
+    "speedtype": "⚡️ Tezkor Terish",
+    "tilepuzzle": "🧩 Adabiy Mozaika",
+    "association": "🔗 So'z Assotsiatsiyasi",
+    "hangman": "🪢 Dorboz / Harf Qidiruv",
+    "bookmemory": "🃏 Kitob Xotirasi",
+    "spellcheck": "✍️ Imlo Saralovchi",
+    "labyrinth": "🧭 Adabiy Labirint",
+    "bookbidding": "💰 Jonli Auksion Jangi",
+    "characterclash": "🤺 Qahramonlar To'qnashuvi",
+    # 5 New Novelty & Deduction Interactive Games
+    "riddlebox": "🧩 Adabiy Jumboq",
+    "quotechain": "🔗 Iqtiboslar Halqasi",
+    "timetraveler": "⏳ Tarixiy Sayohatchi",
+    "bluffmaster": "🎭 Haqiqatmi yoki Uydirma?",
+    "symbolmatch": "🗝 Adabiy Ramzlar",
 }
 
 ENTRY_FEES = {k: 0 for k in TITLES}  # barcha o'yinlar bepul (2026-08-19)
@@ -221,6 +251,23 @@ def _raw_pool(flavor):
         "gazzoliy": QUIZ_GAZZOLIY_QUESTIONS,
         "fano": QUIZ_FANO_QUESTIONS,
         "marifat": QUIZ_MARIFAT_QUESTIONS,
+        # 10 New Non-Test Interactive Games
+        "wordlock": WORDLOCK_QUESTIONS,
+        "speedtype": SPEEDTYPE_QUESTIONS,
+        "tilepuzzle": TILEPUZZLE_QUESTIONS,
+        "association": ASSOCIATION_QUESTIONS,
+        "hangman": HANGMAN_QUESTIONS,
+        "bookmemory": BOOKMEMORY_QUESTIONS,
+        "spellcheck": SPELLCHECK_QUESTIONS,
+        "labyrinth": LABYRINTH_QUESTIONS,
+        "bookbidding": BOOKBIDDING_QUESTIONS,
+        "characterclash": CHARACTERCLASH_QUESTIONS,
+        # 5 New Novelty & Deduction Interactive Games
+        "riddlebox": RIDDLEBOX_QUESTIONS,
+        "quotechain": QUOTECHAIN_QUESTIONS,
+        "timetraveler": TIMETRAVELER_QUESTIONS,
+        "bluffmaster": BLUFFMASTER_QUESTIONS,
+        "symbolmatch": SYMBOLMATCH_QUESTIONS,
     }
     if flavor == "cover":
         return _cover_raw_pool()
@@ -258,12 +305,12 @@ def _blurred_cover_url(book) -> str:
 def _identity(flavor, item):
     if flavor == "impostor":
         return item.get("fake") or item.get("q", "")
-    if flavor == "connection":
+    if flavor in ("connection", "association"):
         return str(item.get("items")) if "items" in item else item.get("q", "")
     if flavor == "cover":
         return item.get("title", "")
-    if flavor == "anagram":
-        return item.get("anagram", "")
+    if flavor in ("anagram", "wordlock", "hangman"):
+        return item.get("word") or item.get("anagram", "")
     if flavor == "wordle":
         return item.get("word", "")
     if flavor == "cipher":
@@ -272,7 +319,7 @@ def _identity(flavor, item):
         return item.get("acronym", "")
     if flavor == "character":
         return item.get("desc", "")
-    if flavor == "dialogue":
+    if flavor in ("dialogue", "speedtype"):
         return item.get("quote", "")
     if flavor == "crossword":
         return item.get("clue", "")
@@ -297,6 +344,45 @@ def _prep_one(flavor, item):
                 "q": f"🔠 Anagramma: <b>{item['anagram']}</b>\n(Maslahat: {item.get('hint', '')})",
                 "options": options,
                 "correct": options.index(ans),
+            }
+        if flavor == "wordlock":
+            options = [item["word"]] + list(item["distractors"])
+            ans = item["word"]
+            random.shuffle(options)
+            return {
+                "q": f"🗝 So'z Qulfi: <b>{item['word']}</b>\n(Maslahat: {item.get('hint', '')})",
+                "options": options,
+                "correct": options.index(ans),
+            }
+        if flavor == "hangman":
+            options = [item["word"]] + list(item["distractors"])
+            ans = item["word"]
+            random.shuffle(options)
+            return {
+                "q": f"🪢 Dorboz / Harf Qidiruv:\n(Maslahat: <b>{item.get('hint', '')}</b>)",
+                "options": options,
+                "correct": options.index(ans),
+            }
+        if flavor == "speedtype":
+            options = [item["speaker"]] + list(item["distractors"])
+            ans = item["speaker"]
+            random.shuffle(options)
+            return {
+                "q": f"⚡️ Tezkor Iqtibos:\n«<b>{item['quote']}</b>»\n({item.get('context', '')})",
+                "options": options,
+                "correct": options.index(ans),
+            }
+        if flavor == "association":
+            options = list(item["options"])
+            ci = item["correct"]
+            correct_text = options[ci]
+            random.shuffle(options)
+            items_str = " · ".join(item.get("items", []))
+            return {
+                "q": f"🔗 Bog'lovchi kalit so'zlar:\n<b>[{items_str}]</b>\n{item.get('q', '')}",
+                "options": options,
+                "correct": options.index(correct_text),
+                "items": item.get("items", []),
             }
         if flavor == "crossword":
             options = [item["answer"]] + list(item["distractors"])
@@ -726,27 +812,39 @@ def finalize(game_id: int) -> dict | None:
     return _finalize_individual(g)
 
 
-def grant_vip_premium(score, rank: int) -> int:
-    """Hand the VIP arena's top-3 Premium bonus to one winner, exactly once.
+def get_vip_premium_label(rank: int) -> str:
+    hours = VIP_PREMIUM_HOURS_BONUS.get(rank, 0)
+    if hours == 24:
+        return "1 kun"
+    elif hours > 0:
+        return f"{hours} soat"
+    return ""
+
+
+def grant_vip_premium(score, rank: int) -> dict:
+    """Hand the VIP arena's top-3 Premium bonus (1st: 1 kun/24h, 2nd: 12 soat, 3rd: 6 soat) to one winner, exactly once.
 
     `QuizScore.premium_days` is both the receipt and the idempotency guard, so
     a re-finalize or a late settle run can never double-grant. Failures are
-    swallowed deliberately: this used to raise (Payment wasn't even imported
-    here), which aborted the whole payout loop — the winner below the crash
-    point got no Kitobcha at all and the daily sequence stalled on the game.
+    swallowed deliberately.
     """
-    days = VIP_PREMIUM_DAYS_BONUS.get(rank, 0)
-    if not days or score.premium_days:
-        return score.premium_days or 0
+    hours = VIP_PREMIUM_HOURS_BONUS.get(rank, 0)
+    label = get_vip_premium_label(rank)
+    if not hours or score.premium_days:
+        return {
+            "hours": hours if score.premium_days else 0,
+            "days": 1 if (score.premium_days and hours >= 24) else 0,
+            "text": label if score.premium_days else "",
+        }
     try:
         from tgbot.services.premium import grant_premium
-        grant_premium(score.user, days=days)
+        grant_premium(score.user, hours=hours)
     except Exception as e:
         print(f"grant_vip_premium: score={score.id} rank={rank}: {e}")
-        return 0
-    score.premium_days = days
+        return {"hours": 0, "days": 0, "text": ""}
+    score.premium_days = 1 if hours >= 24 else hours
     score.save(update_fields=["premium_days", "updated_at"])
-    return days
+    return {"hours": hours, "days": 1 if hours >= 24 else 0, "text": label}
 
 
 def _finalize_individual(g) -> dict:
@@ -755,7 +853,7 @@ def _finalize_individual(g) -> dict:
     tiers = VIP_REWARD_TIERS if g.is_vip else REWARD_TIERS
     participation = VIP_PARTICIPATION if g.is_vip else PARTICIPATION
     for i, s in enumerate(scores):
-        reward = tiers[i] if i < 3 else (participation if i < 10 else 25)
+        reward = tiers[i] if i < 3 else (participation if i < 10 else 10)
         if not s.rewarded:
             applied = _add_ball_reward(s.user, reward)
             s.rewarded = True
@@ -763,7 +861,10 @@ def _finalize_individual(g) -> dict:
             s.save(update_fields=["rewarded", "reward", "updated_at"])
         else:
             applied = s.reward or reward
-        prem_days = grant_vip_premium(s, i) if g.is_vip else 0
+        prem_info = grant_vip_premium(s, i) if g.is_vip else {"hours": 0, "days": 0, "text": ""}
+        prem_text = prem_info.get("text", "")
+        prem_days = prem_info.get("days", 0)
+        prem_hours = prem_info.get("hours", 0)
         winners.append({
             "rank": i + 1, "user_id": s.user_id, "telegram_id": s.user.telegram_id,
             "name": s.user.full_name or "Kitobxon", "points": s.points, "reward": applied,
@@ -771,6 +872,8 @@ def _finalize_individual(g) -> dict:
             "correct": s.points // POINTS, "q_total": len(g.questions or []),
             "time": round(s.effective_time, 1), "answered": s.answered_count,
             "premium_days": prem_days,
+            "premium_hours": prem_hours,
+            "premium_text": prem_text,
         })
     g.rewarded = True
     g.save(update_fields=["rewarded", "updated_at"])

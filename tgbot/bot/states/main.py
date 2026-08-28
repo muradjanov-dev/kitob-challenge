@@ -134,6 +134,7 @@ class ShopProductCreateState(StatesGroup):
     image = State()
     price = State()
     stock = State()
+    duration_days = State()
 
 
 class ShopProductEditState(StatesGroup):

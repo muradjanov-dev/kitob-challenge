@@ -72,6 +72,25 @@ from .gazzoliy import QUIZ_GAZZOLIY_QUESTIONS
 from .fano import QUIZ_FANO_QUESTIONS
 from .marifat import QUIZ_MARIFAT_QUESTIONS
 
+# 10 New Interactive & Mechanics-rich Games
+from .wordlock import WORDLOCK_QUESTIONS
+from .speedtype import SPEEDTYPE_QUESTIONS
+from .tilepuzzle import TILEPUZZLE_QUESTIONS
+from .association import ASSOCIATION_QUESTIONS
+from .hangman import HANGMAN_QUESTIONS
+from .bookmemory import BOOKMEMORY_QUESTIONS
+from .spellcheck import SPELLCHECK_QUESTIONS
+from .labyrinth import LABYRINTH_QUESTIONS
+from .bookbidding import BOOKBIDDING_QUESTIONS
+from .characterclash import CHARACTERCLASH_QUESTIONS
+
+# 5 New Novelty & Deduction Interactive Games
+from .riddlebox import RIDDLEBOX_QUESTIONS
+from .quotechain import QUOTECHAIN_QUESTIONS
+from .timetraveler import TIMETRAVELER_QUESTIONS
+from .bluffmaster import BLUFFMASTER_QUESTIONS
+from .symbolmatch import SYMBOLMATCH_QUESTIONS
+
 __all__ = [
     "FEUD_QUESTIONS",
     "CASTLE_QUESTIONS",
@@ -135,4 +154,19 @@ __all__ = [
     "QUIZ_GAZZOLIY_QUESTIONS",
     "QUIZ_FANO_QUESTIONS",
     "QUIZ_MARIFAT_QUESTIONS",
+    "WORDLOCK_QUESTIONS",
+    "SPEEDTYPE_QUESTIONS",
+    "TILEPUZZLE_QUESTIONS",
+    "ASSOCIATION_QUESTIONS",
+    "HANGMAN_QUESTIONS",
+    "BOOKMEMORY_QUESTIONS",
+    "SPELLCHECK_QUESTIONS",
+    "LABYRINTH_QUESTIONS",
+    "BOOKBIDDING_QUESTIONS",
+    "CHARACTERCLASH_QUESTIONS",
+    "RIDDLEBOX_QUESTIONS",
+    "QUOTECHAIN_QUESTIONS",
+    "TIMETRAVELER_QUESTIONS",
+    "BLUFFMASTER_QUESTIONS",
+    "SYMBOLMATCH_QUESTIONS",
 ]

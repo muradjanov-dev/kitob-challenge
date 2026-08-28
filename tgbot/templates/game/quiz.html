@@ -2,177 +2,451 @@
 <html lang="uz">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title id="pageTitle">Bilim O'yini</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    :root{--bg:#15161a;--card:#1c1e23;--card2:#23262c;--text:#e8e6e1;--muted:#9a9a96;
-      --accent:#795cc1;--accent2:#49a296;--ok:#43a470;--bad:#c76b74;--line:#2b2e34;
-      --teama:#6483c4;--teamb:#cd7a91;}
-    @media (prefers-color-scheme: light){:root{--bg:#f2f0ec;--card:#faf9f6;--card2:#efece6;--text:#23252a;--muted:#6b7280;--accent:#785cc1;--accent2:#49a296;--line:#e2ded6;}}
-    *{box-sizing:border-box}html,body{margin:0;padding:0}
-    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;padding:14px 12px 28px;max-width:640px;margin:0 auto}
-    .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
-    .title{font-weight:800;font-size:18px}.title small{display:block;font-weight:600;font-size:12px;color:var(--muted)}
-    .timer{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-weight:800;font-variant-numeric:tabular-nums;min-width:70px;text-align:center}
-    .timer .lbl{display:block;font-size:10px;color:var(--muted);font-weight:600}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:12px}
-    .qcard{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;text-align:center;padding:22px 16px}
-    .qcard .qn{font-size:12px;font-weight:800;opacity:.9}
-    .qtext{font-size:18px;font-weight:800;line-height:1.35;margin-top:8px}
-    .items{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
-    .chip{background:rgba(255,255,255,.2);border-radius:8px;padding:4px 10px;font-size:12.5px;font-weight:700}
-    .qimg{max-width:100%;max-height:220px;border-radius:14px;margin-top:10px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
-    .opt{display:block;width:100%;text-align:left;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:13px 14px;font-size:15px;font-weight:600;margin-bottom:9px;cursor:pointer}
-    .opt:hover{border-color:var(--accent)}
-    .opt.correct{background:rgba(37,194,110,.18);border-color:var(--ok);color:var(--ok);font-weight:800}
-    .opt.wrong{background:rgba(255,93,108,.15);border-color:var(--bad);color:var(--bad)}
-    .opt:disabled{cursor:default}
-    .toast{min-height:20px;margin-top:9px;font-size:14px;font-weight:700;text-align:center}
-    .toast.ok{color:var(--ok)}.toast.bad{color:var(--bad)}
-    .stat{display:flex;justify-content:space-between;gap:8px;margin-bottom:12px}
-    .stat .box{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center}
-    .stat .box b{display:block;font-size:20px;color:var(--accent)}
-    .stat .box span{font-size:11px;color:var(--muted)}
-    .teambar{display:flex;border-radius:12px;overflow:hidden;height:34px;border:1px solid var(--line);margin-bottom:12px}
-    .teambar .a{background:var(--teama);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
-    .teambar .b{background:var(--teamb);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
-    .sect{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:2px 0 10px}
-    .lb{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
-    .lb:last-child{border-bottom:0}.rank{width:26px;text-align:center;font-weight:900}
-    .rank.g1{color:#ffcc4d}.rank.g2{color:#c9d1dc}.rank.g3{color:#e6a56b}
-    .lb-name{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .lb-name.team-a{color:var(--teama)}.lb-name.team-b{color:var(--teamb)}
-    .pts{font-weight:900;color:var(--accent)}
-    .big{text-align:center;padding:26px 16px}.big .em{font-size:46px}.big h2{margin:10px 0 6px;font-size:20px}.big p{color:var(--muted);margin:0;font-size:14px;line-height:1.5}
-    .lifetime{text-align:center;color:var(--muted);font-size:12px;margin-top:14px}
-    .statsgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
-    .sbox{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 4px;text-align:center}
-    .sbox b{display:block;font-size:18px;color:var(--accent)}.sbox span{font-size:10px;color:var(--muted)}
-    .hrow{text-align:left;padding:9px 2px;border-bottom:1px solid var(--line)}.hrow:last-child{border-bottom:0}
-    .hrow .hd{font-size:11px;color:var(--muted)}.hrow .hw{font-weight:700}
-    .muted{color:var(--muted)}.hidden{display:none}
+    :root {
+      --bg: #18181b;
+      --card: #212126;
+      --card2: #28282f;
+      --text: #ece9e2;
+      --muted: #95938d;
+      --accent: #5e6d8a;
+      --accent2: #52796f;
+      --ok: #468a68;
+      --bad: #b85d68;
+      --line: #32323a;
+      --teama: #4a6fa5;
+      --teamb: #9c5c64;
+      --badge: #383842;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #faf7f2;
+        --card: #f3eee6;
+        --card2: #eae4d8;
+        --text: #2a2723;
+        --muted: #736f68;
+        --accent: #5e6d8a;
+        --accent2: #52796f;
+        --ok: #3a7a58;
+        --bad: #aa505b;
+        --line: #dfd7ca;
+        --teama: #4a6fa5;
+        --teamb: #9c5c64;
+        --badge: #dfd7ca;
+      }
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Inter, sans-serif;
+      padding: 14px 14px 36px;
+      max-width: 620px;
+      margin: 0 auto;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .title {
+      font-weight: 800;
+      font-size: 19px;
+      letter-spacing: -0.02em;
+    }
+    .title small {
+      display: block;
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .timer {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 8px 14px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      min-width: 76px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .timer .lbl {
+      display: block;
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+    }
+    .qcard {
+      background: linear-gradient(145deg, var(--card2), var(--card));
+      border: 1px solid var(--line);
+      color: var(--text);
+      text-align: center;
+      padding: 24px 18px;
+      border-radius: 20px;
+      position: relative;
+    }
+    .qcard .qn {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--muted);
+      background: var(--badge);
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .qtext {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.42;
+      margin-top: 12px;
+      letter-spacing: -0.01em;
+    }
+    .items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+      margin-top: 12px;
+    }
+    .chip {
+      background: var(--card2);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 5px 12px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .qimg {
+      max-width: 100%;
+      max-height: 220px;
+      border-radius: 14px;
+      margin-top: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+      border: 1px solid var(--line);
+    }
+    .opt-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .opt {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      text-align: left;
+      background: var(--card);
+      border: 1.5px solid var(--line);
+      color: var(--text);
+      border-radius: 16px;
+      padding: 14px 16px;
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.35;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    }
+    .opt:active {
+      transform: scale(0.985);
+      background: var(--card2);
+    }
+    .opt-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--card2);
+      border: 1px solid var(--line);
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .opt-text {
+      flex: 1;
+    }
+    .opt.correct {
+      background: rgba(70, 138, 104, 0.15);
+      border-color: var(--ok);
+      color: var(--ok);
+      font-weight: 700;
+    }
+    .opt.correct .opt-badge {
+      background: var(--ok);
+      border-color: var(--ok);
+      color: #fff;
+    }
+    .opt.wrong {
+      background: rgba(184, 93, 104, 0.14);
+      border-color: var(--bad);
+      color: var(--bad);
+    }
+    .opt.wrong .opt-badge {
+      background: var(--bad);
+      border-color: var(--bad);
+      color: #fff;
+    }
+    .opt.chosen {
+      border-color: var(--accent);
+    }
+    .opt:disabled {
+      cursor: default;
+    }
+    .opt.gone {
+      opacity: 0;
+      transform: scale(0.95);
+      pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    .text-input-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .text-input {
+      width: 100%;
+      background: var(--card);
+      border: 1.5px solid var(--line);
+      color: var(--text);
+      border-radius: 16px;
+      padding: 15px;
+      font-size: 16px;
+      font-weight: 700;
+      text-align: center;
+      font-family: inherit;
+      outline: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    }
+    .text-input:focus {
+      border-color: var(--accent);
+    }
+    .btn-submit {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 16px;
+      padding: 15px;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: transform 0.1s, opacity 0.15s;
+    }
+    .btn-submit:active {
+      transform: scale(0.985);
+      opacity: 0.9;
+    }
+    .toast {
+      min-height: 22px;
+      margin-top: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .toast.ok { color: var(--ok); }
+    .toast.bad { color: var(--bad); }
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .stat .box {
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat .box b {
+      display: block;
+      font-size: 20px;
+      color: var(--accent);
+    }
+    .stat .box span {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .teambar {
+      display: flex;
+      border-radius: 12px;
+      overflow: hidden;
+      height: 36px;
+      border: 1px solid var(--line);
+      margin-bottom: 12px;
+    }
+    .teambar .a {
+      background: var(--teama);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 13px;
+    }
+    .teambar .b {
+      background: var(--teamb);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 13px;
+    }
+    .sect {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin: 4px 0 10px;
+    }
+    .lb {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .lb:last-child { border-bottom: 0; }
+    .rank {
+      width: 28px;
+      text-align: center;
+      font-weight: 900;
+      font-size: 15px;
+    }
+    .rank.g1 { color: #d4af37; }
+    .rank.g2 { color: #a8b0ba; }
+    .rank.g3 { color: #c48c66; }
+    .lb-name {
+      flex: 1;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 14.5px;
+    }
+    .lb-name.team-a { color: var(--teama); }
+    .lb-name.team-b { color: var(--teamb); }
+    .pts {
+      font-weight: 800;
+      color: var(--accent);
+      font-size: 15px;
+    }
+    .big {
+      text-align: center;
+      padding: 30px 18px;
+    }
+    .big .em { font-size: 48px; margin-bottom: 8px; }
+    .big h2 { margin: 10px 0 8px; font-size: 21px; font-weight: 800; }
+    .big p { color: var(--muted); margin: 0; font-size: 14.5px; line-height: 1.5; }
+    .lifetime {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12.5px;
+      margin-top: 14px;
+      font-weight: 600;
+    }
+    .statsgrid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .sbox {
+      background: var(--card2);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 6px;
+      text-align: center;
+    }
+    .sbox b {
+      display: block;
+      font-size: 19px;
+      color: var(--accent);
+    }
+    .sbox span {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .hrow {
+      text-align: left;
+      padding: 10px 2px;
+      border-bottom: 1px solid var(--line);
+    }
+    .hrow:last-child { border-bottom: 0; }
+    .hrow .hd { font-size: 11px; color: var(--muted); }
+    .hrow .hw { font-weight: 700; margin-top: 2px; }
+    .muted { color: var(--muted); }
+    .hidden { display: none !important; }
 
-    /* ── JOKERLAR: o'yin ichida Kitobchaga sotib olinadigan yordamlar ─── */
-    .jokers{display:flex;gap:8px;margin-bottom:12px}
-    .jk{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;
-      padding:9px 6px 8px;text-align:center;cursor:pointer;color:var(--text);
-      font-family:inherit;transition:transform .12s,border-color .12s,opacity .12s}
-    .jk:active{transform:scale(.95)}
-    .jk .ic{display:block;font-size:19px;line-height:1.15}
-    .jk .nm{display:block;font-size:10px;font-weight:800;margin-top:2px}
-    .jk .pr{display:block;font-size:10.5px;font-weight:800;color:var(--accent2);margin-top:2px}
-    .jk[disabled]{opacity:.4;cursor:default}
-    .jk.used{border-color:var(--ok);opacity:.65}
-    .jk.used .pr{color:var(--ok)}
-    .jk.poor .pr{color:var(--bad)}
-    .jkbal{font-size:11px;font-weight:700;color:var(--muted);text-align:center;margin:-4px 0 10px}
-    .jkbal b{color:var(--accent2)}
-    .opt.gone{opacity:0;transform:scale(.9);pointer-events:none;transition:opacity .35s,transform .35s}
-    .shieldtag{display:inline-block;background:rgba(255,93,108,.15);border:1px solid var(--bad);
-      color:var(--bad);border-radius:8px;padding:2px 8px;font-size:11px;font-weight:800;margin-left:6px}
-
-    /* THEMES */
-    /* Terminal feel WITHOUT the retina-burning #00ff41-on-black: a muted
-       sage phosphor on warm charcoal, no glow. Same character, readable for
-       a whole game. */
-    body.theme-hacker { --bg: #16181a; --card: #1c1f21; --card2: #232729; --text: #a8c0a4; --muted: #6f8a70; font-family: 'Courier New', Courier, monospace; }
-    body.theme-hacker .card { border: 1px solid #33413a; }
-    body.theme-hacker .qcard { background: #1c1f21; border-bottom: 2px solid #55705c; color: #b9cdb4; }
-    body.theme-hacker .opt { background: #1c1f21; border-color: #3c4a41; color: #a8c0a4; font-family: 'Courier New', Courier, monospace; }
-    body.theme-hacker .opt:hover { background: #2a322c; color: #cddcc7; }
-
-
-    /* Keeps the chunky arcade shape (solid offset "button" edge, no gradient
-       glow) but in dusty retro tones instead of #ff00ff / #00ffff neon. */
-    body.theme-arcade { --bg: #221b2e; --card: #2c2439; --card2: #362c46; --text: #e4dced; --muted: #a396b5; font-family: 'Impact', sans-serif; letter-spacing: 1px; }
-    body.theme-arcade .card { border: 2px solid #4a3f5c; }
-    body.theme-arcade .qcard { background: #3a2f4a; border: none; color: #ece5f2; }
-    body.theme-arcade .opt { background: #7d5a72; border: 3px solid #6a4b62; color: #f5eef2; font-size: 18px; border-radius: 8px; box-shadow: 0 6px 0 #4e3648; transition: all 0.1s; margin-bottom: 12px; }
-    body.theme-arcade .opt:active { transform: translateY(6px); box-shadow: 0 0 0 #4e3648; }
-    body.theme-arcade .opt.correct { background: #5f8f6b; border-color: #4c7456; box-shadow: 0 6px 0 #3a5a42; color: #f2f7f3; }
-    body.theme-arcade .opt.wrong { background: #3a3a3f; border-color: #2c2c30; box-shadow: 0 6px 0 #232326; color: #85858c; }
-
-    body.theme-classic { --bg: #f4ecd8; --card: #e8dcc4; --card2: #dfd1b3; --text: #3e2723; --muted: #795548; font-family: 'Courier New', Courier, monospace; }
-    body.theme-classic .card { border: 1px dashed #a1887f; border-radius: 2px; }
-    body.theme-classic .qcard { background: transparent; border-bottom: 2px solid #5d4037; color: #3e2723; font-weight: bold; }
-    body.theme-classic .opt { background: #fdfaf3; border: 1px solid #d7ccc8; color: #3e2723; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); border-radius: 0; position: relative; }
-    body.theme-classic .opt:hover { background: #f5f0e1; }
-
-    .equalizer { display: flex; justify-content: center; align-items: flex-end; gap: 4px; height: 60px; margin: 20px 0; }
-    .eq-bar { width: 8px; background: var(--accent); border-radius: 4px; animation: eq 1s ease-in-out infinite alternate; }
-    .eq-bar:nth-child(1) { animation-delay: 0.1s; height: 20%; }
-    .eq-bar:nth-child(2) { animation-delay: 0.3s; height: 60%; }
-    .eq-bar:nth-child(3) { animation-delay: 0.0s; height: 100%; }
-    .eq-bar:nth-child(4) { animation-delay: 0.4s; height: 50%; }
-    .eq-bar:nth-child(5) { animation-delay: 0.2s; height: 80%; }
-    @keyframes eq { 0% { transform: scaleY(0.3); } 100% { transform: scaleY(1); } }
-
-    body.theme-sufi { --bg: #2a241f; --card: #3a3229; --card2: #4a4134; --text: #f0e6d2; --muted: #a69886; font-family: Georgia, serif; }
-    body.theme-sufi .card { border: 1px solid #a69886; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
-    body.theme-sufi .qcard { background: linear-gradient(135deg, #4a3b2c, #7a6145); border-bottom: 2px solid #d4af37; color: #f0e6d2; text-shadow: 1px 1px 3px rgba(0,0,0,0.8); }
-    body.theme-sufi .opt { background: #3a3229; border-color: #d4af37; color: #f0e6d2; border-radius: 4px; }
-    
-    body.theme-visual .qcard { background: transparent; padding: 10px 16px 0; color: var(--text); }
-    body.theme-visual .qimg { max-height: 280px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 100%; object-fit: cover; border-radius: 18px; }
-    body.theme-visual .opt { text-align: center; justify-content: center; }
-
-    .grid-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .grid-opts .opt { text-align: center; height: 100%; min-height: 80px; display: flex; align-items: center; justify-content: center; padding: 15px; font-size: 15px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s, background 0.2s; margin-bottom: 0; }
-    .grid-opts .opt:active { transform: scale(0.95); }
-
-    .flip-card { perspective: 1000px; background: transparent; border: 0; padding: 0; outline: none; margin-bottom: 0; cursor: pointer; }
-    .flip-card-inner { position: relative; width: 100%; height: 100%; min-height: 100px; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
-    .flip-card.answered .flip-card-inner { transform: rotateY(180deg); }
-    .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; border-radius: 16px; padding: 15px; font-weight: 800; font-size: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 2px solid var(--line); }
-    .flip-card-front { background: var(--card2); color: var(--text); }
-    .flip-card-back { transform: rotateY(180deg); color: #fff; }
-    .flip-card-back.correct { background: var(--ok); border-color: var(--ok); }
-    .flip-card-back.wrong { background: var(--bad); border-color: var(--bad); }
-    .flip-card-back.neutral { background: var(--card); border-color: var(--line); color: var(--muted); }
-    .swipe-deck { position: relative; width: 100%; height: 280px; margin-bottom: 20px; perspective: 1000px; }
-    .tinder-card { position: absolute; width: 100%; height: 100%; background: var(--card2); border: 3px solid var(--line); border-radius: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; padding: 20px; text-align: center; cursor: grab; transition: transform 0.3s ease, opacity 0.3s; transform-origin: 50% 100%; color: var(--text); }
-    .tinder-card.dragging { transition: none; cursor: grabbing; }
-    .swipe-controls { display: flex; gap: 15px; justify-content: center; margin-bottom: 10px; }
-    .swipe-controls button { flex: 1; padding: 18px; border-radius: 18px; font-size: 18px; font-weight: 900; border: none; cursor: pointer; color: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-
-    /* ── QO'L HARAKATI MEXANIKALARI ─────────────────────────────────────
-       Barmoq bilan o'ynaladigan 3 ta qo'shimcha usul: tortib tashlash,
-       surgich va tirnab ochish. Uchalasi ham oxirida oddiy javob indeksini
-       yuboradi, shuning uchun backend o'zgarmaydi. */
-    .drop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-    .drop-slot { background: var(--card2); border: 2px dashed var(--line); border-radius: 16px; padding: 16px 10px;
-                 min-height: 74px; display: flex; align-items: center; justify-content: center; text-align: center;
-                 font-weight: 700; font-size: 14px; transition: all .15s; }
-    .drop-slot.hot { border-color: var(--accent); background: var(--accent); color: #fff; transform: scale(1.05); }
-    .drag-token { width: 76px; height: 76px; border-radius: 50%; margin: 0 auto;
-                  background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff;
-                  display: flex; align-items: center; justify-content: center; font-size: 32px;
-                  box-shadow: 0 8px 22px rgba(0,0,0,.35); touch-action: none; cursor: grab; position: relative; z-index: 5; }
-    .drag-token.grabbing { cursor: grabbing; transition: none; }
-    .drag-hint { text-align: center; color: var(--muted); font-size: 13px; font-weight: 700; margin: 10px 0; }
-
-    .slider-wrap { padding: 6px 4px 0; }
-    .slider-track { position: relative; height: 12px; border-radius: 8px; background: var(--card2);
-                    border: 1px solid var(--line); margin: 46px 12px 12px; touch-action: none; }
-    .slider-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 8px;
-                   background: linear-gradient(90deg, var(--accent), var(--accent2)); }
-    .slider-knob { position: absolute; top: 50%; width: 42px; height: 42px; margin-left: -21px; border-radius: 50%;
-                   background: var(--accent); border: 3px solid #fff; box-shadow: 0 4px 14px rgba(0,0,0,.4);
-                   transform: translateY(-50%); touch-action: none; }
-    .slider-stops { display: flex; justify-content: space-between; margin: 0 12px 14px; }
-    .slider-stops span { flex: 1; text-align: center; font-size: 11px; color: var(--muted); font-weight: 700; }
-    .slider-value { text-align: center; font-size: 17px; font-weight: 900; color: var(--accent); min-height: 26px; margin-bottom: 10px; }
-
-    .scratch-wrap { position: relative; border-radius: 18px; overflow: hidden; margin-bottom: 12px; }
-    .scratch-canvas { display: block; width: 100%; touch-action: none; }
-    .scratch-under { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-                     padding: 18px; text-align: center; font-weight: 800; font-size: 16px;
-                     background: var(--card2); color: var(--text); z-index: -1; }
-    #btnNo { background: var(--bad); }
-    #btnYes { background: var(--ok); }
-
-
+    /* JOKERS */
+    .jokers {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .jk {
+      flex: 1;
+      background: var(--card);
+      border: 1.5px solid var(--line);
+      border-radius: 16px;
+      padding: 10px 6px;
+      text-align: center;
+      cursor: pointer;
+      color: var(--text);
+      font-family: inherit;
+      transition: transform 0.12s, border-color 0.12s, opacity 0.12s;
+    }
+    .jk:active { transform: scale(0.95); }
+    .jk .ic { display: block; font-size: 19px; line-height: 1.15; }
+    .jk .nm { display: block; font-size: 10.5px; font-weight: 800; margin-top: 3px; }
+    .jk .pr { display: block; font-size: 11px; font-weight: 800; color: var(--accent2); margin-top: 2px; }
+    .jk[disabled] { opacity: 0.38; cursor: default; }
+    .jk.used { border-color: var(--ok); opacity: 0.65; }
+    .jk.used .pr { color: var(--ok); }
+    .jk.poor .pr { color: var(--bad); }
+    .jkbal {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      text-align: center;
+      margin: -2px 0 12px;
+    }
+    .jkbal b { color: var(--accent2); }
   </style>
 </head>
 <body data-flavor="{{ flavor }}">
@@ -182,13 +456,13 @@
   </div>
 
   <div id="live" class="hidden">
-    <div class="card" id="feeBanner" style="background:rgba(255,204,77,.12);border:1px solid var(--accent2);font-size:12.5px;line-height:1.5;padding:10px 12px"></div>
+    <div class="card" id="feeBanner" style="background:var(--card2);border:1px solid var(--line);font-size:12.5px;line-height:1.5;padding:10px 12px"></div>
     <div class="teambar hidden" id="teamBar"><div class="a" id="teamABar">A</div><div class="b" id="teamBBar">B</div></div>
     <div class="card qcard">
       <div class="qn" id="qn">SAVOL</div>
       <div class="qtext" id="qtext">—</div>
-      <div id="audioBox" class="hidden" style="margin:10px 0;text-align:center">
-        <button id="playAudioBtn" type="button" style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#ff5252,#ff7b25);color:#fff;border:0;padding:10px 20px;border-radius:24px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(255,82,82,0.35);transition:all .2s">
+      <div id="audioBox" class="hidden" style="margin:12px 0;text-align:center">
+        <button id="playAudioBtn" type="button" style="display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;border:0;padding:11px 22px;border-radius:24px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.15)">
           <span>🔊</span> <span id="audioBtnText">Ovozni tinglash</span>
         </button>
       </div>
@@ -201,812 +475,637 @@
       <button type="button" class="jk" id="jkSniper"><span class="ic">🎯</span><span class="nm">Snayper</span><span class="pr">500 🪙</span></button>
     </div>
     <div class="jkbal hidden" id="jkBal"></div>
-    <div class="card" id="optsCard"><div id="opts"></div><div class="toast" id="toast"></div></div>
+
+    <div id="opts"></div>
+    <div class="toast" id="toast"></div>
+
     <div class="stat">
-      <div class="box"><b id="myPts">0</b><span id="myPtsLbl">Ballaringiz</span></div>
-      <div class="box"><b id="qnum">1/1</b><span>Savol</span></div>
+      <div class="box"><b id="myPts">0</b><span id="myPtsLbl">Sizning ochkoingiz</span></div>
+      <div class="box"><b id="qnum">1/10</b><span>Savol</span></div>
     </div>
-    <div class="card"><div class="sect">🏆 Reyting</div><div id="board"></div></div>
+
+    <div class="card">
+      <div class="sect">🏆 Jonli Peshqadamlar</div>
+      <div id="board"></div>
+    </div>
   </div>
 
-  <div id="info" class="card big hidden"></div>
+  <div id="info" class="card big"></div>
   <div id="lifetime" class="lifetime hidden"></div>
 
   <script>
-    var FLAVOR = document.body.getAttribute('data-flavor');
+    var FLAVOR = document.body.dataset.flavor || 'twofacts';
     var META = {
-      twofacts:  {emoji:'🎭', title:"Ikki haqiqat, bir yolg'on", fee:25, api:'/ikki-haqiqat/api/', none:"Ikki haqiqat, bir yolg'on tez orada boshlanadi — guruhni kuzating!", scheduled:"3 ta gapdan qaysi biri yolg'on ekanini tez toping!", accent:'#795cc1', accent2:'#b795d0'},
-      impostor:  {emoji:'🃏', title:"Kim yolg'onchi?", fee:25, api:'/kim-yolgonchi/api/', none:"Kim yolg'onchi? tez orada boshlanadi — guruhni kuzating!", scheduled:"3 haqiqiy va 1 soxta juftlik orasidan soxtasini toping!", accent:'#be5566', accent2:'#d0959f'},
-      connection:{emoji:'🧩', title:"Yashirin bog'lanish", fee:25, api:'/bog-lanish/api/', none:"Yashirin bog'lanish tez orada boshlanadi — guruhni kuzating!", scheduled:"4 ta narsani bog'lovchi yashirin mavzuni toping!", accent:'#3b9b93', accent2:'#7ac3bd'},
-      teams:     {emoji:'👥', title:"Jamoa Jangi", fee:30, api:'/jamoa-jangi/api/', none:"Jamoa Jangi tez orada boshlanadi — guruhni kuzating!", scheduled:"Ikki jamoaga bo'linasiz — jamoangiz ko'proq to'g'ri javob bersin!", accent:'#5c7dc1', accent2:'#95a8d0'},
-      timeline:  {emoji:'🕰️', title:"Vaqt Mashinasi", fee:25, api:'/vaqt-mashinasi/api/', none:"Vaqt Mashinasi tez orada boshlanadi — guruhni kuzating!", scheduled:"Kitob yoki mutafakkir qaysi asrga tegishli ekanini toping!", accent:'#b28e43', accent2:'#c8b484'},
-      matchbook: {emoji:'🎯', title:"Muallif-Asar Moslashtirish", fee:25, api:'/muallif-asar/api/', none:"Muallif-Asar Moslashtirish tez orada boshlanadi — guruhni kuzating!", scheduled:"Muallifga tegishli haqiqiy asarni 4 variantdan tez toping!", accent:'#3b9b62', accent2:'#81c693'},
-      reverse:   {emoji:'🔄', title:"Teskari Viktorina", fee:25, api:'/teskari-viktorina/api/', none:"Teskari Viktorina tez orada boshlanadi — guruhni kuzating!", scheduled:"Javob avval ko'rsatiladi — qaysi savolga mos kelishini toping!", accent:'#6d45b7', accent2:'#c379b5'},
-      cover:     {emoji:'🖼', title:"Kitob Muqovasi", fee:25, api:'/kitob-muqovasi/api/', none:"Kitob Muqovasi tez orada boshlanadi — guruhni kuzating!", scheduled:"Xiralashtirilgan muqovadan kitobni 4 variantdan tez toping!", accent:'#b28e43', accent2:'#c8b484'}
+      twofacts:   {emoji:'🧠', title:"Ikki haqiqat, bir yolg'on", accent:'#5e6d8a', accent2:'#52796f'},
+      impostor:   {emoji:'🎭', title:"Kim yolg'onchi?", accent:'#9c5c64', accent2:'#b9734c'},
+      connection: {emoji:'🔗', title:"Yashirin bog'lanish", accent:'#4a6fa5', accent2:'#52796f'},
+      teams:      {emoji:'👥', title:"Jamoa Jangi", accent:'#5e6d8a', accent2:'#9c5c64'},
+      timeline:   {emoji:'⏳', title:"Vaqt Mashinasi", accent:'#b9734c', accent2:'#c5a059'},
+      matchbook:  {emoji:'🧩', title:"Muallif-Asar", accent:'#52796f', accent2:'#5e6d8a'},
+      reverse:    {emoji:'🔄', title:"Teskari Viktorina", accent:'#6b5b7b', accent2:'#4a6fa5'},
+      cover:      {emoji:'📖', title:"Kitob Muqovasi", accent:'#5e6d8a', accent2:'#52796f'},
+      // 30 Games
+      anagram:    {emoji:'🔠', title:"Anagramma Kitob", accent:'#52796f', accent2:'#5e6d8a'},
+      blitz:      {emoji:'⚡️', title:"Blitz 60", accent:'#c5a059', accent2:'#b9734c'},
+      crossword:  {emoji:'🧩', title:"Mini Krossvord", accent:'#5e6d8a', accent2:'#52796f'},
+      wordle:     {emoji:'🔤', title:"Harfma-Harf", accent:'#52796f', accent2:'#4a6fa5'},
+      cipher:     {emoji:'🔐', title:"Sherlok Kodi", accent:'#4a6fa5', accent2:'#5e6d8a'},
+      acronym:    {emoji:'🎯', title:"Bosh Harflar", accent:'#9c5c64', accent2:'#b9734c'},
+      character:  {emoji:'👤', title:"Qahramonni Top", accent:'#b9734c', accent2:'#c5a059'},
+      dialogue:   {emoji:'🗣', title:"Kimning gapi?", accent:'#5e6d8a', accent2:'#52796f'},
+      plotmap:    {emoji:'🗺', title:"Syujet Xaritasi", accent:'#4a6fa5', accent2:'#52796f'},
+      sequence:   {emoji:'⏳', title:"Ketma-ketlik", accent:'#b9734c', accent2:'#c5a059'},
+      oddone:     {emoji:'🔍', title:"Ortiqchasini Top", accent:'#9c5c64', accent2:'#5e6d8a'},
+      ending:     {emoji:'✍️', title:"Asar Yakuni", accent:'#52796f', accent2:'#4a6fa5'},
+      pixel:      {emoji:'🖼', title:"Piksel Muqova", accent:'#5e6d8a', accent2:'#52796f'},
+      aiart:      {emoji:'🎨', title:"AI Rasmlar", accent:'#6b5b7b', accent2:'#5e6d8a'},
+      scenes:     {emoji:'🎭', title:"Sahna Ko'rinishi", accent:'#9c5c64', accent2:'#b9734c'},
+      audioquote: {emoji:'🎧', title:"Ovozli Iqtibos", accent:'#4a6fa5', accent2:'#52796f'},
+      mosaic:     {emoji:'🧩', title:"Kitob Mozaikasi", accent:'#52796f', accent2:'#c5a059'},
+      hiddendetail:{emoji:'🔎', title:"Yashirin Detal", accent:'#b9734c', accent2:'#4a6fa5'},
+      duel:       {emoji:'🤺', title:"1v1 Jonli Duel", accent:'#9c5c64', accent2:'#4a6fa5'},
+      buzzer:     {emoji:'🔔', title:"Tezkor Qo'ng'iroq", accent:'#c5a059', accent2:'#b9734c'},
+      bracket:    {emoji:'🏆', title:"Haftalik Turnir", accent:'#d4af37', accent2:'#5e6d8a'},
+      auction:    {emoji:'💰', title:"Kitob Auksioni", accent:'#c5a059', accent2:'#52796f'},
+      regions:    {emoji:'👥', title:"Viloyatlar Jangi", accent:'#4a6fa5', accent2:'#5e6d8a'},
+      king:       {emoji:'👑', title:"Qirol Taxti", accent:'#7a5c88', accent2:'#c5a059'},
+      rhyme:      {emoji:'📜', title:"Bahri-Bayt", accent:'#875d50', accent2:'#b9734c'},
+      scholars:   {emoji:'🕌', title:"Sharq Allomalari", accent:'#52796f', accent2:'#5e6d8a'},
+      genres:     {emoji:'📚', title:"Janrlar Ustasi", accent:'#4a6fa5', accent2:'#52796f'},
+      numbers:    {emoji:'🔢', title:"Adabiy Raqamlar", accent:'#9c5c64', accent2:'#c5a059'},
+      worldlit:   {emoji:'🌍', title:"Jahon Adabiyoti", accent:'#4a6fa5', accent2:'#52796f'},
+      mysterybox: {emoji:'🎁', title:"Sirli Sandiq", accent:'#b9734c', accent2:'#52796f'},
+      // 10 Mind & Logic
+      mindtrap:   {emoji:'🧠', title:"Fikr Tuzog'i", accent:'#6b5b7b', accent2:'#5e6d8a'},
+      stoic:      {emoji:'🧘‍♂️', title:"Ongli Hayot", accent:'#52796f', accent2:'#5e6d8a'},
+      antiherd:   {emoji:'🐑', title:"Podadan Ajral", accent:'#9c5c64', accent2:'#b9734c'},
+      dilemma:    {emoji:'⚖️', title:"Axloqiy Dilemma", accent:'#b9734c', accent2:'#5e6d8a'},
+      causeeffect:{emoji:'🔮', title:"Sabab va Oqibat", accent:'#5e6d8a', accent2:'#6b5b7b'},
+      masks:      {emoji:'🎭', title:"Niqoblar Foshi", accent:'#9c5c64', accent2:'#52796f'},
+      socrates:   {emoji:'🏛', title:"Sokrat Suhbatlari", accent:'#4a6fa5', accent2:'#52796f'},
+      memento:    {emoji:'⌛️', title:"Vaqt Paradoksi", accent:'#b9734c', accent2:'#c5a059'},
+      strategy:   {emoji:'♟', title:"Strategik Tafakkur", accent:'#5e6d8a', accent2:'#52796f'},
+      paradox:    {emoji:'💡', title:"Paradokslar Olami", accent:'#52796f', accent2:'#4a6fa5'},
+      // 10 Tasavvuf
+      simurgh:    {emoji:'🕊', title:"Simurg' Parvozi", accent:'#52796f', accent2:'#4a6fa5'},
+      ishq:       {emoji:'🕯', title:"Parvona va Sham", accent:'#9c5c64', accent2:'#b9734c'},
+      nafs:       {emoji:'🛡', title:"Nafs Tarbiyasi", accent:'#52796f', accent2:'#5e6d8a'},
+      qalb:       {emoji:'🪞', title:"Qalb Sayqali", accent:'#4a6fa5', accent2:'#52796f'},
+      naqshband:  {emoji:'🌾', title:"Xalvat dar Anjuman", accent:'#875a4f', accent2:'#52796f'},
+      yassaviy:   {emoji:'📜', title:"Hikmatlar Daryosi", accent:'#7a5c88', accent2:'#5e6d8a'},
+      masnaviy:   {emoji:'🪈', title:"Nay Nidosi", accent:'#9c5c64', accent2:'#5e6d8a'},
+      gazzoliy:   {emoji:'🗝', title:"Kimyoi Saodat", accent:'#b9734c', accent2:'#c5a059'},
+      fano:       {emoji:'🌊', title:"Fanofilloh", accent:'#52796f', accent2:'#4a6fa5'},
+      marifat:    {emoji:'☀️', title:"Haqiqat Quyoshi", accent:'#c5a059', accent2:'#b9734c'},
+      // 10 New Non-Test Games
+      wordlock:   {emoji:'🗝', title:"So'z Qulfi", accent:'#b9734c', accent2:'#c5a059'},
+      speedtype:  {emoji:'⚡️', title:"Tezkor Terish", accent:'#4a6fa5', accent2:'#52796f'},
+      tilepuzzle: {emoji:'🧩', title:"Adabiy Mozaika", accent:'#52796f', accent2:'#5e6d8a'},
+      association:{emoji:'🔗', title:"So'z Assotsiatsiyasi", accent:'#9c5c64', accent2:'#b9734c'},
+      hangman:    {emoji:'🪢', title:"Dorboz", accent:'#c5a059', accent2:'#52796f'},
+      bookmemory: {emoji:'🃏', title:"Kitob Xotirasi", accent:'#5e6d8a', accent2:'#4a6fa5'},
+      spellcheck: {emoji:'✍️', title:"Imlo Saralovchi", accent:'#7a5c88', accent2:'#5e6d8a'},
+      labyrinth:  {emoji:'🧭', title:"Adabiy Labirint", accent:'#52796f', accent2:'#4a6fa5'},
+      bookbidding:{emoji:'💰', title:"Jonli Auksion", accent:'#c5a059', accent2:'#b9734c'},
+      characterclash:{emoji:'🤺', title:"Qahramonlar Jangi", accent:'#9c5c64', accent2:'#5e6d8a'},
+      // 5 New Novelty & Deduction Interactive Games
+      riddlebox:  {emoji:'🧩', title:"Adabiy Jumboq", accent:'#7a5c88', accent2:'#52796f'},
+      quotechain: {emoji:'🔗', title:"Iqtiboslar Halqasi", accent:'#52796f', accent2:'#4a6fa5'},
+      timetraveler:{emoji:'⏳', title:"Tarixiy Sayohatchi", accent:'#b9734c', accent2:'#c5a059'},
+      bluffmaster:{emoji:'🎭', title:"Haqiqatmi yoki Uydirma?", accent:'#9c5c64', accent2:'#b9734c'},
+      symbolmatch:{emoji:'🗝', title:"Adabiy Ramzlar", accent:'#5e6d8a', accent2:'#52796f'},
     };
-    var BETA_GAMES = {
-      anagram:   {emoji:'🔠', title:"Anagramma Kitob", accent:'#c1755c', accent2:'#cfa395'},
-      blitz:     {emoji:'⚡️', title:"Blitz 60", accent:'#bb9f4b', accent2:'#d0c195'},
-      crossword: {emoji:'🧩', title:"Mini Krossvord", accent:'#3b909b', accent2:'#95c9d0'},
-      wordle:    {emoji:'🔤', title:"Harfma-Harf", accent:'#4caf50', accent2:'#96cf98'},
-      cipher:    {emoji:'🔐', title:"Sherlok Kodi", accent:'#8e3b9c', accent2:'#c795d0'},
-      acronym:   {emoji:'🎯', title:"Bosh Harflar", accent:'#bb4c72', accent2:'#d095a9'},
-      character: {emoji:'👤', title:"Qahramonni Top", accent:'#4354b1', accent2:'#959ed0'},
-      dialogue:  {emoji:'🗣', title:"Kimning gapi?", accent:'#3b9b92', accent2:'#83c8c1'},
-      plotmap:   {emoji:'🗺', title:"Syujet Xaritasi", accent:'#865e50', accent2:'#bcaaa4'},
-      sequence:  {emoji:'⏳', title:"Ketma-ketlik", accent:'#607d8b', accent2:'#a7b6be'},
-      oddone:    {emoji:'🔍', title:"Ortiqchasini Top", accent:'#c1635c', accent2:'#d09595'},
-      ending:    {emoji:'✍️', title:"Asar Yakuni", accent:'#6942af', accent2:'#aa95d0'},
-      pixel:     {emoji:'🖼', title:"Piksel Muqova", accent:'#5590bf', accent2:'#95b6d0'},
-      aiart:     {emoji:'🎨', title:"AI Rasmlar", accent:'#bb4c72', accent2:'#d095a9'},
-      scenes:    {emoji:'🎭', title:"Sahna Ko'rinishi", accent:'#8e3b9c', accent2:'#c795d0'},
-      audioquote:{emoji:'🎧', title:"Ovozli Iqtibos", accent:'#3b909b', accent2:'#95c9d0'},
-      mosaic:    {emoji:'🧩', title:"Kitob Mozaikasi", accent:'#4caf50', accent2:'#96cf98'},
-      hiddendetail:{emoji:'🔎', title:"Yashirin Detal", accent:'#b98b46', accent2:'#d0b895'},
-      duel:      {emoji:'🤺', title:"1v1 Jonli Duel", accent:'#ba4848', accent2:'#d09595'},
-      buzzer:    {emoji:'🔔', title:"Tezkor Qo'ng'iroq", accent:'#c1a45c', accent2:'#d0ca95'},
-      bracket:   {emoji:'🏆', title:"Haftalik Turnir", accent:'#b27b43', accent2:'#c8ac84'},
-      auction:   {emoji:'💰', title:"Kitob Auksioni", accent:'#3d9a41', accent2:'#96cf98'},
-      regions:   {emoji:'👥', title:"Viloyatlar Jangi", accent:'#4176aa', accent2:'#95b6d0'},
-      king:      {emoji:'👑', title:"Qirol Taxti", accent:'#7f3b9b', accent2:'#c795d0'},
-      rhyme:     {emoji:'📜', title:"Bahri-Bayt", accent:'#875d50', accent2:'#bcaaa4'},
-      scholars:  {emoji:'🕌', title:"Sharq Allomalari", accent:'#3b9b90', accent2:'#83c8c1'},
-      genres:    {emoji:'📚', title:"Janrlar Ustasi", accent:'#3b489b', accent2:'#959ed0'},
-      numbers:   {emoji:'🔢', title:"Adabiy Raqamlar", accent:'#9e3c63', accent2:'#d095a9'},
-      worldlit:  {emoji:'🌍', title:"Jahon Adabiyoti", accent:'#3b799b', accent2:'#95bdd0'},
-      mysterybox:{emoji:'🎁', title:"Sirli Sandiq", accent:'#b96246', accent2:'#d0a395'},
-      // 10 Mind, Logic & Conscious Living Games
-      mindtrap:  {emoji:'🧠', title:"Fikr Tuzog'i", accent:'#6c40aa', accent2:'#aa95d0'},
-      stoic:     {emoji:'🧘‍♂️', title:"Ongli Hayot", accent:'#3b9b91', accent2:'#83c8c1'},
-      antiherd:  {emoji:'🐑', title:"Podadan Ajral", accent:'#b0436b', accent2:'#d095a9'},
-      dilemma:   {emoji:'⚖️', title:"Axloqiy Dilemma", accent:'#b27b43', accent2:'#c8ac84'},
-      causeeffect:{emoji:'🔮', title:"Sabab va Oqibat", accent:'#573b9b', accent2:'#977dc5'},
-      masks:     {emoji:'🎭', title:"Niqoblar Foshi", accent:'#9e3c63', accent2:'#d095a9'},
-      socrates:  {emoji:'🏛', title:"Sokrat Suhbatlari", accent:'#3f4da5', accent2:'#7f8ac5'},
-      memento:   {emoji:'⌛️', title:"Vaqt Paradoksi", accent:'#a7643f', accent2:'#c8ac84'},
-      strategy:  {emoji:'♟', title:"Strategik Tafakkur", accent:'#6b6b6b', accent2:'#9e9e9e'},
-      paradox:   {emoji:'💡', title:"Paradokslar Olami", accent:'#3b919b', accent2:'#95c9d0'},
-      // 10 Sufism, Nafs Purification & Divine Love Games
-      simurgh:   {emoji:'🕊', title:"Simurg' Parvozi", accent:'#3b939b', accent2:'#6fb5bf'},
-      ishq:      {emoji:'🕯', title:"Parvona va Sham", accent:'#ad4141', accent2:'#c47d7b'},
-      nafs:      {emoji:'🛡', title:"Nafs Tarbiyasi", accent:'#3b9b40', accent2:'#81c784'},
-      qalb:      {emoji:'🪞', title:"Qalb Sayqali", accent:'#3b689b', accent2:'#8eb0cc'},
-      naqshband: {emoji:'🌾', title:"Xalvat dar Anjuman", accent:'#875a4f', accent2:'#a1887f'},
-      yassaviy:  {emoji:'📜', title:"Hikmatlar Daryosi", accent:'#773b9b', accent2:'#b471bf'},
-      masnaviy:  {emoji:'🪈', title:"Nay Nidosi", accent:'#9b3b65', accent2:'#ca889e'},
-      gazzoliy:  {emoji:'🗝', title:"Kimyoi Saodat", accent:'#bc8350', accent2:'#d0ca95'},
-      fano:      {emoji:'🌊', title:"Fanofilloh", accent:'#3b9b8f', accent2:'#61b8b0'},
-      marifat:   {emoji:'☀️', title:"Haqiqat Quyoshi", accent:'#a7643f', accent2:'#c8ac84'},
-    };
-    for (var k in BETA_GAMES) {
-      if (!META[k]) {
-        var bg = BETA_GAMES[k];
-        META[k] = {
-          emoji: bg.emoji,
-          title: bg.title,
-          fee: 25,
-          api: '/' + k + '/api/',
-          none: bg.title + " tez orada boshlanadi — guruhni kuzating!",
-          scheduled: "Savollarga eng tez va to'g'ri javob bering!",
-          accent: bg.accent,
-          accent2: bg.accent2,
-          isBeta: true
-        };
-      }
-    }
-    var M = META[FLAVOR] || META.twofacts;
-    
-    // Theme categorization
-    var themeGroups = {
-      hacker: ['cipher', 'mindtrap', 'paradox', 'strategy', 'sequence', 'stoic', 'antiherd', 'dilemma', 'causeeffect', 'masks', 'socrates', 'memento'],
-      sufi: ['simurgh', 'ishq', 'nafs', 'qalb', 'naqshband', 'yassaviy', 'masnaviy', 'gazzoliy', 'fano', 'marifat'],
-      visual: ['cover', 'pixel', 'aiart', 'mosaic', 'hiddendetail'],
-      cards: ['impostor', 'twofacts', 'oddone', 'matchbook', 'duel'],
-      arcade: ['auction', 'buzzer', 'bracket', 'king', 'mysterybox', 'numbers', 'ending', 'rhyme', 'audioquote'],
-      classic: ['worldlit', 'genres', 'scholars', 'character', 'dialogue', 'plotmap', 'scenes', 'regions']
-    };
-    // ── Qo'l bilan o'ynaladigan 25 ta o'yin ────────────────────────────
-    // Oddiy tugma bosish o'rniga barmoq harakati. Har biri baribir javob
-    // indeksini yuboradi, shuning uchun backend va ball hisobi o'zgarmaydi.
-    var inputModes = {
-      swipe:   ['impostor','twofacts','oddone','matchbook','duel','dialogue','character','scholars','worldlit','genres'],
-      drag:    ['king','buzzer','bracket','auction','regions','mysterybox','ending','plotmap'],
-      slider:  ['timeline','numbers','sequence','rhyme'],
-      scratch: ['pixel','mosaic','hiddendetail']
-    };
-    var INPUT_MODE = '';
-    for (var im in inputModes) {
-      if (inputModes[im].indexOf(FLAVOR) !== -1) { INPUT_MODE = im; break; }
-    }
 
-    var activeTheme = 'default';
-    for (var t in themeGroups) {
-      if (themeGroups[t].indexOf(FLAVOR) !== -1) {
-        activeTheme = t;
-        document.body.classList.add('theme-' + t);
-        break;
-      }
-    }
-    
+    var M = META[FLAVOR] || {emoji:'📖', title:"Bilim O'yini", accent:'#5e6d8a', accent2:'#52796f'};
+    M.api = '/' + FLAVOR + '/api/';
+    M.none = M.title + " tez orada boshlanadi — guruhni kuzating!";
+    M.scheduled = "Savollarga eng tez va to'g'ri javob bering!";
+
     document.documentElement.style.setProperty('--accent', M.accent);
     document.documentElement.style.setProperty('--accent2', M.accent2);
     document.getElementById('pageTitle').textContent = M.title;
     document.getElementById('gameEmoji').textContent = M.emoji;
     document.getElementById('gameTitle').textContent = M.title;
-    if (M.isBeta) {
-      document.getElementById('subtitle').innerHTML = '<span style="display:inline-block;padding:2px 7px;background:linear-gradient(135deg,#ff9800,#f44336);color:#fff;border-radius:6px;font-size:10px;font-weight:800;letter-spacing:.5px;margin-left:4px">🧪 TEST / BETA</span>';
+    document.getElementById('feeBanner').innerHTML = '🎁 <b>Kirish BEPUL!</b> Qatnashing va Kitobcha yutib oling.';
+
+    var tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+    if (tg) {
+      try {
+        tg.ready();
+        tg.expand();
+        if (tg.enableClosingConfirmation) tg.enableClosingConfirmation();
+      } catch(e) {}
     }
-    // Barcha jonli o'yinlar bepul (2026-08-19) — M.fee endi ishlatilmaydi.
-    document.getElementById('feeBanner').innerHTML = '🎁 <b>Kirish BEPUL!</b> Faqat o\'ynang va Kitobcha yutib oling.' + (FLAVOR==='teams' ? ' 👥 Jamoangiz g\'olib chiqsa — HAR BIR a\'zo Kitobcha oladi (jamoa kattaroq bo\'lsa, ko\'proq!), eng ko\'p to\'g\'ri javob berganlar esa qo\'shimcha bonus oladi!' : '');
-    if (FLAVOR === 'teams') { document.getElementById('myPtsLbl').textContent = 'Sizning ballaringiz'; }
 
-    var tg=(window.Telegram&&window.Telegram.WebApp)?window.Telegram.WebApp:null;
-    if(tg){try{tg.ready();tg.expand();}catch(e){}}
-    function readInit(){if(tg&&tg.initData)return tg.initData;try{var q=new URLSearchParams(location.search).get('tgWebAppData');if(q)return q;}catch(e){}var h=(location.hash||'').replace(/^#/,'');if(h){try{var d=new URLSearchParams(h).get('tgWebAppData');if(d)return d;}catch(e){}}return'';}
-    var INIT=readInit();
-    var $=function(id){return document.getElementById(id);};
-    var localSeconds=0,busy=false,lastQ=-1;
-    var curOpts=[],curAnswered=false,curCorrectIdx=-1,curChoice=-1;
-    // ── Jokerlar holati ────────────────────────────────────────────────
-    // curHidden — 50/50 yashirgan variant indekslari (serverdan keladi, shu
-    // sababli sahifa yangilansa ham o'sha ikkitasi yashirinligicha qoladi).
-    var curHidden=[],jokerBusy=false,jokerBalance=0,jokerFading=false;
-    var jokerPrices={fifty:100,shield:300,sniper:500};
-    var jokerUsed=[],jokerShields=0,jokerShieldsLeft=2,lastState=null;
-    var TEXT_FLAVORS=['anagram','wordle','crossword','cipher'];
-    function fmt(s){s=Math.max(0,s|0);var m=Math.floor(s/60),r=s%60;return(m<10?'0':'')+m+':'+(r<10?'0':'')+r;}
-    function esc(t){return(t||'').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
-    function api(path,opts){opts=opts||{};opts.headers=Object.assign({'X-Telegram-Init-Data':INIT},opts.headers||{});return fetch(path,opts).then(function(r){return r.json();});}
+    function readInit() {
+      if (tg && tg.initData) return tg.initData;
+      try {
+        var q = new URLSearchParams(location.search).get('tgWebAppData');
+        if (q) return q;
+      } catch(e) {}
+      var h = (location.hash || '').replace(/^#/, '');
+      if (h) {
+        try {
+          var d = new URLSearchParams(h).get('tgWebAppData');
+          if (d) return d;
+        } catch(e) {}
+      }
+      return '';
+    }
+    var INIT = readInit();
+    var $ = function(id) { return document.getElementById(id); };
+    var localSeconds = 0, busy = false, lastQ = -1;
+    var curOpts = [], curAnswered = false, curCorrectIdx = -1, curChoice = -1;
+    var curHidden = [], jokerBusy = false, jokerBalance = 0, jokerFading = false;
+    var jokerPrices = {fifty: 100, shield: 300, sniper: 500};
+    var jokerUsed = [], jokerShields = 0, jokerShieldsLeft = 2, lastState = null;
 
-    // The exact numbers the ranking is computed from, shown next to every
-    // player: correct answers, then time. Unanswered questions are charged the
-    // full answer window, so the time is comparable across all players.
-    function detail(r){
-      var p=[];
-      if(r.q_total)p.push('✅ '+(r.correct||0)+'/'+r.q_total);
-      if(r.time)p.push('⏱ '+r.time+'s');
+    var TEXT_FLAVORS = ['anagram', 'wordle', 'crossword', 'cipher', 'speedtype', 'wordlock', 'hangman', 'spellcheck'];
+    var LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+    function fmt(s) {
+      s = Math.max(0, s | 0);
+      var m = Math.floor(s / 60), r = s % 60;
+      return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
+    }
+    function esc(t) {
+      return (t || '').replace(/[&<>"]/g, function(c) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+      });
+    }
+    function api(path, opts) {
+      opts = opts || {};
+      opts.headers = Object.assign({'X-Telegram-Init-Data': INIT}, opts.headers || {});
+      return fetch(path, opts).then(function(r) { return r.json(); });
+    }
+
+    function detail(r) {
+      var p = [];
+      if (r.q_total) p.push('✅ ' + (r.correct || 0) + '/' + r.q_total);
+      if (r.time) p.push('⏱ ' + r.time + 's');
       return p.join(' · ');
     }
-    function answerKeyHtml(s){
-      if(!s.answer_key||!s.answer_key.length)return '';
-      var h='<div style="text-align:left;margin-top:16px"><div style="font-weight:800;margin-bottom:6px">📋 To\'g\'ri javoblar</div>';
-      s.answer_key.forEach(function(r){
-        var mark=r.you==='ok'?'✅':(r.you==='shield'?'🛡':(r.you==='no'?'❌':'➖'));
-        var t=r.secs!=null?' <span class="muted">('+r.secs+'s)</span>':'';
-        h+='<div class="lb"><div class="rank">'+mark+'</div><div class="lb-name">'+esc(r.answer)+t+'</div></div>';
+
+    function answerKeyHtml(s) {
+      if (!s.answer_key || !s.answer_key.length) return '';
+      var h = '<div style="text-align:left;margin-top:16px"><div style="font-weight:800;margin-bottom:8px">📋 To\'g\'ri javoblar</div>';
+      s.answer_key.forEach(function(r) {
+        var mark = r.you === 'ok' ? '✅' : (r.you === 'shield' ? '🛡' : (r.you === 'no' ? '❌' : '➖'));
+        var t = r.secs != null ? ' <span class="muted">(' + r.secs + 's)</span>' : '';
+        h += '<div class="lb"><div class="rank">' + mark + '</div><div class="lb-name">' + esc(r.answer) + t + '</div></div>';
       });
-      return h+'<div class="muted" style="font-size:11px;margin-top:6px">✅ siz topgan · 🛡 qalqon kechirgan · ❌ xato · ➖ javob bermagan</div></div>';
+      return h + '<div class="muted" style="font-size:11px;margin-top:6px">✅ to\'g\'ri · 🛡 qalqon saqlagan · ❌ xato · ➖ javob berilmagan</div></div>';
     }
 
-    // ── 1) TORTIB TASHLASH: kitobchani javob katagiga sudrang ─────────
-    function renderDrag(box){
-      box.className = '';
-      var hint = document.createElement('div');
-      hint.className = 'drag-hint';
-      hint.textContent = '📖 Kitobchani javob katagiga sudrab tashlang';
-      box.appendChild(hint);
+    function renderOpts() {
+      var box = $('opts');
+      box.innerHTML = '';
 
-      var grid = document.createElement('div'); grid.className = 'drop-grid';
-      var slots = [];
-      curOpts.forEach(function(o, i){
-        var sl = document.createElement('div');
-        sl.className = 'drop-slot';
-        sl.textContent = o;
-        sl.addEventListener('click', function(){ if (!curAnswered && !busy) answer(i); });
-        slots.push(sl); grid.appendChild(sl);
-      });
-      box.appendChild(grid);
-
-      var token = document.createElement('div');
-      token.className = 'drag-token';
-      token.textContent = '📖';
-      box.appendChild(token);
-
-      var dx = 0, dy = 0, active = false;
-      function slotUnder(x, y){
-        for (var i = 0; i < slots.length; i++) {
-          var r = slots[i].getBoundingClientRect();
-          if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return i;
-        }
-        return -1;
-      }
-      function highlight(idx){
-        for (var i = 0; i < slots.length; i++) {
-          if (i === idx) { slots[i].classList.add('hot'); } else { slots[i].classList.remove('hot'); }
-        }
-      }
-      function start(x, y){
-        if (curAnswered || busy) return;
-        var r = token.getBoundingClientRect();
-        dx = x - (r.left + r.width / 2); dy = y - (r.top + r.height / 2);
-        active = true; token.classList.add('grabbing');
-      }
-      function move(x, y){
-        if (!active) return;
-        token.style.position = 'fixed';
-        token.style.left = (x - dx - 38) + 'px';
-        token.style.top  = (y - dy - 38) + 'px';
-        highlight(slotUnder(x, y));
-      }
-      function end(x, y){
-        if (!active) return;
-        active = false; token.classList.remove('grabbing');
-        var idx = slotUnder(x, y);
-        highlight(-1);
-        token.style.position = ''; token.style.left = ''; token.style.top = '';
-        if (idx >= 0) answer(idx);
-      }
-      token.addEventListener('touchstart', function(e){ var t = e.touches[0]; start(t.clientX, t.clientY); }, {passive:true});
-      token.addEventListener('touchmove',  function(e){ var t = e.touches[0]; move(t.clientX, t.clientY); }, {passive:true});
-      token.addEventListener('touchend',   function(e){ var t = e.changedTouches[0]; end(t.clientX, t.clientY); });
-      token.addEventListener('mousedown',  function(e){ start(e.clientX, e.clientY); });
-      document.addEventListener('mousemove', function(e){ move(e.clientX, e.clientY); });
-      document.addEventListener('mouseup',   function(e){ end(e.clientX, e.clientY); });
-    }
-
-    // ── 2) SURGICH: javobni shkala bo'ylab surib tanlang ──────────────
-    function renderSlider(box){
-      box.className = '';
-      var wrap = document.createElement('div'); wrap.className = 'slider-wrap';
-      var val = document.createElement('div'); val.className = 'slider-value';
-      var track = document.createElement('div'); track.className = 'slider-track';
-      var fill = document.createElement('div'); fill.className = 'slider-fill';
-      var knob = document.createElement('div'); knob.className = 'slider-knob';
-      track.appendChild(fill); track.appendChild(knob);
-      var stops = document.createElement('div'); stops.className = 'slider-stops';
-      for (var i = 0; i < curOpts.length; i++) {
-        var sp = document.createElement('span'); sp.textContent = (i + 1); stops.appendChild(sp);
-      }
-      var btn = document.createElement('button');
-      btn.className = 'opt';
-      btn.style.background = 'var(--accent)'; btn.style.color = '#fff'; btn.style.textAlign = 'center';
-      btn.textContent = '✅ Tasdiqlash';
-
-      var sel = 0;
-      function place(i){
-        sel = Math.max(0, Math.min(curOpts.length - 1, i));
-        var pct = curOpts.length > 1 ? (sel / (curOpts.length - 1)) * 100 : 0;
-        knob.style.left = pct + '%'; fill.style.width = pct + '%';
-        val.textContent = curOpts[sel];
-      }
-      function fromX(clientX){
-        var r = track.getBoundingClientRect();
-        if (r.width <= 0) return;
-        place(Math.round(((clientX - r.left) / r.width) * (curOpts.length - 1)));
-      }
-      var dragging = false;
-      function down(x){ if (curAnswered || busy) return; dragging = true; fromX(x); }
-      knob.addEventListener('touchstart', function(e){ down(e.touches[0].clientX); }, {passive:true});
-      track.addEventListener('touchstart', function(e){ down(e.touches[0].clientX); }, {passive:true});
-      document.addEventListener('touchmove', function(e){ if (dragging) fromX(e.touches[0].clientX); }, {passive:true});
-      document.addEventListener('touchend', function(){ dragging = false; });
-      knob.addEventListener('mousedown', function(e){ down(e.clientX); });
-      track.addEventListener('mousedown', function(e){ down(e.clientX); });
-      document.addEventListener('mousemove', function(e){ if (dragging) fromX(e.clientX); });
-      document.addEventListener('mouseup', function(){ dragging = false; });
-      btn.addEventListener('click', function(){ if (!curAnswered && !busy) answer(sel); });
-
-      wrap.appendChild(val); wrap.appendChild(track); wrap.appendChild(stops);
-      box.appendChild(wrap); box.appendChild(btn);
-      place(0);
-    }
-
-    // ── 3) TIRNAB OCHISH: ishqalab oching, keyin tanlang ──────────────
-    function renderScratch(box){
-      box.className = '';
-      var wrap = document.createElement('div'); wrap.className = 'scratch-wrap';
-      var under = document.createElement('div'); under.className = 'scratch-under';
-      under.textContent = '🔍 Ochildi — endi javobni tanlang!';
-      var cv = document.createElement('canvas'); cv.className = 'scratch-canvas';
-      wrap.appendChild(under); wrap.appendChild(cv);
-      box.appendChild(wrap);
-
-      var optsHost = document.createElement('div');
-      optsHost.style.display = 'none';
-      curOpts.forEach(function(o, i){
-        var hid = (curHidden||[]).indexOf(i)!==-1;
-        if(hid && !curAnswered) return;
-        var b = document.createElement('button');
-        b.className = 'opt'; b.textContent = o;
-        if (curAnswered) {
-            b.disabled = true;
-            if (i === curCorrectIdx) b.className = 'opt correct';
-            else if (i === curChoice) b.className = 'opt wrong';
-        } else {
-            b.addEventListener('click', function(){ if (!curAnswered && !busy) answer(i); });
-        }
-        optsHost.appendChild(b);
-      });
-      box.appendChild(optsHost);
-
-      var W = wrap.clientWidth || 320, H = 150;
-      cv.width = W; cv.height = H; cv.style.height = H + 'px';
-      var ctx = cv.getContext('2d');
-      ctx.fillStyle = '#6b7280'; ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = '#e5e7eb'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('👆 Barmoq bilan ishqalang', W / 2, H / 2);
-      ctx.globalCompositeOperation = 'destination-out';
-
-      var revealed = false, painting = false, rubCount = 0;
-      function rub(x, y){
-        var r = cv.getBoundingClientRect();
-        ctx.beginPath();
-        ctx.arc(x - r.left, y - r.top, 35, 0, Math.PI * 2); // Bigger brush
-        ctx.fill();
-        if (revealed) return;
-        rubCount++;
-        if (rubCount % 4 !== 0) return; // Throttle expensive check
-
-        var d = ctx.getImageData(0, 0, W, H).data, clear = 0, seen = 0;
-        for (var i = 3; i < d.length; i += 320) { seen++; if (d[i] === 0) clear++; }
-        if (seen && clear / seen > 0.25) { // Lower threshold to 25%
-          revealed = true;
-          wrap.style.display = 'none';
-          optsHost.style.display = '';
-        }
-      }
-      cv.addEventListener('touchstart', function(e){ e.preventDefault(); painting = true; var t = e.touches[0]; rub(t.clientX, t.clientY); }, {passive:false});
-      cv.addEventListener('touchmove',  function(e){ e.preventDefault(); if (painting) { var t = e.touches[0]; rub(t.clientX, t.clientY); } }, {passive:false});
-      cv.addEventListener('touchend',   function(){ painting = false; });
-      cv.addEventListener('mousedown',  function(e){ painting = true; rub(e.clientX, e.clientY); });
-      cv.addEventListener('mousemove',  function(e){ if (painting) rub(e.clientX, e.clientY); });
-      cv.addEventListener('mouseup',    function(){ painting = false; });
-    }
-
-    function renderOpts(){
-      var box=$('opts');box.innerHTML='';
-      var textGames = ['anagram', 'wordle', 'crossword', 'cipher'];
-      if (textGames.indexOf(FLAVOR) !== -1) {
-        var input = document.createElement('input');
-        input.type = 'text';
-        input.className = 'opt';
-        input.style.webkitUserSelect = 'text';
-        input.style.userSelect = 'text';
-        input.placeholder = 'Javobni yozing...';
-        input.style.textAlign = 'center';
-        input.style.marginBottom = '10px';
-        input.style.fontWeight = 'bold';
-        
-        var btn = document.createElement('button');
-        btn.className = 'opt';
-        btn.style.background = 'var(--accent)';
-        btn.style.color = '#fff';
-        btn.style.textAlign = 'center';
-        btn.textContent = 'Yuborish';
+      if (TEXT_FLAVORS.indexOf(FLAVOR) !== -1) {
+        var wrap = document.createElement('div');
+        wrap.className = 'text-input-wrap';
 
         if (curAnswered) {
-          input.disabled = true;
-          btn.disabled = true;
-          input.style.display = 'none'; // hide input after answer to just show result
-          if (curCorrectIdx >= 0 && curOpts[curCorrectIdx]) {
-             var res = document.createElement('div');
-             res.style.marginTop = '10px';
-             res.style.fontWeight = 'bold';
-             res.style.fontSize = '16px';
-             res.style.textAlign = 'center';
-             res.style.padding = '12px';
-             res.style.borderRadius = '12px';
-             res.style.background = 'var(--card2)';
-             if (curChoice !== -1 && curCorrectIdx === curChoice) {
-               res.innerHTML = '<span style="color:var(--ok)">✅ To\'g\'ri: ' + curOpts[curCorrectIdx] + '</span>';
-               res.style.border = '1px solid var(--ok)';
-             } else {
-               res.innerHTML = '<span style="color:var(--bad)">❌ Xato!</span><br><span style="color:var(--text);font-size:14px;margin-top:6px;display:inline-block">To\'g\'ri javob: <b>' + curOpts[curCorrectIdx] + '</b></span>';
-               res.style.border = '1px solid var(--bad)';
-             }
-             box.appendChild(res);
+          var res = document.createElement('div');
+          res.style.marginTop = '6px';
+          res.style.fontWeight = '700';
+          res.style.fontSize = '15px';
+          res.style.textAlign = 'center';
+          res.style.padding = '14px';
+          res.style.borderRadius = '16px';
+          res.style.background = 'var(--card)';
+          if (curChoice !== -1 && curCorrectIdx === curChoice) {
+            res.innerHTML = '<span style="color:var(--ok)">✅ Barakalla! To\'g\'ri javob: ' + esc(curOpts[curCorrectIdx]) + '</span>';
+            res.style.border = '1.5px solid var(--ok)';
+          } else {
+            res.innerHTML = '<span style="color:var(--bad)">❌ Noto\'g\'ri!</span><br><span style="color:var(--text);font-size:14px;margin-top:6px;display:inline-block">To\'g\'ri javob: <b>' + esc(curOpts[curCorrectIdx] || '') + '</b></span>';
+            res.style.border = '1.5px solid var(--bad)';
           }
+          box.appendChild(res);
         } else {
-          btn.addEventListener('click', function(){
+          var input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'text-input';
+          input.placeholder = 'Javobingizni yozing...';
+          input.autocomplete = 'off';
+          input.autocapitalize = 'off';
+
+          var btn = document.createElement('button');
+          btn.className = 'btn-submit';
+          btn.textContent = '✅ Tasdiqlash';
+
+          function submitText() {
             var val = input.value.trim().toLowerCase();
-            if(!val) return;
+            if (!val) return;
             var matchIdx = -1;
-            for(var i=0; i<curOpts.length; i++){
-              if(curOpts[i].toLowerCase().trim() === val){
-                matchIdx = i; break;
+            for (var i = 0; i < curOpts.length; i++) {
+              if (curOpts[i].toLowerCase().trim() === val) {
+                matchIdx = i;
+                break;
               }
             }
-            answer(matchIdx); // sends index if found, else -1 (which backend will mark as wrong)
+            answer(matchIdx);
+          }
+
+          btn.addEventListener('click', submitText);
+          input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') submitText();
           });
-          input.addEventListener('keypress', function(e){
-            if(e.key === 'Enter') btn.click();
-          });
+
+          wrap.appendChild(input);
+          wrap.appendChild(btn);
+          box.appendChild(wrap);
+          setTimeout(function() { try { input.focus(); } catch(e) {} }, 150);
         }
-        
-        if(!curAnswered) {
-          box.appendChild(input);
-          box.appendChild(btn);
-          setTimeout(function(){ input.focus(); }, 100);
-        }
-      } else {
-        if (activeTheme === 'visual' || activeTheme === 'cards' || activeTheme === 'sufi' || activeTheme === 'hacker') {
-          box.className = 'grid-opts';
+        return;
+      }
+
+      // Multiple Choice Cards
+      var list = document.createElement('div');
+      list.className = 'opt-list';
+
+      var fading = jokerFading;
+      curOpts.forEach(function(o, i) {
+        var hid = curHidden.indexOf(i) !== -1;
+        if (hid && !curAnswered && !fading) return;
+
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'opt';
+
+        var badge = document.createElement('span');
+        badge.className = 'opt-badge';
+        badge.textContent = LETTERS[i] || (i + 1);
+
+        var txt = document.createElement('span');
+        txt.className = 'opt-text';
+        txt.textContent = o;
+
+        b.appendChild(badge);
+        b.appendChild(txt);
+
+        if (curAnswered) {
+          b.disabled = true;
+          if (i === curCorrectIdx) b.className += ' correct';
+          else if (i === curChoice) b.className += ' wrong';
+        } else if (hid) {
+          b.disabled = true;
+          b.dataset.fade = '1';
         } else {
-          box.className = '';
-        }
-
-        // 💡 50/50 ishlatilgan bo'lsa, oddiy tugmalarga qaytamiz: surish,
-        // sudrash, surgich va tirnash mexanikalari variantlar to'liq
-        // ro'yxatiga bog'langan, ikkitasi yo'qolganda ular buzilib qolardi.
-        var mode = (curHidden.length && !curAnswered) ? '' : INPUT_MODE;
-        if (mode) {
-          if (curAnswered) {
-            box.className = 'grid-opts';
-            curOpts.forEach(function(o,i){
-              var fc = document.createElement('div');
-              fc.className = 'flip-card answered';
-              var fci = document.createElement('div'); fci.className = 'flip-card-inner';
-              var fcf = document.createElement('div'); fcf.className = 'flip-card-front'; fcf.textContent = o;
-              var fcb = document.createElement('div'); fcb.className = 'flip-card-back';
-              fc.style.cursor = 'default';
-              if(i===curCorrectIdx){ fcb.className += ' correct'; fcb.innerHTML = '✅<br>' + o; }
-              else if(i===curChoice){ fcb.className += ' wrong'; fcb.innerHTML = '❌<br>' + o; }
-              else { fcb.className += ' neutral'; fcb.textContent = o; }
-              fci.appendChild(fcf); fci.appendChild(fcb); fc.appendChild(fci); box.appendChild(fc);
-            });
-            return;
-          }
-          
-          if (mode === 'drag')    { renderDrag(box);    return; }
-          if (mode === 'slider')  { renderSlider(box);  return; }
-          if (mode === 'scratch') { renderScratch(box); return; }
-
-          box.className = '';
-          var instructions = document.createElement('div');
-          // Apostroflar qochirilishi SHART: qochirilmagan holda bu satr butun
-          // <script> blokini parse qilinmaydigan qilib qo'yadi va Mini App'dagi
-          // BARCHA o'yin ishlamay qoladi (ed911a7 dan beri shunday edi).
-          instructions.innerHTML = '<span style="color:var(--muted);font-size:14px;font-weight:700">👈 Noto\'g\'ri &nbsp; &nbsp; &nbsp; &nbsp; To\'g\'ri 👉</span>';
-          instructions.style.textAlign = 'center'; instructions.style.marginBottom = '10px';
-          
-          var deck = document.createElement('div'); deck.className = 'swipe-deck';
-          var controls = document.createElement('div'); controls.className = 'swipe-controls';
-          var btnNo = document.createElement('button'); btnNo.id = 'btnNo'; btnNo.innerHTML = "❌ Noto'g'ri";
-          var btnYes = document.createElement('button'); btnYes.id = 'btnYes'; btnYes.innerHTML = "✅ To'g'ri";
-          controls.appendChild(btnNo); controls.appendChild(btnYes);
-          
-          var cards = [];
-          var activeIndex = 0;
-          
-          for(var i=curOpts.length-1; i>=0; i--) {
-            var c = document.createElement('div');
-            c.className = 'tinder-card';
-            c.textContent = curOpts[i];
-            c.dataset.idx = i;
-            cards.unshift(c); 
-            deck.appendChild(c);
-          }
-          
-          function initCards() {
-             for(var i=activeIndex; i<cards.length; i++){
-                var offset = i - activeIndex;
-                cards[i].style.transform = 'scale('+(1 - offset*0.05)+') translateY('+(offset*15)+'px)';
-                cards[i].style.zIndex = cards.length - offset;
-                cards[i].style.opacity = 1;
-             }
-          }
-          initCards();
-          
-          function handleSwipe(isYes) {
-             if(activeIndex >= cards.length || busy) return;
-             var topCard = cards[activeIndex];
-             topCard.style.transition = 'transform 0.4s ease, opacity 0.4s';
-             topCard.style.transform = 'translate('+(isYes ? 200 : -200)+'px, -50px) rotate('+(isYes ? 30 : -30)+'deg)';
-             topCard.style.opacity = '0';
-             
-             if (isYes) {
-               var originalIdx = parseInt(topCard.dataset.idx);
-               answer(originalIdx);
-             } else {
-               activeIndex++;
-               if (activeIndex >= cards.length) {
-                 var lastIdx = parseInt(topCard.dataset.idx);
-                 answer(lastIdx);
-               } else {
-                 initCards();
-                 setupDrag(cards[activeIndex]);
-               }
-             }
-          }
-          
-          btnNo.onclick = function(){ handleSwipe(false); };
-          btnYes.onclick = function(){ handleSwipe(true); };
-          
-          var startX = 0, startY = 0, currentX = 0, currentY = 0, isDragging = false;
-          function setupDrag(card) {
-            if(!card) return;
-            card.addEventListener('touchstart', function(e){
-              isDragging = true;
-              startX = e.touches[0].clientX;
-              startY = e.touches[0].clientY;
-              card.style.transition = 'none';
-            }, {passive: true});
-            
-            card.addEventListener('touchmove', function(e){
-              if(!isDragging) return;
-              currentX = e.touches[0].clientX - startX;
-              currentY = e.touches[0].clientY - startY;
-              var rotate = currentX * 0.05;
-              card.style.transform = 'translate('+currentX+'px, '+currentY+'px) rotate('+rotate+'deg)';
-            }, {passive: true});
-            
-            card.addEventListener('touchend', function(e){
-              isDragging = false;
-              card.style.transition = 'transform 0.3s ease, opacity 0.3s';
-              if (currentX > 80) {
-                 handleSwipe(true);
-              } else if (currentX < -80) {
-                 handleSwipe(false);
-              } else {
-                 card.style.transform = 'translate(0px, 0px) rotate(0deg)'; 
-              }
-            });
-          }
-          
-          if(cards.length > 0) setupDrag(cards[0]);
-
-          box.appendChild(instructions);
-          box.appendChild(deck);
-          box.appendChild(controls);
-        } else {
-          if (FLAVOR === 'audioquote' && !curAnswered) {
-             var eq = document.createElement('div');
-             eq.className = 'equalizer';
-             eq.innerHTML = '<div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div>';
-             box.appendChild(eq);
-          }
-          // `fading` — 50/50 shu lahzada bosildi: yashiriladigan variantlar
-          // avval chiziladi, so'ng animatsiya bilan so'nadi. Undan keyingi
-          // har qanday qayta chizishda ular umuman chizilmaydi (sahifa
-          // yangilansa ham — yashiringan indekslar serverda saqlanadi).
-          var fading = jokerFading;
-          curOpts.forEach(function(o,i){
-            var hid = curHidden.indexOf(i)!==-1;
-            // Javob berilgandan keyin hammasi qaytadi — natijani tekshirish uchun.
-            if(hid && !curAnswered && !fading) return;
-            var b=document.createElement('button');b.className='opt';b.textContent=o;
-            if(curAnswered){
-              b.disabled=true;
-              if(i===curCorrectIdx)b.className='opt correct';
-              else if(i===curChoice)b.className='opt wrong';
-            }else if(hid){
-              b.disabled=true;b.dataset.fade='1';
-            }else{ b.addEventListener('click',function(){answer(i);}); }
-            box.appendChild(b);
+          b.addEventListener('click', function() {
+            if (tg && tg.HapticFeedback) {
+              try { tg.HapticFeedback.impactOccurred('light'); } catch(e) {}
+            }
+            answer(i);
           });
-          if(fading && !curAnswered){
-            jokerFading=false;
-            // Sinf keyingi kadrda qo'shiladi — aks holda element allaqachon
-            // shaffof holda tug'ilib, CSS o'tishi umuman ishlamaydi.
-            setTimeout(function(){
-              var gone=box.querySelectorAll('[data-fade="1"]');
-              for(var i=0;i<gone.length;i++) gone[i].className='opt gone';
-              setTimeout(function(){ if(!curAnswered) renderOpts(); },400);
-            },20);
-          }
         }
+        list.appendChild(b);
+      });
+
+      box.appendChild(list);
+
+      if (fading && !curAnswered) {
+        jokerFading = false;
+        setTimeout(function() {
+          var gone = box.querySelectorAll('[data-fade="1"]');
+          for (var i = 0; i < gone.length; i++) gone[i].className += ' gone';
+          setTimeout(function() { if (!curAnswered) renderOpts(); }, 350);
+        }, 20);
       }
     }
 
-    // ── JOKERLAR ────────────────────────────────────────────────────────
-    // Uchta yordam Kitobcha evaziga sotib olinadi. Barcha tekshiruv serverda
-    // (balans, o'yin fazasi, takroriy xarid) — bu yerdagisi faqat tugmalarni
-    // to'g'ri holatda ko'rsatish uchun.
-    var JOKER_LABELS={fifty:'50/50',shield:'Qalqon',sniper:'Snayper'};
-
-    function jokerReason(kind){
-      if(jokerBusy) return 'busy';
-      if(jokerUsed.indexOf(kind)!==-1) return 'used';
-      if(kind==='fifty'){
-        if(TEXT_FLAVORS.indexOf(FLAVOR)!==-1) return 'na';   // javob yoziladi, variantlar ko'rinmaydi
-        if(curAnswered) return 'answered';
-        if(curOpts.length<3) return 'na';
+    function jokerReason(kind) {
+      if (jokerBusy) return 'busy';
+      if (jokerUsed.indexOf(kind) !== -1) return 'used';
+      if (kind === 'fifty') {
+        if (TEXT_FLAVORS.indexOf(FLAVOR) !== -1) return 'na';
+        if (curAnswered) return 'answered';
+        if (curOpts.length < 3) return 'na';
       }
-      if(kind==='sniper' && curAnswered) return 'answered';
-      if(kind==='shield' && jokerShieldsLeft<=0) return 'limit';
-      if(jokerBalance < jokerPrices[kind]) return 'poor';
+      if (kind === 'sniper' && curAnswered) return 'answered';
+      if (kind === 'shield' && jokerShieldsLeft <= 0) return 'limit';
+      if (jokerBalance < jokerPrices[kind]) return 'poor';
       return '';
     }
 
-    function renderJokers(s){
-      var bar=$('jokers'), bal=$('jkBal');
-      if(!s || s.status!=='live' || s.phase!=='answer' || s.eliminated){
-        bar.classList.add('hidden'); bal.classList.add('hidden'); return;
+    function renderJokers(s) {
+      var bar = $('jokers'), bal = $('jkBal');
+      if (!s || s.status !== 'live' || s.phase !== 'answer' || s.eliminated) {
+        bar.classList.add('hidden');
+        bal.classList.add('hidden');
+        return;
       }
-      bar.classList.remove('hidden'); bal.classList.remove('hidden');
-      ['fifty','shield','sniper'].forEach(function(kind){
-        var el=$('jk'+kind.charAt(0).toUpperCase()+kind.slice(1));
-        if(!el) return;
-        var why=jokerReason(kind);
-        el.className='jk'+(why==='used'?' used':'')+(why==='poor'?' poor':'');
+      bar.classList.remove('hidden');
+      bal.classList.remove('hidden');
+      ['fifty', 'shield', 'sniper'].forEach(function(kind) {
+        var el = $('jk' + kind.charAt(0).toUpperCase() + kind.slice(1));
+        if (!el) return;
+        var why = jokerReason(kind);
+        el.className = 'jk' + (why === 'used' ? ' used' : '') + (why === 'poor' ? ' poor' : '');
         el.disabled = !!why;
-        var pr=el.querySelector('.pr');
-        if(why==='used') pr.textContent='✓ olindi';
-        else if(why==='limit') pr.textContent='limit';
-        else if(why==='na') pr.textContent='—';
-        else pr.textContent=jokerPrices[kind]+' 🪙';
+        var pr = el.querySelector('.pr');
+        if (why === 'used') pr.textContent = '✓ olindi';
+        else if (why === 'limit') pr.textContent = 'limit';
+        else if (why === 'na') pr.textContent = '—';
+        else pr.textContent = jokerPrices[kind] + ' 🪙';
       });
-      // Qalqon zaxirasi bo'lsa, tugmada nechtaligi ko'rinib tursin.
-      var sh=$('jkShield');
-      if(sh) sh.querySelector('.nm').textContent = jokerShields>0 ? ('Qalqon ×'+jokerShields) : 'Qalqon';
-      bal.innerHTML='🪙 Balans: <b>'+jokerBalance+'</b> Kitobcha'+
-        (jokerShields>0?' · ❤️ <b>'+jokerShields+'</b> qalqon tayyor':'');
+      var sh = $('jkShield');
+      if (sh) sh.querySelector('.nm').textContent = jokerShields > 0 ? ('Qalqon ×' + jokerShields) : 'Qalqon';
+      bal.innerHTML = '🪙 Balans: <b>' + jokerBalance + '</b> Kitobcha' +
+        (jokerShields > 0 ? ' · ❤️ <b>' + jokerShields + '</b> qalqon faol' : '');
     }
 
-    function jokerToast(msg, good){
-      var t=$('toast'); t.className='toast '+(good?'ok':'bad'); t.textContent=msg;
+    function jokerToast(msg, good) {
+      var t = $('toast');
+      t.className = 'toast ' + (good ? 'ok' : 'bad');
+      t.textContent = msg;
     }
 
-    function useJoker(kind){
-      if(jokerBusy||jokerReason(kind))return;
-      jokerBusy=true; renderJokers(lastState);
-      api('/api/quiz/'+FLAVOR+'/joker/',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({kind:kind})}).then(function(r){
-        if(r&&r.ok){
-          if(typeof r.balance==='number') jokerBalance=r.balance;
-          if(jokerUsed.indexOf(kind)===-1) jokerUsed.push(kind);
-          if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.impactOccurred('medium')}catch(e){}}
-          if(kind==='fifty'){
-            curHidden=r.hidden||[]; jokerFading=true; renderOpts();
+    function useJoker(kind) {
+      if (jokerBusy || jokerReason(kind)) return;
+      jokerBusy = true;
+      renderJokers(lastState);
+      api('/api/quiz/' + FLAVOR + '/joker/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({kind: kind})
+      }).then(function(r) {
+        if (r && r.ok) {
+          if (typeof r.balance === 'number') jokerBalance = r.balance;
+          if (jokerUsed.indexOf(kind) === -1) jokerUsed.push(kind);
+          if (tg && tg.HapticFeedback) {
+            try { tg.HapticFeedback.impactOccurred('medium'); } catch(e) {}
+          }
+          if (kind === 'fifty') {
+            curHidden = r.hidden || [];
+            jokerFading = true;
+            renderOpts();
             jokerToast("💡 Ikkita noto'g'ri variant olib tashlandi!", true);
-          }else if(kind==='shield'){
-            jokerShields=(jokerShields||0)+1;
-            jokerShieldsLeft=Math.max(0,jokerShieldsLeft-1);
+          } else if (kind === 'shield') {
+            jokerShields = (jokerShields || 0) + 1;
+            jokerShieldsLeft = Math.max(0, jokerShieldsLeft - 1);
             jokerToast("❤️ Qalqon olindi — bitta xato javob kechiriladi.", true);
-          }else if(kind==='sniper'){
-            curAnswered=true; curChoice=r.choice;
-            curCorrectIdx=(r.correct_index!==undefined?r.correct_index:-1);
-            curHidden=[]; renderOpts();
+          } else if (kind === 'sniper') {
+            curAnswered = true;
+            curChoice = r.choice;
+            curCorrectIdx = (r.correct_index !== undefined ? r.correct_index : -1);
+            curHidden = [];
+            renderOpts();
             jokerToast("🎯 Snayper to'g'ri javobni belgiladi!", true);
           }
           poll();
-        }else{
+        } else {
           jokerToast(({
-            insufficient_balance:"🪙 Kitobcha yetarli emas.",
-            already_answered:"Siz allaqachon javob berdingiz.",
-            joker_round_limit:"Bu savolda qalqon allaqachon olindi — keyingisida olishingiz mumkin.",
-            joker_limit:"Bu o'yinda qalqon limiti tugadi.",
-            not_answering:"Hozir javob vaqti emas.",
-            eliminated:"Siz chetlatilgansiz.",
-            premium_required:"👑 Bu arena faqat VIP Premium a'zolar uchun.",
-            joker_unavailable:"Bu savolda 50/50 ishlamaydi."
-          })[r&&r.error]||"Joker qabul qilinmadi.", false);
-          if(r&&typeof r.balance==='number') jokerBalance=r.balance;
+            insufficient_balance: "🪙 Kitobcha yetarli emas.",
+            already_answered: "Siz allaqachon javob berdingiz.",
+            joker_round_limit: "Bu savolda qalqon allaqachon olindi.",
+            joker_limit: "Bu o'yinda qalqon limiti tugadi.",
+            not_answering: "Hozir javob vaqti emas.",
+            eliminated: "Siz chetlatilgansiz.",
+            premium_required: "👑 Bu arena faqat VIP Premium a'zolar uchun.",
+            joker_unavailable: "Bu savolda 50/50 ishlamaydi."
+          })[r && r.error] || "Joker qabul qilinmadi.", false);
+          if (r && typeof r.balance === 'number') jokerBalance = r.balance;
         }
-      }).catch(function(){}).then(function(){ jokerBusy=false; renderJokers(lastState); });
+      }).catch(function() {}).then(function() {
+        jokerBusy = false;
+        renderJokers(lastState);
+      });
     }
 
-    $('jkFifty').addEventListener('click',function(){useJoker('fifty');});
-    $('jkShield').addEventListener('click',function(){useJoker('shield');});
-    $('jkSniper').addEventListener('click',function(){useJoker('sniper');});
+    $('jkFifty').addEventListener('click', function() { useJoker('fifty'); });
+    $('jkShield').addEventListener('click', function() { useJoker('shield'); });
+    $('jkSniper').addEventListener('click', function() { useJoker('sniper'); });
 
-    function statsHistoryHtml(s){
-      var lt=s.lifetime||{};
-      var h='<div class="statsgrid"><div class="sbox"><b>'+(lt.games||0)+'</b><span>O\'yin</span></div><div class="sbox"><b>'+(lt.points||0)+'</b><span>Jami ochko</span></div><div class="sbox"><b>'+(lt.best||0)+'</b><span>Rekord</span></div></div>';
-      if(s.history&&s.history.length){
-        h+='<div class="sect" style="margin-top:16px;text-align:left">🕘 O\'tgan o\'yinlar</div>';
-        s.history.forEach(function(g){h+='<div class="hrow"><div class="hd">'+esc(g.date)+'</div><div class="hw">🥇 '+esc(g.winner)+' <span class="muted">('+g.winner_points+' ochko)</span></div><div class="muted" style="font-size:12px">'+g.players+' 👤</div></div>';});
+    function statsHistoryHtml(s) {
+      var lt = s.lifetime || {};
+      var h = '<div class="statsgrid"><div class="sbox"><b>' + (lt.games || 0) + '</b><span>O\'yin</span></div><div class="sbox"><b>' + (lt.points || 0) + '</b><span>Jami ochko</span></div><div class="sbox"><b>' + (lt.best || 0) + '</b><span>Rekord</span></div></div>';
+      if (s.history && s.history.length) {
+        h += '<div class="sect" style="margin-top:16px;text-align:left">🕘 O\'tgan o\'yinlar</div>';
+        s.history.forEach(function(g) {
+          h += '<div class="hrow"><div class="hd">' + esc(g.date) + '</div><div class="hw">🥇 ' + esc(g.winner) + ' <span class="muted">(' + g.winner_points + ' ochko)</span></div><div class="muted" style="font-size:12px">' + g.players + ' 👤</div></div>';
+        });
       }
       return h;
     }
 
-    function render(s){
-      lastState=s;
-      var live=$('live'),info=$('info');
-      if(typeof s.balance==='number') jokerBalance=s.balance;
-      if(s.joker_prices) jokerPrices=s.joker_prices;
-      if(s.vip_locked){
-        live.classList.add('hidden');info.classList.remove('hidden');
+    function render(s) {
+      lastState = s;
+      var live = $('live'), info = $('info');
+      if (typeof s.balance === 'number') jokerBalance = s.balance;
+      if (s.joker_prices) jokerPrices = s.joker_prices;
+      if (s.vip_locked) {
+        live.classList.add('hidden');
+        info.classList.remove('hidden');
         renderJokers(null);
-        $('timerLbl').textContent='VIP';$('subtitle').textContent='⭐️ Faqat Premium';
-        info.innerHTML='<div class="em">👑</div><h2 style="color:#ffd700">VIP Premium Arena</h2><p style="color:#ffcc00;font-weight:600;font-size:15px">Ushbu arena faqat VIP Premium a\'zolari uchun!</p><p style="margin-top:10px;font-size:14px;color:var(--text-muted)">Ishtirok etish hamda <b>500 – 1000 Kitobcha</b> va <b>BEPUL Premium</b> yutib olish uchun Premium obunani faollashtiring.</p><div style="margin-top:18px"><a href="/dokon/" style="display:inline-block;background:linear-gradient(135deg,#ffd700,#ff9900);color:#111;font-weight:800;padding:12px 24px;border-radius:14px;text-decoration:none;box-shadow:0 4px 15px rgba(255,215,0,0.3)">⭐️ Premium Faollashtirish</a></div>'+statsHistoryHtml(s);
-        localSeconds=0;$('timer').textContent='--:--';return;
+        info.innerHTML = '<div class="em">👑</div><h2 style="color:var(--accent)">VIP Premium Arena</h2><p style="font-weight:600;font-size:15px">Ushbu arena faqat VIP Premium a\'zolari uchun!</p><p style="margin-top:10px;font-size:14px;color:var(--muted)">Yutuq: <b>350 / 200 / 100 Kitobcha + 1 kun / 12 soat / 6 soat Premium!</b></p><div style="margin-top:18px"><a href="/dokon/" style="display:inline-block;background:var(--accent);color:#fff;font-weight:800;padding:13px 26px;border-radius:16px;text-decoration:none;box-shadow:0 4px 15px rgba(0,0,0,0.15)">⭐️ Premium Faollashtirish</a></div>' + statsHistoryHtml(s);
+        localSeconds = 0;
+        $('timer').textContent = '--:--';
+        return;
       }
-      if(s.status==='live'){
-        live.classList.remove('hidden');info.classList.add('hidden');
-        $('subtitle').textContent='Savol '+s.q_number+' / '+s.q_total;
-        $('qn').textContent='SAVOL '+s.q_number+' / '+s.q_total;
-        $('myPts').textContent=s.your_points||0;$('qnum').textContent=s.q_number+'/'+s.q_total;
-        if(s.q_index!==lastQ){lastQ=s.q_index;curAnswered=false;curCorrectIdx=-1;curChoice=-1;curHidden=[];jokerUsed=[];$('toast').textContent='';}
-        // Joker holati serverdan keladi: sahifa yangilansa yoki boshqa
-        // qurilmadan ochilsa ham 50/50 o'sha ikkitasini yashirib turadi.
-        var jk=s.jokers||{};
-        if(!jokerBusy){
-          jokerUsed=jk.used||[];
-          if(!jokerFading) curHidden=jk.hidden||[];
-          jokerShields=jk.shields||0;
-          jokerShieldsLeft=(jk.shields_left_to_buy!==undefined?jk.shields_left_to_buy:2);
+      if (s.status === 'live') {
+        live.classList.remove('hidden');
+        info.classList.add('hidden');
+        $('subtitle').textContent = 'Savol ' + s.q_number + ' / ' + s.q_total;
+        var badgeText = 'SAVOL ' + s.q_number + ' / ' + s.q_total;
+        if (FLAVOR === 'riddlebox') badgeText = '🧩 ADABIY JUMBOQ · ' + s.q_number + '/' + s.q_total;
+        else if (FLAVOR === 'quotechain') badgeText = '🔗 IQTIBOS HALQASI · ' + s.q_number + '/' + s.q_total;
+        else if (FLAVOR === 'timetraveler') badgeText = '⏳ TARIXIY DAVR · ' + s.q_number + '/' + s.q_total;
+        else if (FLAVOR === 'bluffmaster') badgeText = '🎭 YOLG\'ONNI TOPING · ' + s.q_number + '/' + s.q_total;
+        else if (FLAVOR === 'symbolmatch') badgeText = '🗝 RAMZIY MA\'NO · ' + s.q_number + '/' + s.q_total;
+        else if (FLAVOR === 'characterclash') badgeText = '🤺 QAHRAMONLAR JANGI · ' + s.q_number + '/' + s.q_total;
+        else if (FLAVOR === 'tilepuzzle') badgeText = '🧩 ADABIY MOZAIKA · ' + s.q_number + '/' + s.q_total;
+        else if (FLAVOR === 'wordlock') badgeText = '🗝 SO\'Z QULFI · ' + s.q_number + '/' + s.q_total;
+        else if (FLAVOR === 'hangman') badgeText = '🪢 DORBOZ · ' + s.q_number + '/' + s.q_total;
+        else if (FLAVOR === 'speedtype') badgeText = '⚡️ TEZKOR TERISH · ' + s.q_number + '/' + s.q_total;
+        else if (FLAVOR === 'labyrinth') badgeText = '🧭 ADABIY LABIRINT · ' + s.q_number + '/' + s.q_total;
+        $('qn').textContent = badgeText;
+        $('myPts').textContent = s.your_points || 0;
+        $('qnum').textContent = s.q_number + '/' + s.q_total;
+        if (s.q_index !== lastQ) {
+          lastQ = s.q_index;
+          curAnswered = false;
+          curCorrectIdx = -1;
+          curChoice = -1;
+          curHidden = [];
+          jokerUsed = [];
+          $('toast').textContent = '';
         }
-        $('qtext').innerHTML = (s.q||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/&lt;b&gt;/gi,'<b>').replace(/&lt;\/b&gt;/gi,'</b>').replace(/\n/g,'<br>');
-        var audioBox=$('audioBox');
-        if(FLAVOR==='audioquote'||s.audio_url){
+        var jk = s.jokers || {};
+        if (!jokerBusy) {
+          jokerUsed = jk.used || [];
+          if (!jokerFading) curHidden = jk.hidden || [];
+          jokerShields = jk.shields || 0;
+          jokerShieldsLeft = (jk.shields_left_to_buy !== undefined ? jk.shields_left_to_buy : 2);
+        }
+        $('qtext').innerHTML = (s.q || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/&lt;b&gt;/gi,'<b>').replace(/&lt;\/b&gt;/gi,'</b>').replace(/\n/g,'<br>');
+
+        var audioBox = $('audioBox');
+        if (FLAVOR === 'audioquote' || s.audio_url) {
           audioBox.classList.remove('hidden');
-          $('playAudioBtn').onclick=function(){
-            if(s.audio_url){
-              try{var aud=new Audio(s.audio_url);aud.play();}catch(e){}
-            }else if(window.speechSynthesis){
+          $('playAudioBtn').onclick = function() {
+            if (s.audio_url) {
+              try { var aud = new Audio(s.audio_url); aud.play(); } catch(e) {}
+            } else if (window.speechSynthesis) {
               window.speechSynthesis.cancel();
-              var clean=(s.q||'').replace(/\[.*?\]/g,'').trim();
-              var u=new SpeechSynthesisUtterance(clean);
-              u.rate=0.9;
+              var clean = (s.q || '').replace(/\[.*?\]/g, '').trim();
+              var u = new SpeechSynthesisUtterance(clean);
+              u.rate = 0.9;
               window.speechSynthesis.speak(u);
             }
           };
-        }else{ audioBox.classList.add('hidden'); }
-        var itemsRow=$('itemsRow');
-        if(s.items&&s.items.length){
+        } else {
+          audioBox.classList.add('hidden');
+        }
+
+        var itemsRow = $('itemsRow');
+        if (s.items && s.items.length) {
           itemsRow.classList.remove('hidden');
-          itemsRow.innerHTML=s.items.map(function(it){return '<span class="chip">'+esc(it)+'</span>';}).join('');
-        }else{ itemsRow.classList.add('hidden'); itemsRow.innerHTML=''; }
-        var qimg=$('qimg');
-        if(s.image){ qimg.src=s.image; qimg.classList.remove('hidden'); }
-        else{ qimg.classList.add('hidden'); qimg.src=''; }
-        curOpts=s.options||[];
-        if(s.answered){curAnswered=true;curChoice=(s.your_choice!==undefined?s.your_choice:-1);}
-        if(s.phase==='reveal'){curCorrectIdx=(s.correct_index!==undefined?s.correct_index:-1);curAnswered=true;$('timerLbl').textContent='NATIJA';}
-        else{$('timerLbl').textContent='JAVOB';}
+          itemsRow.innerHTML = s.items.map(function(it) { return '<span class="chip">' + esc(it) + '</span>'; }).join('');
+        } else {
+          itemsRow.classList.add('hidden');
+          itemsRow.innerHTML = '';
+        }
+
+        var qimg = $('qimg');
+        if (s.image) {
+          qimg.src = s.image;
+          qimg.classList.remove('hidden');
+        } else {
+          qimg.classList.add('hidden');
+          qimg.src = '';
+        }
+
+        curOpts = s.options || [];
+        if (s.answered) {
+          curAnswered = true;
+          curChoice = (s.your_choice !== undefined ? s.your_choice : -1);
+        }
+        if (s.phase === 'reveal') {
+          curCorrectIdx = (s.correct_index !== undefined ? s.correct_index : -1);
+          curAnswered = true;
+          $('timerLbl').textContent = 'NATIJA';
+        } else {
+          $('timerLbl').textContent = 'JAVOB';
+        }
         renderOpts();
         renderJokers(s);
-        var teamBar=$('teamBar');
-        if(FLAVOR==='teams'){
+
+        var teamBar = $('teamBar');
+        if (FLAVOR === 'teams') {
           teamBar.classList.remove('hidden');
-          var ap=s.team_a_points||0, bp=s.team_b_points||0, tot=ap+bp||1;
-          $('teamABar').style.flex=(ap/tot); $('teamABar').textContent='A: '+ap;
-          $('teamBBar').style.flex=(bp/tot); $('teamBBar').textContent='B: '+bp;
-        } else { teamBar.classList.add('hidden'); }
-        var b='';(s.leaderboard||[]).forEach(function(r,i){
-          var cls=i===0?'g1':i===1?'g2':i===2?'g3':'';
-          var teamCls = r.team==='a' ? ' team-a' : (r.team==='b' ? ' team-b' : '');
-          var teamTag = r.team ? (r.team==='a'?' 🔵':' 🔴') : '';
-          b+='<div class="lb"><div class="rank '+cls+'">'+(i+1)+'</div><div class="lb-name'+teamCls+'">'+esc(r.name)+teamTag+'<br><span class="muted" style="font-size:11px">'+detail(r)+'</span></div><div class="pts">'+r.points+'</div></div>';
+          var ap = s.team_a_points || 0, bp = s.team_b_points || 0, tot = ap + bp || 1;
+          $('teamABar').style.flex = (ap / tot);
+          $('teamABar').textContent = 'A: ' + ap;
+          $('teamBBar').style.flex = (bp / tot);
+          $('teamBBar').textContent = 'B: ' + bp;
+        } else {
+          teamBar.classList.add('hidden');
+        }
+
+        var b = '';
+        (s.leaderboard || []).forEach(function(r, i) {
+          var cls = i === 0 ? 'g1' : (i === 1 ? 'g2' : (i === 2 ? 'g3' : ''));
+          var teamCls = r.team === 'a' ? ' team-a' : (r.team === 'b' ? ' team-b' : '');
+          var teamTag = r.team ? (r.team === 'a' ? ' 🔵' : ' 🔴') : '';
+          b += '<div class="lb"><div class="rank ' + cls + '">' + (i + 1) + '</div><div class="lb-name' + teamCls + '">' + esc(r.name) + teamTag + '<br><span class="muted" style="font-size:11px">' + detail(r) + '</span></div><div class="pts">' + r.points + '</div></div>';
         });
-        $('board').innerHTML=b||'<div class="muted" style="padding:6px 0">Hali ball yo\'q.</div>';
-        localSeconds=s.seconds;
-      }else{
-        live.classList.add('hidden');info.classList.remove('hidden');
+        $('board').innerHTML = b || '<div class="muted" style="padding:6px 0">Hozircha ball yo\'q.</div>';
+        localSeconds = s.seconds;
+      } else {
+        live.classList.add('hidden');
+        info.classList.remove('hidden');
         renderJokers(null);
-        if(s.status==='scheduled'){
-          $('timerLbl').textContent='BOSHLANISH';$('subtitle').textContent='Tez orada';
-          info.innerHTML='<div class="em">'+M.emoji+'</div><h2>O\'yin boshlanmoqda</h2><p>'+M.scheduled+' Tayyor turing!</p>'+statsHistoryHtml(s);
-          localSeconds=s.seconds;
-        }else if(s.status==='finished'){
-          $('timerLbl').textContent='TUGADI';$('timer').textContent='00:00';$('subtitle').textContent='Tugadi';
-          var w='';(s.leaderboard||[]).forEach(function(r,i){var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';var rew=r.reward?'<span style="color:var(--accent2);font-weight:800">🪙 +'+r.reward+'</span>':'';var prem=r.premium_days?'<br><span style="color:var(--accent2);font-size:11px">💎 '+r.premium_days+' kun</span>':'';w+='<div class="lb"><div class="rank">'+medal+'</div><div class="lb-name">'+esc(r.name)+' <span class="muted">'+r.points+'</span><br><span class="muted" style="font-size:11px">'+detail(r)+'</span></div><div class="pts">'+rew+prem+'</div></div>';});
-          var mine=s.your_reward?('<div class="stat" style="margin-top:12px"><div class="box"><b>🪙 +'+s.your_reward+'</b><span>Sizning mukofotingiz</span></div>'+(s.your_premium_days?'<div class="box"><b>💎 '+s.your_premium_days+' kun</b><span>BEPUL Premium</span></div>':'')+'</div>'):'';
-          info.innerHTML='<div class="em">🏁</div><h2>O\'yin tugadi!</h2><p>Ochko olganlar mukofot oldi 🎉</p>'+mine+(w?'<div style="text-align:left;margin-top:14px">'+w+'</div>':'')+answerKeyHtml(s)+statsHistoryHtml(s);
-          localSeconds=0;
-        }else{
-          $('timerLbl').textContent='—';$('timer').textContent='--:--';$('subtitle').textContent='Kutilmoqda';
-          info.innerHTML='<div class="em">'+M.emoji+'</div><h2>Hozircha o\'yin yo\'q</h2><p>'+M.none+'</p>'+statsHistoryHtml(s);
-          localSeconds=0;
+        if (s.status === 'scheduled') {
+          $('timerLbl').textContent = 'BOSHLANISH';
+          $('subtitle').textContent = 'Tez orada';
+          info.innerHTML = '<div class="em">' + M.emoji + '</div><h2>O\'yin boshlanmoqda</h2><p>' + M.scheduled + ' Tayyor turing!</p>' + statsHistoryHtml(s);
+          localSeconds = s.seconds;
+        } else if (s.status === 'finished') {
+          $('timerLbl').textContent = 'TUGADI';
+          $('timer').textContent = '00:00';
+          $('subtitle').textContent = 'Tugadi';
+          var w = '';
+          (s.leaderboard || []).forEach(function(r, i) {
+            var medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : (i + 1) + '.'));
+            var rew = r.reward ? '<span style="color:var(--accent2);font-weight:800">🪙 +' + r.reward + '</span>' : '';
+            w += '<div class="lb"><div class="rank">' + medal + '</div><div class="lb-name">' + esc(r.name) + ' <span class="muted">' + r.points + '</span><br><span class="muted" style="font-size:11px">' + detail(r) + '</span></div><div class="pts">' + rew + '</div></div>';
+          });
+          var mine = s.your_reward ? ('<div class="stat" style="margin-top:12px"><div class="box"><b>🪙 +' + s.your_reward + '</b><span>Sizning mukofotingiz</span></div></div>') : '';
+          info.innerHTML = '<div class="em">🏁</div><h2>O\'yin yakunlandi!</h2><p>Qatnashgan barcha ishtirokchilarga rahmat 🎉</p>' + mine + (w ? '<div style="text-align:left;margin-top:14px">' + w + '</div>' : '') + answerKeyHtml(s) + statsHistoryHtml(s);
+          localSeconds = 0;
+        } else {
+          $('timerLbl').textContent = '—';
+          $('timer').textContent = '--:--';
+          $('subtitle').textContent = 'Kutilmoqda';
+          info.innerHTML = '<div class="em">' + M.emoji + '</div><h2>Hozircha faol o\'yin yo\'q</h2><p>' + M.none + '</p>' + statsHistoryHtml(s);
+          localSeconds = 0;
         }
       }
-      var lt=s.lifetime||{games:0,points:0};var lel=$('lifetime');lel.classList.remove('hidden');
-      lel.innerHTML="📊 Umumiy: <b>"+lt.games+"</b> o'yin · <b>"+lt.points+"</b> ochko";
-      $('timer').textContent=fmt(localSeconds);
+      var lt = s.lifetime || {games:0, points:0};
+      var lel = $('lifetime');
+      lel.classList.remove('hidden');
+      lel.innerHTML = "📊 Jami ishtirok: <b>" + lt.games + "</b> o'yin · <b>" + lt.points + "</b> ochko";
+      $('timer').textContent = fmt(localSeconds);
     }
 
-    function poll(){api(M.api+'state/').then(function(s){if(!s||s.ok===false){$('info').classList.remove('hidden');$('live').classList.add('hidden');$('info').innerHTML='<div class="em">🔒</div><h2>Kirish xatosi</h2><p>Saytni ✨ Sayt tugmasi orqali qayta oching.</p>';return;}render(s);}).catch(function(){});}
-    function answer(choice){
-      if(busy||curAnswered)return;busy=true;
-      api(M.api+'submit/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({choice:choice})}).then(function(r){
-        if(r.ok||r.error==='already_answered'){
-          $('toast').textContent='';
-          curAnswered=true;curChoice=choice;curCorrectIdx=(r.correct_index!==undefined?r.correct_index:-1);renderOpts();
-          if(r.shielded){
-            jokerShields=Math.max(0,jokerShields-1);
+    function poll() {
+      api(M.api + 'state/').then(function(s) {
+        if (!s || s.ok === false) {
+          $('info').classList.remove('hidden');
+          $('live').classList.add('hidden');
+          $('info').innerHTML = '<div class="em">🔒</div><h2>Kirish xatosi</h2><p>Iltimos, bot orqali qayta kiring.</p>';
+          return;
+        }
+        render(s);
+      }).catch(function() {});
+    }
+
+    function answer(choice) {
+      if (busy || curAnswered) return;
+      busy = true;
+      api(M.api + 'submit/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({choice: choice})
+      }).then(function(r) {
+        if (r.ok || r.error === 'already_answered') {
+          $('toast').textContent = '';
+          curAnswered = true;
+          curChoice = choice;
+          curCorrectIdx = (r.correct_index !== undefined ? r.correct_index : -1);
+          renderOpts();
+          if (r.shielded) {
+            jokerShields = Math.max(0, jokerShields - 1);
             jokerToast("❤️ Qalqon xatoni kechirdi — ochko saqlanib qoldi!", true);
           }
-          if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.notificationOccurred((r.correct||r.shielded)?'success':'error')}catch(e){}}
+          if (tg && tg.HapticFeedback) {
+            try { tg.HapticFeedback.notificationOccurred((r.correct || r.shielded) ? 'success' : 'error'); } catch(e) {}
+          }
           poll();
         } else {
-          var t=$('toast');t.className='toast bad';
-          t.textContent=({premium_required:"👑 Ushbu arena faqat VIP Premium a'zolar uchun!",insufficient_balance:"🪙 Balansingiz yetarli emas.",not_answering:"Hozir javob vaqti emas."})[r.error]||"Qabul qilinmadi.";
+          var t = $('toast');
+          t.className = 'toast bad';
+          t.textContent = ({
+            premium_required: "👑 Ushbu arena faqat VIP Premium a'zolar uchun!",
+            insufficient_balance: "🪙 Balansingiz yetarli emas.",
+            not_answering: "Hozir javob vaqti emas."
+          })[r.error] || "Qabul qilinmadi.";
         }
-      }).catch(function(){}).then(function(){busy=false;});
+      }).catch(function() {}).then(function() {
+        busy = false;
+      });
     }
-    setInterval(function(){if(localSeconds>0){localSeconds--;$('timer').textContent=fmt(localSeconds);}},1000);
-    poll();setInterval(poll,1500);
+
+    setInterval(function() {
+      if (localSeconds > 0) {
+        localSeconds--;
+        $('timer').textContent = fmt(localSeconds);
+      }
+    }, 1000);
+
+    poll();
+    setInterval(poll, 1500);
   </script>
 {% include "_tracking.html" with section="quiz-"|add:flavor %}
 </body>

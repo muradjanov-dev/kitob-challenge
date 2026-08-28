@@ -867,6 +867,8 @@
         let badgeHtml = '';
         if (p.is_auction) {
           badgeHtml = '<div class="badge-auction">🔥 AUKSION</div>';
+        } else if (p.grants_premium_days) {
+          badgeHtml = '<div class="badge-premium" style="position:absolute;top:10px;left:10px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:3px 8px;border-radius:8px;font-size:10px;font-weight:800;letter-spacing:0.5px;box-shadow:0 2px 8px rgba(217,119,6,0.4);z-index:2;">⭐ ' + p.grants_premium_days + ' KUN PREMIUM</div>';
         } else if (p.stock_qty != null && p.stock_qty <= 0) {
           badgeHtml = '<div class="badge-soldout">TUGADI</div>';
         }
@@ -1112,9 +1114,13 @@
         : (canAfford
             ? p.price + ' Kitobcha bilan sotib olish'
             : 'Yetarli emas — yana ' + (p.price - balance) + ' 🪙 kerak');
+      const premiumNote = p.grants_premium_days
+        ? '<div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:8px 12px;margin:8px 0;color:#fbbf24;font-size:13px;font-weight:700;text-align:center;">⭐ ' + p.grants_premium_days + ' kunlik Premium (Avtomatik faollashadi!)</div>'
+        : '';
       showSheet(
         '<div class="preview">' + img + '</div>' +
         '<h2>' + escapeHTML(p.name) + '</h2>' +
+        premiumNote +
         (p.description ? '<div class="desc">' + escapeHTML(p.description) + '</div>' : '') +
         '<div class="price-big"><span class="mini-coin"></span>' + p.price + '<span style="font-size:13px;color:var(--text-dim);font-weight:600;margin-left:6px;">Kitobcha</span></div>' +
         '<button class="buy-btn" id="buyBtn"' + (canAfford ? '' : ' disabled') + '>' + buyLabel + '</button>' +

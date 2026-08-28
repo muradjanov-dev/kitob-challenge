@@ -169,6 +169,7 @@ def _product_payload(p: ShopProduct, request: HttpRequest) -> dict:
         "highest_bid": highest_bid,
         "bids_count": p.auction_bids.count() if p.is_auction else 0,
         "is_ended": is_ended,
+        "grants_premium_days": p.grants_premium_days,
     }
 
 

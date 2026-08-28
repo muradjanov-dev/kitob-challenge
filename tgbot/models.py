@@ -2211,6 +2211,11 @@ class GameSequence(BaseModel):
         # 10 Sufism, Nafs Purification, and Divine Love Games (✨ Tasavvuf & Ishqulloh)
         "simurgh", "ishq", "nafs", "qalb", "naqshband",
         "yassaviy", "masnaviy", "gazzoliy", "fano", "marifat",
+        # 10 New Non-Test Interactive Games
+        "wordlock", "speedtype", "tilepuzzle", "association", "hangman",
+        "bookmemory", "spellcheck", "labyrinth", "bookbidding", "characterclash",
+        # 5 New Novelty & Deduction Interactive Games
+        "riddlebox", "quotechain", "timetraveler", "bluffmaster", "symbolmatch",
     ]
 
     slot = models.CharField(max_length=16, choices=SLOT_CHOICES)

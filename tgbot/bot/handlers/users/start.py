@@ -366,6 +366,23 @@ async def do_start(message: types.Message, state: FSMContext):
         "gazzoliy": ("/gazzoliy/", "🗝 O'yinni ochish", "🗝 Kimyoi Saodat"),
         "fano": ("/fano/", "🌊 O'yinni ochish", "🌊 Fanofilloh"),
         "marifat": ("/marifat/", "☀️ O'yinni ochish", "☀️ Haqiqat Quyoshi"),
+        # 10 New Non-Test Interactive Games
+        "wordlock": ("/wordlock/", "🗝 O'yinni ochish", "🗝 So'z Qulfi"),
+        "speedtype": ("/speedtype/", "⚡️ O'yinni ochish", "⚡️ Tezkor Terish"),
+        "tilepuzzle": ("/tilepuzzle/", "🧩 O'yinni ochish", "🧩 Adabiy Mozaika"),
+        "association": ("/association/", "🔗 O'yinni ochish", "🔗 So'z Assotsiatsiyasi"),
+        "hangman": ("/hangman/", "🪢 O'yinni ochish", "🪢 Dorboz"),
+        "bookmemory": ("/bookmemory/", "🃏 O'yinni ochish", "🃏 Kitob Xotirasi"),
+        "spellcheck": ("/spellcheck/", "✍️ O'yinni ochish", "✍️ Imlo Saralovchi"),
+        "labyrinth": ("/labyrinth/", "🧭 O'yinni ochish", "🧭 Adabiy Labirint"),
+        "bookbidding": ("/bookbidding/", "💰 O'yinni ochish", "💰 Jonli Auksion"),
+        "characterclash": ("/characterclash/", "🤺 O'yinni ochish", "🤺 Qahramonlar Jangi"),
+        # 5 New Novelty & Deduction Interactive Games
+        "riddlebox": ("/riddlebox/", "🧩 O'yinni ochish", "🧩 Adabiy Jumboq"),
+        "quotechain": ("/quotechain/", "🔗 O'yinni ochish", "🔗 Iqtiboslar Halqasi"),
+        "timetraveler": ("/timetraveler/", "⏳ O'yinni ochish", "⏳ Tarixiy Sayohatchi"),
+        "bluffmaster": ("/bluffmaster/", "🎭 O'yinni ochish", "🎭 Haqiqatmi yoki Uydirma?"),
+        "symbolmatch": ("/symbolmatch/", "🗝 O'yinni ochish", "🗝 Adabiy Ramzlar"),
     }
     if args in _GAME_DEEPLINKS and already_registered:
         if user and not user.is_registered:

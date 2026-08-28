@@ -31,7 +31,9 @@ def _is_admin(user) -> bool:
 
 def _shop_admin_menu_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(InlineKeyboardButton("➕ Mahsulot qo'shish", callback_data="shopadm:add"))
+    kb.add(InlineKeyboardButton("🛍 Oddiy mahsulot qo'shish", callback_data="shopadm:add:normal"))
+    kb.add(InlineKeyboardButton("⭐ Premium obuna qo'shish (Avto)", callback_data="shopadm:add:premium"))
+    kb.add(InlineKeyboardButton("🏛 Auksion sovg'a qo'shish", callback_data="shopadm:add:auction"))
     kb.add(InlineKeyboardButton("📋 Mahsulotlar ro'yxati", callback_data="shopadm:list:0"))
     kb.add(InlineKeyboardButton("🔙 Admin panelga qaytish", callback_data="menu:admin"))
     return kb
@@ -50,8 +52,8 @@ async def shop_admin_menu(message: types.Message, user):
     is_admin is already enforced by the router."""
     await message.answer(
         "🛒 <b>Do'kon boshqaruvi</b>\n\n"
-        "Bot orqali mahsulot qo'shish, ko'rish va o'chirish mumkin. "
-        "Murakkab tahrirlar uchun Django admin paneldan foydalaning.",
+        "Bot orqali oddiy mahsulot, <b>⭐ Premium obuna (avtomatik beriluvchi)</b> yoki <b>🏛 Auksion sovg'a</b> qo'shish, ko'rish va boshqarish mumkin.\n"
+        "Kengaytirilgan boshqaruv uchun Django admin panelidan ham foydalanishingiz mumkin.",
         parse_mode="HTML",
         reply_markup=_shop_admin_menu_kb(),
     )
@@ -71,20 +73,37 @@ _WIZARD_STATES = [
     ShopProductCreateState.image,
     ShopProductCreateState.price,
     ShopProductCreateState.stock,
+    ShopProductCreateState.duration_days,
 ]
 
 
-@dp.callback_query_handler(lambda c: c.data == "shopadm:add", state="*")
+@dp.callback_query_handler(lambda c: c.data in ("shopadm:add", "shopadm:add:normal", "shopadm:add:premium", "shopadm:add:auction"), state="*")
 async def shopadm_add_start(call: types.CallbackQuery, state: FSMContext):
     user = await aget_user(call.from_user.id)
     if not _is_admin(user):
         await call.answer("Faqat adminlar uchun", show_alert=True)
         return
     await call.answer()
+    is_auction = (call.data == "shopadm:add:auction")
+    is_premium = (call.data == "shopadm:add:premium")
+    await state.finish()
     await ShopProductCreateState.name.set()
+    await state.update_data(is_auction=is_auction, is_premium=is_premium)
+
+    if is_auction:
+        mode_label = "🏛 <b>Auksion sovg'a qo'shish</b>"
+        example_name = "Nodir «O'tkan kunlar» qo'lyozmasi"
+    elif is_premium:
+        mode_label = "⭐ <b>Premium obuna qo'shish (Avtomatik faollashuvchi)</b>"
+        example_name = "Kitob Challenge Premium (1 oylik)"
+    else:
+        mode_label = "🛍 <b>Oddiy mahsulot qo'shish</b>"
+        example_name = "Mutolaa vaucheri 50 000 so'm"
+
     await call.message.answer(
-        "1️⃣ <b>Mahsulot nomini yuboring</b>\n\n"
-        "Masalan: <code>Sertifikat 50 000 so'm</code>\n\n"
+        f"{mode_label}\n\n"
+        "1️⃣ <b>Mahsulot / obuna nomini yuboring:</b>\n\n"
+        f"Masalan: <code>{example_name}</code>\n\n"
         "Bekor qilish: /bekor",
         parse_mode="HTML",
     )
@@ -107,8 +126,8 @@ async def shopadm_get_name(message: types.Message, state: FSMContext):
     await state.update_data(name=name)
     await ShopProductCreateState.description.set()
     await message.answer(
-        "2️⃣ <b>Tavsifni yuboring</b>\n\n"
-        "Bu sotib olish oynasida ko'rinadi. O'tkazib yuborish: /skip",
+        "2️⃣ <b>Tavsifni yuboring:</b>\n\n"
+        "Bu auksion/xarid oynasida ishtirokchilarga ko'rinadi. O'tkazib yuborish: /skip",
         parse_mode="HTML",
     )
 
@@ -132,7 +151,7 @@ async def shopadm_get_description(message: types.Message, state: FSMContext):
 async def _ask_image(message: types.Message, state: FSMContext):
     await ShopProductCreateState.image.set()
     await message.answer(
-        "3️⃣ <b>Rasm yuboring</b>\n\n"
+        "3️⃣ <b>Rasm yuboring:</b>\n\n"
         "Mahsulot kartochkasi uchun rasm. O'tkazib yuborish: /skip",
         parse_mode="HTML",
     )
@@ -141,17 +160,14 @@ async def _ask_image(message: types.Message, state: FSMContext):
 @dp.message_handler(commands=["skip"], state=ShopProductCreateState.image)
 async def shopadm_skip_image(message: types.Message, state: FSMContext):
     await state.update_data(image_file_id=None)
-    await _ask_price(message, state)
+    await _ask_price_or_bid(message, state)
 
 
 @dp.message_handler(state=ShopProductCreateState.image, content_types=types.ContentTypes.PHOTO)
 async def shopadm_get_image(message: types.Message, state: FSMContext):
-    # Biggest photo size = last entry. Store the file_id; we resolve to bytes
-    # at commit time so a user who restarts the wizard doesn't accumulate
-    # half-downloaded files on disk.
     photo = message.photo[-1]
     await state.update_data(image_file_id=photo.file_id)
-    await _ask_price(message, state)
+    await _ask_price_or_bid(message, state)
 
 
 @dp.message_handler(state=ShopProductCreateState.image)
@@ -159,13 +175,23 @@ async def shopadm_image_invalid(message: types.Message, state: FSMContext):
     await message.answer("Iltimos rasm yuboring yoki /skip.")
 
 
-async def _ask_price(message: types.Message, state: FSMContext):
+async def _ask_price_or_bid(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    is_auction = data.get("is_auction", False)
     await ShopProductCreateState.price.set()
-    await message.answer(
-        "4️⃣ <b>Narxni Kitobchada yuboring</b>\n\n"
-        "Faqat raqam, masalan: <code>250</code>",
-        parse_mode="HTML",
-    )
+    if is_auction:
+        await message.answer(
+            "4️⃣ <b>Boshlang'ich qiymatni (minimal stavka) yuboring:</b>\n\n"
+            "Ishtirokchilar auksionda kamida shu miqdordan boshlab taklif berishadi.\n"
+            "Masalan: <code>100</code> yoki <code>500</code> Kitobcha",
+            parse_mode="HTML",
+        )
+    else:
+        await message.answer(
+            "4️⃣ <b>Narxni Kitobchada yuboring:</b>\n\n"
+            "Faqat raqam, masalan: <code>250</code>",
+            parse_mode="HTML",
+        )
 
 
 @dp.message_handler(state=ShopProductCreateState.price, content_types=types.ContentTypes.TEXT)
@@ -176,16 +202,49 @@ async def shopadm_get_price(message: types.Message, state: FSMContext):
         return
     price = int(raw)
     if price < 1 or price > 10_000_000:
-        await message.answer("Narx 1 va 10 000 000 oralig'ida bo'lishi kerak. Qaytadan.")
+        await message.answer("Qiymat 1 va 10 000 000 oralig'ida bo'lishi kerak. Qaytadan.")
         return
     await state.update_data(price=price)
-    await ShopProductCreateState.stock.set()
-    await message.answer(
-        "5️⃣ <b>Zaxira sonini yuboring</b>\n\n"
-        "Cheksiz uchun: /unlimited\n"
-        "Yoki raqam, masalan: <code>10</code>",
-        parse_mode="HTML",
-    )
+
+    data = await state.get_data()
+    if data.get("is_auction"):
+        await ShopProductCreateState.duration_days.set()
+        await message.answer(
+            "5️⃣ <b>Auksion davomiyligini (kunlarda) kiriting:</b>\n\n"
+            "Masalan: <code>10</code> (auksion 10 kundan keyin yakunlanadi va g'olib aniqlanadi)\n"
+            "Standart: 3, 5, 7 yoki 10 kun",
+            parse_mode="HTML",
+        )
+    elif data.get("is_premium"):
+        await ShopProductCreateState.duration_days.set()
+        await message.answer(
+            "5️⃣ <b>Premium obuna davomiyligini (kunlarda) kiriting:</b>\n\n"
+            "Masalan: <code>30</code> (1 oylik), <code>7</code> (1 haftalik), <code>90</code> (3 oylik), <code>365</code> (1 yillik).\n"
+            "💡 <i>Foydalanuvchi do'kondan sotib olganda, unga Premium avtomatik tarzda shu kunga ochiladi (admin qo'lda berishi shart emas)!</i>",
+            parse_mode="HTML",
+        )
+    else:
+        await ShopProductCreateState.stock.set()
+        await message.answer(
+            "5️⃣ <b>Zaxira sonini yuboring:</b>\n\n"
+            "Cheksiz uchun: /unlimited\n"
+            "Yoki raqam, masalan: <code>10</code>",
+            parse_mode="HTML",
+        )
+
+
+@dp.message_handler(state=ShopProductCreateState.duration_days, content_types=types.ContentTypes.TEXT)
+async def shopadm_get_duration(message: types.Message, state: FSMContext):
+    raw = (message.text or "").strip()
+    if not raw.isdigit():
+        await message.answer("Faqat musbat butun son kiriting (masalan: 30).")
+        return
+    days = int(raw)
+    if days < 1 or days > 3650:
+        await message.answer("Muddat 1 va 3650 kun oralig'ida bo'lishi kerak.")
+        return
+    await state.update_data(duration_days=days, stock=None)
+    await _show_preview(message, state)
 
 
 @dp.message_handler(commands=["unlimited"], state=ShopProductCreateState.stock)
@@ -214,31 +273,56 @@ async def _show_preview(message: types.Message, state: FSMContext):
     desc = data.get("description", "") or "—"
     price = data.get("price", 0)
     stock = data.get("stock")
-    stock_label = "Cheksiz" if stock is None else str(stock)
+    is_auction = data.get("is_auction", False)
+    is_premium = data.get("is_premium", False)
+    duration_days = data.get("duration_days", 30)
     has_img = "Ha" if data.get("image_file_id") else "Yo'q"
+
+    if is_auction:
+        type_label = "🏛 Auksion (Kimoshdi savdosi)"
+        cost_label = f"<b>Boshlang'ich stavka:</b> {price} Kitobcha"
+        limit_label = f"<b>Auksion davomiyligi:</b> {duration_days} kun"
+    elif is_premium:
+        type_label = "⭐ Premium obuna (Avtomatik ochiladi)"
+        cost_label = f"<b>Narx:</b> {price} Kitobcha"
+        limit_label = f"<b>Premium muddati:</b> {duration_days} kun (Cheksiz zaxira)"
+    else:
+        type_label = "🛍 Oddiy mahsulot"
+        cost_label = f"<b>Narx:</b> {price} Kitobcha"
+        limit_label = f"<b>Zaxira:</b> {'Cheksiz' if stock is None else str(stock)}"
+
     text = (
-        "📋 <b>Mahsulotni tasdiqlang</b>\n\n"
+        "📋 <b>Mahsulot ma'lumotlarini tasdiqlang:</b>\n\n"
+        f"<b>Turi:</b> {type_label}\n"
         f"<b>Nomi:</b> {_escape(name)}\n"
         f"<b>Tavsif:</b> {_escape(desc)}\n"
         f"<b>Rasm:</b> {has_img}\n"
-        f"<b>Narx:</b> {price} Kitobcha\n"
-        f"<b>Zaxira:</b> {stock_label}"
+        f"{cost_label}\n"
+        f"{limit_label}"
     )
     kb = InlineKeyboardMarkup(row_width=2)
     kb.row(
-        InlineKeyboardButton("✅ Saqlash", callback_data="shopadm:save"),
+        InlineKeyboardButton("✅ Saqlash va e'lon qilish", callback_data="shopadm:save"),
         InlineKeyboardButton("❌ Bekor qilish", callback_data="shopadm:cancel"),
     )
     await message.answer(text, parse_mode="HTML", reply_markup=kb)
 
 
 @sync_to_async
-def _create_product_sync(name, description, price, stock):
+def _create_product_sync(name, description, price, stock, is_auction=False, is_premium=False, duration_days=10):
+    import datetime
+    from django.utils import timezone
+    auction_end = timezone.now() + datetime.timedelta(days=duration_days) if is_auction else None
+    premium_days = duration_days if is_premium else None
     return ShopProduct.objects.create(
         name=name,
         description=description or "",
         price_kitobcha=price,
-        stock_qty=stock,
+        stock_qty=None if is_premium else (1 if is_auction else stock),
+        is_auction=is_auction,
+        min_start_bid=price if is_auction else 100,
+        auction_end_at=auction_end,
+        grants_premium_days=premium_days,
         is_active=True,
     )
 
@@ -255,6 +339,9 @@ async def shopadm_save(call: types.CallbackQuery, state: FSMContext):
     description = data.get("description") or ""
     price = int(data.get("price") or 0)
     stock = data.get("stock")
+    is_auction = bool(data.get("is_auction", False))
+    is_premium = bool(data.get("is_premium", False))
+    duration_days = int(data.get("duration_days") or 30)
     file_id = data.get("image_file_id")
     if not name or price < 1:
         await call.answer("Maydonlar to'liq emas — qaytadan boshlang.", show_alert=True)
@@ -262,7 +349,10 @@ async def shopadm_save(call: types.CallbackQuery, state: FSMContext):
         return
 
     await call.answer("Saqlanmoqda…")
-    product = await _create_product_sync(name, description, price, stock)
+    product = await _create_product_sync(
+        name, description, price, stock,
+        is_auction=is_auction, is_premium=is_premium, duration_days=duration_days
+    )
 
     if file_id:
         try:
@@ -275,14 +365,33 @@ async def shopadm_save(call: types.CallbackQuery, state: FSMContext):
             await call.message.answer("⚠️ Rasm yuklashda xatolik (mahsulot rasmsiz saqlandi).")
 
     await state.finish()
-    stock_label = "cheksiz" if product.stock_qty is None else str(product.stock_qty)
-    await call.message.answer(
-        "✅ <b>Mahsulot qo'shildi!</b>\n\n"
-        f"<b>{_escape(product.name)}</b>\n"
-        f"💰 {product.price_kitobcha} Kitobcha • 📦 {stock_label}",
-        parse_mode="HTML",
-        reply_markup=_shop_admin_menu_kb(),
-    )
+    if is_auction:
+        await call.message.answer(
+            "🏛 <b>Auksion muvaffaqiyatli boshlandi!</b>\n\n"
+            f"<b>{_escape(product.name)}</b>\n"
+            f"💰 Boshlang'ich taklif: <b>{product.min_start_bid} Kitobcha</b>\n"
+            f"⏳ Davomiyligi: <b>{duration_days} kun</b>",
+            parse_mode="HTML",
+            reply_markup=_shop_admin_menu_kb(),
+        )
+    elif is_premium:
+        await call.message.answer(
+            "⭐ <b>Premium obuna muvaffaqiyatli qo'shildi!</b>\n\n"
+            f"<b>{_escape(product.name)}</b>\n"
+            f"💰 Narxi: <b>{product.price_kitobcha} Kitobcha</b>\n"
+            f"⚡️ Premium muddati: <b>{duration_days} kun</b> (Xarid qilinganda avtomatik ochiladi)",
+            parse_mode="HTML",
+            reply_markup=_shop_admin_menu_kb(),
+        )
+    else:
+        stock_label = "cheksiz" if product.stock_qty is None else str(product.stock_qty)
+        await call.message.answer(
+            "✅ <b>Mahsulot qo'shildi!</b>\n\n"
+            f"<b>{_escape(product.name)}</b>\n"
+            f"💰 {product.price_kitobcha} Kitobcha • 📦 {stock_label}",
+            parse_mode="HTML",
+            reply_markup=_shop_admin_menu_kb(),
+        )
 
     await _announce_new_product_to_groups(product)
 
@@ -296,14 +405,35 @@ async def _announce_new_product_to_groups(product: ShopProduct):
 
     desc = (product.description or "").strip()
     desc_line = f"\n{_escape(desc)}\n" if desc else ""
-    stock_label = "cheksiz" if product.stock_qty is None else str(product.stock_qty)
-    text = (
-        "🛍 <b>Do'konga yangi mahsulot qo'shildi!</b>\n\n"
-        f"<b>{_escape(product.name)}</b>\n"
-        f"{desc_line}\n"
-        f"💰 <b>{product.price_kitobcha} Kitobcha</b> • 📦 {stock_label}\n\n"
-        "Sotib olish uchun: «🛒 Do'kon» bo'limiga o'ting!"
-    )
+
+    if product.is_auction:
+        text = (
+            "🏛 <b>KITOB CHALLENGE'DA YANGI AUKSION BOSHLANDI!</b> 🔥📚\n\n"
+            f"🌟 <b>{_escape(product.name)}</b>\n"
+            f"{desc_line}\n"
+            f"💰 <b>Boshlang'ich minimal taklif:</b> {product.min_start_bid or 100} Kitobcha\n"
+            "🎯 <b>100% Xavfsiz:</b> Agar g'olib bo'la olmasangiz, barcha tikkan Kitobchalaringiz to'liq balansingizga qaytariladi!\n\n"
+            "👇 <i>Do'konga kiring va o'z taklifingizni bering!</i>"
+        )
+    elif product.grants_premium_days:
+        text = (
+            "⭐ <b>DO'KONDA YANGI PREMIUM OBUNA!</b> 🚀🌟\n\n"
+            f"👑 <b>{_escape(product.name)}</b>\n"
+            f"{desc_line}\n"
+            f"💰 <b>Narxi:</b> {product.price_kitobcha} Kitobcha\n"
+            f"⚡️ <b>Muddati:</b> {product.grants_premium_days} kunlik Premium\n\n"
+            "✨ <i>Sotib olishingiz bilan Premium avtomatik tarzda hisobingizga qo'shiladi!</i>\n"
+            "Kiring: «🛒 Do'kon»"
+        )
+    else:
+        stock_label = "cheksiz" if product.stock_qty is None else str(product.stock_qty)
+        text = (
+            "🛍 <b>Do'konga yangi mahsulot qo'shildi!</b>\n\n"
+            f"<b>{_escape(product.name)}</b>\n"
+            f"{desc_line}\n"
+            f"💰 <b>{product.price_kitobcha} Kitobcha</b> • 📦 {stock_label}\n\n"
+            "Sotib olish uchun: «🛒 Do'kon» bo'limiga o'ting!"
+        )
 
     for gid, tid in _announce_targets():
         try:
