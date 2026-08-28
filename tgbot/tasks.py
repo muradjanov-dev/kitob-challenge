@@ -6349,13 +6349,14 @@ def _start_quiz_flavor(flavor, is_vip=False):
             f"⭐️ <b>VIP PREMIUM ARENA: {game_title}</b> ⭐️\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi!\n"
             f"👑 <b>Faqat VIP Premium a'zolar uchun!</b>\n\n"
-            f"💰 <b>Yutuq: 350 / 200 / 100 Kitobcha + 1 kun / 12 soat / 6 soatlik Premium!</b>\n👇 Kiring:"
+            f"💰 <b>VIP Mukofot: 350 / 200 / 100 Kitobcha + 1 kun / 12 soat / 6 soatlik Premium!</b>\n👇 Kiring:"
         )
     else:
         announcement_text = texts.get(
             flavor,
-            f"🧪 <b>{game_title} (Test / Beta)</b>\n\n"
+            f"🎮 <b>{game_title}</b>\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
+            f"💰 <b>Mukofot:</b> 100 / 60 / 30 Kitobcha\n"
             f"🎁 <b>Kirish BEPUL!</b>\n👇 Kiring:"
         )
     deep_link = deep_link_params.get(flavor, flavor)
