@@ -36,8 +36,8 @@ DEFAULT_DURATION_MIN = 10
 LEAD_SECONDS = 30  # lobby countdown after the announcement, so everyone can join
 MIN_TITLE_LETTERS = 4  # skip titles too short to blank meaningfully
 
-REWARD_TIERS = {0: 100, 1: 60, 2: 30}
-PARTICIPATION = 10  # guest Kitobcha for participants who didn't place in top 3
+REWARD_TIERS = {0: 150, 1: 90, 2: 45}
+PARTICIPATION = 15  # guest Kitobcha for participants who didn't place in top 3
 
 
 def _add_ball_reward(user, amount: int) -> int:

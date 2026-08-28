@@ -24,8 +24,8 @@ QUESTION_SECONDS = 20
 BOSS_HP = 600
 DAMAGE = 10
 
-VICTORY_REWARD = 60      # per contributor (>=1 correct) when the boss falls
-CONTRIB_CONSOLATION = 15  # answered but no correct, or defeat
+VICTORY_REWARD = 90       # per contributor (>=1 correct) when the boss falls
+CONTRIB_CONSOLATION = 25  # answered but no correct, or defeat
 
 
 def _prep_questions(raw):

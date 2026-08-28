@@ -6356,7 +6356,7 @@ def _start_quiz_flavor(flavor, is_vip=False):
             flavor,
             f"🎮 <b>{game_title}</b>\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
-            f"💰 <b>Mukofot:</b> 100 / 60 / 30 Kitobcha\n"
+            f"💰 <b>Mukofot:</b> 150 / 90 / 45 Kitobcha\n"
             f"🎁 <b>Kirish BEPUL!</b>\n👇 Kiring:"
         )
     deep_link = deep_link_params.get(flavor, flavor)
