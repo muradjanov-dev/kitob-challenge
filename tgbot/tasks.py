@@ -6349,7 +6349,7 @@ def _start_quiz_flavor(flavor, is_vip=False):
             f"⭐️ <b>VIP PREMIUM ARENA: {game_title}</b> ⭐️\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi!\n"
             f"👑 <b>Faqat VIP Premium a'zolar uchun!</b>\n\n"
-            f"💰 <b>VIP Mukofot: 350 / 200 / 100 Kitobcha + 1 kun / 12 soat / 6 soatlik Premium!</b>\n👇 Kiring:"
+            f"💰 <b>VIP Mukofot: 500 / 300 / 150 Kitobcha + 1 kun / 12 soat / 6 soatlik Premium!</b>\n👇 Kiring:"
         )
     else:
         announcement_text = texts.get(

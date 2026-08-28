@@ -88,14 +88,14 @@ VIP_TOP_GAMES = [
     "gazzoliy", "wordlock", "speedtype", "association", "tilepuzzle", "labyrinth", "characterclash",
     "riddlebox", "quotechain", "timetraveler", "bluffmaster", "symbolmatch"
 ]
-VIP_REWARD_TIERS = {0: 350, 1: 200, 2: 100}  # Rebalanced Kitobcha rewards
+VIP_REWARD_TIERS = {0: 500, 1: 300, 2: 150}  # Elevated VIP Kitobcha rewards
 VIP_PREMIUM_HOURS_BONUS = {0: 24, 1: 12, 2: 6}  # 1-o'rin: 1 kun (24 soat), 2-o'rin: 12 soat, 3-o'rin: 6 soat
 VIP_PREMIUM_DAYS_BONUS = {0: 1, 1: 0, 2: 0}  # legacy backwards compatibility
-VIP_PARTICIPATION = 30
+VIP_PARTICIPATION = 50
 
 
 def _dynamic_base(team_size, is_vip=False):
-    base = 150 if is_vip else TEAM_BASE_REWARD
+    base = 200 if is_vip else TEAM_BASE_REWARD
     prev = 1
     for upper, step in TEAM_SIZE_BANDS:
         if team_size <= upper:
@@ -902,7 +902,7 @@ def _finalize_teams(g) -> dict:
             rank = rank_by_score_id.get(s.id)
             bonus = TEAM_RANK_BONUS.get(rank, 0) if rank is not None else 0
             if g.is_vip and rank is not None and rank < 3:
-                bonus += 50
+                bonus += 80
             reward = base_calc + bonus
         else:
             reward = VIP_PARTICIPATION if g.is_vip else PARTICIPATION
