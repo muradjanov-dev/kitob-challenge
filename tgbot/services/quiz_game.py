@@ -90,7 +90,7 @@ VIP_TOP_GAMES = [
 ]
 VIP_REWARD_TIERS = {0: 500, 1: 300, 2: 150}  # Elevated VIP Kitobcha rewards
 VIP_PREMIUM_HOURS_BONUS = {0: 24, 1: 12, 2: 6}  # 1-o'rin: 1 kun (24 soat), 2-o'rin: 12 soat, 3-o'rin: 6 soat
-VIP_PREMIUM_DAYS_BONUS = {0: 1, 1: 0, 2: 0}  # legacy backwards compatibility
+VIP_PREMIUM_DAYS_BONUS = {0: 1, 1: 0, 2: 0}  # 1-o'ringa 1 kun, 2-o'ringa 12 soat, 3-o'ringa 6 soat
 VIP_PARTICIPATION = 50
 
 
@@ -813,9 +813,12 @@ def finalize(game_id: int) -> dict | None:
 
 
 def get_vip_premium_label(rank: int) -> str:
+    days = VIP_PREMIUM_DAYS_BONUS.get(rank, 0)
     hours = VIP_PREMIUM_HOURS_BONUS.get(rank, 0)
-    if hours == 24:
-        return "1 kun"
+    if days > 0:
+        return f"{days} kun"
+    elif hours >= 24:
+        return f"{hours // 24} kun"
     elif hours > 0:
         return f"{hours} soat"
     return ""
@@ -829,22 +832,23 @@ def grant_vip_premium(score, rank: int) -> dict:
     swallowed deliberately.
     """
     hours = VIP_PREMIUM_HOURS_BONUS.get(rank, 0)
+    days = VIP_PREMIUM_DAYS_BONUS.get(rank, 0)
     label = get_vip_premium_label(rank)
     if not hours or score.premium_days:
         return {
             "hours": hours if score.premium_days else 0,
-            "days": 1 if (score.premium_days and hours >= 24) else 0,
+            "days": days if (score.premium_days and days > 0) else (1 if (score.premium_days and hours >= 24) else 0),
             "text": label if score.premium_days else "",
         }
     try:
         from tgbot.services.premium import grant_premium
-        grant_premium(score.user, hours=hours)
+        grant_premium(score.user, days=days, hours=(0 if days > 0 else hours))
     except Exception as e:
         print(f"grant_vip_premium: score={score.id} rank={rank}: {e}")
         return {"hours": 0, "days": 0, "text": ""}
-    score.premium_days = 1 if hours >= 24 else hours
+    score.premium_days = days if days > 0 else (1 if hours >= 24 else hours)
     score.save(update_fields=["premium_days", "updated_at"])
-    return {"hours": hours, "days": 1 if hours >= 24 else 0, "text": label}
+    return {"hours": hours, "days": days if days > 0 else (1 if hours >= 24 else 0), "text": label}
 
 
 def _finalize_individual(g) -> dict:
@@ -932,7 +936,7 @@ def _finalize_teams(g) -> dict:
 
 def finalize_due_games(flavor=None) -> list:
     now = timezone.now()
-    qs = QuizGame.objects.exclude(status=QuizGame.STATUS_FINISHED).filter(ends_at__lt=now)
+    qs = QuizGame.objects.filter(rewarded=False, ends_at__lt=now)
     if flavor:
         qs = qs.filter(flavor=flavor)
     out = []
@@ -987,6 +991,10 @@ def state_payload(profile, flavor) -> dict:
     status, qi, phase, secs = _phase(g, now)
     nq = len(g.questions or [])
     finished = status == "finished"
+    if finished and not g.rewarded and g.ends_at and g.ends_at <= now:
+        finalize(g.id)
+        g.refresh_from_db()
+
     my = QuizScore.objects.filter(game=g, user=profile).first()
     has_prem = profile.has_active_premium() if profile else False
     payload = {

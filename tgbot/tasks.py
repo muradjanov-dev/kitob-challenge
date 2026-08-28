@@ -6181,35 +6181,6 @@ INTERACTIVE_PRIORITY_GAMES = [
     "mysterybox", "simurgh", "masnaviy", "gazzoliy",
 ]
 
-
-@shared_task
-def start_game_sequence(slot, count=3, pool=None):
-    """Kick off today's `slot` ('morning' 10:00, 'evening' 22:00, or 'vip_2230') sequence.
-    Heavily prioritizes interactive, non-standard gameplay over repetitive ABCD trivia."""
-    from tgbot.models import GameSequence
-
-    today = timezone.localdate()
-    is_vip = (slot == GameSequence.SLOT_VIP)
-
-    # 1. Stale previous days sequences auto-close
-    GameSequence.objects.filter(completed=False, date__lt=today).update(completed=True)
-
-    if not pool:
-        if is_vip:
-            pool = VIP_TOP_GAMES
-        else:
-            interactive_available = [g for g in INTERACTIVE_PRIORITY_GAMES if g in _GAME_LABELS_URLS]
-            other_quiz = [g for g in _QUIZ_FLAVORS if g not in INTERACTIVE_PRIORITY_GAMES]
-            
-            # Prioritize 85-90% interactive games
-            if random.random() < 0.9 or not other_quiz:
-                pool = random.sample(interactive_available, min(count, len(interactive_available)))
-            else:
-                p_int = random.sample(interactive_available, min(count - 1, len(interactive_available)))
-                p_oth = random.sample(other_quiz, 1)
-                pool = p_int + p_oth
-            random.shuffle(pool)
-
 @shared_task
 def start_emoji_game():
     from tgbot.services.emoji_game import create_scheduled_emoji, finalize_due_games, LEAD_SECONDS

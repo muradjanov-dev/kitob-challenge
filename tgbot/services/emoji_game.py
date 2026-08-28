@@ -176,7 +176,7 @@ def finalize(game_id: int) -> dict | None:
 def finalize_due_games() -> list:
     now = timezone.now()
     out = []
-    for g in EmojiGame.objects.exclude(status=EmojiGame.STATUS_FINISHED).filter(ends_at__lt=now):
+    for g in EmojiGame.objects.filter(rewarded=False, ends_at__lt=now):
         summary = finalize(g.id)
         if summary is not None:
             out.append((g, summary))
@@ -222,6 +222,10 @@ def state_payload(profile) -> dict:
     status, qi, phase, secs = _phase(g, now)
     nq = len(g.questions or [])
     finished = status == "finished"
+    if finished and not g.rewarded and g.ends_at and g.ends_at <= now:
+        finalize(g.id)
+        g.refresh_from_db()
+
     my = EmojiScore.objects.filter(game=g, user=profile).first()
     payload = {
         "ok": True, "status": status, "phase": phase, "game_id": g.id,

@@ -350,7 +350,7 @@ def finalize(game_id: int) -> dict | None:
 def finalize_due_games() -> list:
     now = timezone.now()
     out = []
-    for g in SurvivalGame.objects.exclude(status=SurvivalGame.STATUS_FINISHED).filter(ends_at__lt=now):
+    for g in SurvivalGame.objects.filter(rewarded=False, ends_at__lt=now):
         summary = finalize(g.id)
         if summary is not None:
             out.append((g, summary))
@@ -397,6 +397,12 @@ def state_payload(profile) -> dict:
     nq = len(g.questions or [])
     if status == "live":
         _ensure_lives_resolved(g, qi)
+
+    finished = status == "finished"
+    if finished and not g.rewarded and g.ends_at and g.ends_at <= now:
+        finalize(g.id)
+        g.refresh_from_db()
+
     my = SurvivalPlayer.objects.filter(game=g, user=profile).first()
 
     # Before joining (no SurvivalPlayer row yet), preview lives including any

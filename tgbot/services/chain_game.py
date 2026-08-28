@@ -292,7 +292,7 @@ def finalize(game_id: int) -> dict | None:
 def finalize_due_games() -> list:
     now = timezone.now()
     out = []
-    for g in ChainGame.objects.filter(status=ChainGame.STATUS_LIVE, ends_at__lt=now):
+    for g in ChainGame.objects.filter(rewarded=False, ends_at__lt=now):
         summary = finalize(g.id)
         if summary is not None:
             out.append((g, summary))
@@ -411,6 +411,11 @@ def state_payload(profile) -> dict:
         }
 
     finished = status == "finished"
+    if finished and not g.rewarded and g.ends_at and g.ends_at <= now:
+        finalize(g.id)
+        g.refresh_from_db()
+        my = ChainScore.objects.filter(game=g, user=profile).first()
+
     return {
         "ok": True,
         "status": status,
