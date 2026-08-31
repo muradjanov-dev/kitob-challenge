@@ -15,7 +15,7 @@ from django.db.models.functions import Greatest
 from django.utils import timezone
 
 from tgbot.models import CastleGame, CastleHit
-from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, ENTRY_FEE
+from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, ENTRY_FEE, request_finalize
 from tgbot.services.game_questions import CASTLE_QUESTIONS
 
 LEAD_SECONDS = 30
@@ -132,9 +132,18 @@ def finalize(game_id: int) -> dict | None:
         g = CastleGame.objects.select_for_update().get(id=game_id)
         already = g.rewarded
         victory = g.victory or g.boss_hp == 0
+        # Claim the game inside the row lock. `rewarded` used to be set only
+        # after the payout loop, outside the lock, so two overlapping ticks
+        # could both read already=False and both announce the same result.
+        claim = []
         if g.status != CastleGame.STATUS_FINISHED:
             g.status = CastleGame.STATUS_FINISHED
-            g.save(update_fields=["status", "updated_at"])
+            claim.append("status")
+        if not already:
+            g.rewarded = True
+            claim.append("rewarded")
+        if claim:
+            g.save(update_fields=claim + ["updated_at"])
     if already:
         return None
 
@@ -165,8 +174,6 @@ def finalize(game_id: int) -> dict | None:
             "reward": applied,
             "boosted": applied != reward,
         })
-    g.rewarded = True
-    g.save(update_fields=["rewarded", "updated_at"])
     rewarded.sort(key=lambda r: (-r["correct"], r.get("total_time", 0.0)))
     return {"victory": victory, "players": len(rewarded), "contributors": contributors,
             "winners": rewarded}
@@ -243,8 +250,7 @@ def state_payload(profile) -> dict:
 
     finished = status == "finished"
     if finished and not g.rewarded and g.ends_at and g.ends_at <= now:
-        finalize(g.id)
-        g.refresh_from_db()
+        request_finalize("castle", g.id, g.ends_at, finalize)
 
     payload = {
         "ok": True, "status": status, "game_id": g.id,

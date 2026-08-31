@@ -32,7 +32,7 @@ from django.db.models import F, Sum, Count, Max
 from django.utils import timezone
 
 from tgbot.models import QuizGame, QuizAnswer, QuizScore, GameJoker
-from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, REWARD_TIERS, PARTICIPATION
+from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, REWARD_TIERS, PARTICIPATION, request_finalize
 from tgbot.services import game_jokers
 from tgbot.services.game_questions import (
     QUIZ_TWOFACTS_QUESTIONS, QUIZ_IMPOSTOR_QUESTIONS, QUIZ_CONNECTION_QUESTIONS,
@@ -274,6 +274,59 @@ def _raw_pool(flavor):
     if flavor in _MAP:
         return _MAP[flavor]
     raise ValueError(f"unknown flavor {flavor}")
+
+
+def flavor_is_playable(flavor: str) -> bool:
+    """Can this flavor actually build a game in *this* process?
+
+    Only `cover` can answer no. It blurs real cover images at creation time,
+    and the media volume is mounted on the web service alone -- the Celery
+    worker, which is what starts every scheduled game, has no /app/media at
+    all. So picking `cover` for a slot guaranteed a FileNotFoundError, and
+    before `_advance_game_sequence` learned to skip a type it could not start,
+    that froze the whole slot: every sequence whose 2nd or 3rd game was
+    `cover` stopped dead with its first game's results already posted.
+
+    Checked at runtime rather than hardcoded, so the flavor comes back on its
+    own if the volume is ever readable from the worker. Cached for an hour --
+    slots only start twice a day.
+    """
+    if flavor != "cover":
+        return True
+
+    from django.core.cache import cache
+    key = "quiz_flavor_playable:cover"
+    try:
+        cached = cache.get(key)
+        if cached is not None:
+            return bool(cached)
+    except Exception:
+        pass
+
+    need = NUM_QUESTIONS["cover"]
+    readable = 0
+    try:
+        for item in _cover_raw_pool():
+            try:
+                with item["book"].cover.open("rb") as f:
+                    f.read(1)
+            except Exception:
+                continue
+            readable += 1
+            if readable >= need:
+                break
+    except Exception as e:
+        print(f"flavor_is_playable(cover): {e}")
+
+    ok = readable >= need
+    if not ok:
+        print(f"flavor_is_playable: cover unavailable here "
+              f"({readable}/{need} cover images readable)")
+    try:
+        cache.set(key, 1 if ok else 0, 3600)
+    except Exception:
+        pass
+    return ok
 
 
 def _cover_raw_pool():
@@ -801,9 +854,18 @@ def finalize(game_id: int) -> dict | None:
     with transaction.atomic():
         g = QuizGame.objects.select_for_update().get(id=game_id)
         already = g.rewarded
+        # Claim the game inside the row lock. `rewarded` used to be set only
+        # after the payout loop, outside the lock, so two overlapping ticks
+        # could both read already=False and both announce the same result.
+        claim = []
         if g.status != QuizGame.STATUS_FINISHED:
             g.status = QuizGame.STATUS_FINISHED
-            g.save(update_fields=["status", "updated_at"])
+            claim.append("status")
+        if not already:
+            g.rewarded = True
+            claim.append("rewarded")
+        if claim:
+            g.save(update_fields=claim + ["updated_at"])
     if already:
         return None
 
@@ -879,8 +941,6 @@ def _finalize_individual(g) -> dict:
             "premium_hours": prem_hours,
             "premium_text": prem_text,
         })
-    g.rewarded = True
-    g.save(update_fields=["rewarded", "updated_at"])
     return {"winners": winners, "players": len(scores)}
 
 
@@ -925,8 +985,6 @@ def _finalize_teams(g) -> dict:
             "time": round(s.effective_time, 1), "answered": s.answered_count,
             "premium_days": 0,
         })
-    g.rewarded = True
-    g.save(update_fields=["rewarded", "updated_at"])
     return {
         "winners": winners, "players": len(scores),
         "team_a_points": g.team_a_points, "team_b_points": g.team_b_points,
@@ -992,8 +1050,7 @@ def state_payload(profile, flavor) -> dict:
     nq = len(g.questions or [])
     finished = status == "finished"
     if finished and not g.rewarded and g.ends_at and g.ends_at <= now:
-        finalize(g.id)
-        g.refresh_from_db()
+        request_finalize(flavor, g.id, g.ends_at, finalize)
 
     my = QuizScore.objects.filter(game=g, user=profile).first()
     has_prem = profile.has_active_premium() if profile else False

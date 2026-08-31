@@ -14,7 +14,7 @@ from django.db.models import Sum, Count, Max
 from django.utils import timezone
 
 from tgbot.models import WisdomGame, WisdomAnswer, WisdomScore
-from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, REWARD_TIERS, PARTICIPATION
+from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, REWARD_TIERS, PARTICIPATION, request_finalize
 from tgbot.services.game_questions import WISDOM_QUESTIONS
 
 ENTRY_FEE = 0  # bepul (2026-08-19)
@@ -153,9 +153,18 @@ def finalize(game_id: int) -> dict | None:
     with transaction.atomic():
         g = WisdomGame.objects.select_for_update().get(id=game_id)
         already = g.rewarded
+        # Claim the game inside the row lock. `rewarded` used to be set only
+        # after the payout loop, outside the lock, so two overlapping ticks
+        # could both read already=False and both announce the same result.
+        claim = []
         if g.status != WisdomGame.STATUS_FINISHED:
             g.status = WisdomGame.STATUS_FINISHED
-            g.save(update_fields=["status", "updated_at"])
+            claim.append("status")
+        if not already:
+            g.rewarded = True
+            claim.append("rewarded")
+        if claim:
+            g.save(update_fields=claim + ["updated_at"])
     if already:
         return None
 
@@ -179,8 +188,6 @@ def finalize(game_id: int) -> dict | None:
             "best_streak": s.best_streak, "reward": applied,
             "time": round(s.total_time or 0.0, 1),
         })
-    g.rewarded = True
-    g.save(update_fields=["rewarded", "updated_at"])
     return {"winners": winners, "players": len(scores)}
 
 
@@ -234,8 +241,7 @@ def state_payload(profile) -> dict:
     nq = len(g.questions or [])
     finished = status == "finished"
     if finished and not g.rewarded and g.ends_at and g.ends_at <= now:
-        finalize(g.id)
-        g.refresh_from_db()
+        request_finalize("wisdom", g.id, g.ends_at, finalize)
 
     my = WisdomScore.objects.filter(game=g, user=profile).first()
     payload = {

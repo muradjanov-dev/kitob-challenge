@@ -5958,12 +5958,13 @@ def start_chain_game():
     """Create a fresh live Kitob Zanjiri and announce it to the reading groups
     with a button that opens the game Mini App (via /start zanjir)."""
     from tgbot.services.chain_game import (
-        create_scheduled_game, finalize_due_games, DEFAULT_DURATION_MIN, LEAD_SECONDS,
+        create_scheduled_game, DEFAULT_DURATION_MIN, LEAD_SECONDS,
     )
 
-    # Close out any previous game that never got finalized, then open a new one
-    # with a short lobby so players who just saw this post can get ready.
-    finalize_due_games()
+    # Open a new game with a short lobby so players who just saw this post can
+    # get ready. Any previous game is settled by chain_game_tick, never here:
+    # finalizing at start time banks the rewards but drops the summary, which
+    # is what posts results, DMs winners and advances the daily sequence.
     game = create_scheduled_game()
 
     username = _get_bot_username()
@@ -6100,8 +6101,11 @@ def _announce_game(text, start_param):
 
 @shared_task
 def start_feud_game():
-    from tgbot.services.feud_game import create_scheduled_feud, finalize_due_games, LEAD_SECONDS
-    finalize_due_games()
+    from tgbot.services.feud_game import create_scheduled_feud, LEAD_SECONDS
+    # NOTE: the previous game of this type is settled by games_finalize_tick /
+    # chain_game_tick, never here. Calling finalize_due_games() at start time
+    # would bank the rewards but throw the summary away, so the results post,
+    # the winner DMs and _advance_game_sequence() would all be skipped.
     game = create_scheduled_feud()
     text = (
         "🗣 <b>KO'PCHILIK NIMA DEDI?</b>\n\n"
@@ -6117,8 +6121,11 @@ def start_feud_game():
 
 @shared_task
 def start_castle_game():
-    from tgbot.services.castle_game import create_scheduled_castle, finalize_due_games, LEAD_SECONDS
-    finalize_due_games()
+    from tgbot.services.castle_game import create_scheduled_castle, LEAD_SECONDS
+    # NOTE: the previous game of this type is settled by games_finalize_tick /
+    # chain_game_tick, never here. Calling finalize_due_games() at start time
+    # would bank the rewards but throw the summary away, so the results post,
+    # the winner DMs and _advance_game_sequence() would all be skipped.
     game = create_scheduled_castle()
     text = (
         "🏰 <b>BILIM QAL'ASI</b> — jamoaviy jang!\n\n"
@@ -6183,8 +6190,11 @@ INTERACTIVE_PRIORITY_GAMES = [
 
 @shared_task
 def start_emoji_game():
-    from tgbot.services.emoji_game import create_scheduled_emoji, finalize_due_games, LEAD_SECONDS
-    finalize_due_games()
+    from tgbot.services.emoji_game import create_scheduled_emoji, LEAD_SECONDS
+    # NOTE: the previous game of this type is settled by games_finalize_tick /
+    # chain_game_tick, never here. Calling finalize_due_games() at start time
+    # would bank the rewards but throw the summary away, so the results post,
+    # the winner DMs and _advance_game_sequence() would all be skipped.
     game = create_scheduled_emoji()
     text = (
         "🎬 <b>EMOJI KITOB</b> — emojidan kitobni top!\n\n"
@@ -6201,8 +6211,11 @@ def start_emoji_game():
 
 @shared_task
 def start_wisdom_game():
-    from tgbot.services.wisdom_game import create_scheduled_wisdom, finalize_due_games, LEAD_SECONDS, ENTRY_FEE
-    finalize_due_games()
+    from tgbot.services.wisdom_game import create_scheduled_wisdom, LEAD_SECONDS, ENTRY_FEE
+    # NOTE: the previous game of this type is settled by games_finalize_tick /
+    # chain_game_tick, never here. Calling finalize_due_games() at start time
+    # would bank the rewards but throw the summary away, so the results post,
+    # the winner DMs and _advance_game_sequence() would all be skipped.
     game = create_scheduled_wisdom()
     text = (
         "☪️ <b>HIKMAT XAZINASI</b> — kim aytgan?\n\n"
@@ -6219,8 +6232,11 @@ def start_wisdom_game():
 
 @shared_task
 def start_detective_game():
-    from tgbot.services.detective_game import create_scheduled_detective, finalize_due_games, LEAD_SECONDS, ENTRY_FEE
-    finalize_due_games()
+    from tgbot.services.detective_game import create_scheduled_detective, LEAD_SECONDS, ENTRY_FEE
+    # NOTE: the previous game of this type is settled by games_finalize_tick /
+    # chain_game_tick, never here. Calling finalize_due_games() at start time
+    # would bank the rewards but throw the summary away, so the results post,
+    # the winner DMs and _advance_game_sequence() would all be skipped.
     game = create_scheduled_detective()
     text = (
         "📖 <b>KITOB DETEKTIVI</b> — maxfiy kitobni top!\n\n"
@@ -6237,8 +6253,11 @@ def start_detective_game():
 
 @shared_task
 def start_survival_game():
-    from tgbot.services.survival_game import create_scheduled_survival, finalize_due_games, LEAD_SECONDS, ENTRY_FEE
-    finalize_due_games()
+    from tgbot.services.survival_game import create_scheduled_survival, LEAD_SECONDS, ENTRY_FEE
+    # NOTE: the previous game of this type is settled by games_finalize_tick /
+    # chain_game_tick, never here. Calling finalize_due_games() at start time
+    # would bank the rewards but throw the summary away, so the results post,
+    # the winner DMs and _advance_game_sequence() would all be skipped.
     game = create_scheduled_survival()
     text = (
         "💀 <b>OMON QOLISH</b> — elimination o'yin!\n\n"
@@ -6253,8 +6272,11 @@ def start_survival_game():
 
 
 def _start_quiz_flavor(flavor, is_vip=False):
-    from tgbot.services.quiz_game import create_scheduled_quiz, finalize_due_games, LEAD_SECONDS, ENTRY_FEES, TITLES
-    finalize_due_games(flavor)
+    from tgbot.services.quiz_game import create_scheduled_quiz, LEAD_SECONDS, ENTRY_FEES, TITLES
+    # NOTE: the previous game of this type is settled by games_finalize_tick /
+    # chain_game_tick, never here. Calling finalize_due_games() at start time
+    # would bank the rewards but throw the summary away, so the results post,
+    # the winner DMs and _advance_game_sequence() would all be skipped.
     game = create_scheduled_quiz(flavor, is_vip=is_vip)
     texts = {
         "twofacts": (
@@ -6434,7 +6456,9 @@ def start_game_sequence(slot, count=3, pool=None):
     GameSequence.objects.filter(completed=False, date__lt=today).update(completed=True)
 
     if not pool:
-        all_quiz = list(_QUIZ_FLAVORS)
+        from tgbot.services.quiz_game import flavor_is_playable
+        # Never draw a flavor this process cannot build (see flavor_is_playable).
+        all_quiz = [f for f in _QUIZ_FLAVORS if flavor_is_playable(f)]
         base_games = ["chain", "feud", "castle", "emoji", "wisdom", "detective", "survival"]
         if is_vip:
             pool = VIP_TOP_GAMES
@@ -6472,7 +6496,10 @@ def start_game_sequence(slot, count=3, pool=None):
         print(f"start_game_sequence: {slot} sequence {seq.game_types}, starting {first_type} #{game.id} (is_vip={is_vip})")
     else:
         print(f"start_game_sequence: failed to start {first_type}, auto-advancing...")
-        _advance_game_sequence(first_type, None)
+        seq.current_game_type = first_type
+        seq.current_game_id = None
+        seq.save(update_fields=["current_game_type", "current_game_id", "updated_at"])
+        _advance_game_sequence(first_type, None, seq=seq)
 
 
 @shared_task
@@ -6507,53 +6534,92 @@ def start_special_evening_event(count=5, bonus_count=2):
     start_game_sequence("evening", count=count, pool=NEW_GAME_TYPES)
 
 
-def _advance_game_sequence(game_type, game_id=None):
+def _complete_game_sequence(seq):
+    """Mark `seq` finished and run the end-of-slot hooks."""
+    from tgbot.models import GameSequence
+
+    seq.completed = True
+    seq.current_index = len(seq.game_types)
+    seq.save(update_fields=["completed", "current_index", "updated_at"])
+    print(f"_advance_game_sequence: {seq.slot}/{seq.date} sequence complete")
+    if seq.slot != GameSequence.SLOT_EVENING:
+        return
+    try:
+        announce_top_game_players()
+    except Exception as e:
+        print(f"_advance_game_sequence announce_top_game_players error: {e}")
+    try:
+        start_vip_premium_evening_event.delay()
+    except Exception as e:
+        print(f"_advance_game_sequence start_vip_premium_evening_event delay error: {e}")
+        try:
+            start_vip_premium_evening_event()
+        except Exception as e2:
+            print(f"_advance_game_sequence sync start error: {e2}")
+
+
+def _advance_game_sequence(game_type, game_id=None, seq=None):
     """If `game_id` (of `game_type`) was the current step of a live daily
     sequence, start the next game type in line — or mark the sequence
-    completed once all have run."""
+    completed once all have run.
+
+    Pass `seq` when the caller already knows which sequence it is holding
+    (a freshly created one whose first game failed to start, or the watchdog's
+    own row). Without it we only match on `current_game_type`/`current_game_id`
+    — never "any open sequence today", which used to let one slot's finished
+    game advance the other slot's."""
     from tgbot.models import GameSequence
 
     today = timezone.localdate()
-    qs = GameSequence.objects.filter(completed=False, date=today)
-    if game_id:
-        seq = qs.filter(current_game_type=game_type, current_game_id=game_id).first()
-    else:
-        seq = qs.filter(current_game_type=game_type).first() or qs.first()
+    if seq is None:
+        qs = GameSequence.objects.filter(completed=False, date=today)
+        if game_id:
+            seq = qs.filter(current_game_type=game_type, current_game_id=game_id).first()
+        else:
+            seq = qs.filter(current_game_type=game_type).first()
 
-    if not seq:
+    if not seq or seq.completed:
         return
 
-    next_index = seq.current_index + 1
-    if next_index >= len(seq.game_types):
-        seq.completed = True
-        seq.current_index = next_index
-        seq.save(update_fields=["completed", "current_index", "updated_at"])
-        print(f"_advance_game_sequence: {seq.slot}/{seq.date} sequence complete")
-        if seq.slot == GameSequence.SLOT_EVENING:
-            try:
-                announce_top_game_players()
-            except Exception as e:
-                print(f"_advance_game_sequence announce_top_game_players error: {e}")
-            try:
-                start_vip_premium_evening_event.delay()
-            except Exception as e:
-                print(f"_advance_game_sequence start_vip_premium_evening_event delay error: {e}")
-                try:
-                    start_vip_premium_evening_event()
-                except Exception as e2:
-                    print(f"_advance_game_sequence sync start error: {e2}")
-        return
-
-    next_type = seq.game_types[next_index]
     is_vip = (seq.slot == GameSequence.SLOT_VIP)
-    game = _start_game_safely(next_type, is_vip=is_vip)
-    seq.current_index = next_index
-    seq.current_game_type = next_type
-    seq.current_game_id = game.id if game else None
-    seq.save(update_fields=[
-        "current_index", "current_game_type", "current_game_id", "updated_at",
-    ])
-    print(f"_advance_game_sequence: {seq.slot}/{seq.date} advancing to {next_type} #{getattr(game, 'id', None)} (is_vip={is_vip})")
+
+    # Walk forward until something actually starts. A type whose starter throws
+    # (empty question bank, bad catalog data) must not park the sequence on
+    # `current_game_id = None`, because the watchdog would then retry that same
+    # broken type every minute and the slot would never reach its later games.
+    next_index = seq.current_index + 1
+    while next_index < len(seq.game_types):
+        next_type = seq.game_types[next_index]
+        game = _start_game_safely(next_type, is_vip=is_vip)
+        if game:
+            seq.current_index = next_index
+            seq.current_game_type = next_type
+            seq.current_game_id = game.id
+            seq.save(update_fields=[
+                "current_index", "current_game_type", "current_game_id", "updated_at",
+            ])
+            print(f"_advance_game_sequence: {seq.slot}/{seq.date} advancing to "
+                  f"{next_type} #{game.id} (is_vip={is_vip})")
+            return
+        print(f"_advance_game_sequence: {seq.slot}/{seq.date} could not start "
+              f"{next_type}, skipping to the next game type")
+        next_index += 1
+
+    _complete_game_sequence(seq)
+
+
+# How far behind a slot may fall and still be resumed. The watchdog normally
+# catches a finished game within a minute, so anything older than this means the
+# whole slot was missed (worker down, deploy, broker outage). Quietly closing it
+# beats dumping two surprise games and a VIP arena into the groups at midnight.
+SEQUENCE_RESUME_GRACE_SECONDS = 30 * 60
+
+
+def _sequence_is_stale(seq, ended_at, now):
+    """True when this slot fell so far behind that resuming it would be worse
+    than dropping it."""
+    reference = ended_at or seq.updated_at
+    return bool(reference and (now - reference).total_seconds() > SEQUENCE_RESUME_GRACE_SECONDS)
 
 
 def _auto_recover_game_sequences():
@@ -6582,6 +6648,12 @@ def _auto_recover_game_sequences():
         gid = seq.current_game_id
 
         if not gid or not gt:
+            if _sequence_is_stale(seq, None, now):
+                print(f"_auto_recover_game_sequences: {seq.slot}/{seq.date} never got "
+                      f"a game going and is too old to start one now; closing it")
+                seq.completed = True
+                seq.save(update_fields=["completed", "updated_at"])
+                continue
             first_type = seq.game_types[seq.current_index]
             is_vip = (seq.slot == GameSequence.SLOT_VIP)
             game = _start_game_safely(first_type, is_vip=is_vip)
@@ -6589,49 +6661,75 @@ def _auto_recover_game_sequences():
                 seq.current_game_type = first_type
                 seq.current_game_id = game.id
                 seq.save(update_fields=["current_game_type", "current_game_id", "updated_at"])
+            else:
+                # Retrying a type that will not start just burns a minute every
+                # minute for the rest of the day -- move the slot on instead.
+                print(f"_auto_recover_game_sequences: {seq.slot} cannot start "
+                      f"{first_type}, advancing past it")
+                seq.current_game_type = first_type
+                seq.save(update_fields=["current_game_type", "updated_at"])
+                _advance_game_sequence(first_type, None, seq=seq)
             continue
 
         # Check if the currently registered game has ended
         is_finished = False
+        ended_at = None
         try:
             if gt == "chain":
                 g = ChainGame.objects.filter(id=gid).first()
                 if not g or g.status == ChainGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
                     is_finished = True
+                    ended_at = g.ends_at if g else None
             elif gt == "feud":
                 g = FeudGame.objects.filter(id=gid).first()
                 if not g or g.status == FeudGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
                     is_finished = True
+                    ended_at = g.ends_at if g else None
             elif gt == "castle":
                 g = CastleGame.objects.filter(id=gid).first()
                 if not g or g.status == CastleGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
                     is_finished = True
+                    ended_at = g.ends_at if g else None
             elif gt == "emoji":
                 g = EmojiGame.objects.filter(id=gid).first()
                 if not g or g.status == EmojiGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
                     is_finished = True
+                    ended_at = g.ends_at if g else None
             elif gt == "wisdom":
                 g = WisdomGame.objects.filter(id=gid).first()
                 if not g or g.status == WisdomGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
                     is_finished = True
+                    ended_at = g.ends_at if g else None
             elif gt == "detective":
                 g = DetectiveGame.objects.filter(id=gid).first()
                 if not g or g.status == DetectiveGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
                     is_finished = True
+                    ended_at = g.ends_at if g else None
             elif gt == "survival":
                 g = SurvivalGame.objects.filter(id=gid).first()
                 if not g or g.status == SurvivalGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
                     is_finished = True
+                    ended_at = g.ends_at if g else None
             else:
                 g = QuizGame.objects.filter(id=gid).first()
                 if not g or g.status == QuizGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
                     is_finished = True
+                    ended_at = g.ends_at if g else None
         except Exception as e:
             print(f"_auto_recover_game_sequences check {gt}#{gid} error: {e}")
 
-        if is_finished:
-            print(f"_auto_recover_game_sequences: {seq.slot} game {gt}#{gid} has ended, advancing sequence...")
-            _advance_game_sequence(gt, gid)
+        if not is_finished:
+            continue
+
+        if _sequence_is_stale(seq, ended_at, now):
+            print(f"_auto_recover_game_sequences: {seq.slot}/{seq.date} fell too far "
+                  f"behind after {gt}#{gid}; closing it instead of resuming")
+            seq.completed = True
+            seq.save(update_fields=["completed", "updated_at"])
+            continue
+
+        print(f"_auto_recover_game_sequences: {seq.slot} game {gt}#{gid} has ended, advancing sequence...")
+        _advance_game_sequence(gt, gid, seq=seq)
 
 
 @shared_task

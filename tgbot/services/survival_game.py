@@ -20,7 +20,7 @@ from django.db.models import F
 from tgbot.models import (
     SurvivalGame, SurvivalPlayer, SurvivalAnswer, TelegramProfile, GameJoker,
 )
-from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, PARTICIPATION
+from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, PARTICIPATION, request_finalize
 from tgbot.services import game_jokers
 from tgbot.services.game_questions import SURVIVAL_QUESTIONS
 
@@ -289,9 +289,18 @@ def finalize(game_id: int) -> dict | None:
     with transaction.atomic():
         g = SurvivalGame.objects.select_for_update().get(id=game_id)
         already = g.rewarded
+        # Claim the game inside the row lock. `rewarded` used to be set only
+        # after the payout loop, outside the lock, so two overlapping ticks
+        # could both read already=False and both announce the same result.
+        claim = []
         if g.status != SurvivalGame.STATUS_FINISHED:
             g.status = SurvivalGame.STATUS_FINISHED
-            g.save(update_fields=["status", "updated_at"])
+            claim.append("status")
+        if not already:
+            g.rewarded = True
+            claim.append("rewarded")
+        if claim:
+            g.save(update_fields=claim + ["updated_at"])
     if already:
         return None
 
@@ -342,8 +351,6 @@ def finalize(game_id: int) -> dict | None:
                 })
 
     winners.sort(key=lambda w: (-w["survived"], -w["correct"], w.get("total_time", 0.0)))
-    g.rewarded = True
-    g.save(update_fields=["rewarded", "updated_at"])
     return {"winners": winners, "players": len(players), "survivors": len(survivors)}
 
 
@@ -400,8 +407,7 @@ def state_payload(profile) -> dict:
 
     finished = status == "finished"
     if finished and not g.rewarded and g.ends_at and g.ends_at <= now:
-        finalize(g.id)
-        g.refresh_from_db()
+        request_finalize("survival", g.id, g.ends_at, finalize)
 
     my = SurvivalPlayer.objects.filter(game=g, user=profile).first()
 

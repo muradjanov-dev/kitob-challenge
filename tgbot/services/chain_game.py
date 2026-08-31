@@ -48,6 +48,62 @@ def _add_ball_reward(user, amount: int) -> int:
     return user.update_ball(True, amount)
 
 
+# Seconds a finished game is given to be settled by the Celery tick before a
+# web page-view settles it itself. See request_finalize() below.
+FINALIZE_GRACE_SECONDS = 300
+
+
+def request_finalize(kind: str, game_id: int, ends_at=None, finalize_fn=None) -> None:
+    """Ask the Celery tick to settle a game whose clock has just run out,
+    instead of settling it inline inside a web request.
+
+    Every engine's `state_payload()` is polled roughly once a second by every
+    open page, so the first poll after the last question is the earliest
+    moment anyone notices the game is over. It used to call `finalize()` right
+    there. That banked the Kitobcha, but it also burned the one-shot
+    `rewarded` guard, so when `games_finalize_tick` ran a few seconds later it
+    found nothing due and skipped the three things only it does: post the
+    results to the groups, DM each winner their `+N Kitobcha`, and call
+    `_advance_game_sequence()`. Losing that last one froze the daily 10:00 /
+    22:00 slot on its first game -- games #2 and #3 never started, and every
+    GameSequence since 2026-08-29 sat at current_index=0 forever.
+
+    So the finish sequence keeps a single owner. This only nudges the tick to
+    run now rather than at the top of the next minute, deduped through the
+    cache so a room full of pollers queues one task, not hundreds.
+
+    `finalize_fn` is the last resort: if the tick has had FINALIZE_GRACE_SECONDS
+    and still hasn't settled the game (broker down, worker dead), settle it
+    here so players are paid even though the announcement is lost. The
+    sequence still recovers -- `_auto_recover_game_sequences` advances on the
+    game's clock, not on who rewarded it.
+    """
+    from django.core.cache import cache
+
+    kick = True
+    try:
+        kick = bool(cache.add(f"finalize_kick:{kind}:{game_id}", 1, 45))
+    except Exception:
+        pass  # cache down -- fall through and just queue the task
+
+    if kick:
+        try:
+            from tgbot.tasks import chain_game_tick, games_finalize_tick
+            (chain_game_tick if kind == "chain" else games_finalize_tick).delay()
+        except Exception as e:
+            print(f"request_finalize: queueing tick for {kind}#{game_id} failed: {e}")
+
+    if finalize_fn and ends_at:
+        overdue = (timezone.now() - ends_at).total_seconds()
+        if overdue > FINALIZE_GRACE_SECONDS:
+            print(f"request_finalize: {kind}#{game_id} unsettled {int(overdue)}s "
+                  f"after ending -- finalizing inline")
+            try:
+                finalize_fn(game_id)
+            except Exception as e:
+                print(f"request_finalize: inline finalize {kind}#{game_id} failed: {e}")
+
+
 def charge_entry_fee(profile, amount: int = ENTRY_FEE) -> bool:
     """Deduct `amount` Kitobcha from profile.ball if affordable (defaults to
     ENTRY_FEE=25). Shared by every live game so the join-cost logic is
@@ -243,9 +299,18 @@ def finalize(game_id: int) -> dict | None:
         if g.pending:
             g.pending = None
             g.save(update_fields=["pending", "updated_at"])
+        # Claim the game inside the row lock. `rewarded` used to be set only
+        # after the payout loop, outside the lock, so two overlapping ticks
+        # could both read already=False and both announce the same result.
+        claim = []
         if g.status != ChainGame.STATUS_FINISHED:
             g.status = ChainGame.STATUS_FINISHED
-            g.save(update_fields=["status", "updated_at"])
+            claim.append("status")
+        if not already:
+            g.rewarded = True
+            claim.append("rewarded")
+        if claim:
+            g.save(update_fields=claim + ["updated_at"])
     if already:
         return None
 
@@ -284,8 +349,6 @@ def finalize(game_id: int) -> dict | None:
             "time": round(s.total_time or 0.0, 1),
         })
 
-    g.rewarded = True
-    g.save(update_fields=["rewarded", "updated_at"])
     return {"winners": winners, "players": len(scores), "links": len(g.chain or [])}
 
 
@@ -412,9 +475,7 @@ def state_payload(profile) -> dict:
 
     finished = status == "finished"
     if finished and not g.rewarded and g.ends_at and g.ends_at <= now:
-        finalize(g.id)
-        g.refresh_from_db()
-        my = ChainScore.objects.filter(game=g, user=profile).first()
+        request_finalize("chain", g.id, g.ends_at, finalize)
 
     return {
         "ok": True,
