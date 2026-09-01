@@ -5959,6 +5959,7 @@ def start_chain_game():
     with a button that opens the game Mini App (via /start zanjir)."""
     from tgbot.services.chain_game import (
         create_scheduled_game, DEFAULT_DURATION_MIN, LEAD_SECONDS,
+        REWARD_TIERS, PARTICIPATION,
     )
 
     # Open a new game with a short lobby so players who just saw this post can
@@ -5981,9 +5982,10 @@ def start_chain_game():
         "📖 Kitob nomidan tushib qolgan <b>1 yoki 2 ta harfni</b> birinchi bo'lib "
         "topgan ochko oladi — va zanjir darhol yangi kitobga o'tadi!\n\n"
         "🎁 <b>Kirish BEPUL!</b>\n"
-        "🏆 Ochko olganlar mukofot oladi (1/2/3-o'rin: <b>300/200/100 🪙</b>); "
-        "bekorchi kirish haqini yo'qotadi.\n"
+        f"🏆 1/2/3-o'rin: <b>{REWARD_TIERS[0]}/{REWARD_TIERS[1]}/{REWARD_TIERS[2]} 🪙</b>, "
+        f"ochko olgan qolganlarga <b>{PARTICIPATION} 🪙</b>.\n"
         "👇 Hoziroq kiring:"
+        + PREMIUM_2X_NOTE
     )
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     for group_id, thread_id in _game_targets():
@@ -6014,6 +6016,7 @@ def chain_game_tick():
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     medals = ["🥇", "🥈", "🥉"]
+    prem_ids = _premium_ids_safe()
     for game, summary in results:
         winners = summary.get("winners", [])
         lines = [
@@ -6054,6 +6057,7 @@ def chain_game_tick():
                         f"🎉 Kitob Zanjirida <b>{w['rank']}-o'rin</b>!\n"
                         f"🪙 <b>+{w['reward']} Kitobcha</b> qo'shildi.\n"
                         f"Ballaringiz: {w['points']} · Topilgan kitoblar: {w['links']}"
+                        + _premium_missed_line(w, prem_ids)
                     ),
                     "parse_mode": "HTML",
                 }, timeout=8)
@@ -6066,11 +6070,23 @@ def chain_game_tick():
 # ────────────────────────────────────────────────────────────────────────
 # Ko'pchilik nima dedi? (Feud) + Bilim Qal'asi (Castle) — start & finalize.
 # ────────────────────────────────────────────────────────────────────────
+# Every live game pays Premium members double (TelegramProfile.update_ball, via
+# chain_game._add_ball_reward). That was true but invisible: the announcements
+# quoted one set of numbers and said nothing about the multiplier, so the
+# clearest reason to hold Premium never reached the people deciding whether to
+# buy it. Appended to every game announcement rather than repeated in each
+# engine's own copy.
+PREMIUM_2X_NOTE = "\n\n💎 <i>Premium a'zolar bu o'yinda <b>2 barobar</b> Kitobcha oladi.</i>"
+
+
 def _announce_game(text, start_param):
     from datetime import timedelta
     from django.utils import timezone
     from tgbot.models import ScheduledMessageDeletion
 
+    # Pointless in the VIP arena — everyone in there is already Premium.
+    if PREMIUM_2X_NOTE not in text and "VIP PREMIUM ARENA" not in text:
+        text += PREMIUM_2X_NOTE
     username = _get_bot_username()
     rows = []
     if username:
@@ -6741,6 +6757,9 @@ def games_finalize_tick():
     from tgbot.services import feud_game, castle_game, emoji_game
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     medals = ["🥇", "🥈", "🥉"]
+    # Read once per tick, not once per winner: every non-Premium winner's DM
+    # closes with what the same game would have paid at the Premium 2x rate.
+    prem_ids = _premium_ids_safe()
 
     # 1. Feud
     try:
@@ -6771,7 +6790,9 @@ def games_finalize_tick():
                     continue
                 try:
                     requests.post(url, data={"chat_id": w["telegram_id"],
-                        "text": f"🗣 Ko'pchilik nima dedi? — <b>{w['rank']}-o'rin</b>!\n🪙 <b>+{w['reward']} Kitobcha</b> · Ball: {w['points']}",
+                        "text": (f"🗣 Ko'pchilik nima dedi? — <b>{w['rank']}-o'rin</b>!\n"
+                                 f"🪙 <b>+{w['reward']} Kitobcha</b> · Ball: {w['points']}"
+                                 + _premium_missed_line(w, prem_ids)),
                         "parse_mode": "HTML"}, timeout=8)
                 except Exception:
                     pass
@@ -6804,7 +6825,9 @@ def games_finalize_tick():
                     continue
                 try:
                     requests.post(url, data={"chat_id": w["telegram_id"],
-                        "text": f"🏰 Bilim Qal'asi: <b>+{w['reward']} Kitobcha</b>! To'g'ri javoblar: {w['correct']}",
+                        "text": (f"🏰 Bilim Qal'asi: <b>+{w['reward']} Kitobcha</b>! "
+                                 f"To'g'ri javoblar: {w['correct']}"
+                                 + _premium_missed_line(w, prem_ids)),
                         "parse_mode": "HTML"}, timeout=8)
                 except Exception:
                     pass
@@ -6840,7 +6863,9 @@ def games_finalize_tick():
                     continue
                 try:
                     requests.post(url, data={"chat_id": w["telegram_id"],
-                        "text": f"🎬 Emoji Kitob — <b>{w['rank']}-o'rin</b>!\n🪙 <b>+{w['reward']} Kitobcha</b> · Ball: {w['points']}",
+                        "text": (f"🎬 Emoji Kitob — <b>{w['rank']}-o'rin</b>!\n"
+                                 f"🪙 <b>+{w['reward']} Kitobcha</b> · Ball: {w['points']}"
+                                 + _premium_missed_line(w, prem_ids)),
                         "parse_mode": "HTML"}, timeout=8)
                 except Exception:
                     pass
@@ -6904,7 +6929,13 @@ def _broadcast_and_dm(header_lines, winners, dm_text_fn, dm_markup_fn=None):
     `dm_text_fn(winner) -> str`. Shared by the new games' finalize announcements.
 
     `dm_markup_fn(winner)` may return a JSON inline keyboard (or None) so a
-    single DM can carry an upsell button without every caller needing one."""
+    single DM can carry an upsell button without every caller needing one.
+
+    Every non-Premium winner's DM automatically gets the "you would have earned
+    double" line appended (see `_premium_missed_line`). It used to be spelled
+    out by hand in `_finalize_quiz_flavor` only, so the 2x multiplier -- the
+    single most concrete reason to buy Premium -- went unmentioned in the seven
+    other engines. Callers must not add it themselves any more."""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     text = _trim_telegram("\n".join(header_lines))
     if not _is_admin_only(winners):
@@ -6917,16 +6948,19 @@ def _broadcast_and_dm(header_lines, winners, dm_text_fn, dm_markup_fn=None):
                 requests.post(url, data=data, timeout=10)
             except Exception:
                 pass
+    prem_ids = _premium_ids_safe()
     for w in winners:
         if not w.get("reward"):
             continue
         try:
-            payload = {"chat_id": w["telegram_id"], "text": dm_text_fn(w),
+            payload = {"chat_id": w["telegram_id"],
+                       "text": dm_text_fn(w) + _premium_missed_line(w, prem_ids),
                        "parse_mode": "HTML"}
-            if dm_markup_fn:
-                markup = dm_markup_fn(w)
-                if markup:
-                    payload["reply_markup"] = markup
+            markup = dm_markup_fn(w) if dm_markup_fn else None
+            if markup is None and w.get("user_id") not in prem_ids:
+                markup = _trial_premium_expiry_markup()
+            if markup:
+                payload["reply_markup"] = markup
             requests.post(url, data=payload, timeout=8)
         except Exception:
             pass
@@ -7109,15 +7143,13 @@ def _finalize_quiz_flavor(flavor):
                 + " yutdi — siz esa qatnasha olmadingiz.</i>"
             )
         try:
-            prem_ids = _premium_ids_safe()
+            # The "you'd have earned double" line and the upsell button are
+            # added for every non-Premium winner inside _broadcast_and_dm.
             _broadcast_and_dm(lines, winners, lambda w: (
                 f"{emoji_} {title} — <b>+{w['reward']} Kitobcha</b>! Ball: {w['points']}"
                 f"{_scoreline(w)}"
                 + (f"\n💎 Sizga <b>{w.get('premium_text') or (str(w.get('premium_days', '')) + ' kun')} BEPUL Premium</b> ham berildi — "
                    "barcha VIP imtiyozlar faol!" if (w.get("premium_text") or w.get("premium_days")) else "")
-                + _premium_missed_line(w, prem_ids)
-            ), dm_markup_fn=lambda w: (
-                None if w.get("user_id") in prem_ids else _trial_premium_expiry_markup()
             ))
         except Exception as e:
             # Rewards are already banked at this point -- a failed announcement
