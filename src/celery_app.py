@@ -148,6 +148,20 @@ app.conf.beat_schedule = {
     # chain-game-tick / games-finalize-tick below). Entry fee is a flat 25
     # Kitobcha regardless of which game is live. Admins can still start any
     # specific game anytime via the management commands.
+    # Teaser DM 10 minutes ahead of each slot. DM only -- the groups get the
+    # real announcement at slot time. This deliberately raises the documented
+    # 3-DM/day cap below to 5 for a non-reporting user; it was asked for so
+    # readers who are not watching the groups still hear the games starting.
+    'games-teaser-morning': {
+        'task': 'tgbot.tasks.send_game_teaser',
+        'schedule': crontab(hour=9, minute=50),
+        'args': ('morning',),
+    },
+    'games-teaser-evening': {
+        'task': 'tgbot.tasks.send_game_teaser',
+        'schedule': crontab(hour=21, minute=50),
+        'args': ('evening',),
+    },
     'games-random-morning': {
         'task': 'tgbot.tasks.start_game_sequence',
         'schedule': crontab(hour=10, minute=0),

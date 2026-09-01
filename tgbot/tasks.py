@@ -6070,6 +6070,114 @@ def chain_game_tick():
 # ────────────────────────────────────────────────────────────────────────
 # Ko'pchilik nima dedi? (Feud) + Bilim Qal'asi (Castle) — start & finalize.
 # ────────────────────────────────────────────────────────────────────────
+# ── Pre-game teaser DM ───────────────────────────────────────────────────
+# Sent ~10 minutes before each live-game slot. DM only, never a group post:
+# the groups already get the real announcement at slot time, and the point of
+# this one is to pull people who are not watching the groups back in.
+#
+# NOTE ON THE DM BUDGET: celery_app.py documents a hard cap of 3 reminder DMs
+# per user per day. This adds up to 2 more (09:50 and 21:50), so a
+# non-reporting user can now see 5. That was a deliberate product call, not an
+# oversight -- see the commit that introduced it.
+GAME_TEASER_LEAD_MINUTES = 10
+
+
+def _teaser_group_buttons():
+    """Group links for the teaser DM.
+
+    Prefers whatever an admin stored on RequiredGroup, then falls back to what
+    Telegram itself reports for each game chat (`getChat` -> public @username,
+    or the primary invite link). `exportChatInviteLink` is deliberately NOT
+    used: it revokes the group's existing primary link as a side effect.
+    """
+    from tgbot.models import RequiredGroup
+
+    seen, rows = set(), []
+    for link in (RequiredGroup.objects
+                 .exclude(invite_link__isnull=True).exclude(invite_link__exact="")
+                 .values_list("invite_link", flat=True)):
+        if link not in seen:
+            seen.add(link)
+            rows.append([{"text": "\U0001f4da Guruhga kirish", "url": link}])
+
+    if not rows:
+        api = f"https://api.telegram.org/bot{BOT_TOKEN}/getChat"
+        for chat_id, _thread in _game_targets():
+            try:
+                res = requests.get(api, params={"chat_id": chat_id}, timeout=8).json()
+                if not res.get("ok"):
+                    continue
+                chat = res["result"]
+                url = (f"https://t.me/{chat['username']}" if chat.get("username")
+                       else chat.get("invite_link"))
+                if not url or url in seen:
+                    continue
+                seen.add(url)
+                rows.append([{"text": f"\U0001f4da {chat.get('title') or 'Guruh'}"[:60], "url": url}])
+            except Exception as e:
+                print(f"_teaser_group_buttons {chat_id}: {e}")
+    return json.dumps({"inline_keyboard": rows}) if rows else None
+
+
+def _game_teaser_text(slot):
+    """The teaser itself. Which three games run is genuinely undecided until
+    start_game_sequence draws them at slot time, so the suspense is real."""
+    from tgbot.services.chain_game import REWARD_TIERS, PARTICIPATION
+
+    when = "22:00" if slot == "evening" else "10:00"
+    head = ("\U0001f319 <b>KECHKI O'YINLAR BOSHLANISHIGA 10 DAQIQA!</b>"
+            if slot == "evening" else
+            "\u2600\ufe0f <b>KUNDUZGI O'YINLAR BOSHLANISHIGA 10 DAQIQA!</b>")
+    return (
+        f"{head}\n\n"
+        f"Bugun <b>3 ta o'yin</b> ketma-ket o'tadi \u2014 qaysilari ekani hali "
+        f"<b>sir</b>. 70 dan ortiq o'yin ichidan qaysi uchtasi chiqishini "
+        f"hozircha hech kim bilmaydi \U0001f60f\n\n"
+        f"\U0001fa99 1/2/3-o'rin: <b>{REWARD_TIERS[0]}/{REWARD_TIERS[1]}/{REWARD_TIERS[2]} Kitobcha</b>, "
+        f"ochko olgan hammaga <b>{PARTICIPATION}</b>\n"
+        f"\U0001f48e Premium a'zolar <b>2 barobar</b> oladi\n"
+        f"\U0001f381 Kirish <b>BEPUL</b>\n\n"
+        f"\u23f0 Boshlanish: <b>{when}</b>\n"
+        f"O'yin guruhda e'lon qilinadi \u2014 hoziroq kirib turing \U0001f447"
+    )
+
+
+@shared_task
+def send_game_teaser(slot="evening"):
+    """DM every reachable reader 10 minutes before the `slot` games start."""
+    import time
+
+    text = _game_teaser_text(slot)
+    keyboard = _teaser_group_buttons()
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    ids = list(
+        TelegramProfile.objects
+        .filter(is_registered=True, is_blocked=False)
+        .values_list("telegram_id", flat=True).distinct()
+    )
+    sent = blocked = failed = 0
+    for uid in ids:
+        data = {"chat_id": uid, "text": text, "parse_mode": "HTML",
+                "disable_web_page_preview": "true"}
+        if keyboard:
+            data["reply_markup"] = keyboard
+        try:
+            resp = requests.post(url, data=data, timeout=8)
+            if resp.status_code == 200:
+                sent += 1
+            elif resp.status_code == 403:
+                TelegramProfile.objects.filter(telegram_id=uid).update(is_blocked=True)
+                blocked += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+        time.sleep(0.04)
+    print(f"send_game_teaser({slot}): sent={sent} blocked={blocked} failed={failed} "
+          f"of {len(ids)}")
+    return {"slot": slot, "sent": sent, "blocked": blocked, "failed": failed}
+
+
 # Every live game pays Premium members double (TelegramProfile.update_ball, via
 # chain_game._add_ball_reward). That was true but invisible: the announcements
 # quoted one set of numbers and said nothing about the multiplier, so the
@@ -6359,8 +6467,8 @@ def _start_quiz_flavor(flavor, is_vip=False):
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi!\n"
             f"👑 <b>Faqat VIP Premium a'zolar uchun!</b>\n\n"
             f"💰 <b>VIP Mukofot: 500 / 300 / 150 Kitobcha</b>\n"
-            f"💎 1-o'ringa qo'shimcha <b>6 soatlik Premium</b> — haftada bir marta, "
-            f"faqat Premiumi yo'q g'oliblarga\n👇 Kiring:"
+            f"💎 Premium 2× bilan g'olibga <b>1000 Kitobcha</b> — botdagi eng katta "
+            f"mukofot!\n👇 Kiring:"
         )
     else:
         announcement_text = texts.get(
@@ -7172,7 +7280,7 @@ def broadcast_major_update_to_all():
         "• 🎧 <b>Ovozli Iqtibos:</b> Jonli audio eshitib asarni topish.\n\n"
         "👑 <b>VIP Premium Arena (Har kuni 22:30 da):</b>\n"
         "• 5 ta eng zo'r o'yin ketma-ket!\n"
-        "• 🥇 <b>+500 – 1000 Kitobcha</b>, 1-o'ringa <b>6 soatlik Premium</b>!\n\n"
+        "• 🥇 <b>+500 Kitobcha</b> — Premium 2× bilan <b>1000 Kitobcha</b>!\n\n"
         "🧹 <b>Guruhlarda toza muhit:</b>\n"
         "• Test oraliq xabarlari 12 soatdan keyin avtomatik tozalanadi, faqat natijalar qoladi.\n"
         "• Test qaysi kitobdan ekanligi aniq ko'rsatiladi.\n\n"

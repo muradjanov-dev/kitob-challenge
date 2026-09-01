@@ -89,12 +89,19 @@ VIP_TOP_GAMES = [
     "riddlebox", "quotechain", "timetraveler", "bluffmaster", "symbolmatch"
 ]
 VIP_REWARD_TIERS = {0: 500, 1: 300, 2: 150}  # Elevated VIP Kitobcha rewards
-# Premium bu yerda ATAYLAB kam: faqat 1-o'rin, faqat 6 soat. Ilgari har kuni
-# kechqurun 1 kun + 12 soat + 6 soat berilardi -- oyiga ~52 Premium-kun, deyarli
-# hammasi o'sha bir necha kuchli o'yinchiga. 2- va 3-o'rin endi faqat Kitobcha
-# oladi. Ustiga services/premium.py dagi chegara ham qo'llanadi (haftada bir
-# marta, va allaqachon Premiumi borga umuman berilmaydi).
-VIP_PREMIUM_HOURS_BONUS = {0: 6}
+# The VIP arena hands out NO Premium at all, and that is not an oversight.
+#
+# Entry is gated on has_active_premium() (see submit_answer), so every single
+# player in here already holds Premium -- all 37 of them at the time of
+# writing. services/premium.py refuses a free grant to anyone who is already
+# Premium, so the old "1-o'ringa 6 soat Premium" line was a prize that could
+# never once be awarded: 37 of 37 eligible players were blocked.
+#
+# Handing Premium to Premium members would only extend subscriptions for free,
+# which is the opposite of what the scarcity work was for. The reward here is
+# Kitobcha, and it is already the largest in the bot: 500/300/150, which the
+# 2x multiplier turns into 1000/600/300 for these players.
+VIP_PREMIUM_HOURS_BONUS = {}
 VIP_PREMIUM_DAYS_BONUS = {}
 VIP_PARTICIPATION = 50
 
