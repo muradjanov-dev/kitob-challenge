@@ -6740,6 +6740,11 @@ def _advance_game_sequence(game_type, game_id=None, seq=None):
 # beats dumping two surprise games and a VIP arena into the groups at midnight.
 SEQUENCE_RESUME_GRACE_SECONDS = 30 * 60
 
+# How long a just-written GameSequence row is left alone. Only the row's own
+# creator fills in current_game_id, and it does so a moment after the insert,
+# so anything shorter lets the watchdog mistake setup for a stall.
+SEQUENCE_SETUP_GRACE_SECONDS = 120
+
 
 def _sequence_is_stale(seq, ended_at, now):
     """True when this slot fell so far behind that resuming it would be worse
@@ -6774,12 +6779,29 @@ def _auto_recover_game_sequences():
         gid = seq.current_game_id
 
         if not gid or not gt:
+            # A sequence another task is still setting up is indistinguishable
+            # from a stuck one. start_vip_premium_evening_event creates the row
+            # first and writes current_game_id about half a second later, once
+            # its game exists; on 2026-09-01 this tick read the row inside that
+            # gap, decided the slot had stalled, and started a SECOND VIP game
+            # (#170 next to the real #169, which already had players). Give any
+            # freshly-written row time to finish before touching it.
+            if (now - seq.updated_at).total_seconds() < SEQUENCE_SETUP_GRACE_SECONDS:
+                continue
+
             if _sequence_is_stale(seq, None, now):
                 print(f"_auto_recover_game_sequences: {seq.slot}/{seq.date} never got "
                       f"a game going and is too old to start one now; closing it")
                 seq.completed = True
                 seq.save(update_fields=["completed", "updated_at"])
                 continue
+
+            # Re-read before acting: a slower writer may have filled the row in
+            # while this tick worked through the engines above.
+            seq.refresh_from_db()
+            if seq.completed or seq.current_game_id:
+                continue
+
             first_type = seq.game_types[seq.current_index]
             is_vip = (seq.slot == GameSequence.SLOT_VIP)
             game = _start_game_safely(first_type, is_vip=is_vip)
