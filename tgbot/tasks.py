@@ -6342,7 +6342,9 @@ def _start_quiz_flavor(flavor, is_vip=False):
             f"⭐️ <b>VIP PREMIUM ARENA: {game_title}</b> ⭐️\n\n"
             f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi!\n"
             f"👑 <b>Faqat VIP Premium a'zolar uchun!</b>\n\n"
-            f"💰 <b>VIP Mukofot: 500 / 300 / 150 Kitobcha + 1 kun / 12 soat / 6 soatlik Premium!</b>\n👇 Kiring:"
+            f"💰 <b>VIP Mukofot: 500 / 300 / 150 Kitobcha</b>\n"
+            f"💎 1-o'ringa qo'shimcha <b>6 soatlik Premium</b> — haftada bir marta, "
+            f"faqat Premiumi yo'q g'oliblarga\n👇 Kiring:"
         )
     else:
         announcement_text = texts.get(
@@ -7138,7 +7140,7 @@ def broadcast_major_update_to_all():
         "• 🎧 <b>Ovozli Iqtibos:</b> Jonli audio eshitib asarni topish.\n\n"
         "👑 <b>VIP Premium Arena (Har kuni 22:30 da):</b>\n"
         "• 5 ta eng zo'r o'yin ketma-ket!\n"
-        "• 🥇 <b>+500 – 1000 Kitobcha + 3 kun BEPUL Premium!</b>\n\n"
+        "• 🥇 <b>+500 – 1000 Kitobcha</b>, 1-o'ringa <b>6 soatlik Premium</b>!\n\n"
         "🧹 <b>Guruhlarda toza muhit:</b>\n"
         "• Test oraliq xabarlari 12 soatdan keyin avtomatik tozalanadi, faqat natijalar qoladi.\n"
         "• Test qaysi kitobdan ekanligi aniq ko'rsatiladi.\n\n"

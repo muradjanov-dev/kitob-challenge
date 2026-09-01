@@ -111,6 +111,23 @@ def log_purchase(user, item_key: str, price: int) -> None:
     MarketPurchase.objects.create(user=user, item_key=item_key, price=price)
 
 
+def _premium_refused_fallback(p, label: str) -> str:
+    """Consolation when services/premium.py refuses a won Premium.
+
+    A prize must never announce something the winner did not get -- that is the
+    exact failure premium.py was written to end. Refusals only happen to people
+    who already have Premium or who won some in the last week, so the honest
+    swap is Kitobcha plus a free game entry."""
+    from decimal import Decimal as _D
+    p.ball = _D(p.ball or 0) + _D(150)
+    p.bonus_free_game_entries = (p.bonus_free_game_entries or 0) + 1
+    p.save(update_fields=["ball", "bonus_free_game_entries"])
+    return (f"{label}\n\n"
+            "💎 Premium hozir berilmadi — sizda allaqachon Premium bor "
+            "yoki oxirgi 7 kunda yutgansiz. Buning o'rniga <b>+150 Kitobcha</b> va "
+            "<b>1 ta bepul bilet</b> berildi!")
+
+
 def charge(user, price: int) -> bool:
     """Deduct `price` Kitobcha from `user` if affordable (or refund, when
     `price` is negative — see the Reyting sponsorligi race-loss refund).
@@ -162,7 +179,7 @@ MYSTERY_PRIZES = [
     ("magic_answer_aid", 4),
     ("quote_wall_post", 3),
     ("friend_gift_ticket", 5),
-    ("aura_gold_reader", 4),
+    ("aura_gold_reader", 4),  # endi Premium emas -- bilet + Kitobcha (pastga qarang)
     ("wisdom_chest_key", 3),
     ("title_night_thief", 5),
     ("title_simurgh_wing", 4),
@@ -194,8 +211,10 @@ MYSTERY_PRIZES = [
     ("strategy_pass", 5),
     ("mindtrap_pass", 5),
     ("blitz_pass", 5),
-    ("premium_3h", 2),
-    ("premium_24h", 1),
+    # Sirli Sandiqdagi yagona Premium sovg'asi -- ataylab eng kam og'irlikda.
+    # Ilgari quti ochilishining ~1.85% i Premium berardi (aura 1.06% = 1 kun,
+    # premium_3h 0.53%, premium_24h 0.26%); endi 0.26% va faqat 3 soat.
+    ("premium_3h", 1),
     ("life_1", 10),
     ("life_2", 7),
     ("life_3", 5),
@@ -255,9 +274,11 @@ CREATIVE_TANGIBLE_REWARDS = {
     "secret_key_box": ('🔑 Sirli Qutining Oltin Kaliti: Keyingi qutini 100% BEPUL ochish huquqi!', 'free_box', 1),
     "magic_answer_aid": ("✨ Jonli O'yindagi Sehrli Qutqaruvchi: 1 ta xato javobni to'g'rilovchi yordamchi!", 'game_aid', 1),
     "quote_wall_post": ("📣 Guruhda Siz Tanlagan Iqtibosni Butun Jamiyatga Tantanali E'lon Qilish!", 'broadcast_quote', 1),
+    # 'gift_pass' Premium beradi, shuning uchun bu sovg'a MYSTERY_PRIZES dan
+    # butunlay olib tashlangan (2026-08-28); ta'rif faqat eski yozuvlar uchun.
     "friend_gift_premium": ("🎁 Do'stingizga 24 Soatlik BEPUL Premium Sovg'a Qilish Kuponi!", 'gift_pass', 1),
     "friend_gift_ticket": ("🎟 Do'stingizga Jonli O'yin Biletini Hadya Qilish Chiptasi!", 'gift_ticket', 1),
-    "aura_gold_reader": ('✨ Profilingiz Uchun 24 Soatlik «Oltin Kitobxon Aulasi» Nuri!', 'aura', 24),
+    "aura_gold_reader": ('✨ «Oltin Kitobxon Aurasi» — 1 ta bepul bilet va 100 Kitobcha!', 'badge', 1),
     "wisdom_chest_key": ("🗝 Donishmandlik Sandig'i Kaliti: +300 Kitobcha va Faxriy E'tirof!", 'ball_direct', 300),
     "title_night_thief": ("🌙 «Tungi Kitob O'g'risi» — Tunda mutolaa qiluvchi afsonaviy kitobxon unvoni!", 'badge', "🌙 Tungi Kitob O'g'risi"),
     "title_simurgh_wing": ("🦅 «Simurg' Qanoti» — Yuksak ma'rifat sohibi faxriy unvoni!", 'badge', "🦅 Simurg' Qanoti"),
@@ -476,11 +497,14 @@ def _apply_mystery_prize(user, pick: str):
                 # trial_premium_until used to leave the winner locked out of
                 # nearly every feature the prize text promised.
                 until = grant_premium(p, hours=val)
+                if until is None:
+                    return _premium_refused_fallback(p, label), False
                 return (f"{label} — barcha VIP imtiyozlar va o'yinlar faollashtirildi! "
                         f"(⏳ {timezone.localtime(until).strftime('%d.%m %H:%M')} gacha)"), False
 
             elif ptype == "premium_days":
-                grant_premium(p, days=val)
+                if grant_premium(p, days=val) is None:
+                    return _premium_refused_fallback(p, label), False
                 return f"{label} — obunangizga +{val} kun qo'shildi!", False
 
             elif ptype == "survival":
@@ -587,7 +611,8 @@ def _apply_mystery_prize(user, pick: str):
                 return "📣 <b>Adabiy Ilhom:</b> Sizning nomingizdan guruhga hikmatli iqtibos yo'llanadi va <b>+2 ta Bepul Bilet</b> berildi!", False
 
             elif ptype == "gift_pass":
-                grant_premium(p, days=1)
+                if grant_premium(p, days=1) is None:
+                    return _premium_refused_fallback(p, "🎁 <b>Do'stlik & Saxovat In'omi</b>"), False
                 return "🎁 <b>Do'stlik & Saxovat In'omi:</b> Sizga <b>24 soatlik BEPUL Premium</b> faollashtirildi!", False
 
             elif ptype == "gift_ticket":
@@ -596,7 +621,8 @@ def _apply_mystery_prize(user, pick: str):
                 return "🎟 <b>Do'stlik Chiptasi:</b> Jonli o'yinlarga <b>2 ta BEPUL Bilet</b> taqdim etildi!", False
 
             elif ptype == "aura":
-                grant_premium(p, days=1)
+                if grant_premium(p, days=1) is None:
+                    return _premium_refused_fallback(p, "✨👑 <b>Oltin Kitobxon Aurasi</b>"), False
                 return "✨👑 <b>Oltin Kitobxon Aurasi:</b> Profilingiz 24 soatlik VIP Premium maqomiga ega bo'ldi!", False
 
             elif ptype == "badge":

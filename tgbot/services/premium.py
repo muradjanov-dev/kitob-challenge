@@ -29,11 +29,61 @@ from django.db.models import Max
 from django.utils import timezone
 
 
+# ── Scarcity limits for *won* Premium ────────────────────────────────────
+#
+# Every free prize path funnels through grant_premium(), and only those: a real
+# purchase (handlers/groups/confirm_payment.py), a Kitobcha shop redemption
+# (shop_views.py) and a manual admin grant (admin_panel.py) all call
+# Payment.grant_or_extend() directly and are deliberately NOT limited here.
+#
+# Before these limits, Premium had effectively stopped being something anyone
+# needed to buy: over the 30 days to 2026-09-01 the bot handed out 1736 Premium
+# grants, 1728 of them free and 8 paid, and one reader had stacked 23 free
+# grants into a 27-day balance without ever paying. The VIP arena alone gave
+# 1 day + 12h + 6h *every evening* -- about 52 Premium-days a month, almost all
+# of it to the same handful of top players.
+FREE_PREMIUM_MAX_HOURS = 24      # a single prize can never exceed one day
+FREE_PREMIUM_COOLDOWN_DAYS = 7   # ...and one per user per week, at most
+
+
+def free_premium_blocked_reason(user) -> str | None:
+    """Why `user` cannot be given free Premium right now, or None if they can.
+
+    Two rules, both aimed at spreading a scarce prize across many readers
+    instead of letting the same few farm it:
+
+    1. Already Premium (paid or won) -- an extra day is worth nothing to
+       someone who already has one, and stacking is what produced the 27-day
+       balances. They get the prize's fallback reward instead.
+    2. Won free Premium within the last FREE_PREMIUM_COOLDOWN_DAYS.
+    """
+    from datetime import timedelta
+    from tgbot.models import Payment
+
+    if not user:
+        return "no_user"
+    if user.has_active_premium():
+        return "already_premium"
+    if Payment.objects.filter(
+        user=user, status="paid", end_date__gte=timezone.localdate(),
+    ).exists():
+        return "already_premium"
+
+    recent = Payment.objects.filter(
+        user=user, amount=0,
+        created_at__gte=timezone.now() - timedelta(days=FREE_PREMIUM_COOLDOWN_DAYS),
+    ).exists()
+    return "cooldown" if recent else None
+
+
 def grant_premium(user, *, days: int = 0, hours: int = 0) -> object:
     """Grant `days`/`hours` of real, fully-functional Premium to `user`.
 
     Always EXTENDS whatever the user already has (see Payment.grant_or_extend)
-    instead of resetting it. Returns the new trial-window end datetime.
+    instead of resetting it. Returns the new trial-window end datetime, or
+    **None** when the scarcity limits above refused the grant -- callers must
+    check for None and offer their fallback reward rather than announcing a
+    Premium the winner did not receive.
     """
     from tgbot.models import Payment
 
@@ -41,6 +91,15 @@ def grant_premium(user, *, days: int = 0, hours: int = 0) -> object:
     hours = int(hours or 0)
     if days <= 0 and hours <= 0:
         return getattr(user, "trial_premium_until", None)
+
+    reason = free_premium_blocked_reason(user)
+    if reason:
+        print(f"grant_premium: refused for user={getattr(user, 'id', None)} ({reason})")
+        return None
+
+    # Clamp before anything is written -- a 3-day prize becomes one day.
+    total_hours = min(days * 24 + hours, FREE_PREMIUM_MAX_HOURS)
+    days, hours = divmod(total_hours, 24)
 
     now = timezone.now()
 

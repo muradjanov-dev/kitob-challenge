@@ -89,8 +89,13 @@ VIP_TOP_GAMES = [
     "riddlebox", "quotechain", "timetraveler", "bluffmaster", "symbolmatch"
 ]
 VIP_REWARD_TIERS = {0: 500, 1: 300, 2: 150}  # Elevated VIP Kitobcha rewards
-VIP_PREMIUM_HOURS_BONUS = {0: 24, 1: 12, 2: 6}  # 1-o'rin: 1 kun (24 soat), 2-o'rin: 12 soat, 3-o'rin: 6 soat
-VIP_PREMIUM_DAYS_BONUS = {0: 1, 1: 0, 2: 0}  # 1-o'ringa 1 kun, 2-o'ringa 12 soat, 3-o'ringa 6 soat
+# Premium bu yerda ATAYLAB kam: faqat 1-o'rin, faqat 6 soat. Ilgari har kuni
+# kechqurun 1 kun + 12 soat + 6 soat berilardi -- oyiga ~52 Premium-kun, deyarli
+# hammasi o'sha bir necha kuchli o'yinchiga. 2- va 3-o'rin endi faqat Kitobcha
+# oladi. Ustiga services/premium.py dagi chegara ham qo'llanadi (haftada bir
+# marta, va allaqachon Premiumi borga umuman berilmaydi).
+VIP_PREMIUM_HOURS_BONUS = {0: 6}
+VIP_PREMIUM_DAYS_BONUS = {}
 VIP_PARTICIPATION = 50
 
 
@@ -886,31 +891,39 @@ def get_vip_premium_label(rank: int) -> str:
     return ""
 
 
+NO_PREMIUM = {"hours": 0, "days": 0, "text": ""}
+
+
 def grant_vip_premium(score, rank: int) -> dict:
-    """Hand the VIP arena's top-3 Premium bonus (1st: 1 kun/24h, 2nd: 12 soat, 3rd: 6 soat) to one winner, exactly once.
+    """Hand the VIP arena's 1st-place Premium bonus (6 soat) to one winner, exactly once.
 
     `QuizScore.premium_days` is both the receipt and the idempotency guard, so
     a re-finalize or a late settle run can never double-grant. Failures are
     swallowed deliberately.
+
+    Returns an all-zero dict whenever nothing was actually granted -- including
+    when services/premium.py refuses on scarcity grounds. Callers key their
+    "+ N Premium" line off `text`, so a refused prize is simply never
+    announced, and the winner keeps the Kitobcha half of the prize.
     """
     hours = VIP_PREMIUM_HOURS_BONUS.get(rank, 0)
     days = VIP_PREMIUM_DAYS_BONUS.get(rank, 0)
     label = get_vip_premium_label(rank)
-    if not hours or score.premium_days:
-        return {
-            "hours": hours if score.premium_days else 0,
-            "days": days if (score.premium_days and days > 0) else (1 if (score.premium_days and hours >= 24) else 0),
-            "text": label if score.premium_days else "",
-        }
+    if score.premium_days:                       # already settled — replay the receipt
+        return {"hours": hours, "days": days, "text": label}
+    if not hours and not days:
+        return dict(NO_PREMIUM)
     try:
         from tgbot.services.premium import grant_premium
-        grant_premium(score.user, days=days, hours=(0 if days > 0 else hours))
+        granted = grant_premium(score.user, days=days, hours=(0 if days > 0 else hours))
     except Exception as e:
         print(f"grant_vip_premium: score={score.id} rank={rank}: {e}")
-        return {"hours": 0, "days": 0, "text": ""}
-    score.premium_days = days if days > 0 else (1 if hours >= 24 else hours)
+        return dict(NO_PREMIUM)
+    if granted is None:                          # refused by the scarcity limits
+        return dict(NO_PREMIUM)
+    score.premium_days = days if days > 0 else hours
     score.save(update_fields=["premium_days", "updated_at"])
-    return {"hours": hours, "days": days if days > 0 else (1 if hours >= 24 else 0), "text": label}
+    return {"hours": hours, "days": days, "text": label}
 
 
 def _finalize_individual(g) -> dict:
