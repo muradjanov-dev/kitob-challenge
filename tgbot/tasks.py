@@ -6396,12 +6396,15 @@ def start_survival_game():
 
 
 def _start_quiz_flavor(flavor, is_vip=False):
-    from tgbot.services.quiz_game import create_scheduled_quiz, LEAD_SECONDS, ENTRY_FEES, TITLES
+    from tgbot.services.quiz_game import (
+        create_scheduled_quiz, LEAD_SECONDS, VIP_LEAD_SECONDS, ENTRY_FEES, TITLES,
+    )
     # NOTE: the previous game of this type is settled by games_finalize_tick /
     # chain_game_tick, never here. Calling finalize_due_games() at start time
     # would bank the rewards but throw the summary away, so the results post,
     # the winner DMs and _advance_game_sequence() would all be skipped.
-    game = create_scheduled_quiz(flavor, is_vip=is_vip)
+    lead = VIP_LEAD_SECONDS if is_vip else LEAD_SECONDS
+    game = create_scheduled_quiz(flavor, lead_seconds=lead, is_vip=is_vip)
     texts = {
         "twofacts": (
             "🎭 <b>IKKI HAQIQAT, BIR YOLG'ON</b>\n\n"
@@ -6464,7 +6467,7 @@ def _start_quiz_flavor(flavor, is_vip=False):
     if is_vip:
         announcement_text = (
             f"⭐️ <b>VIP PREMIUM ARENA: {game_title}</b> ⭐️\n\n"
-            f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi!\n"
+            f"⏳ <b>{lead // 60} daqiqadan keyin</b> boshlanadi — ulgurib kiring!\n"
             f"👑 <b>Faqat VIP Premium a'zolar uchun!</b>\n\n"
             f"💰 <b>VIP Mukofot: 500 / 300 / 150 Kitobcha</b>\n"
             f"💎 Premium 2× bilan g'olibga <b>1000 Kitobcha</b> — botdagi eng katta "
@@ -6668,20 +6671,43 @@ def _complete_game_sequence(seq):
     seq.current_index = len(seq.game_types)
     seq.save(update_fields=["completed", "current_index", "updated_at"])
     print(f"_advance_game_sequence: {seq.slot}/{seq.date} sequence complete")
-    if seq.slot != GameSequence.SLOT_EVENING:
+
+    # The VIP arena is the last act of the evening, not a separate event, so
+    # the "today's games are over" round-up has to wait for it.
+    #
+    # It used to be posted the moment the three regular games finished, one
+    # second before the VIP invitation. On 2026-09-02 the groups read:
+    #
+    #   22:13  Sirli Sandiq — yakun!            (13 players had just played)
+    #   22:14  TANTANALI E'LON — BUGUNGI O'YINLAR YAKUNI!
+    #   22:14  VIP PREMIUM ARENA ... Kiring:
+    #
+    # Everyone was told the day was over and then invited to one more game a
+    # second later. The VIP game drew 0 players, against 13 in the game that
+    # ended a minute earlier.
+    if seq.slot == GameSequence.SLOT_EVENING:
+        try:
+            start_vip_premium_evening_event.delay()
+        except Exception as e:
+            print(f"_advance_game_sequence start_vip_premium_evening_event delay error: {e}")
+            try:
+                start_vip_premium_evening_event()
+            except Exception as e2:
+                print(f"_advance_game_sequence sync start error: {e2}")
+                # Nothing will follow, so close the day out here instead.
+                _announce_day_wrapup()
         return
+
+    if seq.slot == GameSequence.SLOT_VIP:
+        _announce_day_wrapup()
+
+
+def _announce_day_wrapup():
+    """Post the end-of-day round-up, once the evening really is over."""
     try:
         announce_top_game_players()
     except Exception as e:
-        print(f"_advance_game_sequence announce_top_game_players error: {e}")
-    try:
-        start_vip_premium_evening_event.delay()
-    except Exception as e:
-        print(f"_advance_game_sequence start_vip_premium_evening_event delay error: {e}")
-        try:
-            start_vip_premium_evening_event()
-        except Exception as e2:
-            print(f"_advance_game_sequence sync start error: {e2}")
+        print(f"_announce_day_wrapup announce_top_game_players error: {e}")
 
 
 def _advance_game_sequence(game_type, game_id=None, seq=None):
