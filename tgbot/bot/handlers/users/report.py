@@ -10,7 +10,7 @@ from asgiref.sync import sync_to_async
 from django.core.paginator import Paginator
 
 from tgbot.models import ConfirmationReport, BooksToRead
-from tgbot.bot.keyboards.reply import main_markup, back_keyboard
+from tgbot.bot.keyboards.reply import main_markup, main_markup_for_user, back_keyboard
 from tgbot.bot.loader import dp, bot
 from tgbot.bot.loader import gettext as _
 from tgbot.bot.states.main import ReportState
@@ -611,7 +611,10 @@ async def book_selection_handler(call: CallbackQuery, state: FSMContext):
             await call.answer(_("Kamida bitta kitob tanlang!"), show_alert=True)
             return
 
-        await state.update_data(pending_books=list(selected_book_ids), book_reports={})
+        # `call.message` belongs to the bot, so `from_user` on it is the bot --
+        # stash the real reader's id for the steps that need to look them up.
+        await state.update_data(pending_books=list(selected_book_ids), book_reports={},
+                                tg_user_id=call.from_user.id)
         await ask_next_book_pages(call.message, state)
 
     elif call.data == "noop":
@@ -1043,6 +1046,16 @@ async def process_delete_book_yes_btn(call: types.CallbackQuery, state: FSMConte
 
 # ── Per-book value entry loop (pages for live, minutes for audio) ─────────────
 
+async def _ask_for_conclusion(message, state: FSMContext):
+    """Last step of the report: the short takeaway. Reached either straight
+    from the pages loop or after the reader confirms an unusually big day."""
+    await message.answer(
+        _("Kichik xulosa (bugun nima o'rgandingiz)\n\nMasalan: <i>Ilm - bu boylik</i>"),
+        reply_markup=back_keyboard,
+    )
+    await ReportState.conclusion.set()
+
+
 async def ask_next_book_pages(message, state: FSMContext):
     data = await state.get_data()
     pending_books = data.get("pending_books", [])
@@ -1067,11 +1080,32 @@ async def ask_next_book_pages(message, state: FSMContext):
             is_audio=is_audio,
             is_combined=is_combined,
         )
-        await message.answer(
-            _("Kichik xulosa (bugun nima o'rgandingiz)\n\nMasalan: <i>Ilm - bu boylik</i>"),
-            reply_markup=back_keyboard,
-        )
-        await ReportState.conclusion.set()
+
+        # A day's reading at or above HIGH_PAGES_CONFIRM_THRESHOLD is rare
+        # enough to be worth one question. The usual cause is a reader logging
+        # a whole book at once rather than only today's pages, which quietly
+        # inflates the leaderboards everyone else is competing on. Counts
+        # today's already-saved reports too, so it cannot be split past the
+        # check across several submissions.
+        data = await state.get_data()
+        user = await aget_user(data.get("tg_user_id") or message.from_user.id)
+        committed_pages, _committed_audio = await _today_committed_totals(
+            user, timezone.localdate())
+        day_total = committed_pages + live_pages
+        if day_total >= HIGH_PAGES_CONFIRM_THRESHOLD:
+            await message.answer(
+                f"🤔 <b>Bugun jami {day_total} bet.</b>\n\n"
+                f"Bularni barchasini <b>bugun</b> o'qidingizmi, hurmatli kitobxon?",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup().row(
+                    InlineKeyboardButton("✅ Ha", callback_data="high_pages:yes"),
+                    InlineKeyboardButton("❌ Yo'q", callback_data="high_pages:no"),
+                ),
+            )
+            await ReportState.confirm_high_pages.set()
+            return
+
+        await _ask_for_conclusion(message, state)
         return
 
     next_book_id = pending_books[0]
@@ -1105,6 +1139,11 @@ async def ask_next_book_pages(message, state: FSMContext):
 
 MAX_PAGES_PER_DAY = 1000
 MAX_AUDIO_MINUTES_PER_DAY = 600  # 10 hours/day cap
+
+# At or above this many pages in one day, the report pauses and asks the reader
+# to confirm it really was all read today. Sits just under MAX_PAGES_PER_DAY so
+# the whole top band of plausible-but-suspicious days gets the question.
+HIGH_PAGES_CONFIRM_THRESHOLD = 900
 
 
 @sync_to_async
@@ -1191,6 +1230,61 @@ async def process_loop_pages(message: types.Message, state: FSMContext):
 
     await state.update_data(pending_books=pending_books, book_reports=reports)
     await ask_next_book_pages(message, state)
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("high_pages:"),
+                           state=ReportState.confirm_high_pages)
+async def process_high_pages_confirm(call: CallbackQuery, state: FSMContext):
+    """Answer to "was all of this really read today?" for a 900+ page day."""
+    await call.answer()
+    said_yes = call.data.endswith(":yes")
+
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+    if said_yes:
+        await call.message.answer("✅ Rahmat! Hisobotni yakunlaymiz.")
+        await _ask_for_conclusion(call.message, state)
+        return
+
+    # "No" -- send them back through the per-book loop with an empty slate, so
+    # what finally gets saved is only today's reading. Nothing has been written
+    # to ConfirmationReport yet at this point, so there is nothing to undo.
+    data = await state.get_data()
+    selected = list(data.get("selected_book_ids", []))
+    await state.update_data(
+        pending_books=selected, book_reports={},
+        pages_read=0, minutes_listened=None, is_audio=False, is_combined=False,
+    )
+    await call.message.answer(
+        "📝 Yaxshi, qaytadan kiritamiz.\n\n"
+        "Iltimos, <b>faqat bugun</b> o'qigan betlaringizni kiriting — "
+        "kitobning umumiy hajmini emas.",
+        parse_mode="HTML",
+    )
+    if not selected:
+        # Shouldn't happen -- the loop only runs once books are chosen -- but
+        # send_book_selection_menu reads `from_user`, and on `call.message`
+        # that is the bot, so it cannot be reused here. Ask for a restart.
+        await state.finish()
+        reader = await aget_user(data.get("tg_user_id") or call.from_user.id)
+        await call.message.answer(
+            "Kitoblar tanlovi topilmadi. Iltimos, hisobotni qaytadan boshlang.",
+            reply_markup=main_markup_for_user(reader),
+        )
+        return
+    await ask_next_book_pages(call.message, state)
+
+
+@dp.message_handler(state=ReportState.confirm_high_pages)
+async def nudge_high_pages_confirm(message: types.Message, state: FSMContext):
+    """Typing instead of tapping — repeat the question rather than dropping it."""
+    await message.answer(
+        "☝️ Iltimos, yuqoridagi <b>Ha</b> yoki <b>Yo'q</b> tugmasini bosing.",
+        parse_mode="HTML",
+    )
 
 
 @dp.message_handler(state=ReportState.pages_read)

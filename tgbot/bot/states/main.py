@@ -29,6 +29,7 @@ class ReportState(StatesGroup):
     spent_time = State()
     conclusion = State()
     enter_pages_loop = State()
+    confirm_high_pages = State()   # 900+ bet: "hammasini bugun o'qidingizmi?"
     confirm_report = State()
 
 
