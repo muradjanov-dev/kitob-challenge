@@ -6483,8 +6483,69 @@ def _start_quiz_flavor(flavor, is_vip=False):
         )
     deep_link = deep_link_params.get(flavor, flavor)
     _announce_game(announcement_text, deep_link)
+    if is_vip:
+        _dm_vip_arena_invite(game_title, deep_link, lead)
     print(f"start_quiz_{flavor}: game #{game.id} (is_vip={is_vip})")
     return game
+
+
+def _dm_vip_arena_invite(game_title, deep_link, lead_seconds):
+    """DM the arena's invitation to the people who are actually allowed in.
+
+    The VIP arena was announced to the groups and nowhere else, and it drew
+    zero players three evenings running while the ordinary game that ended
+    minutes earlier drew thirteen to sixteen. The arena itself was never
+    broken -- a Premium member's state came back vip_locked=False and
+    submit_answer returned ok -- and eight of the fifteen people playing at
+    22:15 on 2026-09-03 were Premium. They were inside the Mini App, playing,
+    not watching a group chat, so a group-only invitation never reached them.
+
+    Only Premium members can enter, and there are a few dozen of them, so the
+    invitation goes straight to that list. It is not a broadcast: nobody who
+    cannot play is messaged.
+    """
+    from tgbot.services.premium import active_premium_telegram_ids
+    import time
+
+    try:
+        targets = list(active_premium_telegram_ids())
+    except Exception as e:
+        print(f"_dm_vip_arena_invite: could not read the Premium list: {e}")
+        return
+
+    username = _get_bot_username()
+    keyboard = None
+    if username:
+        keyboard = json.dumps({"inline_keyboard": [[
+            {"text": "⭐️ VIP arenaga kirish",
+             "url": f"https://t.me/{username}?start={deep_link}"},
+        ]]})
+
+    text = (
+        f"⭐️ <b>VIP PREMIUM ARENA — siz uchun ochildi!</b>\n\n"
+        f"🎮 Bugungi o'yin: <b>{game_title}</b>\n"
+        f"⏳ <b>{max(1, lead_seconds // 60)} daqiqadan keyin</b> boshlanadi\n\n"
+        f"💰 Mukofot: <b>500 / 300 / 150 Kitobcha</b>\n"
+        f"💎 Premium 2× bilan g'olibga <b>1000 Kitobcha</b>\n\n"
+        f"👑 Bu arenaga faqat Premium a'zolar kira oladi — raqobat kam, "
+        f"yutuq katta. Shoshiling! 👇"
+    )
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    sent = failed = 0
+    for tid in targets:
+        data = {"chat_id": tid, "text": text, "parse_mode": "HTML",
+                "disable_web_page_preview": "true"}
+        if keyboard:
+            data["reply_markup"] = keyboard
+        try:
+            if requests.post(url, data=data, timeout=8).status_code == 200:
+                sent += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+        time.sleep(0.04)
+    print(f"_dm_vip_arena_invite: sent={sent} failed={failed} of {len(targets)}")
 
 
 # Maps a game-type slug to the task that starts it (each returns the created
