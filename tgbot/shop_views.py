@@ -248,6 +248,15 @@ def api_bid(request: HttpRequest) -> JsonResponse:
             if product.auction_end_at and now >= product.auction_end_at:
                 return JsonResponse({"ok": False, "error": "auction_ended"}, status=400)
 
+            # Advertising slots are a Premium-only privilege. Checked here, on
+            # the write path, not just hidden in the UI.
+            if product.premium_only and not user.has_active_premium():
+                return JsonResponse({
+                    "ok": False,
+                    "error": "premium_required",
+                    "message": "⭐️ Bu auksionda faqat Premium a'zolar qatnasha oladi.",
+                }, status=403)
+
             min_start = product.min_start_bid or 100
             if bid_amount < min_start:
                 return JsonResponse({

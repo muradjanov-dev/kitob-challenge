@@ -7455,6 +7455,18 @@ def settle_finished_auctions():
                 winner_bid = bids[0]
                 winner = winner_bid.user
 
+                # An advertising slot has no prize to hand over: the winner is
+                # asked for their link instead, and it runs only once an admin
+                # has passed it. Losing bids are still refunded below, exactly
+                # as for an ordinary auction.
+                if product.is_ad_slot:
+                    _open_ad_campaign(product, winner, winner_bid.amount)
+                    for other_bid in bids[1:]:
+                        _refund_losing_bid(other_bid)
+                    product.is_active = False
+                    product.save(update_fields=["is_active", "updated_at"])
+                    continue
+
                 # Generate unique purchase code
                 for _ in range(5):
                     code = _gen_purchase_code()
@@ -7526,6 +7538,74 @@ def settle_finished_auctions():
             print(f"Error settling auction {product.id}: {e}")
 
 
+def _refund_losing_bid(bid):
+    """Hand a losing bidder their Kitobcha back and tell them so."""
+    from decimal import Decimal
+    from tgbot.models import KitobchaLedger
+
+    try:
+        user = bid.user
+        product = bid.product
+        user.ball = (user.ball or Decimal("0")) + Decimal(bid.amount)
+        user.save(update_fields=["ball"])
+        KitobchaLedger.objects.create(
+            user=user, delta=bid.amount, reason=f"auction_refund:{product.id}",
+        )
+        bid.is_refunded = True
+        bid.save(update_fields=["is_refunded"])
+        requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+            data={"chat_id": user.telegram_id, "parse_mode": "HTML", "text": (
+                f"ℹ️ <b>{escape(product.name)}</b> auksioni yakunlandi.\n\n"
+                f"Bu safar eng yuqori taklif siznikiga to'g'ri kelmadi, lekin "
+                f"tikkan <b>{bid.amount} Kitobchangiz</b> to'liq qaytarildi 🪙"
+            )}, timeout=5,
+        )
+    except Exception as e:
+        print(f"_refund_losing_bid {getattr(bid, 'id', None)}: {e}")
+
+
+def _open_ad_campaign(product, winner, amount):
+    """Create the won advertising slot and ask the winner for their link.
+
+    Nothing is published here. The campaign starts in `awaiting`, and only an
+    admin approval opens its window -- see AdCampaign.approve.
+    """
+    from tgbot.models import AdCampaign
+
+    hours = int(product.ad_slot_hours or 24)
+    campaign = AdCampaign.objects.create(
+        product=product, winner=winner, duration_hours=hours, bid_amount=amount,
+        status=AdCampaign.STATUS_AWAITING,
+    )
+    username = _get_bot_username()
+    kb = None
+    if username:
+        kb = json.dumps({"inline_keyboard": [[
+            {"text": "🔗 Havolani yuborish",
+             "url": f"https://t.me/{username}?start=reklama"},
+        ]]})
+    text = (
+        f"🎉 <b>Tabriklaymiz — reklama auksionida g'olib bo'ldingiz!</b> 🏆\n\n"
+        f"📣 Yutuq: <b>{hours} soatlik reklama</b>\n"
+        f"💰 Yakuniy taklifingiz: <b>{amount} Kitobcha</b>\n\n"
+        f"Endi reklama qilmoqchi bo'lgan <b>havolangizni va matnini</b> yuboring.\n"
+        f"Havola administrator moderatsiyasidan o'tgach, u <b>{hours} soat davomida</b> "
+        f"barcha guruhlarda va bot foydalanuvchilariga ko'rsatiladi.\n\n"
+        f"👇 Boshlash uchun tugmani bosing:"
+    )
+    try:
+        data = {"chat_id": winner.telegram_id, "text": text, "parse_mode": "HTML"}
+        if kb:
+            data["reply_markup"] = kb
+        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                      data=data, timeout=8)
+    except Exception as e:
+        print(f"_open_ad_campaign notify winner {winner.id}: {e}")
+    print(f"_open_ad_campaign: campaign #{campaign.id} for {winner.id}, {hours}h")
+    return campaign
+
+
 # `app` is not imported in this module -- every other task here uses
 # @shared_task, which binds to the configured Celery app lazily. @app.task
 # raised NameError at import time, which took tgbot.tasks down entirely and
@@ -7537,4 +7617,199 @@ def task_broadcast_auction_announcement():
     return broadcast_auction_announcement()
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# Reklama auksioni: tarqatish, muddat tugashi, keyingi auksionni ochish.
+#
+# Havola bu yerda TEKSHIRILMAYDI -- tarqatuvchi faqat AdCampaign.approve()
+# ochgan oynaga ishonadi, uni esa yagona admin tugmasi chaqiradi. Moderatsiya
+# ko'rmagan kampaniyada starts_at/ends_at bo'lmaydi va u bu yerga tushmaydi.
+# ─────────────────────────────────────────────────────────────────────────
 
+AD_AUCTION_INTERVAL_DAYS = 3      # yangi reklama auksioni har 3 kunda
+AD_AUCTION_BIDDING_HOURS = 24     # taklif qilish uchun ochiq turadigan vaqt
+AD_SLOT_DURATIONS = (24, 48)      # ikki xil reklama o'rni
+AD_SLOT_MIN_BID = {24: 500, 48: 900}
+
+
+def _ad_message(campaign):
+    """The published ad. The winner's text is escaped; only the frame is HTML."""
+    return (
+        f"📣 <b>REKLAMA</b>\n\n"
+        f"{escape(campaign.ad_text)}\n\n"
+        f"🔗 {escape(campaign.link)}\n\n"
+        f"<i>Bu joy Kitob Challenge do'konidagi auksionda yutib olingan. "
+        f"Siz ham Kitobcha evaziga o'z reklamangizni joylashtira olasiz.</i>"
+    )
+
+
+@shared_task
+def broadcast_ad_campaign(campaign_id):
+    """Publish an approved ad to every group and every reachable bot user."""
+    import time
+    from tgbot.models import AdCampaign, TelegramProfile
+
+    campaign = AdCampaign.objects.filter(id=campaign_id).select_related("winner").first()
+    if not campaign:
+        print(f"broadcast_ad_campaign: #{campaign_id} not found")
+        return
+    if campaign.status != AdCampaign.STATUS_LIVE or not campaign.ends_at:
+        # Never publish something an admin has not opened a window for.
+        print(f"broadcast_ad_campaign: #{campaign_id} is {campaign.status}, refusing")
+        return
+
+    text = _ad_message(campaign)
+    kb = json.dumps({"inline_keyboard": [[
+        {"text": "🔗 Havolani ochish", "url": campaign.link},
+    ]]})
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    chats = set()
+    for gid, tid in list(_announce_targets()) + list(_game_targets()):
+        chats.add((gid, tid))
+    groups = 0
+    for gid, tid in chats:
+        try:
+            data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
+                    "reply_markup": kb, "disable_web_page_preview": "true"}
+            if tid:
+                data["message_thread_id"] = tid
+            if requests.post(url, data=data, timeout=10).status_code == 200:
+                groups += 1
+        except Exception as e:
+            print(f"broadcast_ad_campaign group {gid}: {e}")
+
+    users = 0
+    ids = list(TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+               .values_list("telegram_id", flat=True).distinct())
+    for uid in ids:
+        try:
+            resp = requests.post(url, data={
+                "chat_id": uid, "text": text, "parse_mode": "HTML",
+                "reply_markup": kb, "disable_web_page_preview": "true"}, timeout=8)
+            if resp.status_code == 200:
+                users += 1
+            elif resp.status_code == 403:
+                TelegramProfile.objects.filter(telegram_id=uid).update(is_blocked=True)
+        except Exception:
+            pass
+        time.sleep(0.04)
+
+    campaign.broadcast_groups = groups
+    campaign.broadcast_users = users
+    campaign.save(update_fields=["broadcast_groups", "broadcast_users", "updated_at"])
+    print(f"broadcast_ad_campaign #{campaign_id}: groups={groups} users={users}/{len(ids)}")
+
+    try:
+        requests.post(url, data={
+            "chat_id": campaign.winner.telegram_id, "parse_mode": "HTML", "text": (
+                f"✅ <b>Reklamangiz efirga chiqdi!</b>\n\n"
+                f"📣 {groups} ta guruh va {users} ta foydalanuvchiga yuborildi.\n"
+                f"⏱ <b>{campaign.duration_hours} soat</b> davomida faol "
+                f"({timezone.localtime(campaign.ends_at):%d.%m %H:%M} gacha)."
+            )}, timeout=8)
+    except Exception:
+        pass
+    return {"groups": groups, "users": users}
+
+
+@shared_task
+def expire_ad_campaigns():
+    """Close the window on ads whose time is up (runs every 5 minutes)."""
+    from tgbot.models import AdCampaign
+
+    now = timezone.now()
+    due = AdCampaign.objects.filter(status=AdCampaign.STATUS_LIVE, ends_at__lte=now)
+    for campaign in due:
+        campaign.status = AdCampaign.STATUS_FINISHED
+        campaign.save(update_fields=["status", "updated_at"])
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                data={"chat_id": campaign.winner.telegram_id, "parse_mode": "HTML",
+                      "text": (
+                          f"⏱ <b>Reklamangiz muddati tugadi.</b>\n\n"
+                          f"{campaign.duration_hours} soat davomida "
+                          f"{campaign.broadcast_groups} ta guruh va "
+                          f"{campaign.broadcast_users} ta foydalanuvchiga ko'rsatildi.\n\n"
+                          f"Yana reklama qilmoqchimisiz? Keyingi auksionni "
+                          f"do'kondan kuzatib boring 🛒")}, timeout=8)
+        except Exception:
+            pass
+        print(f"expire_ad_campaigns: #{campaign.id} finished")
+
+
+@shared_task
+def open_ad_auctions():
+    """Put the two advertising slots up for auction, at most once every
+    AD_AUCTION_INTERVAL_DAYS. Premium members only."""
+    from datetime import timedelta
+    from tgbot.models import ShopProduct
+
+    now = timezone.now()
+    recent = ShopProduct.objects.filter(
+        ad_slot_hours__isnull=False,
+        created_at__gte=now - timedelta(days=AD_AUCTION_INTERVAL_DAYS),
+    ).exists()
+    if recent:
+        print("open_ad_auctions: an ad auction is already running, skipping")
+        return
+
+    ends = now + timedelta(hours=AD_AUCTION_BIDDING_HOURS)
+    created = []
+    for hours in AD_SLOT_DURATIONS:
+        p = ShopProduct.objects.create(
+            name=f"📣 {hours} soatlik reklama o'rni",
+            description=(
+                f"Auksion g'olibi istagan havolasini reklama qila oladi. "
+                f"Havola administrator moderatsiyasidan o'tgach, u {hours} soat "
+                f"davomida barcha guruhlarda va bot foydalanuvchilariga "
+                f"ko'rsatiladi.\n\n"
+                f"⭐️ Faqat Premium a'zolar qatnasha oladi."
+            ),
+            price_kitobcha=AD_SLOT_MIN_BID[hours],
+            is_auction=True,
+            min_start_bid=AD_SLOT_MIN_BID[hours],
+            auction_end_at=ends,
+            ad_slot_hours=hours,
+            premium_only=True,
+            is_active=True,
+            sort_order=-10,
+        )
+        created.append(p)
+
+    lines = [
+        "📣 <b>REKLAMA AUKSIONI OCHILDI!</b>\n",
+        "Kitobchangiz evaziga <b>o'z havolangizni</b> butun loyihaga reklama qiling — "
+        "barcha guruhlarga va bot foydalanuvchilariga yetib boradi.\n",
+    ]
+    for p in created:
+        lines.append(f"• <b>{escape(p.name)}</b> — boshlang'ich {p.min_start_bid} Kitobcha")
+    lines.append(
+        f"\n⏳ Takliflar <b>{AD_AUCTION_BIDDING_HOURS} soat</b> qabul qilinadi "
+        f"({timezone.localtime(ends):%d.%m %H:%M} gacha)."
+    )
+    lines.append("⭐️ <b>Faqat Premium a'zolar</b> qatnasha oladi.")
+    lines.append("🛡 G'olibning havolasi administrator moderatsiyasidan o'tadi.")
+
+    username = _get_bot_username()
+    kb = None
+    if username:
+        kb = json.dumps({"inline_keyboard": [[
+            {"text": "🛒 Auksionga kirish", "url": f"https://t.me/{username}?start=dokon"},
+        ]]})
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    text = "\n".join(lines)
+    for gid, tid in set(list(_announce_targets()) + list(_game_targets())):
+        try:
+            data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
+                    "disable_web_page_preview": "true"}
+            if kb:
+                data["reply_markup"] = kb
+            if tid:
+                data["message_thread_id"] = tid
+            requests.post(url, data=data, timeout=10)
+        except Exception as e:
+            print(f"open_ad_auctions announce {gid}: {e}")
+
+    print(f"open_ad_auctions: opened {[p.id for p in created]} until {ends}")
+    return [p.id for p in created]

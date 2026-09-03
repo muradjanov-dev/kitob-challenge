@@ -415,6 +415,7 @@ class ShopProductAdmin(admin.ModelAdmin):
     fields = (
         'name', 'description', 'image', 'price_kitobcha',
         'is_auction', 'min_start_bid', 'auction_end_at',
+        'ad_slot_hours', 'premium_only',
         'stock_qty', 'sort_order', 'is_active', 'grants_premium_days',
     )
 
@@ -429,6 +430,50 @@ class ShopAuctionBidAdmin(admin.ModelAdmin):
     list_display = ('product', 'user', 'amount', 'is_refunded', 'created_at', 'updated_at')
     list_filter = ('is_refunded', 'product', 'created_at')
     search_fields = ('product__name', 'user__full_name', 'user__telegram_id')
+
+
+@admin.register(models.AdCampaign)
+class AdCampaignAdmin(admin.ModelAdmin):
+    """Read-mostly view of the advertising slots.
+
+    Approving here does the same thing as the admin's Telegram button: it opens
+    the window and queues the broadcast. There is deliberately no way to set
+    STATUS_LIVE by hand -- everything goes through AdCampaign.approve(), so an
+    unreviewed link can never reach the groups.
+    """
+    list_display = ('id', 'winner', 'duration_hours', 'status', 'bid_amount',
+                    'link', 'starts_at', 'ends_at',
+                    'broadcast_groups', 'broadcast_users', 'created_at')
+    list_filter = ('status', 'duration_hours', 'created_at')
+    search_fields = ('winner__full_name', 'winner__telegram_id', 'link', 'ad_text')
+    readonly_fields = ('starts_at', 'ends_at', 'broadcast_groups', 'broadcast_users',
+                       'submitted_at', 'reviewed_at', 'reviewed_by')
+    actions = ('approve_and_broadcast', 'reject_campaign')
+
+    @admin.action(description="✅ Tasdiqlash va tarqatish")
+    def approve_and_broadcast(self, request, queryset):
+        from tgbot.tasks import broadcast_ad_campaign
+        done = 0
+        for campaign in queryset:
+            if campaign.status != models.AdCampaign.STATUS_REVIEW:
+                continue
+            campaign.approve()
+            try:
+                broadcast_ad_campaign.delay(campaign.id)
+            except Exception as e:
+                self.message_user(request, f"#{campaign.id}: navbatga qo'yilmadi ({e})")
+                continue
+            done += 1
+        self.message_user(request, f"{done} ta reklama tasdiqlandi va tarqatilmoqda.")
+
+    @admin.action(description="❌ Rad etish")
+    def reject_campaign(self, request, queryset):
+        n = 0
+        for campaign in queryset:
+            if campaign.status == models.AdCampaign.STATUS_REVIEW:
+                campaign.reject(reason="Administrator rad etdi.")
+                n += 1
+        self.message_user(request, f"{n} ta reklama rad etildi.")
 
 
 

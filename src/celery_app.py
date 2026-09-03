@@ -152,6 +152,20 @@ app.conf.beat_schedule = {
     # real announcement at slot time. This deliberately raises the documented
     # 3-DM/day cap below to 5 for a non-reporting user; it was asked for so
     # readers who are not watching the groups still hear the games starting.
+    # ── Reklama auksioni ─────────────────────────────────────────────────
+    # A fresh pair of advertising slots (24h and 48h) goes up for auction every
+    # third day; open_ad_auctions itself no-ops if one is still running, so the
+    # daily trigger cannot stack them. Bidding is Premium-only and the winner's
+    # link is published only after an admin approves it.
+    'open-ad-auctions': {
+        'task': 'tgbot.tasks.open_ad_auctions',
+        'schedule': crontab(hour=11, minute=0),
+    },
+    'expire-ad-campaigns': {
+        'task': 'tgbot.tasks.expire_ad_campaigns',
+        'schedule': crontab(minute='*/5'),
+    },
+
     'games-teaser-morning': {
         'task': 'tgbot.tasks.send_game_teaser',
         'schedule': crontab(hour=9, minute=50),

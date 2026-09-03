@@ -1083,6 +1083,24 @@ class ShopProduct(BaseModel):
         help_text="When the auction finishes and winner is decided.",
     )
 
+    ad_slot_hours = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Set to 24 or 48 to make this an ADVERTISING slot instead of "
+                  "an ordinary prize. The auction winner is asked for a link and "
+                  "ad text, an admin approves it, and it is then broadcast to "
+                  "every group and every bot user for this many hours. Leave "
+                  "blank for normal products.",
+    )
+    premium_only = models.BooleanField(
+        default=False,
+        help_text="Only Premium members may bid on / buy this. Used by the "
+                  "advertising slots.",
+    )
+
+    @property
+    def is_ad_slot(self) -> bool:
+        return bool(self.ad_slot_hours)
+
     class Meta:
         verbose_name = "Shop Product"
         verbose_name_plural = "Shop Products"
@@ -1166,6 +1184,116 @@ class ShopPurchase(BaseModel):
 
     def __str__(self):
         return f"{self.code} — {self.user.full_name} — {self.product_name_snapshot}"
+
+
+class AdCampaign(BaseModel):
+    """One advertising slot won at auction: the link, the moderation decision,
+    and the window it runs for.
+
+    Lifecycle, in order:
+      awaiting  — auction settled, the winner has been asked for their link
+      review    — winner submitted a link + text; admins must approve it
+      rejected  — an admin refused it (reason kept); the winner may resubmit
+      live      — approved and broadcast; runs until ends_at
+      finished  — the window closed
+
+    The link is never published without an admin passing it: `approve()` is the
+    only thing that sets starts_at/ends_at, so an unreviewed campaign has no
+    window and the broadcaster ignores it.
+    """
+    STATUS_AWAITING = "awaiting"
+    STATUS_REVIEW = "review"
+    STATUS_REJECTED = "rejected"
+    STATUS_LIVE = "live"
+    STATUS_FINISHED = "finished"
+    STATUS_CHOICES = [
+        (STATUS_AWAITING, "Havola kutilmoqda"),
+        (STATUS_REVIEW, "Moderatsiyada"),
+        (STATUS_REJECTED, "Rad etilgan"),
+        (STATUS_LIVE, "Efirda"),
+        (STATUS_FINISHED, "Tugagan"),
+    ]
+
+    product = models.ForeignKey(
+        ShopProduct, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="ad_campaigns",
+    )
+    winner = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="ad_campaigns",
+    )
+    duration_hours = models.PositiveIntegerField(
+        help_text="How long the ad runs once approved (24 or 48).",
+    )
+    bid_amount = models.PositiveIntegerField(
+        default=0, help_text="Winning bid in Kitobcha, kept for the record.",
+    )
+
+    link = models.URLField(max_length=500, blank=True, default="")
+    ad_text = models.TextField(blank=True, default="")
+
+    status = models.CharField(
+        max_length=16, choices=STATUS_CHOICES, default=STATUS_AWAITING,
+    )
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        TelegramProfile, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="ad_campaigns_reviewed",
+    )
+    reject_reason = models.TextField(blank=True, default="")
+
+    starts_at = models.DateTimeField(null=True, blank=True)
+    ends_at = models.DateTimeField(null=True, blank=True)
+    broadcast_groups = models.PositiveIntegerField(default=0)
+    broadcast_users = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Ad Campaign"
+        verbose_name_plural = "Ad Campaigns"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        who = self.winner.full_name or self.winner.telegram_id
+        return f"{who} — {self.duration_hours}h — {self.get_status_display()}"
+
+    @property
+    def is_running(self) -> bool:
+        from django.utils import timezone
+        return bool(
+            self.status == self.STATUS_LIVE
+            and self.ends_at and self.ends_at > timezone.now()
+        )
+
+    def approve(self, admin=None):
+        """Open the ad's window. The only path to STATUS_LIVE."""
+        from datetime import timedelta
+        from django.utils import timezone
+
+        now = timezone.now()
+        self.status = self.STATUS_LIVE
+        self.reviewed_at = now
+        self.reviewed_by = admin
+        self.reject_reason = ""
+        self.starts_at = now
+        self.ends_at = now + timedelta(hours=self.duration_hours)
+        self.save(update_fields=[
+            "status", "reviewed_at", "reviewed_by", "reject_reason",
+            "starts_at", "ends_at", "updated_at",
+        ])
+        return self
+
+    def reject(self, admin=None, reason=""):
+        """Send it back to the winner. They keep the slot and may resubmit."""
+        from django.utils import timezone
+
+        self.status = self.STATUS_REJECTED
+        self.reviewed_at = timezone.now()
+        self.reviewed_by = admin
+        self.reject_reason = reason or ""
+        self.save(update_fields=[
+            "status", "reviewed_at", "reviewed_by", "reject_reason", "updated_at",
+        ])
+        return self
 
 
 class StreakFreezeCoverage(BaseModel):

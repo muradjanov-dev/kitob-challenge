@@ -233,6 +233,14 @@ async def do_start(message: types.Message, state: FSMContext):
         await show_referral_link_screen(message, user)
         return
 
+    # Sent to the winner of an advertising-slot auction so they can hand over
+    # the link they want run. Says so plainly if they have no slot waiting.
+    if args == "reklama" and already_registered:
+        await state.finish()
+        from tgbot.bot.handlers.users.ads import start_ad_submission
+        await start_ad_submission(message, state)
+        return
+
     # AI quiz deep link: /start aiquiz — from the AI-quiz-upgrade broadcast's
     # inline button, lands the user straight in AI quiz creation (same gate
     # as the "🤖 AI yordamida Quiz yaratish" button: Premium, trial window,
