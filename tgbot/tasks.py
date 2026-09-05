@@ -7631,6 +7631,22 @@ AD_SLOT_DURATIONS = (24, 48)      # ikki xil reklama o'rni
 AD_SLOT_MIN_BID = {24: 500, 48: 900}
 
 
+def _ad_reach_estimate():
+    """What a buyer is actually bidding for, in numbers rather than adjectives."""
+    from tgbot.models import TelegramProfile
+
+    try:
+        groups = len(set(list(_announce_targets()) + list(_game_targets())))
+    except Exception:
+        groups = 0
+    try:
+        users = TelegramProfile.objects.filter(
+            is_registered=True, is_blocked=False).count()
+    except Exception:
+        users = 0
+    return {"groups": groups, "users": users}
+
+
 def _ad_message(campaign):
     """The published ad. The winner's text is escaped; only the frame is HTML."""
     return (
@@ -7739,20 +7755,33 @@ def expire_ad_campaigns():
 
 
 @shared_task
-def open_ad_auctions():
+def open_ad_auctions(force=False):
     """Put the two advertising slots up for auction, at most once every
-    AD_AUCTION_INTERVAL_DAYS. Premium members only."""
+    AD_AUCTION_INTERVAL_DAYS. Premium members only.
+
+    `force=True` skips the interval guard, for opening a round by hand between
+    the scheduled ones. The guard exists so the daily trigger cannot stack
+    auctions, not to stop a deliberate manual round.
+    """
     from datetime import timedelta
     from tgbot.models import ShopProduct
 
     now = timezone.now()
-    recent = ShopProduct.objects.filter(
-        ad_slot_hours__isnull=False,
-        created_at__gte=now - timedelta(days=AD_AUCTION_INTERVAL_DAYS),
-    ).exists()
-    if recent:
-        print("open_ad_auctions: an ad auction is already running, skipping")
-        return
+    if not force:
+        # Two guards, because they stop different things: the interval keeps the
+        # cadence at one round every AD_AUCTION_INTERVAL_DAYS (the daily beat
+        # trigger would otherwise open a fresh pair the moment the last one
+        # closed), and the open-auction check stops a second pair appearing
+        # while bidding is still under way.
+        blocked = ShopProduct.objects.filter(
+            ad_slot_hours__isnull=False,
+            created_at__gte=now - timedelta(days=AD_AUCTION_INTERVAL_DAYS),
+        ).exists() or ShopProduct.objects.filter(
+            ad_slot_hours__isnull=False, is_active=True, auction_end_at__gt=now,
+        ).exists()
+        if blocked:
+            print("open_ad_auctions: too soon or one is still running, skipping")
+            return
 
     ends = now + timedelta(hours=AD_AUCTION_BIDDING_HOURS)
     created = []
@@ -7777,26 +7806,36 @@ def open_ad_auctions():
         )
         created.append(p)
 
+    reach = _ad_reach_estimate()
     lines = [
-        "📣 <b>REKLAMA AUKSIONI OCHILDI!</b>\n",
-        "Kitobchangiz evaziga <b>o'z havolangizni</b> butun loyihaga reklama qiling — "
-        "barcha guruhlarga va bot foydalanuvchilariga yetib boradi.\n",
+        "📣 <b>REKLAMA AUKSIONI OCHILDI — HOZIROQ JOYINGIZNI YUTIB OLING!</b>\n",
+        "Kitobchangiz evaziga <b>istalgan turdagi reklamangizni</b> butun loyihaga "
+        "joylashtiring: o'z kanalingiz, biznesingiz, kursingiz, kitobingiz, "
+        "loyihangiz — <b>istalgan havola</b>.\n",
+        f"📊 Qamrov: <b>{reach['groups']} ta guruh</b> va "
+        f"<b>{reach['users']}+ bot foydalanuvchisi</b> — hammasiga bir vaqtda yetib boradi.\n",
+        "🎯 <b>Sotuvdagi o'rinlar:</b>",
     ]
     for p in created:
-        lines.append(f"• <b>{escape(p.name)}</b> — boshlang'ich {p.min_start_bid} Kitobcha")
+        lines.append(f"   • <b>{escape(p.name)}</b> — boshlang'ich {p.min_start_bid} Kitobcha")
     lines.append(
-        f"\n⏳ Takliflar <b>{AD_AUCTION_BIDDING_HOURS} soat</b> qabul qilinadi "
-        f"({timezone.localtime(ends):%d.%m %H:%M} gacha)."
+        f"\n⏳ <b>Takliflar atigi {AD_AUCTION_BIDDING_HOURS} soat</b> qabul qilinadi — "
+        f"{timezone.localtime(ends):%d.%m, %H:%M} da yopiladi!"
     )
-    lines.append("⭐️ <b>Faqat Premium a'zolar</b> qatnasha oladi.")
-    lines.append("🛡 G'olibning havolasi administrator moderatsiyasidan o'tadi.")
+    lines.append("🥇 Eng yuqori taklif bergan g'olib bo'ladi.")
+    lines.append("💸 Yutqazsangiz — <b>Kitobchangiz to'liq qaytariladi</b>, hech narsa yo'qotmaysiz.")
+    lines.append("🛡 Havola administrator <b>moderatsiyasidan</b> o'tadi.")
+    lines.append("⭐️ <b>Faqat Premium a'zolar</b> qatnasha oladi.\n")
+    lines.append("👇 <b>Taklifingizni hoziroq qo'ying — joy bittagina!</b>")
 
     username = _get_bot_username()
     kb = None
     if username:
-        kb = json.dumps({"inline_keyboard": [[
-            {"text": "🛒 Auksionga kirish", "url": f"https://t.me/{username}?start=dokon"},
-        ]]})
+        kb = json.dumps({"inline_keyboard": [
+            [{"text": "🔥 TAKLIF QO'YISH — joyimni yutib olaman",
+              "url": f"https://t.me/{username}?start=dokon"}],
+            [{"text": "⭐️ Premium olish", "url": f"https://t.me/{username}?start=dokon"}],
+        ]})
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     text = "\n".join(lines)
     for gid, tid in set(list(_announce_targets()) + list(_game_targets())):
