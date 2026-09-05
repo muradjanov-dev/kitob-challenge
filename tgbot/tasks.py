@@ -7647,12 +7647,25 @@ def _ad_reach_estimate():
     return {"groups": groups, "users": users}
 
 
+def _esc_text(value):
+    """Escape for Telegram HTML *element content*.
+
+    `&`, `<` and `>` are neutralised, which is everything Telegram's parser can
+    be confused by here. Quotes are deliberately left alone: they only matter
+    inside attributes, and django.utils.html.escape's `&#x27;` is a numeric
+    entity Telegram does not decode -- an advertiser's "o'zbek" would be
+    published as "o&#x27;zbek".
+    """
+    from html import escape as _e
+    return _e(str(value or ""), quote=False)
+
+
 def _ad_message(campaign):
     """The published ad. The winner's text is escaped; only the frame is HTML."""
     return (
         f"📣 <b>REKLAMA</b>\n\n"
-        f"{escape(campaign.ad_text)}\n\n"
-        f"🔗 {escape(campaign.link)}\n\n"
+        f"{_esc_text(campaign.ad_text)}\n\n"
+        f"🔗 {_esc_text(campaign.link)}\n\n"
         f"<i>Bu joy Kitob Challenge do'konidagi auksionda yutib olingan. "
         f"Siz ham Kitobcha evaziga o'z reklamangizni joylashtira olasiz.</i>"
     )
@@ -7816,8 +7829,14 @@ def open_ad_auctions(force=False):
         f"<b>{reach['users']}+ bot foydalanuvchisi</b> — hammasiga bir vaqtda yetib boradi.\n",
         "🎯 <b>Sotuvdagi o'rinlar:</b>",
     ]
+    # django.utils.html.escape always encodes quotes, which turns our own
+    # "o'rni" into "o&#x27;rni" -- Telegram does not decode that numeric entity,
+    # so it shows up literally. These names are generated right above, not user
+    # input, so escape only the characters that actually need it.
+    from html import escape as _esc
     for p in created:
-        lines.append(f"   • <b>{escape(p.name)}</b> — boshlang'ich {p.min_start_bid} Kitobcha")
+        lines.append(f"   • <b>{_esc(p.name, quote=False)}</b> — "
+                     f"boshlang'ich {p.min_start_bid} Kitobcha")
     lines.append(
         f"\n⏳ <b>Takliflar atigi {AD_AUCTION_BIDDING_HOURS} soat</b> qabul qilinadi — "
         f"{timezone.localtime(ends):%d.%m, %H:%M} da yopiladi!"
