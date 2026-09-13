@@ -17,6 +17,46 @@ def _is_admin(telegram_id: int) -> bool:
     return str(telegram_id) in ids
 
 
+def _hold_id(parts, index):
+    """PremiumKitobchaHold id from a callback, or None for a plain payment
+    (and for buttons created before mixed payments existed)."""
+    try:
+        return int(parts[index]) if len(parts) > index and parts[index] else None
+    except ValueError:
+        return None
+
+
+async def _capture_hold(call: types.CallbackQuery, hold_id) -> bool:
+    """True when Premium may be granted. A mixed payment is granted only by
+    the click that captures its Kitobcha: that stops a second admin (group
+    button + DM button) granting it twice, and stops approving a payment whose
+    Kitobcha was already refunded by a rejection."""
+    if not hold_id:
+        return True
+    from tgbot.services import mixed_payment
+    before = await sync_to_async(mixed_payment.capture)(hold_id)
+    if before == "held":
+        return True
+    msg = {
+        "captured": "Bu to'lov allaqachon tasdiqlangan.",
+        "refunded": "Bu to'lov rad etilgan — Kitobcha qaytarilgan. Tasdiqlab bo'lmaydi.",
+    }.get(before, "Aralash to'lov topilmadi.")
+    await call.answer(msg, show_alert=True)
+    return False
+
+
+async def _refund_hold(hold_id, user_telegram_id) -> None:
+    if not hold_id:
+        return
+    from tgbot.services import mixed_payment
+    refunded = await sync_to_async(mixed_payment.refund)(hold_id)
+    if refunded:
+        try:
+            await bot.send_message(user_telegram_id, mixed_payment.refund_text(refunded), parse_mode="HTML")
+        except Exception as e:
+            print(f"mixed payment refund notify failed: {e}")
+
+
 def _build_premium_welcome(start_date, end_date) -> str:
     return (
         "🎉 <b>Tabriklaymiz! Premium faollashtirildi!</b>\n\n"
@@ -38,10 +78,14 @@ async def confirm_payment_message_handler(call: types.CallbackQuery, state: FSMC
     user_telegram_id = split_data[2]
     photo_message_id = split_data[3] if len(split_data) > 3 and split_data[3] != 'None' else None
     days = int(split_data[4]) if len(split_data) > 4 and split_data[4] else 30
+    hold_id = _hold_id(split_data, 5)
 
     user = await aget_user(telegram_id=user_telegram_id)
 
     if not user:
+        return
+
+    if not await _capture_hold(call, hold_id):
         return
 
     try:
@@ -80,6 +124,7 @@ async def confirm_payment_message_handler_reject(call: types.CallbackQuery, stat
     price = int(split_data[1])
     user_telegram_id = split_data[2]
     photo_message_id = split_data[3] if len(split_data) > 3 and split_data[3] != 'None' else None
+    await _refund_hold(_hold_id(split_data, 4), user_telegram_id)
 
     await state.update_data(photo_message_id=photo_message_id)
     await state.update_data(user_telegram_id=user_telegram_id)
@@ -157,6 +202,8 @@ async def padmin_accept(call: types.CallbackQuery):
     if not user:
         await call.answer("Foydalanuvchi topilmadi.", show_alert=True)
         return
+    if not await _capture_hold(call, _hold_id(split_data, 4)):
+        return
 
     # An existing active subscription is EXTENDED, not blocked — buying/
     # granting again while Premium is still active adds the new days on top.
@@ -192,6 +239,7 @@ async def padmin_reject(call: types.CallbackQuery, state: FSMContext):
     split_data = call.data.split(":")
     price = int(split_data[1])
     user_telegram_id = split_data[2]
+    await _refund_hold(_hold_id(split_data, 3), user_telegram_id)
     await state.update_data(padmin_reject_target=user_telegram_id)
 
     try:

@@ -15,6 +15,9 @@ from tgbot.models import (
 
 # How many Kitobcha a correct guess is worth.
 REWARD_KITOBCHA = 100
+# What casting a vote costs. Charged once, together with recording the answer;
+# the author of the quote votes for free (they get no reward either).
+VOTE_FEE_KITOBCHA = 20
 # A conclusion needs at least this many real letters/digits to be a fair quiz —
 # guards against junk entries that are only symbols (".", '"', "/", "-", …).
 MIN_MEANINGFUL_CHARS = 20
@@ -167,6 +170,7 @@ def build_quiz_text(quiz_round) -> str:
         "━━━━━━━━━━━━━━━\n"
         "📖 <b>Bu iqtibos qaysi kitobdan?</b>\n\n"
         f"💬 <i>«{_escape(quiz_round.conclusion)}»</i>\n\n"
+        f"🎟 Ovoz berish → <b>{VOTE_FEE_KITOBCHA}</b> 🪙\n"
         f"🎯 To'g'ri javob → <b>+{quiz_round.reward}</b> 🪙\n"
         f"🎁 Noto'g'ri ham → <b>+{consolation}</b> 🪙 <i>(urinish uchun)</i>\n"
         "💎 Premium → <b>×2</b>\n\n"

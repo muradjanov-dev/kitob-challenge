@@ -1097,6 +1097,18 @@ class ShopProduct(BaseModel):
                   "advertising slots.",
     )
 
+    is_charity = models.BooleanField(
+        default=False,
+        help_text="Xayriya jamg'armasi: sotib olinmaydi, har kim istagancha "
+                  "Kitobcha qo'shadi (kamida CHARITY_MIN_CONTRIBUTION). Har "
+                  "`charity_step` Kitobcha to'planganda loyiha shuncha so'm "
+                  "xayriya qiladi.",
+    )
+    charity_step = models.PositiveIntegerField(
+        default=100_000,
+        help_text="Nechta Kitobcha to'planganda bitta xayriya amalga oshiriladi.",
+    )
+
     @property
     def is_ad_slot(self) -> bool:
         return bool(self.ad_slot_hours)
@@ -1184,6 +1196,115 @@ class ShopPurchase(BaseModel):
 
     def __str__(self):
         return f"{self.code} — {self.user.full_name} — {self.product_name_snapshot}"
+
+
+CHARITY_MIN_CONTRIBUTION = 100
+
+
+class CharityContribution(BaseModel):
+    """One Kitobcha contribution to a charity fund (ShopProduct.is_charity).
+    Non-refundable: the Kitobcha is gone the moment this row exists."""
+    product = models.ForeignKey(
+        ShopProduct, on_delete=models.PROTECT, related_name="charity_contributions",
+    )
+    user = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="charity_contributions",
+    )
+    amount = models.PositiveIntegerField()
+
+    class Meta:
+        verbose_name = "Xayriya hissasi"
+        verbose_name_plural = "Xayriya hissalari"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.user.full_name or self.user.telegram_id} — {self.amount} 🪙"
+
+
+class CharityMilestone(BaseModel):
+    """The fund crossed `number × charity_step` Kitobcha — the project now owes
+    one real donation. Created inside the contributing transaction, so each
+    step exists exactly once (unique_together)."""
+    product = models.ForeignKey(
+        ShopProduct, on_delete=models.PROTECT, related_name="charity_milestones",
+    )
+    number = models.PositiveIntegerField(help_text="1 = first 100.000, 2 = second, ...")
+    last_contribution = models.ForeignKey(
+        CharityContribution, on_delete=models.PROTECT, related_name="+",
+        help_text="The contribution that completed this step. Everyone who "
+                  "contributed after the previous step up to this one is a "
+                  "participant of this milestone.",
+    )
+    participants_count = models.PositiveIntegerField(default=0)
+    broadcast_started = models.BooleanField(default=False)
+    broadcast_users = models.PositiveIntegerField(default=0)
+    is_fulfilled = models.BooleanField(
+        default=False, help_text="Real xayriya amalga oshirildi.",
+    )
+    fulfilled_note = models.TextField(
+        blank=True, default="",
+        help_text="Nima qilindi: kimga, qanday kitob / qancha so'm. Guruhlarga "
+                  "hisobot sifatida e'lon qilinadi.",
+    )
+    fulfilled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Xayriya bosqichi"
+        verbose_name_plural = "Xayriya bosqichlari"
+        unique_together = ("product", "number")
+        ordering = ("-number",)
+
+    def participant_ids(self):
+        """TelegramProfile ids of everyone who contributed toward this step."""
+        prev = (
+            CharityMilestone.objects
+            .filter(product_id=self.product_id, number=self.number - 1)
+            .values_list("last_contribution_id", flat=True).first()
+        )
+        qs = CharityContribution.objects.filter(
+            product_id=self.product_id, id__lte=self.last_contribution_id,
+        )
+        if prev:
+            qs = qs.filter(id__gt=prev)
+        return set(qs.values_list("user_id", flat=True))
+
+    def __str__(self):
+        return f"{self.product.name} — #{self.number}"
+
+
+class PremiumKitobchaHold(BaseModel):
+    """Kitobcha part of a mixed (Kitobcha + card) Premium payment.
+
+    The Kitobcha is deducted when the user sends the receipt and sits here
+    until an admin rules on it: approval captures it, rejection refunds it.
+    Both transitions are guarded on `status` under a row lock, so a double
+    click, or the group button and the DM button both being pressed, can
+    neither refund twice nor refund an approved payment."""
+    STATUS_HELD = "held"
+    STATUS_CAPTURED = "captured"
+    STATUS_REFUNDED = "refunded"
+    STATUS_CHOICES = [
+        (STATUS_HELD, "Held"),
+        (STATUS_CAPTURED, "Captured"),
+        (STATUS_REFUNDED, "Refunded"),
+    ]
+
+    user = models.ForeignKey(
+        TelegramProfile, on_delete=models.CASCADE, related_name="premium_kitobcha_holds",
+    )
+    kitobcha = models.PositiveIntegerField()
+    cash_price = models.PositiveIntegerField(help_text="So'm part paid by card.")
+    plan = models.CharField(max_length=20)
+    days = models.PositiveIntegerField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_HELD)
+
+    class Meta:
+        verbose_name = "Aralash to'lov (Kitobcha qismi)"
+        verbose_name_plural = "Aralash to'lovlar (Kitobcha qismi)"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.user} — {self.kitobcha} 🪙 + {self.cash_price} so'm ({self.status})"
 
 
 class AdCampaign(BaseModel):

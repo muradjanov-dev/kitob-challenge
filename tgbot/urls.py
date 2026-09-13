@@ -12,7 +12,7 @@ from src.settings import WEBHOOK_PATH
 from tgbot.views import health_check_celery, health_check_redis
 from tgbot.shop_views import (
     shop_index, api_products, api_products_public, api_me, api_buy,
-    api_auction_details, api_bid,
+    api_auction_details, api_bid, api_charity_details, api_donate,
 )
 from tgbot.library_views import (
     api_comments, api_add_comment, api_delete_comment, api_my_books, api_recent_comments,
@@ -74,6 +74,8 @@ urlpatterns = [
     path("shop/api/buy/", api_buy, name="shop-api-buy"),
     path("shop/api/auction-details/", api_auction_details, name="shop-api-auction-details"),
     path("shop/api/bid/", api_bid, name="shop-api-bid"),
+    path("shop/api/charity-details/", api_charity_details, name="shop-api-charity-details"),
+    path("shop/api/donate/", api_donate, name="shop-api-donate"),
     path("kabinet/", cabinet_index, name="cabinet"),
     path("kabinet/api/me/", api_cabinet_me, name="cabinet-api-me"),
     path("kabinet/api/report/", api_submit_report, name="cabinet-api-submit-report"),

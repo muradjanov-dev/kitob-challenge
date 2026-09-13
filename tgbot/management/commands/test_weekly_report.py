@@ -155,7 +155,7 @@ class Command(BaseCommand):
         self.stdout.write("  Imagen 3 (1 rasm):    $0.04")
         self.stdout.write("  Jami / user / hafta:  ~$0.041  ≈  525 UZS")
         self.stdout.write("  Jami / user / OY:     ~$0.16   ≈  2,100 UZS")
-        self.stdout.write(f"  Premium narxi:        24,000 UZS/oy")
+        self.stdout.write(f"  Premium narxi:        31,000 UZS/oy")
         self.stdout.write("  Xarajat ulushi:       ~8.75% (text+rasm bilan)")
         self.stdout.write("")
         self.stdout.write("  ❗ Faqat TEXT (Imagen 3 siz):")

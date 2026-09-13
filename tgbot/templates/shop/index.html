@@ -334,6 +334,46 @@
     }
     .quick-bid-chip:active { transform: scale(0.95); background: rgba(230,180,80,0.2); }
 
+    /* ─── Charity fund ───────────────────────────────────────── */
+    .badge-charity {
+      position: absolute; top: 10px; left: 10px; z-index: 2;
+      background: linear-gradient(135deg, #22c55e, #15803d);
+      color: #fff; font-size: 10px; font-weight: 800;
+      padding: 4px 10px; border-radius: 999px; letter-spacing: 0.8px;
+      box-shadow: 0 4px 12px rgba(34,197,94,0.40);
+    }
+    .charity-bar {
+      height: 8px; border-radius: 999px; overflow: hidden;
+      background: rgba(255,255,255,0.08); border: 1px solid var(--card-border);
+    }
+    .charity-bar > span {
+      display: block; height: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, #22c55e, #86efac);
+      transition: width .6s cubic-bezier(.16,1,.3,1);
+    }
+    .charity-big { margin: 14px 0 6px; }
+    .charity-big .nums {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 8px; font-weight: 800;
+    }
+    .charity-big .nums .raised { font-size: 22px; color: #4ade80; font-family: var(--serif); }
+    .charity-big .nums .goal { font-size: 13px; color: var(--text-dim); }
+    .charity-big .charity-bar { height: 12px; }
+    .charity-stats { display: flex; gap: 8px; margin: 12px 0; }
+    .charity-stats > div {
+      flex: 1; text-align: center; padding: 10px 6px; border-radius: 12px;
+      background: var(--card); border: 1px solid var(--card-border);
+    }
+    .charity-stats .v { font-weight: 800; font-size: 16px; color: var(--text); }
+    .charity-stats .l { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    .charity-done {
+      background: rgba(74,222,128,0.10); border: 1px solid rgba(74,222,128,0.28);
+      border-radius: 12px; padding: 10px 12px; margin: 6px 0;
+      font-size: 13px; line-height: 1.45; color: var(--text);
+    }
+    .charity-done b { color: var(--success); }
+    .donate-btn { background: linear-gradient(135deg, #22c55e, #15803d); color: #fff; box-shadow: 0 14px 28px rgba(34,197,94,0.28); }
+
     /* ─── Sheet (modal) ──────────────────────────────────────── */
     .scrim {
       position: fixed; inset: 0; background: rgba(0,0,0,0.55);
@@ -724,6 +764,9 @@
     let balance = 0;
     let balanceLoaded = false;
     let openProduct = null;
+    // Smallest amount of Kitobcha anyone puts in anywhere: an opening bid, a
+    // raise, a charity contribution. Mirrors MIN_BID_STEP on the server.
+    const MIN_STEP = 100;
 
     // ─── Sound engine (Web Audio API, synthesized) ───────────
     const SOUND_KEY_ENABLED = "kc_shop_sound_on";
@@ -865,7 +908,9 @@
                   ? '<div class="stock urgent">🔥 Faqat ' + p.stock_qty + ' qoldi!</div>'
                   : '<div class="stock">Mavjud: ' + p.stock_qty + '</div>'));
         let badgeHtml = '';
-        if (p.is_auction) {
+        if (p.is_charity) {
+          badgeHtml = '<div class="badge-charity">💚 XAYRIYA</div>';
+        } else if (p.is_auction) {
           badgeHtml = '<div class="badge-auction">🔥 AUKSION</div>';
         } else if (p.grants_premium_days) {
           badgeHtml = '<div class="badge-premium" style="position:absolute;top:10px;left:10px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:3px 8px;border-radius:8px;font-size:10px;font-weight:800;letter-spacing:0.5px;box-shadow:0 2px 8px rgba(217,119,6,0.4);z-index:2;">⭐ ' + p.grants_premium_days + ' KUN PREMIUM</div>';
@@ -873,16 +918,22 @@
           badgeHtml = '<div class="badge-soldout">TUGADI</div>';
         }
 
-        const priceRow = p.is_auction
+        const charityProgress = p.is_charity ? ((p.charity_raised || 0) % (p.charity_step || 100000)) : 0;
+        const priceRow = p.is_charity
+          ? '<div class="price-row" style="font-size:12.5px"><span class="mini-coin"></span>' + fmtNum(charityProgress) + '<span style="font-size:11px;color:var(--text-dim);margin-left:2px">/ ' + fmtNum(p.charity_step) + '</span></div>' +
+            '<div class="charity-bar"><span style="width:' + Math.min(100, charityProgress * 100 / (p.charity_step || 100000)).toFixed(1) + '%"></span></div>'
+          : p.is_auction
           ? '<div class="price-row"><span class="mini-coin"></span>' + (p.highest_bid || p.min_start_bid) + '<span style="font-size:11px;color:var(--text-dim);margin-left:4px">eng yuqori</span></div>'
           : '<div class="price-row"><span class="mini-coin"></span>' + p.price + '</div>';
 
-        const auctionNote = p.is_auction
+        const auctionNote = p.is_charity
+          ? '<div class="stock" style="color:#4ade80;font-weight:700">🤲 Istagancha hissa qo\'shing</div>'
+          : p.is_auction
           ? '<div class="stock urgent">⏳ 10 kunlik auksion (' + (p.bids_count || 0) + ' ta taklif)</div>'
           : stockNote;
 
         const shortfall = p.price - balance;
-        const shortfallNote = (!p.is_auction && balanceLoaded && p.is_available && shortfall > 0)
+        const shortfallNote = (!p.is_auction && !p.is_charity && balanceLoaded && p.is_available && shortfall > 0)
           ? '<div class="shortfall">Yana ' + shortfall + ' 🪙 kerak</div>' : '';
 
         card.innerHTML =
@@ -1000,24 +1051,24 @@
           '</div>'
         : '<div class="my-bid-box">' +
             '<div><div class="lbl">Sizning taklifingiz</div><div class="val" style="font-size:14px;color:var(--text-dim)">Hali taklif bermadingiz</div></div>' +
-            '<div style="font-size:12px;color:var(--accent);font-weight:700">Min. 100 🪙</div>' +
+            '<div style="font-size:12px;color:var(--accent);font-weight:700">Min. ' + Math.max(prod.min_start_bid || 0, MIN_STEP) + ' 🪙</div>' +
           '</div>';
 
-      const minAllowed = Math.max(prod.min_start_bid || 100, myBid + 10);
-      const suggested1 = Math.max(minAllowed, 100);
-      const suggested2 = suggested1 + 50;
-      const suggested3 = suggested1 + 100;
+      const minAllowed = myBid > 0 ? myBid + MIN_STEP : Math.max(prod.min_start_bid || 0, MIN_STEP);
+      const suggested1 = minAllowed;
+      const suggested2 = suggested1 + 400;
+      const suggested3 = suggested1 + 900;
 
       const biddingForm = isEnded
         ? '<div class="err-line" style="color:var(--error);text-align:center;font-weight:700;font-size:15px;margin:16px 0">Ushbu auksion yakunlangan!</div>'
-        : '<div class="leaderboard-title">O\'z taklifingizni bering (kamida 100 🪙):</div>' +
+        : '<div class="leaderboard-title">' + (myBid > 0 ? 'Taklifni oshiring (kamida +' + MIN_STEP + ' 🪙):' : 'O\'z taklifingizni bering (kamida ' + minAllowed + ' 🪙):') + '</div>' +
           '<div class="quick-bids">' +
             '<button type="button" class="quick-bid-chip" data-val="' + suggested1 + '">' + suggested1 + ' 🪙</button>' +
             '<button type="button" class="quick-bid-chip" data-val="' + suggested2 + '">' + suggested2 + ' 🪙</button>' +
             '<button type="button" class="quick-bid-chip" data-val="' + suggested3 + '">' + suggested3 + ' 🪙</button>' +
           '</div>' +
           '<div class="bid-input-wrap">' +
-            '<input type="number" id="bidInput" class="bid-input" value="' + suggested1 + '" min="' + minAllowed + '" step="10" placeholder="Miqdor (🪙)" />' +
+            '<input type="number" id="bidInput" class="bid-input" value="' + suggested1 + '" min="' + minAllowed + '" step="' + MIN_STEP + '" placeholder="Miqdor (🪙)" />' +
           '</div>' +
           '<button class="buy-btn" id="placeBidBtn" style="margin-top:12px">🪙 Taklifni yuborish</button>' +
           '<div class="err-line" id="bidErrLine"></div>' +
@@ -1060,13 +1111,10 @@
           const err = document.getElementById("bidErrLine");
           err.textContent = "";
           const val = parseInt(input.value, 10);
-          if (isNaN(val) || val < 100) {
-            err.textContent = "Minimal taklif miqdori — 100 Kitobcha!";
-            sound.play("error");
-            return;
-          }
-          if (val <= myBid) {
-            err.textContent = "Yangi taklif oldingi taklifingizdan (" + myBid + " 🪙) ko\'proq bo\'lishi shart!";
+          if (isNaN(val) || val < minAllowed) {
+            err.textContent = myBid > 0
+              ? "Taklifni kamida " + MIN_STEP + " Kitobchaga oshiring (" + minAllowed + " 🪙 dan)."
+              : "Minimal taklif miqdori — " + minAllowed + " Kitobcha!";
             sound.play("error");
             return;
           }
@@ -1079,8 +1127,8 @@
             sound.play("error");
             const msg = ({
               insufficient_balance: "Balansingizda yetarli Kitobcha yo\'q.",
-              bid_too_low: "Minimal taklif — 100 Kitobcha.",
-              must_increase_bid: "Oldingi taklifingizdan ko\'proq summa kiriting.",
+              bid_too_low: "Minimal taklif — " + minAllowed + " Kitobcha.",
+              must_increase_bid: "Taklifni kamida " + MIN_STEP + " Kitobchaga oshiring.",
               auction_ended: "Auksion yakunlangan.",
             })[res.data.error] || (res.data.error || "Xatolik yuz berdi");
             err.textContent = msg;
@@ -1095,7 +1143,138 @@
       }
     }
 
+    async function openCharitySheet(p) {
+      openProduct = p;
+      const img = p.image_url ? '<img src="' + p.image_url + '" alt=""/>' : '💚';
+      showSheet(
+        '<div class="preview">' + img + '</div>' +
+        '<h2>' + escapeHTML(p.name) + '</h2>' +
+        (p.description ? '<div class="desc">' + escapeHTML(p.description) + '</div>' : '') +
+        '<div class="spinner" id="chSpinner" style="margin:20px auto"></div>' +
+        '<div id="chContent" style="display:none"></div>' +
+        '<button class="close-btn" id="cancelBtn" style="margin-top:14px">Yopish</button>'
+      );
+      document.getElementById("cancelBtn").addEventListener("click", () => { sound.play("tap"); hideSheet(); });
+
+      const r = await api('/shop/api/charity-details/?product_id=' + p.id);
+      if (openProduct !== p) return;
+      const box = document.getElementById("chContent");
+      document.getElementById("chSpinner").style.display = "none";
+      box.style.display = "block";
+      if (!r.ok || !r.data.ok) {
+        box.innerHTML = '<div class="err-line">Ma\'lumotlarni yuklab bo\'lmadi. Qayta urinib ko\'ring.</div>';
+        return;
+      }
+      const d = r.data;
+      balance = d.balance; balanceLoaded = true; renderBalance(false);
+      const pct = Math.min(100, d.progress * 100 / d.step).toFixed(1);
+
+      let doneHtml = '';
+      (d.milestones || []).forEach(m => {
+        doneHtml += m.is_fulfilled
+          ? '<div class="charity-done">✅ <b>' + m.number + '-xayriya amalga oshirildi.</b><br/>' + escapeHTML(m.note) + '</div>'
+          : '<div class="charity-done">⏳ <b>' + m.number + '-bosqich to\'plandi</b> — xayriya tayyorlanmoqda, hisoboti guruhlarda e\'lon qilinadi.</div>';
+      });
+
+      let lbHtml = '';
+      if (!d.top_donors.length) {
+        lbHtml = '<div style="padding:14px;text-align:center;color:var(--text-dim);font-size:13px">Hali hech kim hissa qo\'shmadi. Birinchi bo\'ling!</div>';
+      } else {
+        d.top_donors.forEach(b => {
+          const medal = b.rank === 1 ? '🥇' : (b.rank === 2 ? '🥈' : (b.rank === 3 ? '🥉' : '#' + b.rank));
+          lbHtml += '<div class="lb-row' + (b.is_me ? ' me' : '') + '">' +
+            '<div class="lb-rank">' + medal + '</div>' +
+            '<div class="lb-name">' + escapeHTML(b.name) + (b.is_me ? ' <span style="font-size:11px;color:var(--accent)">(Siz)</span>' : '') + '</div>' +
+            '<div class="lb-amount">' + fmtNum(b.amount) + ' 🪙</div>' +
+          '</div>';
+        });
+      }
+
+      const min = d.min_contribution || MIN_STEP;
+      box.innerHTML =
+        '<div class="charity-big">' +
+          '<div class="nums"><span class="raised">' + fmtNum(d.progress) + ' 🪙</span><span class="goal">/ ' + fmtNum(d.step) + ' Kitobcha</span></div>' +
+          '<div class="charity-bar"><span style="width:' + pct + '%"></span></div>' +
+        '</div>' +
+        '<div class="charity-stats">' +
+          '<div><div class="v">' + d.done_count + '</div><div class="l">xayriya to\'plandi</div></div>' +
+          '<div><div class="v">' + d.donors_count + '</div><div class="l">savobga sherik</div></div>' +
+          '<div><div class="v">' + fmtNum(d.my_total) + '</div><div class="l">sizning hissangiz</div></div>' +
+        '</div>' +
+        doneHtml +
+        '<div class="leaderboard-title">Hissa qo\'shing (kamida ' + min + ' 🪙):</div>' +
+        '<div class="quick-bids">' +
+          [min, 500, 1000, 5000].map(v => '<button type="button" class="quick-bid-chip" data-val="' + v + '">' + fmtNum(v) + ' 🪙</button>').join('') +
+        '</div>' +
+        '<div class="bid-input-wrap"><input type="number" id="donateInput" class="bid-input" value="' + min + '" min="' + min + '" step="' + MIN_STEP + '" /></div>' +
+        '<button class="buy-btn donate-btn" id="donateBtn" style="margin-top:12px">💚 Hissa qo\'shish</button>' +
+        '<div class="err-line" id="donateErr"></div>' +
+        '<div style="font-size:11.5px;color:var(--text-dim);text-align:center;margin-top:6px;line-height:1.45">' +
+          'Har ' + fmtNum(d.step) + ' Kitobcha to\'planganda loyiha Kitobxonlar nomidan ' + fmtNum(d.step) + ' so\'m xayriya qiladi yoki muhtoj insonga shu qiymatgacha kitob olib beradi. Qo\'shilgan Kitobcha qaytarilmaydi.' +
+        '</div>' +
+        '<div class="leaderboard-title">🤲 Eng saxiy kitobxonlar:</div>' +
+        '<div class="leaderboard-list">' + lbHtml + '</div>';
+
+      box.querySelectorAll(".quick-bid-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+          sound.play("tap");
+          document.getElementById("donateInput").value = chip.dataset.val;
+        });
+      });
+
+      const btn = document.getElementById("donateBtn");
+      btn.addEventListener("click", async () => {
+        sound.play("tap");
+        const err = document.getElementById("donateErr");
+        err.textContent = "";
+        const val = parseInt(document.getElementById("donateInput").value, 10);
+        if (isNaN(val) || val < min) {
+          err.textContent = "Minimal hissa — " + min + " Kitobcha.";
+          sound.play("error");
+          return;
+        }
+        if (balanceLoaded && val > balance) {
+          err.textContent = "Balansingizda " + fmtNum(balance) + " Kitobcha bor.";
+          sound.play("error");
+          return;
+        }
+        btn.disabled = true;
+        btn.textContent = "Yuborilmoqda…";
+        const res = await api('/shop/api/donate/', { method: 'POST', body: { product_id: p.id, amount: val } });
+        if (!res.ok || !res.data.ok) {
+          btn.disabled = false;
+          btn.textContent = "💚 Hissa qo'shish";
+          sound.play("error");
+          err.textContent = ({
+            insufficient_balance: "Balansingizda yetarli Kitobcha yo'q.",
+            amount_too_low: "Minimal hissa — " + min + " Kitobcha.",
+            charity_not_found: "Jamg'arma hozir faol emas.",
+            invalid_init_data: "Ulanishda muammo — sahifani qayta yuklab ko'ring.",
+          })[res.data.error] || ("Xatolik: " + (res.data.error || res.status));
+          return;
+        }
+        balance = res.data.balance;
+        renderBalance(true);
+        const cached = products.find(x => x.id === p.id);
+        if (cached) { cached.charity_raised = res.data.raised; renderGrid(); }
+        sound.play("success");
+        fireConfetti();
+        if (tg && tg.showAlert) {
+          try {
+            tg.showAlert(res.data.milestone_reached
+              ? "💚 Rahmat! Sizning hissangiz bilan jamg'arma " + fmtNum(d.step) + " Kitobchaga yetdi!"
+              : "💚 Rahmat! " + fmtNum(val) + " Kitobcha xayriyaga qo'shildi.");
+          } catch (e) {}
+        }
+        openCharitySheet(p);
+      });
+    }
+
     function openProductSheet(p) {
+      if (p.is_charity) {
+        openCharitySheet(p);
+        return;
+      }
       if (p.is_auction) {
         openAuctionSheet(p);
         return;
@@ -1270,6 +1449,9 @@
     }
 
     // ─── Utils ───────────────────────────────────────────────
+    function fmtNum(n) {
+      return String(Math.floor(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    }
     function escapeHTML(s) {
       return String(s == null ? "" : s)
         .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")

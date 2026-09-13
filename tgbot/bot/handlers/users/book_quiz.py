@@ -2,6 +2,7 @@
 import asyncio
 from asgiref.sync import sync_to_async
 from aiogram import types
+from django.db import transaction
 from django.utils import timezone
 
 from tgbot.bot.loader import dp
@@ -33,19 +34,36 @@ def _process_answer(user_id: int, round_id: int, chosen_idx: int) -> str:
     is_premium = _is_premium(user_id)
     promo = "" if is_premium else _STATS_PROMO
 
-    answer, created = BookQuizAnswer.objects.get_or_create(
-        quiz_round=quiz_round, user_id=user_id,
-        defaults={"chosen_index": chosen_idx, "is_correct": is_correct},
-    )
-    if not created:
-        verdict = "to'g'ri ✅" if answer.is_correct else "noto'g'ri ❌"
-        return f"Siz allaqachon javob bergansiz (javobingiz {verdict}).{promo}"
+    from tgbot.services.book_quiz import VOTE_FEE_KITOBCHA
+    is_own_quote = quiz_round.source_user_id == user_id
 
-    if quiz_round.source_user_id == user_id:
-        return (f"🙂 Bu o'zingiz yuborgan xulosa — mukofot yo'q, lekin "
-                f"ishtirokingiz uchun rahmat!{promo}")
+    # The fee and the answer row are written together under a lock on the
+    # voter, so a double tap can neither charge twice nor record a vote that
+    # wasn't paid for.
+    with transaction.atomic():
+        profile = TelegramProfile.objects.select_for_update().get(id=user_id)
+        answer = BookQuizAnswer.objects.filter(quiz_round=quiz_round, user_id=user_id).first()
+        if answer:
+            verdict = "to'g'ri ✅" if answer.is_correct else "noto'g'ri ❌"
+            return f"Siz allaqachon javob bergansiz (javobingiz {verdict}).{promo}"
 
-    profile = TelegramProfile.objects.get(id=user_id)
+        if not is_own_quote and int(profile.ball or 0) < VOTE_FEE_KITOBCHA:
+            return (f"🎟 Ovoz berish {VOTE_FEE_KITOBCHA} Kitobcha turadi.\n"
+                    f"💰 Balansingiz: {int(profile.ball or 0)} Kitobcha.\n\n"
+                    "Hisobot yuborib yoki o'yinlarda Kitobcha ishlab, keyingi "
+                    "viktorinada qatnashing!")
+
+        answer = BookQuizAnswer.objects.create(
+            quiz_round=quiz_round, user_id=user_id,
+            chosen_index=chosen_idx, is_correct=is_correct,
+        )
+        if is_own_quote:
+            return (f"🙂 Bu o'zingiz yuborgan xulosa — mukofot yo'q, lekin "
+                    f"ishtirokingiz uchun rahmat!{promo}")
+
+        profile.update_ball(False, VOTE_FEE_KITOBCHA)
+
+    fee_note = f"🎟 Ovoz: −{VOTE_FEE_KITOBCHA} Kitobcha\n"
     if is_correct:
         awarded = profile.update_ball(True, quiz_round.reward)
         answer.rewarded = True
@@ -72,6 +90,7 @@ def _process_answer(user_id: int, round_id: int, chosen_idx: int) -> str:
 
         return (f"✅ To'g'ri! «{quiz_round.correct_title}»\n\n"
                 f"🪙 +{awarded} Kitobcha{prem_note}\n"
+                f"{fee_note}"
                 f"💰 Balans: {int(profile.ball)}{ach_note}{promo}")
     else:
         awarded = profile.update_ball(True, quiz_round.consolation)
@@ -80,6 +99,7 @@ def _process_answer(user_id: int, round_id: int, chosen_idx: int) -> str:
         prem_note = " 💎 ×2!" if awarded > quiz_round.consolation else ""
         return (f"❌ Noto'g'ri. To'g'ri javob: «{quiz_round.correct_title}»\n\n"
                 f"🎁 Urinish uchun: +{awarded} Kitobcha{prem_note}\n"
+                f"{fee_note}"
                 f"💰 Balans: {int(profile.ball)}\n"
                 f"Keyingi viktorinada omad! 🍀{promo}")
 

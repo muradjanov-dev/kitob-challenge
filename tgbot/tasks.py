@@ -885,11 +885,11 @@ INSPIRATION_POOL = [
     "🌅 Yangi kun — yangi imkoniyat. Hisobot bilan boshla, faxr bilan tugat!",
     "📮 Hisobot tugmasi seni kutmoqda. Bosishga tayyormisan? 👇",
     # ── Referral → Premium reminders ──────────────────────────────────────
-    "💎 Premiumni PULSIZ oling! Do'stlarni taklif qiling: <b>har 3 ta taklif = 1 kun Premium</b> + Kitobcha. Havolangiz: «📊 Reyting → 🌟 Referal».",
-    "🎁 Yolg'iz o'qima — do'st taklif qil! Har taklif uchun Kitobcha, <b>har 3-tasiga 1 kun Premium</b> 💎. «📊 Reyting → 🌟 Referal».",
-    "👥 Do'stingiz ham kitobxon bo'lsin! Referal havolangizni ulashing — sizga 🪙 Kitobcha va <b>Premium kunlari</b> sovg'a!",
-    "🚀 Premium olishning eng oson yo'li — do'st taklif qilish! Har 3 do'st = 1 kun Premium. Havola «📊 Reyting → 🌟 Referal»da.",
-    "💌 Kitobxon do'stingizni chaqiring — u o'qiy boshlasa, sizga bonus 🪙 + <b>har 3 taklifga 1 kun Premium</b> 💎!",
+    "💎 Premiumni PULSIZ oling! Do'stlarni taklif qiling: <b>har bir taklif = 1 kun Premium</b>. Havolangiz: «📊 Reyting → 🌟 Referal».",
+    "🎁 Yolg'iz o'qima — do'st taklif qil! <b>Har bir taklif uchun 1 kun Premium</b> 💎. «📊 Reyting → 🌟 Referal».",
+    "👥 Do'stingiz ham kitobxon bo'lsin! Referal havolangizni ulashing — har biri uchun <b>1 kun 💎 Premium</b> sovg'a!",
+    "🚀 Premium olishning eng oson yo'li — do'st taklif qilish! Har do'st = 1 kun Premium. Havola «📊 Reyting → 🌟 Referal»da.",
+    "💌 Kitobxon do'stingizni chaqiring — u o'qiy boshlasa, sizga <b>1 kun 💎 Premium</b>!",
 ]
 
 
@@ -4907,7 +4907,7 @@ def grant_everyone_premium(days=1, announce=True):
         "🎁 <b>LOYIHA ASOSCHISIDAN SOVG'A!</b> 🎁\n\n"
         "Barcha kitobxonlarga <b>24 soatlik 💎 Premium</b> sovg'a qilindi! 🔥\n\n"
         "Shu 24 soat ichida sizda:\n"
-        "🪙 <b>2 barobar ko'p Kitobcha</b> — har bir hisobot, yutuq va referal uchun\n"
+        "🪙 <b>2 barobar ko'p Kitobcha</b> — har bir hisobot va yutuq uchun\n"
         "♾️ <b>Kuniga cheksiz hisobot</b>\n"
         "📊 <b>Kunlik shaxsiy hisobot</b> va 📈 <b>o'sish grafigi</b>\n"
         "🏆 <b>Challenge tarixi</b>\n"
@@ -5353,7 +5353,7 @@ def _trial_premium_intro_text() -> str:
         f"🎉 <b>Tabriklaymiz! Sizga {TRIAL_PREMIUM_HOURS} soatlik BEPUL Premium sovg'a qilindi!</b>\n\n"
         f"⏳ Amal qilish muddati: <b>{TRIAL_PREMIUM_HOURS} soat</b>\n\n"
         "Shu vaqt ichida sizga quyidagi imkoniyatlar ochiq:\n\n"
-        "🪙 <b>×2 (ikki barobar) Kitobcha!</b> 🔥 — har bir hisobot, yutuq va referal mukofoti ikki barobar!\n"
+        "🪙 <b>×2 (ikki barobar) Kitobcha!</b> 🔥 — har bir hisobot va yutuq mukofoti ikki barobar!\n"
         "♾️ <b>Cheksiz kunlik hisobotlar</b> — bir necha marotaba hisobot yuboring, barchasi avtomatik jamlanadi!\n"
         "💎 <b>Premium belgisi</b> — guruhdagi hisobotingizda 💎 belgisi bilan ajralib turasiz\n\n"
         "Yoqdimi? Muddat tugagach buni doimiy saqlab qolishning 2 ta yo'li bo'ladi — kuting! 🚀"
@@ -7871,3 +7871,115 @@ def open_ad_auctions(force=False):
 
     print(f"open_ad_auctions: opened {[p.id for p in created]} until {ends}")
     return [p.id for p in created]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Xayriya jamg'armasi
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _charity_keyboards():
+    """(group_kb, dm_kb): groups can't host web_app buttons, so they deep-link
+    into the bot; DMs open the shop Mini App directly."""
+    from django.conf import settings as _settings
+    domain = str(_settings.WEB_DOMAIN)
+    if not domain.startswith("http"):
+        domain = f"https://{domain}"
+    username = _get_bot_username()
+    group_kb = json.dumps({"inline_keyboard": [[
+        {"text": "💚 Hissa qo'shish", "url": f"https://t.me/{username}?start=dokon"},
+    ]]}) if username else None
+    dm_kb = json.dumps({"inline_keyboard": [[
+        {"text": "💚 Hissa qo'shish", "web_app": {"url": f"{domain}/shop/"}},
+    ]]})
+    return group_kb, dm_kb
+
+
+def charity_post_to_groups(text: str) -> int:
+    group_kb, _dm_kb = _charity_keyboards()
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    sent = 0
+    for gid, tid in set(list(_announce_targets()) + list(_game_targets())):
+        data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
+                "disable_web_page_preview": "true"}
+        if group_kb:
+            data["reply_markup"] = group_kb
+        if tid:
+            data["message_thread_id"] = tid
+        try:
+            if requests.post(url, data=data, timeout=10).status_code == 200:
+                sent += 1
+        except Exception as e:
+            print(f"charity group post {gid}: {e}")
+    return sent
+
+
+def charity_dm(telegram_ids, text_for) -> int:
+    """DM every id; `text_for(telegram_id)` picks the text. Marks users who
+    blocked the bot, same as every other broadcast."""
+    import time
+    from tgbot.models import TelegramProfile
+
+    _group_kb, dm_kb = _charity_keyboards()
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    sent = 0
+    for uid in telegram_ids:
+        try:
+            resp = requests.post(url, data={
+                "chat_id": uid, "text": text_for(uid), "parse_mode": "HTML",
+                "reply_markup": dm_kb, "disable_web_page_preview": "true"}, timeout=8)
+            if resp.status_code == 200:
+                sent += 1
+            elif resp.status_code == 403:
+                TelegramProfile.objects.filter(telegram_id=uid).update(is_blocked=True)
+        except Exception:
+            pass
+        time.sleep(0.04)
+    return sent
+
+
+@shared_task
+def charity_milestone_broadcast(milestone_id):
+    """A charity step was completed: congratulate the groups, thank everyone
+    who contributed to this step, invite everyone else to the next one, and
+    remind the admins that a real donation is now owed."""
+    from tgbot.models import CharityMilestone, TelegramProfile
+    from tgbot.services import charity
+
+    # Claim the broadcast atomically so a retried or duplicated task can't
+    # message thousands of people twice.
+    claimed = CharityMilestone.objects.filter(
+        id=milestone_id, broadcast_started=False,
+    ).update(broadcast_started=True)
+    if not claimed:
+        print(f"charity_milestone_broadcast: #{milestone_id} already broadcast or missing")
+        return
+
+    m = CharityMilestone.objects.select_related("product").get(id=milestone_id)
+
+    groups = charity_post_to_groups(charity.milestone_group_text(m))
+
+    admin_text = charity.milestone_admin_text(m)
+    for admin_tid in TelegramProfile.objects.filter(
+            is_admin=True, is_blocked=False).values_list("telegram_id", flat=True):
+        send_message(admin_tid, admin_text)
+
+    participant_tids = set(
+        TelegramProfile.objects.filter(id__in=m.participant_ids())
+        .values_list("telegram_id", flat=True)
+    )
+    everyone = list(
+        TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+        .values_list("telegram_id", flat=True).distinct()
+    )
+    # Participants first, so the people who made it happen hear it first.
+    ordered = [t for t in everyone if t in participant_tids] + \
+              [t for t in everyone if t not in participant_tids]
+    thanks = charity.milestone_participant_text(m)
+    invite = charity.milestone_non_participant_text(m)
+    users = charity_dm(ordered, lambda tid: thanks if tid in participant_tids else invite)
+
+    m.broadcast_users = users
+    m.save(update_fields=["broadcast_users", "updated_at"])
+    print(f"charity_milestone_broadcast #{milestone_id}: groups={groups} "
+          f"users={users}/{len(ordered)} participants={len(participant_tids)}")
+    return {"groups": groups, "users": users}

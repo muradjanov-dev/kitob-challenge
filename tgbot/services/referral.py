@@ -1,13 +1,29 @@
 import string
 import random
 import requests
-from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 from asgiref.sync import sync_to_async
 from tgbot.models import UserReferal, TelegramProfile
 from tgbot.bot.loader import bot
 from tgbot.bot.consts import ADMIN_GROUP_ID, TECHNICAL_SUPPORT_THREAD_ID, REFERRAL_CODE_LENGTH
+
+# Every confirmed referral pays Premium days, not Kitobcha -- Kitobcha was
+# inflating, and a day of Premium is a taste of what they'd otherwise buy.
+REFERRAL_PREMIUM_DAYS = 1
+# Anti-farming cap: at most this many referral-paid days per calendar month.
+REFERRAL_PREMIUM_MONTHLY_CAP = 30
+
+
+def referral_premium_days_this_month(referrer) -> int:
+    """Referral-paid Premium days `referrer` has already earned this month.
+    Every referral counted this month earned one, up to the cap."""
+    now = timezone.localtime()
+    count = UserReferal.objects.filter(
+        referrer=referrer,
+        created_at__gte=now.replace(day=1, hour=0, minute=0, second=0, microsecond=0),
+    ).count()
+    return min(count, REFERRAL_PREMIUM_MONTHLY_CAP) * REFERRAL_PREMIUM_DAYS
 
 
 def _send_telegram_message(chat_id, text, thread_id=None, parse_mode="HTML"):
@@ -129,47 +145,33 @@ class ReferralService:
 
         # Award rewards to referrer
         @sync_to_async
-        def _award(count):
+        def _award():
+            """Grant the referral's Premium days. Returns the days granted:
+            0 once this month's cap is reached (the UserReferal created above
+            already counts toward it)."""
             from tgbot.models import Payment
-            from django.utils import timezone as _tz
 
-            # Growing reward: 20, 25, 30, ... (+5 per invite) until cumulative >= 1000, then flat 50
-            # S(n) = 20n + 5*n*(n-1)/2; first n where S(n) >= 1000 is n=17 (S(17)=1020)
-            BREAKPOINT = 17
-            if count <= BREAKPOINT:
-                base_kitobcha = 20 + 5 * (count - 1)
-            else:
-                base_kitobcha = 50
-            # update_ball returns the actually-applied amount (doubled for premium).
-            actually_awarded = referrer.update_ball(True, base_kitobcha)
+            now = timezone.localtime()
+            this_month = UserReferal.objects.filter(
+                referrer=referrer,
+                created_at__gte=now.replace(day=1, hour=0, minute=0, second=0, microsecond=0),
+            ).count()
+            if this_month > REFERRAL_PREMIUM_MONTHLY_CAP:
+                return 0
+            # Straight onto the subscription, not services.premium.grant_premium:
+            # this is earned, like a shop purchase, so the prize scarcity
+            # limits (1/week, not while already Premium) must not swallow it.
+            Payment.grant_or_extend(referrer, REFERRAL_PREMIUM_DAYS, amount=0)
+            return REFERRAL_PREMIUM_DAYS
 
-            # Every 3rd invite = 1 day premium
-            if count % 3 == 0:
-                today = _tz.localdate()
-                active = Payment.objects.filter(
-                    user=referrer, status="paid", end_date__gte=today
-                ).first()
-                if active:
-                    active.end_date = active.end_date + timedelta(days=1)
-                    active.save(update_fields=["end_date"])
-                else:
-                    Payment.objects.create(
-                        user=referrer,
-                        amount=0,
-                        start_date=today,
-                        end_date=today + timedelta(days=1),
-                        status="paid",
-                    )
-            return actually_awarded
-
-        awarded_kitobcha = await _award(ref_count)
+        awarded_days = await _award()
 
         # Referral BOOM bonus — only for users who joined the live boom event.
         boom_payload = await ReferralService._award_boom_bonus(referrer)
 
         # Notify parties
         await ReferralService._notify_admin(referrer, user, referral_code)
-        await ReferralService._notify_referrer(referrer, user, ref_count, awarded_kitobcha)
+        await ReferralService._notify_referrer(referrer, user, ref_count, awarded_days)
         if boom_payload:
             await ReferralService._notify_boom_payout(referrer, boom_payload)
 
@@ -269,18 +271,22 @@ class ReferralService:
             print(f"Failed to send referral notification to admin: {e}")
 
     @staticmethod
-    async def _notify_referrer(referrer: TelegramProfile, new_user: TelegramProfile, ref_count: int = 0, awarded_kitobcha: int = 0):
+    async def _notify_referrer(referrer: TelegramProfile, new_user: TelegramProfile, ref_count: int = 0, awarded_days: int = 0):
         try:
-            BREAKPOINT = 17
-            if ref_count <= BREAKPOINT:
-                base_kitobcha = 20 + 5 * (ref_count - 1)
+            if awarded_days:
+                from tgbot.services.premium import premium_left_text
+                left = await sync_to_async(premium_left_text)(referrer)
+                reward_lines = [
+                    f"💎 <b>+{awarded_days} kun Premium</b> qo'shildi!",
+                    f"⏳ Premium muddatingiz: <b>{left}</b>",
+                ]
             else:
-                base_kitobcha = 50
-            display_amount = awarded_kitobcha if awarded_kitobcha else base_kitobcha
-            premium_note = " 💎 ×2 premium!" if awarded_kitobcha and awarded_kitobcha > base_kitobcha else ""
-            reward_lines = [f"🪙 <b>+{display_amount} Kitobcha</b> qo'shildi!{premium_note}"]
-            if ref_count % 3 == 0:
-                reward_lines.append(f"💎 <b>+1 kun Premium</b> qo'shildi! (har 3 ta taklif)")
+                reward_lines = [
+                    f"💎 Bu oy uchun referal Premium limiti "
+                    f"(<b>{REFERRAL_PREMIUM_MONTHLY_CAP} kun</b>) to'ldi — keyingi "
+                    "oydan yana davom etadi. Taklif qilishda davom eting, "
+                    "reytingingizga baribir qo'shiladi!",
+                ]
 
             referrer_notification = (
                 f"🎉 <b>Yangi Referal!</b>\n\n"

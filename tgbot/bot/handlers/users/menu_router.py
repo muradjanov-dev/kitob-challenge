@@ -1283,24 +1283,21 @@ async def show_referral_link_screen(message: types.Message, user):
     lang = _user_lang(user)
     ref_count = await ReferralService.get_referral_count(user)
     ref_link = await ReferralService.get_referral_link(user)
-    BREAKPOINT = 17
-    if ref_count < BREAKPOINT:
-        next_reward = 20 + 5 * ref_count
-    else:
-        next_reward = 50
-    # "Refs until next premium-day": cycle is every 3 invites.
-    next_prem = 3 - (ref_count % 3) if ref_count % 3 != 0 else 3
+    from tgbot.services.referral import (
+        REFERRAL_PREMIUM_DAYS, REFERRAL_PREMIUM_MONTHLY_CAP, referral_premium_days_this_month,
+    )
+    month_days = await sync_to_async(referral_premium_days_this_month)(user)
     text = _t(
         lang,
         f"🔗 <b>Sizning taklif havolangiz:</b>\n<code>{ref_link}</code>\n\n"
         f"📊 Jami taklif: <b>{ref_count}</b> ta\n"
-        f"🎁 Keyingi taklif uchun: <b>+{next_reward} Kitobcha</b>\n"
-        f"💎 Keyingi premiumgacha: <b>{next_prem} ta</b> taklif qoldi\n\n"
+        f"🎁 Har bir taklif uchun: <b>+{REFERRAL_PREMIUM_DAYS} kun 💎 Premium</b>\n"
+        f"📅 Bu oy olingan: <b>{month_days} / {REFERRAL_PREMIUM_MONTHLY_CAP} kun</b>\n\n"
         f"<i>(Eslatma: taklif faqat do'stingiz birinchi kitob hisobotini yuborgach hisoblanadi — shunchaki /start bosish yetarli emas.)</i>",
         f"🔗 <b>Ваша реферальная ссылка:</b>\n<code>{ref_link}</code>\n\n"
         f"📊 Всего приглашений: <b>{ref_count}</b>\n"
-        f"🎁 За следующее: <b>+{next_reward} Kitobcha</b>\n"
-        f"💎 До следующего Premium: <b>{next_prem}</b> приглашений\n\n"
+        f"🎁 За каждое приглашение: <b>+{REFERRAL_PREMIUM_DAYS} день 💎 Premium</b>\n"
+        f"📅 В этом месяце: <b>{month_days} / {REFERRAL_PREMIUM_MONTHLY_CAP} дней</b>\n\n"
         f"<i>(Примечание: приглашение засчитывается только после того, как ваш друг отправит свой первый отчёт о книге — одного /start недостаточно.)</i>",
     )
 

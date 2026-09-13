@@ -30,7 +30,13 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from tgbot.models import Payment, ShopProduct, ShopPurchase, ShopAuctionBid, TelegramProfile, KitobchaLedger
+from tgbot.models import (
+    CHARITY_MIN_CONTRIBUTION, Payment, ShopProduct, ShopPurchase, ShopAuctionBid,
+    TelegramProfile, KitobchaLedger,
+)
+
+# Smallest opening bid and smallest raise in an auction.
+MIN_BID_STEP = CHARITY_MIN_CONTRIBUTION
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -170,7 +176,15 @@ def _product_payload(p: ShopProduct, request: HttpRequest) -> dict:
         "bids_count": p.auction_bids.count() if p.is_auction else 0,
         "is_ended": is_ended,
         "grants_premium_days": p.grants_premium_days,
+        "is_charity": p.is_charity,
+        "charity_step": p.charity_step if p.is_charity else None,
+        "charity_raised": _charity_raised(p) if p.is_charity else None,
     }
+
+
+def _charity_raised(p: ShopProduct) -> int:
+    from tgbot.services.charity import raised_total
+    return raised_total(p.id)
 
 
 @csrf_exempt
@@ -257,7 +271,7 @@ def api_bid(request: HttpRequest) -> JsonResponse:
                     "message": "⭐️ Bu auksionda faqat Premium a'zolar qatnasha oladi.",
                 }, status=403)
 
-            min_start = product.min_start_bid or 100
+            min_start = max(product.min_start_bid or 0, MIN_BID_STEP)
             if bid_amount < min_start:
                 return JsonResponse({
                     "ok": False,
@@ -280,11 +294,14 @@ def api_bid(request: HttpRequest) -> JsonResponse:
             ).first()
             old_bid_amount = existing_bid.amount if existing_bid else 0
 
-            if bid_amount <= old_bid_amount:
+            # Every Kitobcha a user puts in anywhere is at least 100 -- an
+            # opening bid and each raise alike.
+            if old_bid_amount and bid_amount - old_bid_amount < MIN_BID_STEP:
                 return JsonResponse({
                     "ok": False,
                     "error": "must_increase_bid",
                     "my_current_bid": old_bid_amount,
+                    "min_step": MIN_BID_STEP,
                 }, status=400)
 
             diff = bid_amount - old_bid_amount
@@ -385,6 +402,46 @@ def _notify_outbid(product, loser, loser_amount: int, new_amount: int) -> None:
 
 @csrf_exempt
 @require_GET
+@_require_authed
+def api_charity_details(request: HttpRequest) -> JsonResponse:
+    from tgbot.services import charity
+    try:
+        product_id = int(request.GET.get("product_id", 0))
+    except (ValueError, TypeError):
+        return JsonResponse({"ok": False, "error": "invalid_product_id"}, status=400)
+    product = ShopProduct.objects.filter(id=product_id, is_active=True, is_charity=True).first()
+    if not product:
+        return JsonResponse({"ok": False, "error": "charity_not_found"}, status=404)
+    return JsonResponse({
+        "ok": True,
+        "product": _product_payload(product, request),
+        "balance": int(request.tg_profile.ball or 0),
+        **charity.details(product, request.tg_profile.id),
+    })
+
+
+@csrf_exempt
+@require_POST
+@_require_authed
+def api_donate(request: HttpRequest) -> JsonResponse:
+    from tgbot.services import charity
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
+    product_id, amount = body.get("product_id"), body.get("amount")
+    if not isinstance(product_id, int) or not isinstance(amount, int):
+        return JsonResponse({"ok": False, "error": "invalid_params"}, status=400)
+    try:
+        result = charity.contribute(request.tg_profile.id, product_id, amount)
+    except charity.CharityError as e:
+        status = 404 if e.code == "charity_not_found" else 400
+        return JsonResponse({"ok": False, "error": e.code, **e.extra}, status=status)
+    return JsonResponse({"ok": True, **result})
+
+
+@csrf_exempt
+@require_GET
 def api_products_public(request: HttpRequest) -> JsonResponse:
     """Catalog only, no Telegram auth -- the product list itself (name,
     price, image, stock) isn't personal data, so it doesn't need to wait on
@@ -466,7 +523,7 @@ def api_buy(request: HttpRequest) -> JsonResponse:
             product = ShopProduct.objects.select_for_update().filter(
                 id=product_id, is_active=True,
             ).first()
-            if not product:
+            if not product or product.is_charity or product.is_auction:
                 return JsonResponse({"ok": False, "error": "product_unavailable"}, status=400)
             if product.stock_qty is not None and product.stock_qty <= 0:
                 return JsonResponse({"ok": False, "error": "out_of_stock"}, status=400)

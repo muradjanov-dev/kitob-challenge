@@ -11,11 +11,12 @@ from tgbot.bot.keyboards.inline import make_send_receipt_to_group_button
 from tgbot.bot.consts import ADMIN_GROUP_ID, PAYMENT_THREAD_ID
 from tgbot.models import Payment
 from django.utils import timezone
+from asgiref.sync import sync_to_async
 
 # ── Card & pricing config ────────────────────────────────────────────────────
 CARD_NUMBER = "5614 6830 0539 3277"
 CARD_OWNER  = "N. Murodjonov"
-PREMIUM_PRICE = 24_000   # UZS — iyun 2026 dan yangilandi (17_000 dan)
+PREMIUM_PRICE = 31_000   # UZS — sentyabr 2026 dan (24_000 dan, undan oldin 17_000)
 SUPER_PREMIUM_PRICE = 47_000 # UZS
 PREMIUM_3MO_PRICE = 64_000  # UZS — 3 oylik Premium
 PREMIUM_3DAY_PRICE = 9_000  # UZS — 3 kunlik Premium
@@ -28,7 +29,7 @@ PREMIUM_FEATURES_UZ = (
     "💎 <b>Premium obuna</b>\n"
     "Bir oylik obuna bilan quyidagilarni olasiz:\n\n"
     "🪙 <b>2 barobar ko'p Kitobcha</b> 🔥\n"
-    "   Har bir hisobot, yutuq, challenge va referal uchun oladigan "
+    "   Har bir hisobot, yutuq va challenge uchun oladigan "
     "Kitobchangiz ikki barobar bo'ladi.\n\n"
     "♾️ <b>Kuniga cheksiz hisobot</b>\n"
     "   Bir kunda istagancha hisobot yuborasiz — hammasi birlashtiriladi, "
@@ -52,7 +53,7 @@ PREMIUM_FEATURES_RU = (
     "💎 <b>Premium подписка</b>\n"
     "За месячную подписку вы получаете:\n\n"
     "🪙 <b>В 2 раза больше Kitobcha</b> 🔥\n"
-    "   Kitobcha за каждый отчёт, достижение, challenge и реферала "
+    "   Kitobcha за каждый отчёт, достижение и challenge "
     "удваивается.\n\n"
     "♾️ <b>Безлимитные отчёты в день</b>\n"
     "   Отправляйте сколько угодно отчётов в день — все объединяются, "
@@ -93,7 +94,7 @@ PREMIUM_3MO_FEATURES_UZ = (
     "💎 <b>Premium obuna — 3 oylik</b>\n"
     "3 oylik obuna bilan quyidagilarni olasiz:\n\n"
     "🪙 <b>2 barobar ko'p Kitobcha</b> 🔥\n"
-    "   Har bir hisobot, yutuq, challenge va referal uchun oladigan "
+    "   Har bir hisobot, yutuq va challenge uchun oladigan "
     "Kitobchangiz ikki barobar bo'ladi.\n\n"
     "♾️ <b>Kuniga cheksiz hisobot</b>\n"
     "   Bir kunda istagancha hisobot yuborasiz — hammasi birlashtiriladi, "
@@ -117,7 +118,7 @@ PREMIUM_3MO_FEATURES_RU = (
     "💎 <b>Premium подписка — 3 месяца</b>\n"
     "За 3-месячную подписку вы получаете:\n\n"
     "🪙 <b>В 2 раза больше Kitobcha</b> 🔥\n"
-    "   Kitobcha за каждый отчёт, достижение, challenge и реферала "
+    "   Kitobcha за каждый отчёт, достижение и challenge "
     "удваивается.\n\n"
     "♾️ <b>Безлимитные отчёты в день</b>\n"
     "   Отправляйте сколько угодно отчётов в день — все объединяются, "
@@ -142,7 +143,7 @@ PREMIUM_3DAY_FEATURES_UZ = (
     "💎 <b>Premium obuna — 3 kunlik</b>\n"
     "3 kunlik obuna bilan quyidagilarni olasiz:\n\n"
     "🪙 <b>2 barobar ko'p Kitobcha</b> 🔥\n"
-    "   Har bir hisobot, yutuq, challenge va referal uchun oladigan "
+    "   Har bir hisobot, yutuq va challenge uchun oladigan "
     "Kitobchangiz ikki barobar bo'ladi.\n\n"
     "♾️ <b>Kuniga cheksiz hisobot</b>\n"
     "   Bir kunda istagancha hisobot yuborasiz — hammasi birlashtiriladi, "
@@ -166,7 +167,7 @@ PREMIUM_3DAY_FEATURES_RU = (
     "💎 <b>Premium подписка — 3 дня</b>\n"
     "За 3-дневную подписку вы получаете:\n\n"
     "🪙 <b>В 2 раза больше Kitobcha</b> 🔥\n"
-    "   Kitobcha за каждый отчёт, достижение, challenge и реферала "
+    "   Kitobcha за каждый отчёт, достижение и challenge "
     "удваивается.\n\n"
     "♾️ <b>Безлимитные отчёты в день</b>\n"
     "   Отправляйте сколько угодно отчётов в день — все объединяются, "
@@ -291,7 +292,10 @@ async def buy_plan_callback(call: types.CallbackQuery, state: FSMContext):
     plan = call.data.split(":")[1]
     price = PLAN_PRICES.get(plan, PREMIUM_PRICE)
     days = PLAN_DAYS.get(plan, 30)
-    await state.update_data(payment_price=price, payment_plan=plan, payment_plan_days=days)
+    await state.update_data(
+        payment_price=price, payment_plan=plan, payment_plan_days=days,
+        payment_kitobcha=0, is_gift=False,
+    )
 
     # Must SEND a new message (not edit_text): the payment step uses a reply
     # keyboard (back_keyboard), and editMessageText only accepts inline
@@ -309,6 +313,76 @@ async def buy_plan_callback(call: types.CallbackQuery, state: FSMContext):
     )
     await call.answer()
     await PaymentStates.receipt.set()
+    await _offer_mixed_payment(call.message, user, plan, price, lang)
+
+
+def _mixed_offer_markup(plan: str, kitobcha: int, price: int, lang: str) -> InlineKeyboardMarkup:
+    if lang == "ru":
+        label = f"🪙 Оплатить {kitobcha:,} Kitobcha + {price - kitobcha:,} сум"
+    else:
+        label = f"🪙 {kitobcha:,} Kitobcha + {price - kitobcha:,} so'm to'lash"
+    return InlineKeyboardMarkup().add(
+        InlineKeyboardButton(label, callback_data=f"mixpay:{plan}"))
+
+
+async def _offer_mixed_payment(message: types.Message, user, plan: str, price: int, lang: str):
+    """If the user has Kitobcha, offer to cover up to 30% of the price with it."""
+    from tgbot.services import mixed_payment
+    if not user or plan not in mixed_payment.ALLOWED_PLANS:
+        return
+    kitobcha = mixed_payment.usable_kitobcha(int(user.ball or 0), price)
+    if kitobcha < mixed_payment.STEP:
+        return
+    if lang == "ru":
+        text = (f"💡 <b>Можно дешевле!</b> Покройте до {mixed_payment.MAX_SHARE_PERCENT}% "
+                f"цены своими Kitobcha (1 Kitobcha = 1 сум).")
+    else:
+        text = (f"💡 <b>Arzonroq ham bo'ladi!</b> Narxning {mixed_payment.MAX_SHARE_PERCENT}% "
+                f"gachasini Kitobchangiz bilan to'lang (1 Kitobcha = 1 so'm).")
+    await message.answer(text, parse_mode="HTML",
+                         reply_markup=_mixed_offer_markup(plan, kitobcha, price, lang))
+
+
+@dp.callback_query_handler(ChatTypeFilter(ChatType.PRIVATE), lambda c: c.data and c.data.startswith("mixpay:"), state="*")
+async def mixed_payment_choose(call: types.CallbackQuery, state: FSMContext):
+    from tgbot.services import mixed_payment
+    user = await aget_user(telegram_id=call.from_user.id)
+    lang = user.language if user else "uz"
+    plan = call.data.split(":", 1)[1]
+    data = await state.get_data()
+    if (not user or plan not in mixed_payment.ALLOWED_PLANS
+            or data.get("payment_plan") != plan or data.get("is_gift")):
+        await call.answer("Sessiya eskirgan, Premium menyusidan qaytadan tanlang.", show_alert=True)
+        return
+
+    price = PLAN_PRICES[plan]
+    kitobcha = mixed_payment.usable_kitobcha(int(user.ball or 0), price)
+    if kitobcha < mixed_payment.STEP:
+        await call.answer("Balansingizda yetarli Kitobcha yo'q.", show_alert=True)
+        return
+    cash = price - kitobcha
+    await state.update_data(payment_price=cash, payment_kitobcha=kitobcha)
+    await PaymentStates.receipt.set()
+
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await call.answer()
+    if lang == "ru":
+        head = (f"🪙 <b>Смешанная оплата</b>\n"
+                f"Цена: {price:,} сум\n"
+                f"Kitobcha: −{kitobcha:,} (спишутся при отправке чека)\n"
+                f"К оплате картой: <b>{cash:,} сум</b>\n\n"
+                "Если платёж отклонят, Kitobcha вернутся на баланс.\n\n")
+    else:
+        head = (f"🪙 <b>Aralash to'lov</b>\n"
+                f"Narx: {price:,} so'm\n"
+                f"Kitobcha: −{kitobcha:,} (chek yuborilganda yechiladi)\n"
+                f"Kartaga to'lanadi: <b>{cash:,} so'm</b>\n\n"
+                "To'lov rad etilsa, Kitobcha balansingizga qaytariladi.\n\n")
+    await call.message.answer(head + payment_info_text(lang, cash), parse_mode="HTML",
+                              reply_markup=back_keyboard)
 
 
 # ── Legacy: send_receipt callback (from old inline button) ───────────────────
@@ -404,11 +478,29 @@ async def payment_receipt_photo_handler(message: types.Message, state: FSMContex
         await state.finish()
         return
 
+    kitobcha = int(state_data.get("payment_kitobcha") or 0)
+    hold_id = None
+    kitobcha_line = ""
+    if kitobcha > 0:
+        from tgbot.services import mixed_payment
+        held = await sync_to_async(mixed_payment.hold)(user.id, kitobcha, price, plan, days)
+        if not held:
+            await message.answer(
+                "❗️ Balansingizda endi yetarli Kitobcha yo'q. Premium menyusidan "
+                "qaytadan tanlang yoki to'liq summani to'lang.",
+                reply_markup=main_markup(language=lang),
+            )
+            await state.finish()
+            return
+        hold_id = held.id
+        kitobcha_line = f"🪙 Kitobcha qismi: <b>{kitobcha:,}</b> (yechildi, rad etilsa qaytadi)\n"
+
     caption = (
         f"💳 <b>Yangi to'lov cheki! ({plan.upper()}, {days} kun)</b>\n\n"
         f"👤 Foydalanuvchi: {user.full_name} [{username_link}]\n"
         f"🆔 Telegram ID: <code>{user.telegram_id}</code>\n"
-        f"💰 So'ralgan summa: <b>{price:,} UZS</b>\n\n"
+        f"💰 So'ralgan summa: <b>{price:,} UZS</b>\n"
+        f"{kitobcha_line}\n"
         f"Botdan foydalanishga ruxsat berilsinmi?"
     )
 
@@ -424,6 +516,7 @@ async def payment_receipt_photo_handler(message: types.Message, state: FSMContex
                 telegram_id=user.telegram_id,
                 message_id=None,
                 days=days,
+                hold_id=hold_id,
             )
         )
         # Update button with real message_id for editing later
@@ -435,6 +528,7 @@ async def payment_receipt_photo_handler(message: types.Message, state: FSMContex
                 telegram_id=user.telegram_id,
                 message_id=photo_message.message_id,
                 days=days,
+                hold_id=hold_id,
             )
         )
 
@@ -442,11 +536,11 @@ async def payment_receipt_photo_handler(message: types.Message, state: FSMContex
         dm_kb = InlineKeyboardMarkup(row_width=2).add(
             InlineKeyboardButton(
                 "✅ Ruxsat berish",
-                callback_data=f"padmin_accept:{price}:{user.telegram_id}:{days}",
+                callback_data=f"padmin_accept:{price}:{user.telegram_id}:{days}:{hold_id or ''}",
             ),
             InlineKeyboardButton(
                 "❌ Rad etish",
-                callback_data=f"padmin_reject:{price}:{user.telegram_id}",
+                callback_data=f"padmin_reject:{price}:{user.telegram_id}:{hold_id or ''}",
             ),
         )
         for admin_id in admin_ids:
@@ -468,6 +562,11 @@ async def payment_receipt_photo_handler(message: types.Message, state: FSMContex
 
     except Exception as e:
         print(f"Kvitansiya yuborishda xatolik: {e}")
+        if hold_id:
+            # No admin ever saw this receipt, so nobody could release the
+            # Kitobcha -- give it back now.
+            from tgbot.services import mixed_payment
+            await sync_to_async(mixed_payment.refund)(hold_id)
         if lang == "ru":
             text = "❗️ Ошибка при отправке чека. Попробуйте позже."
         else:

@@ -407,9 +407,9 @@ class QuizSessionAdmin(admin.ModelAdmin):
 class ShopProductAdmin(admin.ModelAdmin):
     list_display = (
         'name', 'price_kitobcha', 'is_auction', 'min_start_bid', 'auction_end_at',
-        'stock_qty', 'is_active', 'grants_premium_days', 'sort_order', 'created_at',
+        'stock_qty', 'is_active', 'grants_premium_days', 'is_charity', 'sort_order', 'created_at',
     )
-    list_filter = ('is_active', 'is_auction')
+    list_filter = ('is_active', 'is_auction', 'is_charity')
     list_editable = ('price_kitobcha', 'is_auction', 'min_start_bid', 'stock_qty', 'is_active', 'sort_order')
     search_fields = ('name', 'description')
     fields = (
@@ -417,12 +417,79 @@ class ShopProductAdmin(admin.ModelAdmin):
         'is_auction', 'min_start_bid', 'auction_end_at',
         'ad_slot_hours', 'premium_only',
         'stock_qty', 'sort_order', 'is_active', 'grants_premium_days',
+        'is_charity', 'charity_step',
     )
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
-        if not change:
+        # A charity fund has its own launch announcement (announce_charity_fund);
+        # the generic "new product, N Kitobcha" post would misdescribe it.
+        if not change and not obj.is_charity:
             _announce_new_shop_product(obj)
+
+
+@admin.register(models.CharityContribution)
+class CharityContributionAdmin(admin.ModelAdmin):
+    list_display = ('user', 'amount', 'product', 'created_at')
+    list_filter = ('product', 'created_at')
+    search_fields = ('user__full_name', 'user__telegram_id')
+    readonly_fields = ('product', 'user', 'amount', 'created_at', 'updated_at')
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(models.CharityMilestone)
+class CharityMilestoneAdmin(admin.ModelAdmin):
+    list_display = ('product', 'number', 'participants_count', 'broadcast_users',
+                    'is_fulfilled', 'fulfilled_at', 'created_at')
+    list_filter = ('is_fulfilled', 'product')
+    readonly_fields = ('product', 'number', 'last_contribution', 'participants_count',
+                       'broadcast_started', 'broadcast_users', 'is_fulfilled',
+                       'fulfilled_at', 'created_at')
+    fields = readonly_fields + ('fulfilled_note',)
+    actions = ('mark_fulfilled_and_announce',)
+
+    def has_add_permission(self, request):
+        return False
+
+    @admin.action(description="✅ Bajarildi — guruhlarga hisobot")
+    def mark_fulfilled_and_announce(self, request, queryset):
+        from django.utils import timezone as _tz
+        from tgbot.services import charity
+        from tgbot.tasks import charity_post_to_groups
+        done = 0
+        for m in queryset.select_related('product'):
+            if m.is_fulfilled:
+                continue
+            if not m.fulfilled_note.strip():
+                self.message_user(
+                    request,
+                    f"#{m.number}: avval «Fulfilled note»ga nima qilinganini yozing, saqlang, "
+                    "keyin shu amalni bosing.",
+                    level=messages.WARNING,
+                )
+                continue
+            m.is_fulfilled = True
+            m.fulfilled_at = _tz.now()
+            m.save(update_fields=['is_fulfilled', 'fulfilled_at', 'updated_at'])
+            groups = charity_post_to_groups(charity.fulfilled_group_text(m))
+            done += 1
+            self.message_user(request, f"#{m.number}: bajarildi, {groups} ta guruhga e'lon qilindi.")
+        if not done:
+            self.message_user(request, "Hech narsa o'zgarmadi.", level=messages.WARNING)
+
+
+@admin.register(models.PremiumKitobchaHold)
+class PremiumKitobchaHoldAdmin(admin.ModelAdmin):
+    list_display = ('user', 'plan', 'kitobcha', 'cash_price', 'status', 'created_at')
+    list_filter = ('status', 'plan')
+    search_fields = ('user__full_name', 'user__telegram_id')
+    readonly_fields = ('user', 'plan', 'days', 'kitobcha', 'cash_price', 'status',
+                       'created_at', 'updated_at')
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(models.ShopAuctionBid)

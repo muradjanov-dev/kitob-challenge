@@ -127,12 +127,14 @@ except Exception:
     send_receipt_button = None
 
 
-async def make_send_receipt_to_group_button(price: int, telegram_id: str, message_id: int, days: int = 30):
+async def make_send_receipt_to_group_button(price: int, telegram_id: str, message_id: int, days: int = 30, hold_id: int = None):
+    # hold_id: PremiumKitobchaHold of a mixed payment, '' for a plain one.
+    h = hold_id or ""
     return InlineKeyboardMarkup(row_width=2).add(
         InlineKeyboardButton(
-            _("✅ Ruxsat berish"), callback_data=f"accept:{price}:{telegram_id}:{message_id}:{days}"),
+            _("✅ Ruxsat berish"), callback_data=f"accept:{price}:{telegram_id}:{message_id}:{days}:{h}"),
         InlineKeyboardButton(
-            _("❗️ Rad etish"), callback_data=f"rejection:{price}:{telegram_id}:{message_id}"),
+            _("❗️ Rad etish"), callback_data=f"rejection:{price}:{telegram_id}:{message_id}:{h}"),
     )
 
 
