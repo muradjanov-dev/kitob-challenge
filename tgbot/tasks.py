@@ -7983,3 +7983,10 @@ def charity_milestone_broadcast(milestone_id):
     print(f"charity_milestone_broadcast #{milestone_id}: groups={groups} "
           f"users={users}/{len(ordered)} participants={len(participant_tids)}")
     return {"groups": groups, "users": users}
+
+
+@shared_task
+def daily_db_backup():
+    """Dump the database and DM it to every admin (see services/db_backup)."""
+    from tgbot.services.db_backup import run_backup
+    return run_backup()

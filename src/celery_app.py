@@ -356,6 +356,13 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.settle_finished_auctions',
         'schedule': crontab(minute='*/5'),
     },
+
+    # Daily database backup, DMed to the admins as a restorable .sql.gz.
+    # 04:00: the quietest hour -- no live games, reports or broadcasts.
+    'daily-db-backup': {
+        'task': 'tgbot.tasks.daily_db_backup',
+        'schedule': crontab(hour=4, minute=0),
+    },
 }
 
 # Use Tashkent local time for crontab schedules (matches admin-set HH:MM).

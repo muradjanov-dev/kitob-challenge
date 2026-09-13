@@ -43,6 +43,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libglib2.0-0 \
     poppler-utils \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# pg_dump for the daily backup (tgbot/services/db_backup.py). Bookworm's own
+# client is v15 and refuses to dump a newer server; the PostgreSQL apt repo's
+# v17 client dumps 17 and every older server.
+RUN install -d /usr/share/postgresql-common/pgdg \
+    && curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+       https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+       > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/wheels /wheels
