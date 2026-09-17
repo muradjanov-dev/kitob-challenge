@@ -1362,13 +1362,31 @@ async def toplist_congrats_handler(call: types.CallbackQuery, state: FSMContext)
     period = parts[1]
     date_str = parts[2]
 
+    # One congratulation per person per leaderboard. Every tap used to DM the
+    # whole top list again, so a few repeated taps on the group post (the
+    # button stays there for good) flooded 20-60 readers with identical
+    # "X sizi tabriklamoqda" messages. cache.add is an atomic SET NX on Redis,
+    # so even a burst of double taps gets through exactly once. Kept for 400
+    # days so it also covers the yearly list.
+    from django.core.cache import cache as _cache
+    claim_key = f"toplist_congrats_done:{user.id}:{period}:{date_str}"
+    try:
+        first_time = await sync_to_async(_cache.add, thread_sensitive=True)(
+            claim_key, 1, 400 * 24 * 3600,
+        )
+    except Exception as e:
+        print(f"toplist_congrats claim failed for {user.id}: {e}")
+        first_time = False  # fail closed: a missed congrats beats a DM flood
+    if not first_time:
+        await call.answer("✅ Siz bu reytingni allaqachon tabriklagansiz.", show_alert=True)
+        return
+
     await call.answer("🎉 Tabrikladingiz! Xabarlar jo'natilmoqda...", show_alert=False)
 
     import asyncio as _asyncio
     import datetime as _dt
     import requests as _req
     import time as _time
-    from asgiref.sync import sync_to_async
     from django.utils.html import escape as _esc
     from tgbot.models import TelegramProfile as _TP, ConfirmationReport as _CR
     from django.db.models import Sum as _Sum
