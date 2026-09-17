@@ -699,34 +699,38 @@
     }
     #pdfCanvas.pdf-canvas-ready { opacity: 1; }
 
-    #pdfFlipWrap {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none;
-      display: none;
-      transform-style: preserve-3d;
-      backface-visibility: hidden;
-      border-radius: 4px 12px 12px 4px;
-      overflow: hidden;
-      z-index: 10;
+    /* Soft paper page-curl. The turning page is cut into thin vertical strips
+       that wrap around a moving cylinder (see _curlApply), so it bends like
+       paper instead of swinging round as one stiff board. */
+    #pdfUnder {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      display: none; pointer-events: none; z-index: 9;
+      background: #fdfbf7; border-radius: 4px 12px 12px 4px;
     }
-    #pdfFlipCanvas {
-      width: 100%; height: 100%;
-      display: block;
+    #pdfCurl {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      display: none; pointer-events: none; z-index: 10;
+      perspective: 2600px; perspective-origin: 50% 50%;
+      transform-style: preserve-3d;
+    }
+    .curl-strip {
+      position: absolute; top: 0; height: 100%;
+      transform-origin: 0 50%;
+      transform-style: preserve-3d;
+      will-change: transform, opacity;
       background: #fdfbf7;
     }
-    .pdf-flip-shadow {
-      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-      background: linear-gradient(to right, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.2) 20%, transparent 65%);
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity .25s ease;
+    .curl-strip canvas { display: block; width: 100%; height: 100%; }
+    .curl-strip.back canvas { visibility: hidden; }
+    .curl-strip.back { background: linear-gradient(to bottom, #f1ebdf, #e9e1d2); }
+    .curl-shade {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: #000; opacity: 0; pointer-events: none;
     }
-    .pdf-flip-highlight {
-      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-      background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,0.45) 50%, rgba(0,0,0,0.2) 65%, transparent 80%);
-      pointer-events: none;
-      opacity: 0;
+    .curl-cast {
+      position: absolute; top: 0; height: 100%; width: 60px;
+      pointer-events: none; opacity: 0;
+      background: linear-gradient(to right, rgba(0,0,0,0.32), rgba(0,0,0,0.12) 45%, transparent);
     }
     .book-spine-effect {
       position: absolute;
@@ -737,85 +741,6 @@
       z-index: 5;
     }
 
-    @keyframes pageTurnNext {
-      0% {
-        transform: rotateY(0deg) skewY(0deg) scale(1);
-        transform-origin: left center;
-        box-shadow: -2px 0 10px rgba(0,0,0,0.2);
-        filter: brightness(1);
-        opacity: 1;
-      }
-      35% {
-        transform: rotateY(-42deg) skewY(-2.5deg) scale(0.98);
-        transform-origin: left center;
-        box-shadow: -18px 12px 35px rgba(0,0,0,0.6);
-        filter: brightness(0.92);
-        opacity: 1;
-      }
-      70% {
-        transform: rotateY(-86deg) skewY(-1deg) scale(0.96);
-        transform-origin: left center;
-        box-shadow: -28px 18px 50px rgba(0,0,0,0.7);
-        filter: brightness(0.8);
-        opacity: 1;
-      }
-      100% {
-        transform: rotateY(-110deg) skewY(0deg) scale(0.94);
-        transform-origin: left center;
-        box-shadow: -35px 22px 55px rgba(0,0,0,0.8);
-        filter: brightness(0.55);
-        opacity: 0;
-      }
-    }
-
-    @keyframes pageTurnPrev {
-      0% {
-        transform: rotateY(-110deg) skewY(0deg) scale(0.94);
-        transform-origin: left center;
-        box-shadow: -35px 22px 55px rgba(0,0,0,0.8);
-        filter: brightness(0.55);
-        opacity: 0;
-      }
-      30% {
-        transform: rotateY(-86deg) skewY(-1deg) scale(0.96);
-        transform-origin: left center;
-        box-shadow: -28px 18px 50px rgba(0,0,0,0.7);
-        filter: brightness(0.8);
-        opacity: 1;
-      }
-      70% {
-        transform: rotateY(-42deg) skewY(-2.5deg) scale(0.98);
-        transform-origin: left center;
-        box-shadow: -18px 12px 35px rgba(0,0,0,0.6);
-        filter: brightness(0.92);
-        opacity: 1;
-      }
-      100% {
-        transform: rotateY(0deg) skewY(0deg) scale(1);
-        transform-origin: left center;
-        box-shadow: -2px 0 10px rgba(0,0,0,0.2);
-        filter: brightness(1);
-        opacity: 1;
-      }
-    }
-
-    .turning-next #pdfFlipWrap {
-      display: block;
-      animation: pageTurnNext 0.52s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-    }
-    .turning-next .pdf-flip-shadow { opacity: 1; }
-    .turning-next .pdf-flip-highlight { opacity: 1; }
-
-    .turning-prev #pdfFlipWrap {
-      display: block;
-      animation: pageTurnPrev 0.52s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-    }
-    .turning-prev .pdf-flip-shadow { opacity: 1; }
-    .turning-prev .pdf-flip-highlight { opacity: 1; }
-
-    @media (prefers-reduced-motion: reduce) {
-      .turning-next #pdfFlipWrap, .turning-prev #pdfFlipWrap { display: none; }
-    }
     #pdfLoading {
       position: absolute; inset: 0; top: 45px; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 14px;
@@ -1486,11 +1411,8 @@
   <div id="pdfCanvasWrap">
     <div id="bookStage">
       <canvas id="pdfCanvas"></canvas>
-      <div id="pdfFlipWrap">
-        <canvas id="pdfFlipCanvas"></canvas>
-        <div class="pdf-flip-shadow"></div>
-        <div class="pdf-flip-highlight"></div>
-      </div>
+      <canvas id="pdfUnder"></canvas>
+      <div id="pdfCurl"></div>
       <div class="book-spine-effect"></div>
     </div>
     <div id="pdfLoading">
@@ -1953,38 +1875,184 @@ function _pdfToast(msg, duration = 1400) {
 }
 document.getElementById('pdfToastClose').addEventListener('click', _pdfToastHide);
 
-let _flipTimer = null;
-function _pdfPlayFlip(dir) {
-  const stage = document.getElementById('bookStage');
-  const flipCanvas = document.getElementById('pdfFlipCanvas');
-  if (!stage || !flipCanvas || !pdfCanvas || !pdfCanvas.width || !pdfCanvas.height) return;
+// ── Soft page curl ───────────────────────────────────────────────
+// The old flip swung a snapshot of the whole page around the spine as one
+// rigid plane (and on "back" it animated the page you were leaving). Here the
+// turning page is sliced into thin vertical strips that wrap around a vertical
+// cylinder sliding from the outer edge to the spine: strips left of the
+// cylinder lie flat, strips on it bend, strips past it lie flat again on the
+// far side. Shading follows each strip's angle, so the fold reads as soft
+// paper. Progress p runs 0 (page flat) -> 1 (page turned past the spine) and
+// can be driven by a timer or directly by a finger (see the touch handlers).
+//   next: the current page is snapshotted and curls away off 0 -> 1,
+//         revealing the next page rendered underneath.
+//   prev: the current page is held on #pdfUnder, the previous page renders
+//         underneath it, then uncurls back over it 1 -> 0.
+const pdfCurl = document.getElementById('pdfCurl');
+const pdfUnder = document.getElementById('pdfUnder');
+const CURL_MS = 640;
+let _curl = null;
+let _pdfRenderWaiters = [];
 
-  const flipCtx = flipCanvas.getContext('2d');
-  flipCanvas.width = pdfCanvas.width;
-  flipCanvas.height = pdfCanvas.height;
-  flipCtx.clearRect(0, 0, flipCanvas.width, flipCanvas.height);
-  try {
-    flipCtx.drawImage(pdfCanvas, 0, 0);
-  } catch (e) {}
+function _curlReducedMotion() {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+}
 
-  stage.classList.remove('turning-next', 'turning-prev');
-  void stage.offsetWidth; // force DOM reflow to restart CSS animation
+// Resolve once the page on the canvas is the requested one and fully drawn.
+function _pdfWhenRendered(cb) {
+  if (!_pdfRendering && _pdfPendingPage === null) { cb(); return; }
+  _pdfRenderWaiters.push(cb);
+}
 
-  if (dir > 0) {
-    stage.classList.add('turning-next');
-  } else {
-    stage.classList.add('turning-prev');
-  }
-
-  // Native haptic feedback inside Telegram
+function _curlHaptic() {
   if (window.Telegram && Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
     try { Telegram.WebApp.HapticFeedback.impactOccurred('light'); } catch (e) {}
   }
+}
 
-  clearTimeout(_flipTimer);
-  _flipTimer = setTimeout(() => {
-    stage.classList.remove('turning-next', 'turning-prev');
-  }, 530);
+function _curlBuild(src) {
+  const W = pdfCanvas.clientWidth, H = pdfCanvas.clientHeight;
+  if (!W || !H || !src.width || !src.height) return null;
+  const n = Math.max(18, Math.min(34, Math.round(W / 13)));
+  const sw = W / n;
+  const kx = src.width / W;
+  pdfCurl.innerHTML = '';
+  const cast = document.createElement('div');
+  cast.className = 'curl-cast';
+  pdfCurl.appendChild(cast);
+  const strips = [];
+  for (let i = 0; i < n; i++) {
+    const el = document.createElement('div');
+    el.className = 'curl-strip';
+    el.style.left = (i * sw) + 'px';
+    el.style.width = (sw + 1.2) + 'px'; // hairline overlap hides seams between strips
+    const c = document.createElement('canvas');
+    const sx = Math.floor(i * sw * kx);
+    const sWidth = Math.min(src.width - sx, Math.ceil((sw + 1.2) * kx));
+    c.width = Math.max(1, sWidth);
+    c.height = src.height;
+    try { c.getContext('2d').drawImage(src, sx, 0, sWidth, src.height, 0, 0, sWidth, src.height); } catch (e) {}
+    const shade = document.createElement('div');
+    shade.className = 'curl-shade';
+    el.appendChild(c);
+    el.appendChild(shade);
+    pdfCurl.appendChild(el);
+    strips.push({ el, shade, x: i * sw, back: false });
+  }
+  pdfCurl.style.display = 'block';
+  return { W, H, sw, strips, cast };
+}
+
+function _curlApply(p) {
+  if (!_curl || !_curl.geo) return;
+  _curl.p = p;
+  const { W, sw, strips, cast } = _curl.geo;
+  const R = Math.max(16, W * 0.1);
+  const PI = Math.PI;
+  const xc = W - p * (W + PI * R + 8);
+  // Where a point of the flat page ends up once wrapped around the cylinder.
+  const map = (x) => {
+    const d = x - xc;
+    if (d <= 0) return [x, 0];
+    if (d < PI * R) return [xc + R * Math.sin(d / R), R * (1 - Math.cos(d / R))];
+    return [xc - (d - PI * R), 2 * R];
+  };
+  for (const s of strips) {
+    const [X, Z] = map(s.x);
+    const th = Math.min(PI, Math.max(0, (s.x + sw / 2 - xc) / R));
+    const back = th > PI / 2;
+    if (back !== s.back) { s.el.classList.toggle('back', back); s.back = back; }
+    // Depth is scaled down: the rotation already reads as a curve, and full
+    // depth made the lifted part look larger than the page under it.
+    s.el.style.transform = `translate3d(${(X - s.x).toFixed(2)}px,0,${(Z * 0.08).toFixed(2)}px) rotateY(${(-th).toFixed(4)}rad)`;
+    const sin = Math.sin(th);
+    s.shade.style.opacity = back ? (0.06 + 0.2 * sin).toFixed(3) : (0.42 * Math.pow(sin, 1.3)).toFixed(3);
+    // Past the spine there is no left-hand page to land on: fade it away.
+    s.el.style.opacity = X < 0 ? Math.max(0, 1 + X / (W * 0.12)).toFixed(3) : '1';
+  }
+  const castOn = xc > 0 && xc < W;
+  cast.style.left = Math.max(0, xc) + 'px';
+  cast.style.width = (R * 1.8) + 'px';
+  cast.style.opacity = castOn ? (Math.sin(Math.min(1, p) * PI) * 0.95).toFixed(3) : '0';
+}
+
+function _curlCleanup() {
+  if (_curl && _curl.raf) cancelAnimationFrame(_curl.raf);
+  _curl = null;
+  pdfCurl.style.display = 'none';
+  pdfCurl.innerHTML = '';
+  pdfUnder.style.display = 'none';
+}
+
+function _curlAnimate(to, ms, done) {
+  if (!_curl) return;
+  if (_curl.raf) cancelAnimationFrame(_curl.raf);
+  const from = _curl.p, t0 = performance.now();
+  const dur = Math.max(120, ms * Math.abs(to - from));
+  const ease = (t) => 0.5 - 0.5 * Math.cos(Math.PI * t); // soft in, soft out
+  const step = (now) => {
+    if (!_curl) return;
+    const t = Math.min(1, (now - t0) / dur);
+    _curlApply(from + (to - from) * ease(t));
+    if (t < 1) _curl.raf = requestAnimationFrame(step);
+    else { _curl.raf = null; if (done) done(); }
+  };
+  _curl.raf = requestAnimationFrame(step);
+}
+
+// Begin a turn. `interactive` leaves progress to the caller (finger drag).
+function _curlBegin(dir, target, interactive) {
+  if (_curl) _curlCleanup();
+  const from = _pdfPage;
+  const c = { dir, target, from, p: dir > 0 ? 0 : 1, geo: null, raf: null,
+              interactive, ready: false, wantP: null, released: null };
+  _curl = c;
+  if (dir > 0) {
+    c.geo = _curlBuild(pdfCanvas);
+    if (!c.geo) { _curlCleanup(); _pdfQueueRender(target, dir); return null; }
+    c.ready = true;
+    _curlApply(0);
+    _pdfQueueRender(target, dir);
+    return c;
+  }
+  // prev: keep showing the current page while the previous one renders below.
+  pdfUnder.width = pdfCanvas.width;
+  pdfUnder.height = pdfCanvas.height;
+  try { pdfUnder.getContext('2d').drawImage(pdfCanvas, 0, 0); } catch (e) {}
+  pdfUnder.style.display = 'block';
+  _pdfQueueRender(target, dir);
+  _pdfWhenRendered(() => {
+    if (_curl !== c) return;
+    c.geo = _curlBuild(pdfCanvas);
+    if (!c.geo) { _curlCleanup(); return; }
+    c.ready = true;
+    _curlApply(c.wantP !== null ? c.wantP : 1);
+    if (c.released) c.released();
+  });
+  return c;
+}
+
+// Finish (commit) or undo (cancel) a turn that is on screen.
+function _curlSettle(commit) {
+  const c = _curl;
+  if (!c) return;
+  const run = () => {
+    if (_curl !== c) return;
+    const end = c.dir > 0 ? (commit ? 1 : 0) : (commit ? 0 : 1);
+    if (commit) _curlHaptic();
+    _curlAnimate(end, CURL_MS, () => {
+      if (_curl !== c) return;
+      if (!commit) {
+        // Put the page we started on back, and keep the curl up until it is drawn.
+        _pdfQueueRender(c.from, -c.dir);
+        _pdfWhenRendered(() => { if (_curl === c) _curlCleanup(); });
+      } else {
+        _curlCleanup();
+      }
+    });
+  };
+  if (c.ready) run();
+  else c.released = run;
 }
 
 function _pdfRenderPage(num, dir) {
@@ -2025,7 +2093,17 @@ function _pdfRenderPage(num, dir) {
         const next = _pdfPendingPage;
         _pdfPendingPage = null;
         _pdfRenderPage(next, 0);
+      } else if (_pdfRenderWaiters.length) {
+        const waiters = _pdfRenderWaiters;
+        _pdfRenderWaiters = [];
+        waiters.forEach(fn => { try { fn(); } catch (e) {} });
       }
+    }).catch(() => {
+      _pdfRendering = false;
+      pdfLoading.classList.add('hidden');
+      const waiters = _pdfRenderWaiters;
+      _pdfRenderWaiters = [];
+      waiters.forEach(fn => { try { fn(); } catch (e) {} });
     });
   });
   _pdfPage = num;
@@ -2041,12 +2119,27 @@ function _pdfQueueRender(num, dir) {
 }
 
 function _pdfTurn(delta) {
+  // A turn still animating is simply completed -- its page is already the
+  // current one -- so quick repeated taps keep up instead of queueing curls.
+  if (_curl) _curlCleanup();
   const target = _pdfPage + delta;
   if (target < 1 || (_pdfNumPages && target > _pdfNumPages)) return;
-  if (!_magMode) {
-    _pdfPlayFlip(delta > 0 ? 1 : -1);
+  const dir = delta > 0 ? 1 : -1;
+  if (_magMode || _curlReducedMotion()) {
+    _pdfQueueRender(target, dir);
+    return;
   }
-  _pdfQueueRender(target, delta > 0 ? 1 : -1);
+  const c = _curlBegin(dir, target, false);
+  if (!c) return;
+  if (dir > 0) {
+    // Let the next page start drawing underneath before the fold uncovers it.
+    let started = false;
+    const go = () => { if (!started && _curl === c) { started = true; _curlSettle(true); } };
+    _pdfWhenRendered(go);
+    setTimeout(go, 260);
+  } else {
+    _curlSettle(true);
+  }
 }
 
 // Sends a real-interaction "I'm actually reading" ping -- only called from
@@ -2223,6 +2316,7 @@ pdfWrap.addEventListener('touchstart', (e) => {
   if (e.touches.length === 2) {
     _pdfSwiping = false;
     _lensCancel();
+    _curlDragEnd(true);
     _pdfPinchDist = _pdfTouchDist(e.touches);
     _pdfPinchStartZoom = _pdfZoom;
   } else if (e.touches.length === 1) {
@@ -2255,6 +2349,7 @@ pdfWrap.addEventListener('touchmove', (e) => {
       _pdfPinchStartZoom = _pdfZoom;
       return;
     }
+    _curlDragEnd(true);
     const factor = _pdfTouchDist(e.touches) / _pdfPinchDist;
     pdfCanvas.style.transform = `scale(${Math.min(3, Math.max(0.5, factor))})`;
   } else if (e.touches.length === 1) {
@@ -2265,8 +2360,47 @@ pdfWrap.addEventListener('touchmove', (e) => {
       const dx = t.clientX - _pdfSwipeX, dy = t.clientY - _pdfSwipeY;
       if (Math.hypot(dx, dy) > LENS_CANCEL_PX) { clearTimeout(_lensTimer); _lensTimer = null; }
     }
+    if (!_lensActive && _pdfSwiping) _curlDragMove(t);
   }
 }, { passive: true });
+
+// The page follows the finger: a horizontal drag lifts the page and bends it
+// as far as the finger has gone; letting go past ~28% of the width (or with a
+// quick flick) completes the turn, otherwise the page settles back flat.
+let _curlDrag = null;
+function _curlDragMove(t) {
+  const dx = t.clientX - _pdfSwipeX, dy = t.clientY - _pdfSwipeY;
+  if (!_curlDrag) {
+    if (_magMode || _curlReducedMotion()) return;
+    if (Math.abs(dx) < 14 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
+    const dir = dx < 0 ? 1 : -1;
+    const target = _pdfPage + dir;
+    if (target < 1 || (_pdfNumPages && target > _pdfNumPages)) return;
+    const c = _curlBegin(dir, target, true);
+    if (!c) return;
+    _curlDrag = { c, dir, lastX: t.clientX, lastT: performance.now(), vx: 0 };
+  }
+  const d = _curlDrag;
+  if (_curl !== d.c) { _curlDrag = null; return; }
+  const now = performance.now();
+  const dt = Math.max(1, now - d.lastT);
+  d.vx = 0.7 * d.vx + 0.3 * ((t.clientX - d.lastX) / dt);
+  d.lastX = t.clientX; d.lastT = now;
+  const W = (d.c.geo && d.c.geo.W) || pdfCanvas.clientWidth || 1;
+  const frac = Math.min(1, Math.max(0, (-d.dir * dx) / (W * 0.9)));
+  d.frac = frac;
+  const p = d.dir > 0 ? frac : 1 - frac;
+  if (d.c.ready) _curlApply(p);
+  else d.c.wantP = p;
+}
+function _curlDragEnd(cancelled) {
+  const d = _curlDrag;
+  _curlDrag = null;
+  if (!d || _curl !== d.c) return false;
+  const flick = (-d.dir * d.vx) > 0.45 && (d.frac || 0) > 0.04;
+  _curlSettle(!cancelled && ((d.frac || 0) > 0.28 || flick));
+  return true;
+}
 pdfWrap.addEventListener('touchend', (e) => {
   if (_magMode) return;
   clearTimeout(_lensTimer); _lensTimer = null;
@@ -2284,6 +2418,7 @@ pdfWrap.addEventListener('touchend', (e) => {
     _pdfPing();
     return;
   }
+  if (_curlDragEnd(false)) { _pdfSwiping = false; return; }
   if (_pdfSwiping) {
     _pdfSwiping = false;
     const t = e.changedTouches[0];
@@ -2296,6 +2431,7 @@ pdfWrap.addEventListener('touchend', (e) => {
 pdfWrap.addEventListener('touchcancel', () => {
   if (_magMode) return;
   _lensCancel();
+  _curlDragEnd(true);
   _pdfPinchDist = null;
   _pdfSwiping = false;
 }, { passive: true });
@@ -2422,6 +2558,9 @@ function closePdfReader() {
   document.getElementById('pdfReader').classList.remove('open');
   document.body.style.overflow = '';
   clearTimeout(_pdfSaveTimer);
+  _curlDrag = null;
+  _curlCleanup();
+  _pdfRenderWaiters = [];
   _pdfDoc = null;
   pdfCtx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
   pdfCanvas.classList.remove('pdf-canvas-ready');
