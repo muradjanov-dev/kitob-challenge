@@ -15,7 +15,7 @@ from django.db.models import Sum, Count
 from django.utils import timezone
 
 from tgbot.models import FeudGame, FeudAnswer, FeudScore
-from tgbot.services.chain_text import normalize
+from tgbot.services.chain_text import answer_key, keys_match
 from tgbot.services.chain_game import (
     _add_ball_reward, charge_entry_fee, ENTRY_FEE, REWARD_TIERS, PARTICIPATION,
     request_finalize,
@@ -83,11 +83,30 @@ def _closed_count(status, qi, phase, nq):
     return qi + 1 if phase == "reveal" else qi
 
 
+def _cluster(norms):
+    """Map each answer key onto the most popular key it is a typo of, so
+    "Otkan kunlar", "O'tkan kunlar!" and "otkan kunlr" count as ONE answer.
+    Exact grouping split the crowd over apostrophes and typos, and matching
+    the majority -- the whole point of the game -- became luck of spelling."""
+    # answer_key() again on the way in: rows written before keys were
+    # apostrophe-free still carry the old normalize() form.
+    counts = Counter(answer_key(n) for n in norms)
+    heads, head_of = [], {}
+    for key, _c in counts.most_common():
+        head = next((h for h in heads if keys_match(key, h)), None)
+        if head is None:
+            heads.append(key)
+            head = key
+        head_of[key] = head
+    return {n: head_of[answer_key(n)] for n in norms}
+
+
 def _score_question(g, q_index):
     answers = list(FeudAnswer.objects.filter(game=g, q_index=q_index))
-    counts = Counter(a.norm for a in answers)
+    canon = _cluster([a.norm for a in answers])
+    counts = Counter(canon[a.norm] for a in answers)
     for a in answers:
-        pts = counts[a.norm] * MATCH_POINTS
+        pts = counts[canon[a.norm]] * MATCH_POINTS
         score, _ = FeudScore.objects.get_or_create(game=g, user_id=a.user_id)
         score.points = (score.points or 0) + pts
         score.total_time = round((score.total_time or 0.0) + (a.time_taken or 0.0), 3)
@@ -114,8 +133,8 @@ def _ensure_scored(game, closed_count):
 
 
 def submit_answer(game_id: int, profile, text: str) -> dict:
-    norm = normalize(text)
-    if not norm or len(norm) < 1:
+    norm = answer_key(text)
+    if not norm:
         return {"ok": False, "error": "empty"}
     g = FeudGame.objects.filter(id=game_id).first()
     if not g:
@@ -131,7 +150,7 @@ def submit_answer(game_id: int, profile, text: str) -> dict:
     if is_first and not charge_entry_fee(profile):
         return {"ok": False, "error": "insufficient_balance", "need": ENTRY_FEE}
 
-    span = game_id and (g.answer_seconds + g.reveal_seconds)
+    span = g.answer_seconds + g.reveal_seconds
     elapsed = (now - g.starts_at).total_seconds()
     within = max(0.01, elapsed - qi * span)
     time_taken = round(within, 3)
@@ -200,11 +219,13 @@ def finalize_due_games() -> list:
 
 
 def _reveal(game, q_index, limit=6):
-    rows = FeudAnswer.objects.filter(game=game, q_index=q_index).values_list("text", "norm")
+    rows = list(FeudAnswer.objects.filter(game=game, q_index=q_index).values_list("text", "norm"))
+    canon = _cluster([norm for _t, norm in rows])
     counts, display = Counter(), {}
     for text, norm in rows:
-        counts[norm] += 1
-        display.setdefault(norm, text)
+        head = canon[norm]
+        counts[head] += 1
+        display.setdefault(head, text)
     return [{"text": display[n], "count": c} for n, c in counts.most_common(limit)]
 
 

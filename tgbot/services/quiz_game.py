@@ -25,6 +25,7 @@ only content prep and (for "teams") scoring differ.
 
 import io
 import random
+import re
 from datetime import timedelta
 
 from django.db import transaction
@@ -34,6 +35,7 @@ from django.utils import timezone
 from tgbot.models import QuizGame, QuizAnswer, QuizScore, GameJoker
 from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, REWARD_TIERS, PARTICIPATION, request_finalize
 from tgbot.services import game_jokers
+from tgbot.services.chain_text import letter_mask, match_text_answer, scramble_letters
 from tgbot.services.game_questions import (
     QUIZ_TWOFACTS_QUESTIONS, QUIZ_IMPOSTOR_QUESTIONS, QUIZ_CONNECTION_QUESTIONS,
     QUIZ_TIMELINE_QUESTIONS, QUIZ_MATCHBOOK_QUESTIONS, QUIZ_REVERSE_QUESTIONS,
@@ -205,6 +207,22 @@ TITLES = {
 }
 
 ENTRY_FEES = {k: 0 for k in TITLES}  # barcha o'yinlar bepul (2026-08-19)
+
+# Flavors answered by typing instead of tapping an option. The page sends the
+# raw text and the server maps it onto an option (see submit_text_answer):
+# matching used to happen in the browser as an exact lower-case compare, so
+# "O‘tkan kunlar", a stray space or one typo scored as a wrong answer.
+# `spellcheck` is not here on purpose -- "which spelling is right?" only
+# works when you can see the spellings.
+TEXT_FLAVORS = {"anagram", "wordle", "crossword", "cipher", "speedtype", "wordlock", "hangman"}
+# Answers that are a person's name: a distinctive part ("Qodiriy") is enough.
+NAME_FLAVORS = {"cipher", "speedtype"}
+# Share of letters shown in the answer's letter-slot hint, beyond each word's
+# first letter. So'z Qulfi is literally "unlock the missing letters" and
+# Dorboz is hangman -- both need some letters on the board to be playable.
+MASK_REVEAL = {"wordlock": 0.45, "hangman": 0.25}
+_HARF_NOTE = re.compile(r"\s*\(\d+\s*harf\)")
+_PAREN_NOTE = re.compile(r"\s*\([^)]*\)")
 NUM_QUESTIONS = {k: (10 if k == "cover" else 11) for k in TITLES}
 
 
@@ -412,8 +430,10 @@ def _prep_one(flavor, item):
             options = [item["answer"]] + list(item["distractors"])
             ans = item["answer"]
             random.shuffle(options)
+            # Scrambled from the answer itself: 15 of the stored `anagram`
+            # strings used letters the answer does not even have.
             return {
-                "q": f"🔠 Anagramma: <b>{item['anagram']}</b>\n(Maslahat: {item.get('hint', '')})",
+                "q": f"🔠 Anagramma: <b>{scramble_letters(ans)}</b>\n(Maslahat: {item.get('hint', '')})",
                 "options": options,
                 "correct": options.index(ans),
             }
@@ -422,7 +442,10 @@ def _prep_one(flavor, item):
             ans = item["word"]
             random.shuffle(options)
             return {
-                "q": f"🗝 So'z Qulfi: <b>{item['word']}</b>\n(Maslahat: {item.get('hint', '')})",
+                # The word itself used to be printed here, so every So'z Qulfi
+                # question showed its own answer. The letter slots under the
+                # question now show the partly unlocked word instead.
+                "q": f"🗝 So'z Qulfi: qulflangan harflarni oching!\n(Maslahat: {item.get('hint', '')})",
                 "options": options,
                 "correct": options.index(ans),
             }
@@ -461,7 +484,9 @@ def _prep_one(flavor, item):
             ans = item["answer"]
             random.shuffle(options)
             return {
-                "q": f"🧩 Krossvord katagi:\n<b>{item['clue']}</b>",
+                # The clue's own "(N harf)" was wrong for 7 of 30 words; the
+                # letter slots show the real length instead.
+                "q": f"🧩 Krossvord katagi:\n<b>{_HARF_NOTE.sub('', item['clue'])}</b>",
                 "options": options,
                 "correct": options.index(ans),
             }
@@ -516,6 +541,10 @@ def _prep_one(flavor, item):
             options = [correct_text] + list(item.get("distractors", []))
         else:
             opts = list(item["options"])
+            if flavor == "spellcheck":
+                # Only the right spelling carried a "(explanation)" suffix,
+                # which gave the answer away at a glance.
+                opts = [_PAREN_NOTE.sub("", o).strip() for o in opts]
             correct_text = opts[item["correct"]]
             options = opts
 
@@ -527,7 +556,31 @@ def _prep_one(flavor, item):
 
     result = _do_prep()
     result["key"] = _identity(flavor, item)
+    if flavor in TEXT_FLAVORS:
+        result["mask"] = _answer_mask(flavor, result)
     return result
+
+
+def correct_text(q) -> str:
+    opts = q.get("options") or []
+    ci = q.get("correct", -1)
+    return str(opts[ci]) if isinstance(ci, int) and 0 <= ci < len(opts) else ""
+
+
+def _answer_mask(flavor, q, rng=None) -> str:
+    answer = correct_text(q)
+    if flavor in NAME_FLAVORS:
+        answer = answer.split("/")[0]  # "Navoiy / Attor" -> slots for one name
+    return letter_mask(answer, MASK_REVEAL.get(flavor, 0.0), rng) if answer else ""
+
+
+def question_mask(game, qi) -> str:
+    """Letter-slot hint for a typed question. Games created before masks were
+    stored get one from a per-question seed, so every poller sees the same."""
+    q = (game.questions or [])[qi]
+    if q.get("mask"):
+        return q["mask"]
+    return _answer_mask(game.flavor, q, random.Random(f"{game.id}:{qi}"))
 
 
 def _prep_cover_question(item, pool_titles=None):
@@ -616,11 +669,15 @@ def latest_game(flavor):
 
 def get_or_activate_live_game(flavor):
     now = timezone.now()
-    g = QuizGame.objects.filter(flavor=flavor, status=QuizGame.STATUS_LIVE).order_by("-starts_at").first()
+    # A game whose clock ran out stays LIVE until the tick settles it; skip it,
+    # or the next scheduled game of this flavor is hidden behind it.
+    g = (QuizGame.objects.filter(flavor=flavor, status=QuizGame.STATUS_LIVE, ends_at__gte=now)
+         .order_by("-starts_at").first())
     if g:
         return g
     pending = (
-        QuizGame.objects.filter(flavor=flavor, status=QuizGame.STATUS_SCHEDULED, starts_at__lte=now)
+        QuizGame.objects.filter(flavor=flavor, status=QuizGame.STATUS_SCHEDULED,
+                                starts_at__lte=now, ends_at__gte=now)
         .order_by("starts_at").first()
     )
     if not pending:
@@ -679,14 +736,29 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
     if g.flavor == "teams" and is_first:
         with transaction.atomic():
             gl = QuizGame.objects.select_for_update().get(id=g.id)
-            team = _assign_team(gl)
-            if team == "a":
-                gl.team_a = list(gl.team_a or []) + [profile.id]
+            # A double tap sends two "first" answers at once; both passed the
+            # is_first check above, so without this the player joined twice
+            # (or once on each side) and skewed the team sizes.
+            if profile.id in (gl.team_a or []):
+                team = "a"
+            elif profile.id in (gl.team_b or []):
+                team = "b"
             else:
-                gl.team_b = list(gl.team_b or []) + [profile.id]
-            gl.save(update_fields=["team_a", "team_b", "updated_at"])
+                team = _assign_team(gl)
+                if team == "a":
+                    gl.team_a = list(gl.team_a or []) + [profile.id]
+                else:
+                    gl.team_b = list(gl.team_b or []) + [profile.id]
+                gl.save(update_fields=["team_a", "team_b", "updated_at"])
 
     q = g.questions[qi]
+    if not isinstance(choice, int) or choice < 0:
+        # QuizAnswer.choice is a PositiveSmallIntegerField. Typed answers that
+        # matched no option arrived here as -1, and the insert failed with an
+        # IntegrityError -- a 500 for every wrong typed answer, so the player
+        # could never get past a question they did not know. One past the last
+        # option is an equally "no option" value the column can store.
+        choice = len(q.get("options") or [])
     correct = (choice == q.get("correct"))
 
     span = g.answer_seconds + g.reveal_seconds
@@ -700,7 +772,8 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
     )
     if not created:
         return {"ok": False, "error": "already_answered",
-                "correct": hit.is_correct, "correct_index": q.get("correct")}
+                "correct": hit.is_correct, "correct_index": q.get("correct"),
+                "correct_text": correct_text(q)}
 
     # ❤️ Qalqon: sotib olingan, hali sarflanmagan qalqon bo'lsa, bitta xato
     # javob kechiriladi va ochko baribir beriladi. Sarflangani javob qatoridagi
@@ -727,7 +800,28 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
     score.save(update_fields=fields)
 
     return {"ok": True, "correct": correct, "shielded": shielded,
-            "correct_index": q.get("correct"), "team": score.team}
+            "correct_index": q.get("correct"), "correct_text": correct_text(q),
+            "team": score.team}
+
+
+def submit_text_answer(game_id: int, profile, text: str) -> dict:
+    """Typed answer for a TEXT_FLAVORS question: map it onto an option on the
+    server (forgiving apostrophes, case, spacing and small typos -- see
+    chain_text.match_text_answer), then score it like a tapped choice. Text
+    that matches nothing is recorded as a wrong answer (choice -1), exactly
+    as the page used to send it."""
+    g = QuizGame.objects.filter(id=game_id).first()
+    if not g:
+        return {"ok": False, "error": "not_live"}
+    status, qi, phase, _ = _phase(g, timezone.now())
+    if status != "live" or phase != "answer" or not (0 <= qi < len(g.questions or [])):
+        return {"ok": False, "error": "not_answering"}
+    q = g.questions[qi]
+    choice = match_text_answer(
+        text, q.get("options") or [], q.get("correct", -1),
+        allow_names=g.flavor in NAME_FLAVORS,
+    )
+    return submit_answer(g.id, profile, choice)
 
 
 def _shields_available(game, profile, bought: int | None = None) -> int:
@@ -828,6 +922,7 @@ def use_joker(game_id: int, profile, kind: str) -> dict:
                     "balance": int(profile.ball or 0)}
         out["choice"] = q.get("correct")
         out["correct_index"] = q.get("correct")
+        out["correct_text"] = correct_text(q)
         out["correct"] = True
         out["balance"] = int(profile.ball or 0)
     return out
@@ -1045,6 +1140,26 @@ def _leaderboard(game, limit=50):
             for r in ranked_scores(game)[:limit]]
 
 
+def _cached_leaderboard(game, limit=50):
+    """ranked_scores() is two queries plus a sort, and every open page polls
+    it every 1.5s -- in a busy game that was most of the web's DB load and
+    made answers feel slow to land. Same 2s shared cache the other engines use."""
+    from django.core.cache import cache
+    key = f"quiz:lb:{game.id}:{limit}"
+    try:
+        v = cache.get(key)
+        if v is not None:
+            return v
+    except Exception:
+        pass
+    v = _leaderboard(game, limit=limit)
+    try:
+        cache.set(key, v, 2)
+    except Exception:
+        pass
+    return v
+
+
 def _lifetime(profile, flavor):
     agg = QuizScore.objects.filter(user=profile, game__flavor=flavor).aggregate(
         games=Count("id"), pts=Sum("points"), best=Max("points"))
@@ -1088,7 +1203,7 @@ def state_payload(profile, flavor) -> dict:
         "has_premium": has_prem,
         "vip_locked": bool(g.is_vip and not has_prem),
         "q_index": qi, "q_number": qi + 1, "q_total": nq, "seconds": secs,
-        "leaderboard": _leaderboard(g),
+        "leaderboard": _cached_leaderboard(g),
         "your_points": (my.points if my else 0),
         "your_team": (my.team if my else ""),
         "your_reward": (my.reward if my else 0),
@@ -1132,7 +1247,13 @@ def state_payload(profile, flavor) -> dict:
     if status == "live" and 0 <= qi < nq:
         q = g.questions[qi]
         payload["q"] = q["q"]
-        payload["options"] = q["options"]
+        is_text = g.flavor in TEXT_FLAVORS
+        payload["input"] = "text" if is_text else "choice"
+        # A typed question must not ship its options: the right answer would
+        # sit in the page's network log while the player is still typing.
+        payload["options"] = [] if is_text else q["options"]
+        if is_text:
+            payload["mask"] = question_mask(g, qi)
         if "items" in q:
             payload["items"] = q["items"]
         if "image" in q:
@@ -1143,8 +1264,12 @@ def state_payload(profile, flavor) -> dict:
             payload["your_choice"] = ans.choice
             payload["your_correct"] = ans.is_correct
             payload["your_shielded"] = ans.shielded
+            if is_text:
+                payload["correct_text"] = correct_text(q)
         if phase == "reveal":
             payload["correct_index"] = q.get("correct")
+            if is_text:
+                payload["correct_text"] = correct_text(q)
         jok = game_jokers.summarize(
             game_jokers.game_rows(profile, GAME_TYPE, g.id), qi,
         )

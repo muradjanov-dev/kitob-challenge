@@ -308,7 +308,7 @@
           poll();
         }else{
           var t=$('toast');t.className='toast bad';
-          t.textContent=({insufficient_balance:"🪙 Kirish uchun 50 Kitobcha kerak — balansingiz yetarli emas.",eliminated:"Siz chetlatilgansiz.",not_live:"O'yin faol emas."})[r.error]||"Qabul qilinmadi.";
+          t.textContent=({insufficient_balance:"🪙 Balansingiz yetarli emas.",eliminated:"Siz chetlatilgansiz.",not_live:"O'yin faol emas."})[r.error]||"Qabul qilinmadi.";
         }
       }).catch(function(){}).then(function(){busy=false;});
     }

@@ -108,7 +108,7 @@ def api_castle_submit(request: HttpRequest) -> JsonResponse:
     except json.JSONDecodeError:
         return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
     choice = body.get("choice")
-    if not isinstance(choice, int):
+    if not isinstance(choice, int) or isinstance(choice, bool) or choice < 0:
         return JsonResponse({"ok": False, "error": "bad_choice"}, status=400)
     g = castle_game.latest_game()
     if not g:
@@ -140,7 +140,7 @@ def api_emoji_submit(request: HttpRequest) -> JsonResponse:
     except json.JSONDecodeError:
         return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
     choice = body.get("choice")
-    if not isinstance(choice, int):
+    if not isinstance(choice, int) or isinstance(choice, bool) or choice < 0:
         return JsonResponse({"ok": False, "error": "bad_choice"}, status=400)
     g = emoji_game.latest_game()
     if not g:
@@ -172,7 +172,7 @@ def api_wisdom_submit(request: HttpRequest) -> JsonResponse:
     except json.JSONDecodeError:
         return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
     choice = body.get("choice")
-    if not isinstance(choice, int):
+    if not isinstance(choice, int) or isinstance(choice, bool) or choice < 0:
         return JsonResponse({"ok": False, "error": "bad_choice"}, status=400)
     g = wisdom_game.get_or_activate_live_game()
     if not g:
@@ -247,7 +247,7 @@ def api_survival_submit(request: HttpRequest) -> JsonResponse:
     except json.JSONDecodeError:
         return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
     choice = body.get("choice")
-    if not isinstance(choice, int):
+    if not isinstance(choice, int) or isinstance(choice, bool) or choice < 0:
         return JsonResponse({"ok": False, "error": "bad_choice"}, status=400)
     g = survival_game.latest_game()
     if not g:
@@ -328,11 +328,19 @@ def api_quiz_submit(request: HttpRequest, flavor: str) -> JsonResponse:
     except json.JSONDecodeError:
         return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
     choice = body.get("choice")
-    if not isinstance(choice, int):
+    text = body.get("text")
+    typed = flavor in quiz_game.TEXT_FLAVORS and isinstance(text, str)
+    if typed:
+        text = text.strip()[:120]
+        if not text:
+            return JsonResponse({"ok": False, "error": "empty"})
+    elif not isinstance(choice, int) or isinstance(choice, bool):
         return JsonResponse({"ok": False, "error": "bad_choice"}, status=400)
     g = quiz_game.get_or_activate_live_game(flavor)
     if not g:
         return JsonResponse({"ok": False, "error": "not_live"})
+    if typed:
+        return JsonResponse(quiz_game.submit_text_answer(g.id, request.tg_profile, text))
     return JsonResponse(quiz_game.submit_answer(g.id, request.tg_profile, choice))
 
 

@@ -6047,6 +6047,8 @@ def chain_game_tick():
             except Exception as e:
                 print(f"chain_game_tick group {group_id}: {e}")
 
+        # Start the next game now, not after every winner has been DMed.
+        _advance_game_sequence("chain", game.id)
         for w in winners:
             if not w.get("reward"):
                 continue
@@ -6064,7 +6066,6 @@ def chain_game_tick():
             except Exception:
                 pass
         print(f"chain_game_tick: finalized game #{game.id}, {len(winners)} scorers")
-        _advance_game_sequence("chain", game.id)
 
 
 # ────────────────────────────────────────────────────────────────────────
@@ -7002,6 +7003,8 @@ def games_finalize_tick():
                         requests.post(url, data=data, timeout=10)
                     except Exception:
                         pass
+            # Start the next game now, not after every winner has been DMed.
+            _advance_game_sequence("feud", game.id)
             for w in winners:
                 if not w.get("reward"):
                     continue
@@ -7013,7 +7016,6 @@ def games_finalize_tick():
                         "parse_mode": "HTML"}, timeout=8)
                 except Exception:
                     pass
-            _advance_game_sequence("feud", game.id)
     except Exception as e:
         print(f"games_finalize_tick feud error: {e}")
 
@@ -7037,6 +7039,8 @@ def games_finalize_tick():
                         requests.post(url, data=data, timeout=10)
                     except Exception:
                         pass
+            # Start the next game now, not after every winner has been DMed.
+            _advance_game_sequence("castle", game.id)
             for w in winners:
                 if not w.get("reward"):
                     continue
@@ -7048,7 +7052,6 @@ def games_finalize_tick():
                         "parse_mode": "HTML"}, timeout=8)
                 except Exception:
                     pass
-            _advance_game_sequence("castle", game.id)
     except Exception as e:
         print(f"games_finalize_tick castle error: {e}")
 
@@ -7075,6 +7078,8 @@ def games_finalize_tick():
                         requests.post(url, data=data, timeout=10)
                     except Exception:
                         pass
+            # Start the next game now, not after every winner has been DMed.
+            _advance_game_sequence("emoji", game.id)
             for w in winners:
                 if not w.get("reward"):
                     continue
@@ -7086,7 +7091,6 @@ def games_finalize_tick():
                         "parse_mode": "HTML"}, timeout=8)
                 except Exception:
                     pass
-            _advance_game_sequence("emoji", game.id)
     except Exception as e:
         print(f"games_finalize_tick emoji error: {e}")
 
@@ -7141,7 +7145,7 @@ def _is_admin_only(winners) -> bool:
     return not TelegramProfile.objects.filter(id__in=uids, is_admin=False).exists()
 
 
-def _broadcast_and_dm(header_lines, winners, dm_text_fn, dm_markup_fn=None):
+def _broadcast_and_dm(header_lines, winners, dm_text_fn, dm_markup_fn=None, after_broadcast=None):
     """Post `header_lines` to every group, then DM each rewarded winner via
     `dm_text_fn(winner) -> str`. Shared by the new games' finalize announcements.
 
@@ -7152,19 +7156,31 @@ def _broadcast_and_dm(header_lines, winners, dm_text_fn, dm_markup_fn=None):
     double" line appended (see `_premium_missed_line`). It used to be spelled
     out by hand in `_finalize_quiz_flavor` only, so the 2x multiplier -- the
     single most concrete reason to buy Premium -- went unmentioned in the seven
-    other engines. Callers must not add it themselves any more."""
+    other engines. Callers must not add it themselves any more.
+
+    `after_broadcast()` runs between the group post and the DMs -- it is where
+    the daily sequence starts its next game. The DMs go out one request at a
+    time, and with dozens of winners the next game used to wait behind them
+    for most of a minute while the groups saw nothing happen."""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     text = _trim_telegram("\n".join(header_lines))
-    if not _is_admin_only(winners):
-        for gid, tid in _game_targets():
+    try:
+        if not _is_admin_only(winners):
+            for gid, tid in _game_targets():
+                try:
+                    data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
+                            "disable_web_page_preview": "true"}
+                    if tid:
+                        data["message_thread_id"] = tid
+                    requests.post(url, data=data, timeout=10)
+                except Exception:
+                    pass
+    finally:
+        if after_broadcast:
             try:
-                data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
-                        "disable_web_page_preview": "true"}
-                if tid:
-                    data["message_thread_id"] = tid
-                requests.post(url, data=data, timeout=10)
-            except Exception:
-                pass
+                after_broadcast()
+            except Exception as e:
+                print(f"_broadcast_and_dm after_broadcast error: {e}")
     prem_ids = _premium_ids_safe()
     for w in winners:
         if not w.get("reward"):
@@ -7200,8 +7216,8 @@ def _finalize_wisdom():
         _broadcast_and_dm(lines, winners, lambda w: (
             f"☪️ Hikmat Xazinasi — <b>{w['rank']}-o'rin</b>!\n"
             f"🪙 <b>+{w['reward']} Kitobcha</b> · Ball: {w['points']}"
-        ))
-        _advance_game_sequence("wisdom", game.id)
+        ), after_broadcast=lambda g=game: _advance_game_sequence("wisdom", g.id))
+        _advance_game_sequence("wisdom", game.id)  # no-op once advanced above
 
 
 def _finalize_detective():
@@ -7220,8 +7236,8 @@ def _finalize_detective():
         _broadcast_and_dm(lines, winners, lambda w: (
             f"📖 Kitob Detektivi — <b>{w['rank']}-o'rin</b>!\n"
             f"🪙 <b>+{w['reward']} Kitobcha</b> · Ball: {w['points']}"
-        ))
-        _advance_game_sequence("detective", game.id)
+        ), after_broadcast=lambda g=game: _advance_game_sequence("detective", g.id))
+        _advance_game_sequence("detective", game.id)  # no-op once advanced above
 
 
 def _finalize_survival():
@@ -7238,8 +7254,8 @@ def _finalize_survival():
         _broadcast_and_dm(lines, winners, lambda w: (
             f"💀 Omon qolish — {'omon qoldingiz!' if w.get('survived') else 'yaxshi harakat!'}\n"
             f"🪙 <b>+{w['reward']} Kitobcha</b> · To'g'ri javoblar: {w['correct']}"
-        ))
-        _advance_game_sequence("survival", game.id)
+        ), after_broadcast=lambda g=game: _advance_game_sequence("survival", g.id))
+        _advance_game_sequence("survival", game.id)  # no-op once advanced above
 
 
 # The 8 original flavors' titles carry no emoji, so they keep a hand-picked
@@ -7367,12 +7383,12 @@ def _finalize_quiz_flavor(flavor):
                 f"{_scoreline(w)}"
                 + (f"\n💎 Sizga <b>{w.get('premium_text') or (str(w.get('premium_days', '')) + ' kun')} BEPUL Premium</b> ham berildi — "
                    "barcha VIP imtiyozlar faol!" if (w.get("premium_text") or w.get("premium_days")) else "")
-            ))
+            ), after_broadcast=lambda g=game: _advance_game_sequence(flavor, g.id))
         except Exception as e:
             # Rewards are already banked at this point -- a failed announcement
             # must not strand the daily sequence on this game.
             print(f"_finalize_quiz_flavor: announce {flavor} #{game.id} failed: {e}")
-        _advance_game_sequence(flavor, game.id)
+        _advance_game_sequence(flavor, game.id)  # no-op once advanced above
 
 
 @shared_task
