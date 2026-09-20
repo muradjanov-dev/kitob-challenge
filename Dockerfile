@@ -5,6 +5,8 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PIP_DEFAULT_TIMEOUT=120
+ENV PIP_RETRIES=10
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -77,4 +79,3 @@ EXPOSE 8000
 
 ENTRYPOINT ["sh", "/app/entrypoint.sh"]
 CMD ["gunicorn", "src.wsgi:application", "--bind", "0.0.0.0:8000"]
-

@@ -3,12 +3,13 @@ set -e
 
 SERVICE_TYPE="${SERVICE_TYPE:-web}"
 
-# Always ensure database migrations are applied before starting any service
-echo "=== Running database migrations ==="
-python manage.py migrate --noinput || echo "migrate warning (non-fatal)"
-
 # Web-specific setup: static files, commands, notifications
 if [ "$SERVICE_TYPE" = "web" ]; then
+  # Only one container migrates. Workers wait for the healthy web service in
+  # Compose, so concurrent migration processes cannot race each other.
+  echo "=== Running database migrations ==="
+  python manage.py migrate --noinput
+
   echo "=== Collecting static files ==="
   python manage.py collectstatic --noinput 2>&1 || echo "collectstatic warning (non-fatal)"
 
@@ -23,8 +24,9 @@ if [ "$SERVICE_TYPE" = "web" ]; then
     echo ""
   fi
 
-  echo "=== Notifying admins of deploy ==="
-  python - <<'PY' || echo "deploy-notify skipped/failed (non-fatal)"
+  if [ "${NOTIFY_ADMINS_ON_DEPLOY:-1}" = "1" ]; then
+    echo "=== Notifying admins of deploy ==="
+    python - <<'PY' || echo "deploy-notify skipped/failed (non-fatal)"
 import os, urllib.request, urllib.parse, datetime
 token = os.environ.get("API_TOKEN")
 admins = os.environ.get("ADMINS", "")
@@ -60,6 +62,7 @@ for raw in admins.split(","):
     except Exception as e:
         print(f"notify failed for {chat_id}: {e}")
 PY
+  fi
 
   # Optional: one-shot test broadcast of a random inspiration to all users.
   # Set BROADCAST_INSPIRATION_ON_BOOT=1 on the web service for the deploy,
@@ -70,8 +73,10 @@ PY
       || echo "broadcast failed (non-fatal)"
   fi
 
-  echo "=== Announcing challenge if none active ==="
-  python manage.py announce_first_challenge || echo "announce_first_challenge failed (non-fatal)"
+  if [ "${ANNOUNCE_CHALLENGE_ON_BOOT:-1}" = "1" ]; then
+    echo "=== Announcing challenge if none active ==="
+    python manage.py announce_first_challenge || echo "announce_first_challenge failed (non-fatal)"
+  fi
 fi
 
 case "$SERVICE_TYPE" in
