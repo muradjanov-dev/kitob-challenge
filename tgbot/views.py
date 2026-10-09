@@ -298,6 +298,76 @@ def internal_diag_achievements(request: HttpRequest):
 
 
 @csrf_exempt
+def internal_restore_lost_data(request: HttpRequest):
+    """Run services.data_restore against a snapshot of the old server's database.
+
+    POST the gzipped snapshot as the body to start a job (?apply=1 writes,
+    otherwise it is a dry run; ?reports=0 skips reading reports). It runs in a
+    background thread -- an apply outlives gunicorn's request timeout -- and
+    GET ?job=<id> returns its result. The snapshot holds user data, which is
+    why it is sent here directly and never committed: the repo is public.
+    Delete this view/URL once the restore is done."""
+    import gzip as _gzip
+    import json as _json
+    import os as _os
+    import tempfile as _tempfile
+    import uuid as _uuid
+
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+        return HttpResponse(status=403)
+
+    workdir = _os.path.join(_tempfile.gettempdir(), "kc_restore")
+    _os.makedirs(workdir, exist_ok=True)
+
+    if request.method == "GET":
+        job = "".join(ch for ch in request.GET.get("job", "") if ch.isalnum())
+        path = _os.path.join(workdir, f"{job}.json")
+        if not job or not _os.path.exists(path):
+            return JsonResponse({"status": "running" if job and _os.path.exists(path + ".run") else "unknown"})
+        with open(path, encoding="utf-8") as fh:
+            return HttpResponse(fh.read(), content_type="application/json")
+    if request.method != "POST":
+        return HttpResponse(status=405)
+
+    try:
+        snap = _json.loads(_gzip.decompress(request.body).decode("utf-8"))
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": f"bad snapshot: {e}"}, status=400)
+    apply = request.GET.get("apply") == "1"
+    with_reports = request.GET.get("reports", "1") != "0"
+    lock = _os.path.join(workdir, "apply.lock")
+    if apply:
+        try:
+            _os.close(_os.open(lock, _os.O_CREAT | _os.O_EXCL))
+        except FileExistsError:
+            return JsonResponse({"ok": False, "error": "an apply is already running"}, status=409)
+
+    job = _uuid.uuid4().hex
+    path = _os.path.join(workdir, f"{job}.json")
+    open(path + ".run", "w").close()
+
+    def _run():
+        from tgbot.services.data_restore import run_restore, RestoreRefused
+        try:
+            out = {"ok": True, **run_restore(snap, apply=apply, with_reports=with_reports)}
+        except RestoreRefused as e:
+            out = {"ok": False, "error": f"refused: {e}"}
+        except Exception as e:
+            out = {"ok": False, "error": repr(e), "trace": traceback.format_exc()[-3000:]}
+        finally:
+            connections.close_all()
+            if apply and _os.path.exists(lock):
+                _os.remove(lock)
+        with open(path, "w", encoding="utf-8") as fh:
+            _json.dump(out, fh, ensure_ascii=False, default=str)
+        _os.remove(path + ".run")
+
+    threading.Thread(target=_run, daemon=True).start()
+    return JsonResponse({"ok": True, "job": job, "apply": apply})
+
+
+@csrf_exempt
 def internal_grant_ai_quiz_bonus_everyone(request: HttpRequest):
     """One-off trigger for ai_quiz_bonus.grant_ai_quiz_bonus_to_everyone --
     grants every registered user the same 1-hour AI-quiz window the Sirli
