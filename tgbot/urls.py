@@ -7,7 +7,6 @@ from .views import (
     internal_broadcast_auction_announcement,
     internal_diag_achievements, internal_diag_ai_quiz_trial_backlog, internal_fix_ai_quiz_trial_backlog,
     internal_grant_ai_quiz_bonus_everyone, internal_ai_quiz_bonus_status,
-    internal_restore_lost_data,
 )
 from src.settings import WEBHOOK_PATH
 from tgbot.views import health_check_celery, health_check_redis
@@ -58,7 +57,6 @@ urlpatterns = [
     path("internal/diag/ai-quiz-trial-backlog/", internal_diag_ai_quiz_trial_backlog, name="internal-diag-ai-quiz-trial-backlog"),
     path("internal/fix/ai-quiz-trial-backlog/", internal_fix_ai_quiz_trial_backlog, name="internal-fix-ai-quiz-trial-backlog"),
     path("internal/grant/ai-quiz-bonus-everyone/", internal_grant_ai_quiz_bonus_everyone, name="internal-grant-ai-quiz-bonus-everyone"),
-    path("internal/restore/lost-data/", internal_restore_lost_data, name="internal-restore-lost-data"),
     path("internal/diag/ai-quiz-bonus-status/", internal_ai_quiz_bonus_status, name="internal-ai-quiz-bonus-status"),
     path("internal/fix/unblock-false-positives/", internal_unblock_false_positives, name="internal-unblock-false-positives"),
     path("internal/diag/challenge-boom-state/", internal_diag_challenge_boom_state, name="internal-diag-challenge-boom-state"),
