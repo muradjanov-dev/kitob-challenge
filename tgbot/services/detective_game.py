@@ -15,7 +15,7 @@ from django.db.models import Sum, Count
 from django.utils import timezone
 
 from tgbot.models import DetectiveGame, DetectiveScore
-from tgbot.services.chain_text import normalize
+from tgbot.services.chain_text import normalize, matches_any
 from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, REWARD_TIERS, PARTICIPATION, request_finalize
 from tgbot.services.game_questions import DETECTIVE_BOOKS
 
@@ -60,7 +60,9 @@ def latest_game():
 
 def get_or_activate_live_game():
     now = timezone.now()
-    g = DetectiveGame.objects.filter(status=DetectiveGame.STATUS_LIVE).order_by("-starts_at").first()
+    # A game whose clock ran out stays LIVE until the tick settles it; skip it,
+    # or the next scheduled game is hidden behind it for up to a minute.
+    g = DetectiveGame.objects.filter(status=DetectiveGame.STATUS_LIVE, ends_at__gte=now).order_by("-starts_at").first()
     if g:
         return g
     pending = (
@@ -115,8 +117,13 @@ def submit_guess(game_id: int, profile, text: str) -> dict:
         DetectiveScore.objects.filter(id=score0.id).delete()
         return {"ok": False, "error": "insufficient_balance", "need": ENTRY_FEE}
 
-    accepted = set(g0.rounds[ri].get("norms") or [])
-    if norm not in accepted:
+    # The stored `norms` are hand-typed and inconsistent ("cholpon" without the
+    # apostrophe, "qutadg'u bilig" with it), and an exact lookup rejected
+    # correct guesses like "Cho'lpon" or a single typo. matches_any() compares
+    # apostrophe-free keys and forgives typos in longer names.
+    rnd = g0.rounds[ri]
+    accepted = list(rnd.get("norms") or []) + [rnd.get("display") or ""]
+    if not matches_any(text, accepted):
         return {"ok": False, "error": "wrong"}
 
     with transaction.atomic():

@@ -54,7 +54,7 @@
   </div>
 
   <div id="live" class="hidden">
-    <div class="card" style="background:rgba(255,204,77,.12);border:1px solid var(--accent2);font-size:12.5px;line-height:1.5;padding:10px 12px">🎁 <b>Kirish BEPUL!</b> ⏱ Qancha erta topsangiz, shuncha ko'p ochko: 1-ipuchida <b>30</b>, 2-da <b>20</b>, 3-da <b>10</b>.</div>
+    <div class="card" style="background:rgba(255,204,77,.12);border:1px solid var(--accent2);font-size:12.5px;line-height:1.5;padding:10px 12px">🎁 <b>Kirish BEPUL!</b> ⏱ Qancha erta topsangiz, shuncha ko'p ochko: 1-ishorada <b>30</b>, 2-da <b>20</b>, 3-da <b>10</b>.</div>
     <div class="card">
       <div class="sect" id="roundLbl">1-RAUND / 8</div>
       <div id="clues"></div>
@@ -117,7 +117,7 @@
         live.classList.add('hidden');info.classList.remove('hidden');
         if(s.status==='scheduled'){
           $('timerLbl').textContent='BOSHLANISH';$('subtitle').textContent='Tez orada';
-          info.innerHTML='<div class="em">📖</div><h2>O\'yin boshlanmoqda</h2><p>Har raundda maxfiy kitob asta-sekin ipuchlari orqali ochiladi. Birinchi to\'g\'ri topgan g\'olib — qancha erta, shuncha ko\'p ochko! Tayyor turing!</p>'+statsHistoryHtml(s);
+          info.innerHTML='<div class="em">📖</div><h2>O\'yin boshlanmoqda</h2><p>Har raundda maxfiy kitob asta-sekin ishoralari orqali ochiladi. Birinchi to\'g\'ri topgan g\'olib — qancha erta, shuncha ko\'p ochko! Tayyor turing!</p>'+statsHistoryHtml(s);
           localSeconds=s.seconds;
         }else if(s.status==='finished'){
           $('timerLbl').textContent='TUGADI';$('timer').textContent='00:00';$('subtitle').textContent='Tugadi';
@@ -149,7 +149,7 @@
           poll();
         }else{
           t.className='toast bad';
-          t.textContent=({wrong:"Noto'g'ri, qayta urinib ko'ring.",already_solved:"Bu raund allaqachon topildi.",insufficient_balance:"🪙 Kirish uchun 40 Kitobcha kerak — balansingiz yetarli emas.",not_live:"O'yin faol emas.",empty:"Nom yozing."})[r.error]||"Qabul qilinmadi.";
+          t.textContent=({wrong:"Noto'g'ri, qayta urinib ko'ring.",already_solved:"Bu raund allaqachon topildi.",insufficient_balance:"🪙 Balansingiz yetarli emas.",not_live:"O'yin faol emas.",empty:"Nom yozing."})[r.error]||"Qabul qilinmadi.";
         }
       }).catch(function(){$('toast').className='toast bad';$('toast').textContent='Tarmoq xatosi.';}).then(function(){busy=false;$('sendBtn').disabled=false;});
     }

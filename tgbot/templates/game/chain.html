@@ -185,11 +185,16 @@
         var maskedEl = $('masked');
         var maskedText = (s.round && s.round.masked) || '–';
         if (maskedEl.textContent !== maskedText){
+          // New round (someone else solved the last one): a half-typed guess
+          // for the old title would only come back as "wrong".
+          if (maskedEl.textContent && maskedEl.textContent !== '–') $('answer').value = '';
           maskedEl.textContent = maskedText;
           maskedEl.classList.remove('pop'); void maskedEl.offsetWidth; maskedEl.classList.add('pop');
         }
         var blanks = (s.round && s.round.blanks) || 1;
-        $('answer').setAttribute('maxlength', blanks);
+        // Room for o'/g' and Cyrillic: a blank "o" is often typed as "o'",
+        // and maxlength=1 cut that off before the server ever saw it.
+        $('answer').setAttribute('maxlength', blanks * 3);
         $('answer').setAttribute('placeholder', blanks === 2 ? '? ?' : '?');
         $('myPts').textContent = s.your_points || 0;
         // leaderboard
@@ -232,7 +237,7 @@
           });
           var mine = (s.your_reward ? ('<div class="me" style="margin-top:12px"><span>Sizning mukofotingiz</span><b>🪙 +'+s.your_reward+'</b></div>') : '');
           info.innerHTML = '<div class="em">🏁</div><h2>O\'yin tugadi!</h2>'
-            + '<p>🏆 Ochko olganlar mukofot oldi (1/2/3: 300/200/100, qolganlar +30). Bekorchi kirish haqini yo\'qotdi.</p>'
+            + '<p>🏆 Ochko olganlar mukofot oldi (1/2/3-o\'rin: 150/90/45, qolganlar +15).</p>'
             + mine
             + (w ? '<div style="text-align:left;margin-top:14px">'+w+'</div>'
                  : '<p class="muted" style="margin-top:12px">Bu safar hech kim qatnashmadi.</p>')
@@ -284,7 +289,7 @@
           t.className='toast bad';
           t.textContent = ({
             wrong_guess:"Noto'g'ri, qayta urinib ko'ring!",
-            insufficient_balance:"🪙 Kirish uchun 25 Kitobcha kerak — balansingiz yetarli emas.",
+            insufficient_balance:"🪙 Balansingiz yetarli emas.",
             not_live:"O'yin hozir faol emas.",
             no_books:"Hozircha kitoblar tugadi, biroz kuting.",
             empty:"Harf(lar)ni yozing."

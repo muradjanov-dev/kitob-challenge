@@ -28,7 +28,7 @@ from django.db.models import Sum, Count
 from django.utils import timezone
 
 from tgbot.models import ChainGame, ChainScore, TelegramProfile, GlobalBook
-from tgbot.services.chain_text import normalize, is_guessable_letter
+from tgbot.services.chain_text import answer_key, is_guessable_letter, _GUESSABLE_APOS
 
 ENTRY_FEE = 0  # Barcha jonli o'yinlar bepul (2026-08-19)
 POINTS_PER_ROUND = 10
@@ -148,7 +148,11 @@ def _pick_round(used_book_ids) -> dict | None:
     fresh = [b for b in all_books if b[0] not in (used_book_ids or [])]
     book_id, title = random.choice(fresh or all_books)
 
-    letter_positions = [i for i, c in enumerate(title) if is_guessable_letter(c)]
+    # Never blank an apostrophe: "O_tkan kunlar" asks the player to type a
+    # punctuation mark, and answer_key() drops apostrophes anyway, so such a
+    # round could not be won by anyone.
+    letter_positions = [i for i, c in enumerate(title)
+                        if is_guessable_letter(c) and c not in _GUESSABLE_APOS]
     n_blanks = min(random.choice([1, 2]), len(letter_positions))
     positions = sorted(random.sample(letter_positions, n_blanks))
     blanks = [{"pos": p, "letter": title[p]} for p in positions]
@@ -189,7 +193,9 @@ def get_or_activate_live_game():
     has opened (and starting its first round). Does NOT finish expired games
     (see finalize)."""
     now = timezone.now()
-    g = ChainGame.objects.filter(status=ChainGame.STATUS_LIVE).order_by("-starts_at").first()
+    # A game whose clock ran out stays LIVE until the tick settles it; skip it,
+    # or the next scheduled game is hidden behind it for up to a minute.
+    g = ChainGame.objects.filter(status=ChainGame.STATUS_LIVE, ends_at__gte=now).order_by("-starts_at").first()
     if g:
         return g
     scheduled = (
@@ -247,7 +253,9 @@ def submit(game_id: int, profile, guess: str) -> dict:
     """Submit a guess for the current round's missing letter(s). Correct
     guesses score immediately and start a new round; wrong guesses just get
     rejected so the round stays open for someone else."""
-    guess_norm = normalize(guess).replace(" ", "")
+    # answer_key() folds case, Cyrillic, diacritics and apostrophes, so "ў",
+    # "o'" and "o" are all the same guess for a blanked "Ў"/"O".
+    guess_norm = answer_key(guess)
     if not guess_norm:
         return {"ok": False, "error": "empty"}
 
@@ -283,7 +291,7 @@ def submit(game_id: int, profile, guess: str) -> dict:
             g.pending = round_
             g.save(update_fields=["pending", "updated_at"])
 
-        expected = normalize("".join(b["letter"] for b in round_["blanks"])).replace(" ", "")
+        expected = answer_key("".join(b["letter"] for b in round_["blanks"]))
         if guess_norm != expected:
             return {"ok": False, "error": "wrong_guess"}
 

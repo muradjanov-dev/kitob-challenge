@@ -67,7 +67,9 @@ def latest_game():
 
 def get_or_activate_live_game():
     now = timezone.now()
-    g = EmojiGame.objects.filter(status=EmojiGame.STATUS_LIVE).order_by("-starts_at").first()
+    # A game whose clock ran out stays LIVE until the tick settles it; skip it,
+    # or the next scheduled game is hidden behind it for up to a minute.
+    g = EmojiGame.objects.filter(status=EmojiGame.STATUS_LIVE, ends_at__gte=now).order_by("-starts_at").first()
     if g:
         return g
     pending = (

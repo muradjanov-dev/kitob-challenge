@@ -248,6 +248,26 @@
     .text-input:focus {
       border-color: var(--accent);
     }
+    .mask {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-align: center;
+      white-space: pre-wrap;
+      word-break: break-word;
+      padding: 12px 10px;
+      border-radius: 14px;
+      background: var(--card2);
+      border: 1px dashed var(--line);
+      color: var(--accent);
+    }
+    .mask-note {
+      font-size: 11.5px;
+      color: var(--muted);
+      text-align: center;
+      margin-top: -4px;
+    }
     .btn-submit {
       width: 100%;
       background: var(--accent);
@@ -620,7 +640,11 @@
     var jokerPrices = {fifty: 100, shield: 300, sniper: 500};
     var jokerUsed = [], jokerShields = 0, jokerShieldsLeft = 2, lastState = null;
 
-    var TEXT_FLAVORS = ['anagram', 'wordle', 'crossword', 'cipher', 'speedtype', 'wordlock', 'hangman', 'spellcheck'];
+    // Typed-answer flavors. The server says so per question (s.input); this
+    // list only covers the moment before the first poll lands.
+    var TEXT_FLAVORS = ['anagram', 'wordle', 'crossword', 'cipher', 'speedtype', 'wordlock', 'hangman'];
+    var isText = TEXT_FLAVORS.indexOf(FLAVOR) !== -1;
+    var curMask = '', curCorrectText = '', curWasCorrect = false, lastOptsSig = '', lastGameId = null;
     var LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
     function fmt(s) {
@@ -659,11 +683,31 @@
 
     function renderOpts() {
       var box = $('opts');
+      // The page polls every 1.5s and used to rebuild this box on every poll.
+      // For typed answers that wiped whatever the player was typing (and
+      // dropped the keyboard) every 1.5 seconds; for buttons it could swallow
+      // a tap. Rebuild only when something visible actually changed.
+      var sig = [lastQ, isText ? 't' : 'c', curAnswered ? 1 : 0, curWasCorrect ? 1 : 0,
+                 curChoice, curCorrectIdx, curCorrectText, curMask,
+                 curHidden.join(','), curOpts.join('')].join('|');
+      if (sig === lastOptsSig && !jokerFading) return;
+      lastOptsSig = sig;
       box.innerHTML = '';
 
-      if (TEXT_FLAVORS.indexOf(FLAVOR) !== -1) {
+      if (isText) {
         var wrap = document.createElement('div');
         wrap.className = 'text-input-wrap';
+
+        if (curMask) {
+          var mk = document.createElement('div');
+          mk.className = 'mask';
+          mk.textContent = curMask;
+          wrap.appendChild(mk);
+          var note = document.createElement('div');
+          note.className = 'mask-note';
+          note.textContent = "Har bir _ — bitta harf. Katta-kichik harf va tutuq belgisi (') muhim emas.";
+          wrap.appendChild(note);
+        }
 
         if (curAnswered) {
           var res = document.createElement('div');
@@ -674,14 +718,16 @@
           res.style.padding = '14px';
           res.style.borderRadius = '16px';
           res.style.background = 'var(--card)';
-          if (curChoice !== -1 && curCorrectIdx === curChoice) {
-            res.innerHTML = '<span style="color:var(--ok)">✅ Barakalla! To\'g\'ri javob: ' + esc(curOpts[curCorrectIdx]) + '</span>';
+          var shown = curCorrectText || (curOpts[curCorrectIdx] || '');
+          if (curWasCorrect) {
+            res.innerHTML = '<span style="color:var(--ok)">✅ Barakalla! To\'g\'ri javob: ' + esc(shown) + '</span>';
             res.style.border = '1.5px solid var(--ok)';
           } else {
-            res.innerHTML = '<span style="color:var(--bad)">❌ Noto\'g\'ri!</span><br><span style="color:var(--text);font-size:14px;margin-top:6px;display:inline-block">To\'g\'ri javob: <b>' + esc(curOpts[curCorrectIdx] || '') + '</b></span>';
+            res.innerHTML = '<span style="color:var(--bad)">❌ Noto\'g\'ri!</span>' + (shown ? '<br><span style="color:var(--text);font-size:14px;margin-top:6px;display:inline-block">To\'g\'ri javob: <b>' + esc(shown) + '</b></span>' : '');
             res.style.border = '1.5px solid var(--bad)';
           }
-          box.appendChild(res);
+          wrap.appendChild(res);
+          box.appendChild(wrap);
         } else {
           var input = document.createElement('input');
           input.type = 'text';
@@ -689,27 +735,29 @@
           input.placeholder = 'Javobingizni yozing...';
           input.autocomplete = 'off';
           input.autocapitalize = 'off';
+          input.setAttribute('autocorrect', 'off');
+          input.setAttribute('spellcheck', 'false');
+          input.setAttribute('enterkeyhint', 'send');
+          input.maxLength = 120;
 
           var btn = document.createElement('button');
           btn.className = 'btn-submit';
           btn.textContent = '✅ Tasdiqlash';
 
           function submitText() {
-            var val = input.value.trim().toLowerCase();
-            if (!val) return;
-            var matchIdx = -1;
-            for (var i = 0; i < curOpts.length; i++) {
-              if (curOpts[i].toLowerCase().trim() === val) {
-                matchIdx = i;
-                break;
-              }
+            var val = input.value.trim();
+            if (!val) {
+              var t = $('toast');
+              t.className = 'toast bad';
+              t.textContent = 'Javobni yozing.';
+              return;
             }
-            answer(matchIdx);
+            sendAnswer({text: val}, -1);
           }
 
           btn.addEventListener('click', submitText);
-          input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') submitText();
+          input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); submitText(); }
           });
 
           wrap.appendChild(input);
@@ -769,7 +817,7 @@
         setTimeout(function() {
           var gone = box.querySelectorAll('[data-fade="1"]');
           for (var i = 0; i < gone.length; i++) gone[i].className += ' gone';
-          setTimeout(function() { if (!curAnswered) renderOpts(); }, 350);
+          setTimeout(function() { if (!curAnswered) { lastOptsSig = ''; renderOpts(); } }, 350);
         }, 20);
       }
     }
@@ -778,7 +826,7 @@
       if (jokerBusy) return 'busy';
       if (jokerUsed.indexOf(kind) !== -1) return 'used';
       if (kind === 'fifty') {
-        if (TEXT_FLAVORS.indexOf(FLAVOR) !== -1) return 'na';
+        if (isText) return 'na';
         if (curAnswered) return 'answered';
         if (curOpts.length < 3) return 'na';
       }
@@ -847,8 +895,10 @@
             jokerToast("❤️ Qalqon olindi — bitta xato javob kechiriladi.", true);
           } else if (kind === 'sniper') {
             curAnswered = true;
+            curWasCorrect = true;
             curChoice = r.choice;
             curCorrectIdx = (r.correct_index !== undefined ? r.correct_index : -1);
+            if (r.correct_text) curCorrectText = r.correct_text;
             curHidden = [];
             renderOpts();
             jokerToast("🎯 Snayper to'g'ri javobni belgiladi!", true);
@@ -922,9 +972,13 @@
         $('qn').textContent = badgeText;
         $('myPts').textContent = s.your_points || 0;
         $('qnum').textContent = s.q_number + '/' + s.q_total;
+        if (s.input) isText = (s.input === 'text');
+        if (s.game_id !== lastGameId) { lastGameId = s.game_id; lastQ = -1; }
         if (s.q_index !== lastQ) {
           lastQ = s.q_index;
           curAnswered = false;
+          curWasCorrect = false;
+          curCorrectText = '';
           curCorrectIdx = -1;
           curChoice = -1;
           curHidden = [];
@@ -977,9 +1031,12 @@
         }
 
         curOpts = s.options || [];
+        curMask = s.mask || '';
+        if (s.correct_text) curCorrectText = s.correct_text;
         if (s.answered) {
           curAnswered = true;
           curChoice = (s.your_choice !== undefined ? s.your_choice : -1);
+          curWasCorrect = !!(s.your_correct || s.your_shielded);
         }
         if (s.phase === 'reveal') {
           curCorrectIdx = (s.correct_index !== undefined ? s.correct_index : -1);
@@ -1062,18 +1119,24 @@
     }
 
     function answer(choice) {
+      sendAnswer({choice: choice}, choice);
+    }
+
+    function sendAnswer(body, choice) {
       if (busy || curAnswered) return;
       busy = true;
       api(M.api + 'submit/', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({choice: choice})
+        body: JSON.stringify(body)
       }).then(function(r) {
         if (r.ok || r.error === 'already_answered') {
           $('toast').textContent = '';
           curAnswered = true;
           curChoice = choice;
+          curWasCorrect = !!(r.correct || r.shielded);
           curCorrectIdx = (r.correct_index !== undefined ? r.correct_index : -1);
+          if (r.correct_text) curCorrectText = r.correct_text;
           renderOpts();
           if (r.shielded) {
             jokerShields = Math.max(0, jokerShields - 1);
@@ -1089,10 +1152,16 @@
           t.textContent = ({
             premium_required: "👑 Ushbu arena faqat VIP Premium a'zolar uchun!",
             insufficient_balance: "🪙 Balansingiz yetarli emas.",
-            not_answering: "Hozir javob vaqti emas."
+            not_answering: "Hozir javob vaqti emas.",
+            not_live: "O'yin hozir faol emas.",
+            empty: "Javobni yozing."
           })[r.error] || "Qabul qilinmadi.";
         }
-      }).catch(function() {}).then(function() {
+      }).catch(function() {
+        var t = $('toast');
+        t.className = 'toast bad';
+        t.textContent = "Tarmoq xatosi — qayta urinib ko'ring.";
+      }).then(function() {
         busy = false;
       });
     }
