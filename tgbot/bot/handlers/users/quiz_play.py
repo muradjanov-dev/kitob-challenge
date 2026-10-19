@@ -1,7 +1,6 @@
 """Quiz play: join Vizov, solo play via deep link, answer questions."""
 import asyncio
 import json
-import os
 import random
 
 from aiogram import types
@@ -15,13 +14,12 @@ from django.db.models import F
 from datetime import timedelta
 from django.utils import timezone
 from tgbot.bot.loader import dp, bot
-from tgbot.bot.utils import aget_user
+from tgbot.bot.utils import aget_user, bot_username
 from tgbot.models import (
     Quiz, QuizQuestion, QuizOption, QuizSession, QuizParticipant, QuizUserAnswer,
     ScheduledMessageDeletion,
 )
 
-BOT_USERNAME = os.environ.get("BOT_USERNAME", "kitob_challange_bot")
 
 
 def _solo_preview_kb(quiz) -> InlineKeyboardMarkup:
@@ -31,7 +29,7 @@ def _solo_preview_kb(quiz) -> InlineKeyboardMarkup:
     kb.add(InlineKeyboardButton(text="▶️ Boshlash", callback_data=f"qsolo:{quiz.id}"))
     kb.add(InlineKeyboardButton(
         text="📤 Guruhga ulashish",
-        url=f"https://t.me/{BOT_USERNAME}?startgroup=quiz_{quiz.link_code}",
+        url=f"https://t.me/{bot_username()}?startgroup=quiz_{quiz.link_code}",
     ))
     return kb
 
@@ -865,7 +863,7 @@ async def _finish_session_solo(session_id: int, chat_id: int):
     else:
         emoji, headline, blurb = "📚", "Hali oldindasiz!", "Bu — boshlanish. Kitobni qo'lga olib, mazasini totib chiqsangiz, keyingi safar yorishasiz."
 
-    bot_link = f"https://t.me/{BOT_USERNAME}"
+    bot_link = f"https://t.me/{bot_username()}"
     bar = _progress_bar(pct)
     players_line = (
         f"👥 Bu quizni jami <b>{player_count}</b> kishi yechgan\n\n" if player_count > 1 else "\n"
@@ -1157,7 +1155,7 @@ async def _finish_group_session(session_id: int, chat_id: int):
         return
 
     if not participants:
-        bot_link = f"https://t.me/{BOT_USERNAME}"
+        bot_link = f"https://t.me/{bot_username()}"
         await bot.send_message(
             chat_id=chat_id,
             text=(
@@ -1190,7 +1188,7 @@ async def _finish_group_session(session_id: int, chat_id: int):
     lines.append("")
     lines.append(f"👥 Jami ishtirokchilar: <b>{len(participants)}</b>")
     lines.append("")
-    bot_link = f"https://t.me/{BOT_USERNAME}"
+    bot_link = f"https://t.me/{bot_username()}"
     lines.append(
         f"<blockquote>🚀 Yana quiz ishlang yoki o'zingiz tuzing:\n"
         f"👉 <a href=\"{bot_link}\">Kitob Challenge bot</a>\n\n"

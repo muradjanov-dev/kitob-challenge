@@ -1,5 +1,4 @@
 """Quiz admin: create, list, edit, delete, launch Vizov."""
-import os
 import json
 
 from aiogram import types
@@ -8,11 +7,10 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from asgiref.sync import sync_to_async
 
 from tgbot.bot.loader import dp, bot
-from tgbot.bot.utils import aget_user
+from tgbot.bot.utils import aget_user, bot_username
 from tgbot.bot.states.main import QuizCreateState, QuizEditState, QuizBattleState
 from tgbot.models import Quiz, QuizQuestion, QuizOption, QuizSession, QuizParticipant, TelegramProfile
 
-BOT_USERNAME = os.environ.get("BOT_USERNAME", "kitob_challange_bot")
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -163,7 +161,7 @@ def _can_edit_quiz(quiz, user) -> bool:
 
 
 def _quiz_link(code: str) -> str:
-    return f"https://t.me/{BOT_USERNAME}?start=quiz_{code}"
+    return f"https://t.me/{bot_username()}?start=quiz_{code}"
 
 
 def _quiz_list_kb(quizzes) -> InlineKeyboardMarkup:
@@ -191,7 +189,7 @@ def _quiz_view_kb(quiz, back: str = "ls") -> InlineKeyboardMarkup:
     # /start quiz_<code> from that group and spins up a group session.
     kb.row(InlineKeyboardButton(
         text="📤 Guruhga ulashish",
-        url=f"https://t.me/{BOT_USERNAME}?startgroup=quiz_{quiz.link_code}",
+        url=f"https://t.me/{bot_username()}?startgroup=quiz_{quiz.link_code}",
     ))
     kb.row(InlineKeyboardButton(text="🗑 O'chirish", callback_data=f"qz:del:{quiz.id}"))
     kb.row(InlineKeyboardButton(text="« Orqaga", callback_data=f"qz:{back}"))

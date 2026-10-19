@@ -61,6 +61,17 @@ def is_admin_id_sync(telegram_id):
 aget_is_admin = sync_to_async(is_admin_id_sync, thread_sensitive=True)
 
 
+def bot_username():
+    """The running bot's @username, as Telegram reports it for our own token
+    (tasks._get_bot_username: getMe, cached for a day, failures not cached).
+
+    Never the BOT_USERNAME env var: on the new server it named a different
+    bot, so the quiz "📤 Guruhga ulashish" button asked people to add someone
+    else's bot to their group, and every quiz link opened that bot."""
+    from tgbot.tasks import _get_bot_username
+    return _get_bot_username() or "kitob_challange_bot"
+
+
 def get_all_users():
     users = User.objects.all()
     return users

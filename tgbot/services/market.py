@@ -926,7 +926,10 @@ def generate_certificate(user) -> bytes:
     draw.text((left_x + 50, panel_y + 70), "✓ HAQIQIY & TASDIQLANGAN", font=font_tiny, fill=_GREEN_ACCENT)
 
     # Center: Community & Bot link
-    bot_username = _os.environ.get("BOT_USERNAME", "kitob_challange_bot")
+    # The running bot's name from getMe, not the BOT_USERNAME env var -- that
+    # named a different bot on the new server (see tgbot.bot.utils.bot_username).
+    from tgbot.tasks import _get_bot_username
+    bot_username = _get_bot_username() or "kitob_challange_bot"
     draw.text((W // 2 - 110, panel_y + 15), f"t.me/{bot_username}", font=font_small_bold, fill=_GOLD_LIGHT)
     draw.text((W // 2 - 145, panel_y + 42), "O'zbekiston Kitobxonlar Jamiyati", font=font_tiny, fill=_MUTED)
     draw.text((W // 2 - 120, panel_y + 65), "2 000 000+ o'qilgan sahifalar", font=font_tiny, fill=_CREAM)
