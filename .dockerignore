@@ -1,5 +1,12 @@
 .git
 .gitignore
+.env
+.env.*
+!.env.example
+!.env.prod.example
+*.dump
+*.pem
+*.key
 __pycache__/
 *.pyc
 node_modules/
