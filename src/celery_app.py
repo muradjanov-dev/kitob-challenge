@@ -236,6 +236,13 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.post_book_quiz',
         'schedule': crontab(hour=21, minute=0),
     },
+    # Kunning latifasi — one reader joke a day in the groups' announcement
+    # topic; 17:00 is the quiet afternoon gap between the 14:00 Viktorina and
+    # the 19:00 evening posts.
+    'post-daily-joke': {
+        'task': 'tgbot.tasks.post_daily_joke',
+        'schedule': crontab(hour=17, minute=0),
+    },
 
     # Single daily inspiration — personalized hour wins; fixed 10:00 is the
     # fallback for users whose optimal_send_hour hasn't been computed yet.
