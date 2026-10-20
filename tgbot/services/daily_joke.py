@@ -5,6 +5,7 @@ groups is approved first), not generated on the fly. The one for a given day
 is picked by its date, so a retried or doubled beat run posts the same joke,
 and the list simply starts over after the last one.
 """
+from datetime import date
 
 HEADER = "😄 <b>Kitobxon latifasi</b> #{n}"
 
@@ -185,10 +186,15 @@ JOKES = [
 ]
 
 
+# Joke #1 went out by hand right after launch (night of 2026-10-21), so the
+# daily post counts from 2026-10-20: 2026-10-21 posts #2, the next day #3, and
+# after the last joke the list starts over at #1.
+START = date(2026, 10, 20)
+
+
 def joke_number_for(day) -> int:
-    """1-based number of the joke posted on `day` (a date): the list is walked
-    by calendar day, starting over after the last joke."""
-    return day.toordinal() % len(JOKES) + 1
+    """1-based number of the joke posted on `day` (a date)."""
+    return (day - START).days % len(JOKES) + 1
 
 
 def joke_text_for(day) -> str:
