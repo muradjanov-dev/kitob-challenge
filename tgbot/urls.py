@@ -28,6 +28,7 @@ from tgbot.game_views import (
     castle_index, api_castle_state, api_castle_submit,
     emoji_index, api_emoji_state, api_emoji_submit,
     wisdom_index, api_wisdom_state, api_wisdom_submit,
+    author_index, api_author_state, api_author_submit, api_author_vote,
     detective_index, api_detective_state, api_detective_submit,
     survival_index, api_survival_state, api_survival_submit, api_survival_joker,
     quiz_index, api_quiz_state, api_quiz_submit, api_quiz_joker,
@@ -99,6 +100,11 @@ urlpatterns = [
     path("hikmat/", wisdom_index, name="wisdom"),
     path("hikmat/api/state/", api_wisdom_state, name="wisdom-api-state"),
     path("hikmat/api/submit/", api_wisdom_submit, name="wisdom-api-submit"),
+
+    path("muallif/", author_index, name="author"),
+    path("muallif/api/state/", api_author_state, name="author-api-state"),
+    path("muallif/api/submit/", api_author_submit, name="author-api-submit"),
+    path("muallif/api/vote/", api_author_vote, name="author-api-vote"),
 
     path("detektiv/", detective_index, name="detective"),
     path("detektiv/api/state/", api_detective_state, name="detective-api-state"),

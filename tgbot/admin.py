@@ -816,6 +816,23 @@ class WisdomScoreAdmin(admin.ModelAdmin):
     search_fields = ('user__full_name', 'user__telegram_id')
 
 
+@admin.register(models.AuthorGame)
+class AuthorGameAdmin(admin.ModelAdmin):
+    list_display = ('id', 'status', 'starts_at', 'writing_ends_at', 'ends_at', 'rewarded')
+    list_filter = ('status', 'rewarded')
+    readonly_fields = ('prompt', 'created_at', 'updated_at')
+
+
+@admin.register(models.AuthorEntry)
+class AuthorEntryAdmin(admin.ModelAdmin):
+    """Tick `hidden` to pull an inappropriate entry out of voting and prizes."""
+    list_display = ('id', 'game', 'user', 'votes', 'reward', 'hidden', 'created_at')
+    list_filter = ('hidden', 'rewarded')
+    list_editable = ('hidden',)
+    search_fields = ('user__full_name', 'user__telegram_id', 'text')
+    readonly_fields = ('votes', 'reward', 'rewarded', 'created_at', 'updated_at')
+
+
 @admin.register(models.DetectiveGame)
 class DetectiveGameAdmin(admin.ModelAdmin):
     list_display = ('id', 'title', 'status', 'starts_at', 'ends_at', 'rewarded')

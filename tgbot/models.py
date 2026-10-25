@@ -2115,6 +2115,63 @@ class WisdomScore(BaseModel):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Muallif bo'lib ko'r — a scene from a book is shown, readers write what
+# happens next, then everyone votes for the continuations they like best
+# (anonymously, never their own). Most-voted writers win.
+# ─────────────────────────────────────────────────────────────────────────────
+class AuthorGame(BaseModel):
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_LIVE = "live"
+    STATUS_FINISHED = "finished"
+    STATUS_CHOICES = [
+        (STATUS_SCHEDULED, "Rejalashtirilgan"), (STATUS_LIVE, "Jonli"),
+        (STATUS_FINISHED, "Tugagan"),
+    ]
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
+    starts_at = models.DateTimeField()
+    writing_ends_at = models.DateTimeField()
+    ends_at = models.DateTimeField(help_text="End of the voting window.")
+    prompt = models.JSONField(default=dict, help_text='{"key","book","author","scene","task"}')
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "author_games"
+        verbose_name = "Muallif bo'lib ko'r — O'yin"
+        verbose_name_plural = "Muallif bo'lib ko'r — O'yinlar"
+        ordering = ("-starts_at",)
+
+    def __str__(self):
+        return f"Muallif #{self.id} — {self.status}"
+
+
+class AuthorEntry(BaseModel):
+    game = models.ForeignKey(AuthorGame, on_delete=models.CASCADE, related_name="entries")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="author_entries")
+    text = models.TextField()
+    votes = models.PositiveIntegerField(default=0)
+    reward = models.PositiveIntegerField(default=0)
+    rewarded = models.BooleanField(default=False)
+    hidden = models.BooleanField(default=False, help_text="Hidden by an admin: kept out of voting and prizes.")
+
+    class Meta:
+        db_table = "author_entries"
+        verbose_name = "Muallif bo'lib ko'r — Yozuv"
+        verbose_name_plural = "Muallif bo'lib ko'r — Yozuvlar"
+        unique_together = ("game", "user")
+        ordering = ("-votes", "created_at")
+
+
+class AuthorVote(BaseModel):
+    game = models.ForeignKey(AuthorGame, on_delete=models.CASCADE, related_name="votes")
+    voter = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="author_votes")
+    entry = models.ForeignKey(AuthorEntry, on_delete=models.CASCADE, related_name="vote_rows")
+
+    class Meta:
+        db_table = "author_votes"
+        unique_together = ("voter", "entry")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Kitob Detektivi — a mystery book is revealed through progressively less vague
 # clues; the FIRST correct free-text guess in a round wins it (earlier clue =
 # more points) and the game advances to the next mystery book.

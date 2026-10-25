@@ -180,6 +180,55 @@ def api_wisdom_submit(request: HttpRequest) -> JsonResponse:
     return JsonResponse(wisdom_game.submit_answer(g.id, request.tg_profile, choice))
 
 
+# ── Muallif bo'lib ko'r ──────────────────────────────────────────────────────
+def author_index(request: HttpRequest) -> HttpResponse:
+    resp = render(request, "game/author.html", {})
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp["Pragma"] = "no-cache"
+    return resp
+
+
+@csrf_exempt
+@require_GET
+@_require_authed
+def api_author_state(request: HttpRequest) -> JsonResponse:
+    from tgbot.services import author_game
+    return JsonResponse(author_game.state_payload(request.tg_profile))
+
+
+@csrf_exempt
+@require_POST
+@_require_authed
+def api_author_submit(request: HttpRequest) -> JsonResponse:
+    from tgbot.services import author_game
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
+    g = author_game.get_or_activate_live_game()
+    if not g:
+        return JsonResponse({"ok": False, "error": "not_live"})
+    return JsonResponse(author_game.submit_entry(g.id, request.tg_profile, str(body.get("text") or "")))
+
+
+@csrf_exempt
+@require_POST
+@_require_authed
+def api_author_vote(request: HttpRequest) -> JsonResponse:
+    from tgbot.services import author_game
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
+    entry_id = body.get("entry_id")
+    if not isinstance(entry_id, int) or isinstance(entry_id, bool):
+        return JsonResponse({"ok": False, "error": "bad_entry"}, status=400)
+    g = author_game.get_or_activate_live_game()
+    if not g:
+        return JsonResponse({"ok": False, "error": "not_live"})
+    return JsonResponse(author_game.toggle_vote(g.id, request.tg_profile, entry_id))
+
+
 # ── Kitob Detektivi ──────────────────────────────────────────────────────────
 def detective_index(request: HttpRequest) -> HttpResponse:
     resp = render(request, "game/detective.html", {})
@@ -374,6 +423,7 @@ _GAME_LABELS_URLS = {
     "wisdom": ("Hikmatlar", "/hikmat/"),
     "detective": ("Detektiv", "/detektiv/"),
     "survival": ("Omon qolish", "/omon-qolish/"),
+    "muallif": ("🎭 Muallif bo'lib ko'r", "/muallif/"),
     "twofacts": ("Ikki haqiqat, bir yolg'on", "/ikki-haqiqat/"),
     "impostor": ("Kim yolg'onchi?", "/kim-yolgonchi/"),
     "connection": ("Yashirin bog'lanish", "/bog-lanish/"),
@@ -459,11 +509,12 @@ _QUIZ_FLAVOR_SET = set(_QUIZ_FLAVORS)
 def _game_participant_count(game_type: str, game_id: int) -> int:
     from tgbot.models import (
         ChainScore, FeudScore, CastleHit, EmojiScore,
-        WisdomScore, DetectiveScore, SurvivalPlayer, QuizScore,
+        WisdomScore, DetectiveScore, SurvivalPlayer, QuizScore, AuthorEntry,
     )
     model_by_type = {
         "chain": ChainScore, "feud": FeudScore, "emoji": EmojiScore,
         "wisdom": WisdomScore, "detective": DetectiveScore, "survival": SurvivalPlayer,
+        "muallif": AuthorEntry,
     }
     if game_type == "castle":
         return CastleHit.objects.filter(game_id=game_id).values("user_id").distinct().count()

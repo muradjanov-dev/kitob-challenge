@@ -305,6 +305,7 @@ async def do_start(message: types.Message, state: FSMContext):
         "detective": ("/detektiv/", "📖 O'yinni ochish", "Kitob Detektivi"),
         "omon-qolish": ("/omon-qolish/", "💀 O'yinni ochish", "Omon qolish"),
         "survival": ("/omon-qolish/", "💀 O'yinni ochish", "Omon qolish"),
+        "muallif": ("/muallif/", "🎭 O'yinni ochish", "Muallif bo'lib ko'r"),
         "ikki-haqiqat": ("/ikki-haqiqat/", "🎭 O'yinni ochish", "Ikki haqiqat, bir yolg'on"),
         "twofacts": ("/ikki-haqiqat/", "🎭 O'yinni ochish", "Ikki haqiqat, bir yolg'on"),
         "kim-yolgonchi": ("/kim-yolgonchi/", "🃏 O'yinni ochish", "Kim yolg'onchi?"),

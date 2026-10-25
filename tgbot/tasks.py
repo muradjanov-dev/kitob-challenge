@@ -6361,13 +6361,13 @@ def send_game_teaser(slot="evening"):
 PREMIUM_2X_NOTE = "\n\n💎 <i>Premium a'zolar bu o'yinda <b>2 barobar</b> Kitobcha oladi.</i>"
 
 
-def _announce_game(text, start_param):
+def _announce_game(text, start_param, premium_note=True):
     from datetime import timedelta
     from django.utils import timezone
     from tgbot.models import ScheduledMessageDeletion
 
     # Pointless in the VIP arena — everyone in there is already Premium.
-    if PREMIUM_2X_NOTE not in text and "VIP PREMIUM ARENA" not in text:
+    if premium_note and PREMIUM_2X_NOTE not in text and "VIP PREMIUM ARENA" not in text:
         text += PREMIUM_2X_NOTE
     username = _get_bot_username()
     rows = []
@@ -6526,6 +6526,95 @@ def start_wisdom_game():
     _announce_game(text, "hikmat")
     print(f"start_wisdom_game: game #{game.id}")
     return game
+
+
+@shared_task
+def start_author_game():
+    from tgbot.services.author_game import (
+        create_scheduled_author, LEAD_SECONDS, WRITE_SECONDS, VOTE_SECONDS,
+        REWARD_TIERS, PARTICIPATION,
+    )
+    # Settled by games_finalize_tick only — see the note in start_emoji_game.
+    game = create_scheduled_author()
+    text = (
+        "🎭 <b>MUALLIF BO'LIB KO'R</b> — yangi o'yin!\n\n"
+        f"⏳ <b>{LEAD_SECONDS // 60} daqiqadan keyin</b> boshlanadi — hozir kiring!\n"
+        "Kitobdan bir lavha ko'rsatiladi — uning davomini o'z tasavvuringiz bilan "
+        f"yozasiz ({WRITE_SECONDS // 60} daqiqa). Keyin hamma yozuvlarni muallif "
+        f"ismisiz o'qib, eng yoqqaniga ovoz beradi ({VOTE_SECONDS // 60} daqiqa).\n\n"
+        f"🏆 Eng ko'p ❤️ olganlar: <b>{' / '.join(map(str, REWARD_TIERS))} Kitobcha</b>\n"
+        f"✍️ Yozgan har bir kishiga <b>{PARTICIPATION} Kitobcha</b>\n"
+        "🎁 <b>Kirish BEPUL!</b>\n👇 Kiring:"
+    )
+    _announce_game(text, "muallif")
+    print(f"start_author_game: game #{game.id}")
+    return game
+
+
+_AUTHOR_VOTING_QUIPS = [
+    "Mualliflar asabiylashib kutyapti — ularni ko'p kuttirmang 😅",
+    "Qaysi biri kimniki — hech kim bilmaydi. Hatto biz ham… deyarli 🤫",
+    "Yozganlar — qahramon, o'qiganlar — hakam. Hakamlar, marhamat! ⚖️",
+    "Bitta yurakcha — bitta muallifning bugungi baxti 💛",
+]
+
+
+def _announce_author_voting():
+    """One group post when a Muallif game's writing window closes, so readers
+    who did not write still come and vote."""
+    from django.core.cache import cache
+    from tgbot.models import AuthorEntry, AuthorGame
+    from tgbot.services.author_game import VOTE_SECONDS, VOTES_PER_READER
+
+    now = timezone.now()
+    for g in AuthorGame.objects.filter(rewarded=False, writing_ends_at__lte=now, ends_at__gt=now):
+        if not cache.add(f"author_voting_announced:{g.id}", 1, 86400):
+            continue
+        n = AuthorEntry.objects.filter(game=g, hidden=False).count()
+        if n < 2:
+            continue
+        text = (
+            "🗳 <b>Muallif bo'lib ko'r — ovoz berish boshlandi!</b>\n\n"
+            f"✍️ <b>{n} ta</b> hikoya yozildi. {random.choice(_AUTHOR_VOTING_QUIPS)}\n\n"
+            f"❤️ {VOTE_SECONDS // 60} daqiqa ichida eng yoqqan {VOTES_PER_READER} tasiga ovoz bering 👇"
+        )
+        _announce_game(text, "muallif", premium_note=False)
+
+
+def _finalize_author():
+    from tgbot.services import author_game
+    medals = ["🥇", "🥈", "🥉"]
+    for game, summary in author_game.finalize_due_games():
+        winners = summary.get("winners", [])
+        p = summary.get("prompt") or {}
+        lines = [
+            "🎭 <b>Muallif bo'lib ko'r — yakun!</b>",
+            f"📖 «{_esc_text(p.get('book', ''))}» — {_esc_text(p.get('author', ''))}",
+        ]
+        if winners:
+            lines.append(f"✍️ {len(winners)} ta hikoya · 🗳 {summary.get('voters', 0)} kishi ovoz berdi\n")
+            ranked = [w for w in winners if w.get("rank")]
+            for w in ranked:
+                lines.append(f"{medals[w['rank'] - 1]} {_esc_text(w['name'])} — <b>{w['votes']}</b> ❤️ (+{w['reward']} 🪙)")
+            if ranked:
+                best = ranked[0]["text"]
+                if len(best) > 700:
+                    best = best[:699].rstrip() + "…"
+                lines.append(f"\n🏆 <b>G'olib hikoya:</b>\n<blockquote>{_esc_text(best)}</blockquote>")
+            else:
+                lines.append("Bu safar hech kim ovoz bermadi 🤷")
+            lines.append(f"\n🎁 Yozgan hammaga <b>+{author_game.PARTICIPATION} 🪙</b>!")
+        else:
+            lines.append("\nBu safar hech kim yozmadi 😔")
+
+        def _dm(w):
+            head = (f"🎭 Muallif bo'lib ko'r — <b>{w['rank']}-o'rin</b>!" if w.get("rank")
+                    else "🎭 Muallif bo'lib ko'r — hikoyangiz uchun rahmat!")
+            return f"{head} ❤️ {w['votes']} ovoz\n🪙 <b>+{w['reward']} Kitobcha</b>"
+
+        _broadcast_and_dm(lines, winners, _dm,
+                          after_broadcast=lambda g=game: _advance_game_sequence("muallif", g.id))
+        _advance_game_sequence("muallif", game.id)  # no-op once advanced above
 
 
 @shared_task
@@ -6736,6 +6825,7 @@ _BASE_GAME_STARTERS = {
     "wisdom": start_wisdom_game,
     "detective": start_detective_game,
     "survival": start_survival_game,
+    "muallif": start_author_game,
 }
 
 
@@ -6808,6 +6898,28 @@ VIP_GAME_NAMES = {
 }
 
 
+def _headliner_key(day, slot):
+    return f"slot_headliner:{day}:{slot}"
+
+
+def slot_headliner(day, slot):
+    from django.core.cache import cache
+    try:
+        return cache.get(_headliner_key(day, slot))
+    except Exception:
+        return None
+
+
+def set_slot_headliner(day, slot, game_type):
+    """Make `game_type` the first game of `slot` on `day` (None clears it)."""
+    from django.core.cache import cache
+    key = _headliner_key(day, slot)
+    if game_type:
+        cache.set(key, game_type, 3 * 86400)
+    else:
+        cache.delete(key)
+
+
 @shared_task
 def start_game_sequence(slot, count=3, pool=None):
     """Kick off today's `slot` ('morning' 10:00, 'evening' 21:30, or 'vip_2230') sequence."""
@@ -6831,6 +6943,12 @@ def start_game_sequence(slot, count=3, pool=None):
             q_sample = random.sample(all_quiz, min(count - len(b_sample), len(all_quiz)))
             pool = b_sample + q_sample
             random.shuffle(pool)
+
+    # A headliner set for this date + slot (internal/ops/headliner/) opens
+    # the slot; the random draw fills the rest.
+    headliner = slot_headliner(today, slot)
+    if headliner and headliner in _GAME_STARTERS:
+        pool = [headliner] + [g for g in pool if g != headliner]
 
     count = min(count, len(pool))
     defaults_game_types = list(pool[:count])
@@ -7020,7 +7138,7 @@ def _auto_recover_game_sequences():
     has already ended past its ends_at timestamp, safely advances it to the next game."""
     from tgbot.models import (
         GameSequence, QuizGame, ChainGame, FeudGame, CastleGame,
-        EmojiGame, WisdomGame, DetectiveGame, SurvivalGame
+        EmojiGame, WisdomGame, DetectiveGame, SurvivalGame, AuthorGame,
     )
     today = timezone.localdate()
     now = timezone.now()
@@ -7117,6 +7235,11 @@ def _auto_recover_game_sequences():
             elif gt == "survival":
                 g = SurvivalGame.objects.filter(id=gid).first()
                 if not g or g.status == SurvivalGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
+                    is_finished = True
+                    ended_at = g.ends_at if g else None
+            elif gt == "muallif":
+                g = AuthorGame.objects.filter(id=gid).first()
+                if not g or g.status == AuthorGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
                     is_finished = True
                     ended_at = g.ends_at if g else None
             else:
@@ -7282,6 +7405,12 @@ def games_finalize_tick():
         _finalize_survival()
     except Exception as e:
         print(f"games_finalize_tick survival error: {e}")
+
+    try:
+        _announce_author_voting()
+        _finalize_author()
+    except Exception as e:
+        print(f"games_finalize_tick muallif error: {e}")
 
     # 5. All Quiz flavors
     from tgbot.game_views import _QUIZ_FLAVORS

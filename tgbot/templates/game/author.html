@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Muallif bo'lib ko'r</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root{--bg:#18181b;--card:#212126;--card2:#28282f;--text:#ece9e2;--muted:#95938d;
+      --accent:#c8922e;--accent2:#5e6d8a;--ok:#468a68;--bad:#b85d68;--line:#32323a;--heart:#e0566b;}
+    @media (prefers-color-scheme: light){:root{--bg:#faf7f2;--card:#f3eee6;--card2:#eae4d8;--text:#2a2723;--muted:#736f68;--line:#dfd7ca;}}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:14px 14px 36px;max-width:620px;margin:0 auto}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+    .title{font-weight:800;font-size:19px;letter-spacing:-0.02em}.title small{display:block;font-weight:600;font-size:12px;color:var(--muted);margin-top:2px}
+    .timer{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 14px;font-weight:800;font-variant-numeric:tabular-nums;min-width:76px;text-align:center}
+    .timer .lbl{display:block;font-size:10px;color:var(--muted);font-weight:700;letter-spacing:0.5px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:12px}
+    .scene{background:linear-gradient(145deg,var(--card2),var(--card))}
+    .book{font-size:11px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.6px}
+    .book span{color:var(--muted)}
+    .scene p{font-family:Georgia,"Times New Roman",serif;font-size:16px;line-height:1.55;margin:10px 0 0}
+    .task{margin-top:12px;font-weight:800;font-size:15px;line-height:1.4}
+    textarea{width:100%;min-height:210px;resize:vertical;background:var(--card2);color:var(--text);border:1.5px solid var(--line);border-radius:14px;padding:12px;font:16px/1.5 Georgia,"Times New Roman",serif}
+    textarea:focus{outline:none;border-color:var(--accent)}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+    .count{font-size:12.5px;color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums}
+    .count.bad{color:var(--bad)}.count.ok{color:var(--ok)}
+    .btn{background:var(--accent);color:#1b1407;border:0;border-radius:14px;padding:12px 18px;font-weight:800;font-size:15px;font-family:inherit;cursor:pointer}
+    .btn:disabled{opacity:.5;cursor:default}
+    .entry{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px}
+    .entry.voted{border-color:var(--heart)}
+    .entry .txt{font-family:Georgia,"Times New Roman",serif;font-size:15.5px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word}
+    .entry .foot{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+    .entry .num{font-size:12px;font-weight:800;color:var(--muted)}
+    .heart{background:var(--card2);border:1.5px solid var(--line);color:var(--text);border-radius:12px;padding:8px 14px;font-weight:800;font-size:14px;font-family:inherit;cursor:pointer}
+    .entry.voted .heart{background:rgba(224,86,107,.15);border-color:var(--heart);color:var(--heart)}
+    .own{font-size:12.5px;font-weight:800;color:var(--accent)}
+    .sect{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:2px 0 10px}
+    .note{background:rgba(200,146,46,.12);border:1px solid var(--accent);font-size:12.5px;line-height:1.5;padding:10px 12px}
+    .lb{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+    .lb:last-child{border-bottom:0}.rank{width:26px;text-align:center;font-weight:900}
+    .lb-name{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+    .pts{font-weight:800;color:var(--accent);font-size:14px;white-space:nowrap}
+    .win{font-family:Georgia,"Times New Roman",serif;font-size:15px;line-height:1.55;white-space:pre-wrap;border-left:3px solid var(--accent);padding-left:12px;margin-top:10px}
+    .big{text-align:center;padding:26px 18px}.big .em{font-size:46px;margin-bottom:6px}.big h2{margin:8px 0 8px;font-size:21px;font-weight:800}.big p{color:var(--muted);margin:0;font-size:14.5px;line-height:1.5}
+    .hrow{text-align:left;padding:10px 2px;border-bottom:1px solid var(--line)}.hrow:last-child{border-bottom:0}
+    .hrow .hd{font-size:11px;color:var(--muted)}.hrow .hw{font-weight:700}
+    .muted{color:var(--muted)}.hidden{display:none !important}
+    .quip{font-size:14px;line-height:1.45;font-weight:600;font-style:italic;color:var(--text);margin:-2px 2px 12px;min-height:40px;transition:opacity .35s}
+    .quip.fade{opacity:0}
+    .toast{min-height:20px;margin-top:8px;font-size:14px;font-weight:700}
+    .toast.ok{color:var(--ok)}.toast.bad{color:var(--bad)}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="title">🎭 Muallif bo'lib ko'r <small id="subtitle">Jonli o'yin</small></div>
+    <div class="timer"><span class="lbl" id="timerLbl">QOLDI</span><span id="timer">--:--</span></div>
+  </div>
+
+  <div id="quip" class="quip hidden"></div>
+
+  <div id="sceneCard" class="card scene hidden">
+    <div class="book" id="book"></div>
+    <p id="scene"></p>
+    <div class="task" id="task"></div>
+  </div>
+
+  <div id="write" class="hidden">
+    <div class="card note" id="writeNote"></div>
+    <div class="card">
+      <textarea id="text" placeholder="Davomini shu yerga yozing..."></textarea>
+      <div class="row">
+        <div class="count" id="count">0</div>
+        <button class="btn" id="send">Yuborish</button>
+      </div>
+      <div class="toast" id="writeToast"></div>
+    </div>
+  </div>
+
+  <div id="vote" class="hidden">
+    <div class="card note" id="voteNote"></div>
+    <div id="entries"></div>
+  </div>
+
+  <div id="info" class="card big hidden"></div>
+  <div id="results" class="hidden"></div>
+
+  <script>
+    var tg=(window.Telegram&&window.Telegram.WebApp)?window.Telegram.WebApp:null;
+    if(tg){try{tg.ready();tg.expand();}catch(e){}}
+    function readInit(){if(tg&&tg.initData)return tg.initData;try{var q=new URLSearchParams(location.search).get('tgWebAppData');if(q)return q;}catch(e){}var h=(location.hash||'').replace(/^#/,'');if(h){try{var d=new URLSearchParams(h).get('tgWebAppData');if(d)return d;}catch(e){}}return'';}
+    var INIT=readInit();
+    var $=function(id){return document.getElementById(id);};
+    var localSeconds=0,gameId=null,shownPhase=null,minC=120,maxC=1500,entriesKey='',busy=false;
+    function fmt(s){s=Math.max(0,s|0);var m=Math.floor(s/60),r=s%60;return(m<10?'0':'')+m+':'+(r<10?'0':'')+r;}
+    function esc(t){return(t||'').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    function api(path,opts){opts=opts||{};opts.headers=Object.assign({'X-Telegram-Init-Data':INIT},opts.headers||{});return fetch(path,opts).then(function(r){return r.json();});}
+    // Playful lines instead of dry reminders -- sarcastic, funny or fond,
+    // rotated every few seconds for the phase the reader is in.
+    var QUIPS={
+      lobby:[
+        "🎭 Qalamni charxlang, ilhomni chaqiring — bir daqiqadan so'ng siz muallifsiz.",
+        "😏 Bugun kim Cho'lponning merosxo'ri ekan — ko'ramiz.",
+        "☕ Choy damlab oling. Hikoya sovuq choy bilan yozilmaydi."
+      ],
+      writing:[
+        "✍️ Qodiriy ham birinchi sahifani bir o'tirishda yozmagan. To'g'ri, unda taymer yo'q edi 😏",
+        "🤫 Ilhom kelmayaptimi? U ham sizga o'xshab kechikadi. Boshlab yuboring — u yo'lda.",
+        "💛 Siz zo'r yozishingizni bilamiz. Endi buni ekran ham bilib qo'ysin.",
+        "😌 Ismingiz yashirin, hech kim kulmaydi. Erkin yozing!",
+        "📚 Tolstoy 1300 betlik roman yozgan. Sizdan atigi 120 belgi so'rayapmiz. Shunchaki aytib qo'ydik.",
+        "🫶 Imlo xatosiga jarima yo'q. Zerikarli yozishga bor — ovozsiz qolasiz 😄",
+        "🤓 Yozuvchilik — klaviaturaga tikilib o'tirish emas. Garchi hozir xuddi shunday ko'rinsa ham.",
+        "🌙 Qahramoningiz sizni kutyapti. U sabrli, lekin taymer unchalik emas."
+      ],
+      hurry:[
+        "⏰ Bir daqiqa qoldi! Shekspir bo'lish shart emas — «Yuborish»ni bosish yetarli.",
+        "🏃 Vaqt tugayapti! Chala asar ham asar. Yuboring!",
+        "😱 Hikoyangiz qahramonini yo'l o'rtasida tashlab ketmang!"
+      ],
+      sent:[
+        "🎉 Yuborildi! Endi o'zingizni muallif deb tanishtirsangiz bo'ladi. Hech bo'lmasa bugun.",
+        "😎 Asar tayyor. Vaqt tugaguncha yana silliqlab olsangiz ham bo'ladi — buyuklar shunday qiladi.",
+        "💐 Barakalla! Muharriringiz sizdan faxrlanyapti. Muharriringiz — biz."
+      ],
+      voting:[
+        "❤️ Do'stingiznikini taniysizmi? Yo'q — ismlar yashirin. Faqat yoqqaniga ovoz bering 😇",
+        "🧐 Tanqidchi bo'lish vaqti keldi. Faqat mehribon tanqidchi.",
+        "🫣 O'zingiznikiga ovoz berib bo'lmaydi. Tekshirdik — hamma bir urinib ko'radi.",
+        "📖 Hammasini o'qing — eng zo'ri oxirida bo'lishi mumkin.",
+        "💌 Har bir yurakcha kimningdir kechqurunini chiroyli qiladi."
+      ]
+    };
+    var quipSet=null,quipIdx=0;
+    function setQuips(name){
+      var q=$('quip');
+      if(!name){q.classList.add('hidden');quipSet=null;return;}
+      q.classList.remove('hidden');
+      if(quipSet===name)return;
+      quipSet=name;quipIdx=Math.floor(Math.random()*QUIPS[name].length);q.textContent=QUIPS[name][quipIdx];
+    }
+    setInterval(function(){
+      if(!quipSet)return;var q=$('quip'),list=QUIPS[quipSet];if(list.length<2)return;
+      q.classList.add('fade');
+      setTimeout(function(){quipIdx=(quipIdx+1)%list.length;q.textContent=list[quipIdx];q.classList.remove('fade');},350);
+    },9000);
+
+    function draftKey(){return 'kc_muallif_draft_'+gameId;}
+    function saveDraft(){try{localStorage.setItem(draftKey(),$('text').value);}catch(e){}}
+    function loadDraft(){try{return localStorage.getItem(draftKey())||'';}catch(e){return'';}}
+
+    function updateCount(){
+      var n=$('text').value.trim().length,c=$('count');
+      c.textContent=n+' / '+maxC+(n<minC?'  (kamida '+minC+')':'');
+      c.className='count '+(n<minC||n>maxC?'bad':'ok');
+    }
+    $('text').addEventListener('input',function(){updateCount();saveDraft();});
+
+    function showScene(p){
+      $('sceneCard').classList.remove('hidden');
+      $('book').innerHTML=esc(p.book)+' <span>— '+esc(p.author)+'</span>';
+      $('scene').textContent=p.scene||'';
+      $('task').textContent='✍️ '+(p.task||'');
+    }
+
+    function historyHtml(h){
+      if(!h||!h.length)return'';
+      var out='<div class="sect" style="margin-top:16px;text-align:left">🕘 O\'tgan o\'yinlar</div>';
+      h.forEach(function(g){out+='<div class="hrow"><div class="hd">'+esc(g.date)+' · '+esc(g.book)+'</div><div class="hw">🥇 '+esc(g.winner)+' <span class="muted">('+g.votes+' ❤️)</span></div><div class="muted" style="font-size:12px">'+g.players+' ✍️</div></div>';});
+      return out;
+    }
+
+    function renderEntries(s){
+      var key=(s.entries||[]).map(function(e){return e.id+(e.voted?'v':'');}).join(',');
+      if(key===entriesKey)return;entriesKey=key;
+      var box=$('entries');
+      if(!(s.entries||[]).length){box.innerHTML='<div class="card big"><div class="em">📭</div><p>Bu safar hech kim yozmadi.</p></div>';return;}
+      var h='';
+      s.entries.forEach(function(e,i){
+        h+='<div class="entry'+(e.voted?' voted':'')+'"><div class="txt">'+esc(e.text)+'</div><div class="foot"><div class="num">#'+(i+1)+'</div>'+
+          (e.own?'<div class="own">✍️ Sizning yozuvingiz</div>':'<button class="heart" data-id="'+e.id+'">'+(e.voted?'❤️ Ovoz berildi':'🤍 Yoqdi')+'</button>')+'</div></div>';
+      });
+      box.innerHTML=h;
+      box.querySelectorAll('.heart').forEach(function(b){b.addEventListener('click',function(){vote(parseInt(b.dataset.id,10));});});
+    }
+
+    function render(s){
+      if(s.status==='none'){
+        hideAll();setQuips(null);$('info').classList.remove('hidden');
+        $('timerLbl').textContent='—';$('timer').textContent='--:--';$('subtitle').textContent='Kutilmoqda';
+        $('info').innerHTML='<div class="em">🎭</div><h2>Hozircha o\'yin yo\'q</h2><p>Muallif bo\'lib ko\'r tez orada boshlanadi — guruhni kuzating!</p>'+historyHtml(s.history);
+        return;
+      }
+      if(gameId!==s.game_id){gameId=s.game_id;shownPhase=null;entriesKey='';}
+      minC=s.min_chars;maxC=s.max_chars;localSeconds=s.seconds;
+      var phaseChanged=shownPhase!==s.phase;shownPhase=s.phase;
+      if(s.phase==='lobby'){
+        if(phaseChanged){hideAll();$('info').classList.remove('hidden');}
+        setQuips('lobby');
+        $('timerLbl').textContent='BOSHLANISH';$('subtitle').textContent='Tez orada';
+        $('info').innerHTML='<div class="em">🎭</div><h2>O\'yin boshlanmoqda</h2><p>Kitobdan bir lavha ko\'rsatiladi — uning davomini o\'z tasavvuringiz bilan yozasiz. Keyin hamma eng yoqqan yozuvlarga ovoz beradi.</p>'+
+          '<p style="margin-top:10px">🏆 1/2/3-o\'rin: <b>'+s.rewards.join('/')+' Kitobcha</b> · har bir yozganga <b>'+s.participation+'</b></p>'+historyHtml(s.history);
+      }else if(s.phase==='writing'){
+        if(phaseChanged){
+          hideAll();showScene(s.prompt);$('write').classList.remove('hidden');
+          var t=$('text');t.maxLength=maxC;t.value=loadDraft()||s.my_text||'';updateCount();
+        }
+        setQuips(s.seconds<=60?'hurry':(s.my_text?'sent':'writing'));
+        $('timerLbl').textContent='YOZISH';$('subtitle').textContent=s.entries_count+' ta yozuv yuborildi';
+        $('writeNote').innerHTML='✍️ <b>'+minC+'–'+maxC+'</b> belgi. Vaqt tugaguncha istalgancha tahrirlab, qayta yuborishingiz mumkin. 🎁 Kirish BEPUL!';
+        $('send').textContent=s.my_text?'Yangilash':'Yuborish';
+      }else if(s.phase==='voting'){
+        if(phaseChanged){hideAll();showScene(s.prompt);$('vote').classList.remove('hidden');window.scrollTo(0,0);}
+        setQuips('voting');
+        $('timerLbl').textContent='OVOZ';$('subtitle').textContent=s.entries_count+' ta yozuv';
+        $('voteNote').innerHTML='❤️ Eng yoqqan yozuvlarga ovoz bering — <b>'+s.votes_left+'</b> ta ovozingiz qoldi (jami '+s.votes_per_reader+'). Mualliflar nomi yashirin, o\'zingiznikiga ovoz berib bo\'lmaydi.';
+        renderEntries(s);
+      }else{
+        if(phaseChanged)hideAll();
+        setQuips(null);
+        $('info').classList.remove('hidden');$('results').classList.remove('hidden');
+        $('timerLbl').textContent='TUGADI';$('timer').textContent='00:00';$('subtitle').textContent='Tugadi';
+        var mine=s.my_reward?'<p style="margin-top:10px;color:var(--accent);font-weight:800">🪙 +'+s.my_reward+' Kitobcha'+(s.my_votes?' · '+s.my_votes+' ❤️':'')+'</p>':'';
+        $('info').innerHTML='<div class="em">🏁</div><h2>O\'yin tugadi!</h2><p>'+esc(s.prompt.book)+' — '+esc(s.prompt.author)+'</p>'+mine;
+        var r=s.results||[],h='';
+        if(r.length){
+          h+='<div class="card"><div class="sect">🏆 Natijalar</div>';
+          r.forEach(function(e,i){var m=e.votes>0&&i<3?['🥇','🥈','🥉'][i]:(i+1)+'.';h+='<div class="lb"><div class="rank">'+m+'</div><div class="lb-name">'+esc(e.name)+' <span class="muted">'+e.votes+' ❤️</span></div><div class="pts">'+(e.reward?'🪙 +'+e.reward:'')+'</div></div>';});
+          h+='</div>';
+          if(r[0].votes>0)h+='<div class="card"><div class="sect">🥇 G\'olib yozuv — '+esc(r[0].name)+'</div><div class="win">'+esc(r[0].text)+'</div></div>';
+        }
+        $('results').innerHTML=h+'<div class="card">'+historyHtml(s.history)+'</div>';
+        localSeconds=0;
+      }
+      $('timer').textContent=fmt(localSeconds);
+    }
+    function hideAll(){['sceneCard','write','vote','info','results'].forEach(function(id){$(id).classList.add('hidden');});}
+    // the rule notes stay, but in small print under the playful line
+    document.querySelectorAll('.note').forEach(function(n){n.style.fontSize='12px';});
+
+    function poll(){api('/muallif/api/state/').then(function(s){if(!s||s.ok===false){hideAll();$('info').classList.remove('hidden');$('info').innerHTML='<div class="em">🔒</div><h2>Kirish xatosi</h2><p>Saytni ✨ Sayt tugmasi orqali qayta oching.</p>';return;}render(s);}).catch(function(){});}
+
+    $('send').addEventListener('click',function(){
+      if(busy)return;busy=true;var t=$('writeToast');
+      api('/muallif/api/submit/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:$('text').value})}).then(function(r){
+        if(r.ok){t.className='toast ok';t.textContent=r.updated?'✅ Yozuvingiz yangilandi':'✅ Yozuvingiz qabul qilindi!';
+          if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.notificationOccurred('success')}catch(e){}}poll();}
+        else{t.className='toast bad';t.textContent=({too_short:'Kamida '+minC+' belgi yozing ('+(r.len||0)+' ta bor).',too_long:'Eng ko\'pi '+maxC+' belgi.',not_writing:'Yozish vaqti tugadi.'})[r.error]||'Qabul qilinmadi.';}
+      }).catch(function(){t.className='toast bad';t.textContent='Aloqa uzildi — qayta bosing.';}).then(function(){busy=false;});
+    });
+
+    function vote(id){
+      if(busy)return;busy=true;
+      api('/muallif/api/vote/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entry_id:id})}).then(function(r){
+        if(!r.ok&&r.error==='no_votes_left'){if(tg&&tg.showAlert){try{tg.showAlert('Ovozlaringiz tugadi. Boshqasiga bermoqchi bo\'lsangiz, avvalgi ovozni bekor qiling.');}catch(e){}}}
+        if(tg&&tg.HapticFeedback&&r.ok){try{tg.HapticFeedback.impactOccurred('light')}catch(e){}}
+        poll();
+      }).catch(function(){}).then(function(){busy=false;});
+    }
+
+    setInterval(function(){if(localSeconds>0){localSeconds--;$('timer').textContent=fmt(localSeconds);}},1000);
+    poll();setInterval(poll,3000);
+  </script>
+{% include "_tracking.html" with section="muallif" %}
+</body>
+</html>

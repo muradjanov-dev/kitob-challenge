@@ -748,6 +748,17 @@ def internal_ops(request: HttpRequest, action: str):
     if action == "broadcast-status":
         return JsonResponse({"ok": True, "status": ops_broadcast.status(body.get("campaign", ""))})
 
+    if action == "headliner":
+        from tgbot.tasks import _GAME_STARTERS, set_slot_headliner, slot_headliner
+        day, slot, game = body.get("date", ""), body.get("slot", "evening"), body.get("game")
+        if not day:
+            return JsonResponse({"ok": False, "error": "date_required"}, status=400)
+        if game and game not in _GAME_STARTERS:
+            return JsonResponse({"ok": False, "error": "unknown_game"}, status=400)
+        if apply:
+            set_slot_headliner(day, slot, game or None)
+        return JsonResponse({"ok": True, "date": day, "slot": slot, "headliner": slot_headliner(day, slot)})
+
     return JsonResponse({"ok": False, "error": "unknown_action"}, status=404)
 
 
