@@ -1542,6 +1542,65 @@ def daily_top_readers_reward():
         _send_reward(rank, row['user_id'], rewards_by_rank.get(rank, 5), stat)
 
 
+def _poll_message(poll):
+    """(text, reply_markup) for a BotPoll. html.escape(quote=False), not
+    django's escape: that one turns every apostrophe into &#x27;, which
+    Telegram shows literally -- "qo'ysak" came out as "qo&#x27;ysak"."""
+    from html import escape as _esc_text
+    text = f"📊 <b>{_esc_text(poll.question, quote=False)}</b>"
+    buttons = [[{"text": opt, "callback_data": f"poll_vote:{poll.id}:{idx}"}]
+               for idx, opt in enumerate(poll.options)]
+    return text, json.dumps({"inline_keyboard": buttons})
+
+
+# A one-off poll the owner asked for on 2026-10-25 (text approved the same
+# day): would readers bid real money for a book the community picks? Sent
+# once, on AUCTION_POLL_DATE, to every registered user and to the groups;
+# votes land in BotPollVote and show up under "📊 So'rovnoma natijalari".
+from datetime import date as _date  # noqa: E402
+
+AUCTION_POLL_DATE = _date(2026, 10, 26)
+AUCTION_POLL_QUESTION = (
+    "Agar hammamiz bitta kitobni tanlab, uni loyiha nomidan auksionga qo'ysak — "
+    "uni haqiqiy pul bilan sotib olish uchun bellashgan bo'larmidingiz?\n\n"
+    "Bunday loyihalar kitobxonlikni kengroq yoyish uchun zarur 📚"
+)
+AUCTION_POLL_OPTIONS = [
+    "🔥 Ha, albatta bellashaman!",
+    "🤔 Kitob va narxiga qarab",
+    "👀 Faqat kuzatib boraman",
+    "🙅 Yo'q, qiziq emas",
+]
+
+
+@shared_task
+def send_auction_interest_poll():
+    from django.core.cache import cache
+
+    if timezone.localdate() != AUCTION_POLL_DATE:
+        return
+    if not cache.add("auction_interest_poll_sent", 1, 60 * 60 * 24 * 7):
+        return
+    poll, _ = BotPoll.objects.get_or_create(
+        question=AUCTION_POLL_QUESTION,
+        defaults={"options": AUCTION_POLL_OPTIONS, "is_active": True},
+    )
+    text, reply_markup = _poll_message(poll)
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    for group_id, thread_id in _announce_targets():
+        try:
+            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                    "reply_markup": reply_markup}
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            resp = requests.post(url, data=data, timeout=10)
+            if not resp.ok:
+                print(f"send_auction_interest_poll group {group_id}: {resp.status_code} {resp.text[:200]}")
+        except Exception as e:
+            print(f"send_auction_interest_poll group {group_id}: {e}")
+    broadcast_poll(poll.id)
+
+
 @shared_task
 def broadcast_poll(poll_id: int):
     """Send a BotPoll to every registered user as a message with inline-button options."""
@@ -1550,11 +1609,7 @@ def broadcast_poll(poll_id: int):
         print(f"broadcast_poll: poll {poll_id} not found or inactive")
         return
 
-    text = f"📊 <b>{escape(poll.question)}</b>"
-    buttons = []
-    for idx, opt in enumerate(poll.options):
-        buttons.append([{"text": opt, "callback_data": f"poll_vote:{poll.id}:{idx}"}])
-    reply_markup = json.dumps({"inline_keyboard": buttons})
+    text, reply_markup = _poll_message(poll)
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)

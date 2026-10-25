@@ -250,6 +250,12 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.post_launch_countdown',
         'schedule': crontab(hour=19, minute=0),
     },
+    # One-off: the real-money book-auction poll, sent on 2026-10-26 only
+    # (date-guarded in the task, so later runs do nothing).
+    'send-auction-interest-poll': {
+        'task': 'tgbot.tasks.send_auction_interest_poll',
+        'schedule': crontab(hour=12, minute=30),
+    },
 
     # Single daily inspiration — personalized hour wins; fixed 10:00 is the
     # fallback for users whose optimal_send_hour hasn't been computed yet.
