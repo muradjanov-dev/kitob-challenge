@@ -5178,6 +5178,57 @@ def post_launch_countdown():
 
 
 @shared_task
+def send_dated_announcement():
+    """11:00 daily: if services.dated_announcements has an approved text for
+    today, post it to the groups and DM it to every registered user, once.
+    The cache claim makes a retried or doubled beat run a no-op, and a user
+    who blocked the bot is marked is_blocked like in every other broadcast."""
+    import time as _t
+    from django.core.cache import cache
+    from tgbot.services.dated_announcements import announcement_for
+
+    today = timezone.localdate()
+    text = announcement_for(today)
+    if not text:
+        return
+    if not cache.add(f"dated_announcement_sent:{today.isoformat()}", 1, 60 * 60 * 24 * 3):
+        return
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    groups = 0
+    for group_id, thread_id in _announce_targets():
+        try:
+            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                    "disable_web_page_preview": "true"}
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            groups += requests.post(url, data=data, timeout=10).ok
+        except Exception as e:
+            print(f"send_dated_announcement group {group_id}: {e}")
+
+    sent = failed = 0
+    ids = TelegramProfile.objects.filter(is_registered=True, is_blocked=False) \
+        .values_list("telegram_id", flat=True).distinct()
+    for chat_id in ids.iterator():
+        try:
+            resp = requests.post(url, data={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                                            "disable_web_page_preview": "true"}, timeout=8)
+            if resp.status_code == 429:
+                _t.sleep(int(resp.json().get("parameters", {}).get("retry_after", 3)) + 1)
+                resp = requests.post(url, data={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                                                "disable_web_page_preview": "true"}, timeout=8)
+            if resp.ok:
+                sent += 1
+            else:
+                failed += 1
+                if resp.status_code == 403:
+                    TelegramProfile.objects.filter(telegram_id=chat_id).update(is_blocked=True)
+        except Exception:
+            failed += 1
+        _t.sleep(0.04)
+    print(f"send_dated_announcement {today}: groups={groups} sent={sent} failed={failed}")
+
+
+@shared_task
 def send_viktorina_promo():
     """Promote the Viktorina to everyone: once a day for the first 10 days after
     launch, then only on a random ~40% of days. Each send pulls a fresh creative

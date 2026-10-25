@@ -250,6 +250,12 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.post_launch_countdown',
         'schedule': crontab(hour=19, minute=0),
     },
+    # Owner-approved announcements, each sent once on its own date
+    # (services.dated_announcements); a no-op on dates without one.
+    'send-dated-announcement': {
+        'task': 'tgbot.tasks.send_dated_announcement',
+        'schedule': crontab(hour=11, minute=0),
+    },
     # One-off: the real-money book-auction poll, sent on 2026-10-26 only
     # (date-guarded in the task, so later runs do nothing).
     'send-auction-interest-poll': {
