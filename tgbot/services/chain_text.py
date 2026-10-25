@@ -86,7 +86,7 @@ def normalize(text: str) -> str:
 # Latin letters with diacritics that turn up in imported titles/answers
 # ("BOYBÖRI", Turkish spellings). Folded to what a player would actually type.
 _DIACRITICS = str.maketrans({
-    "ö": "o", "ü": "u", "ı": "i", "ə": "a", "ğ": "g", "ş": "sh", "ç": "ch",
+    "ö": "o", "ü": "u", "ı": "i", "ə": "a", "ğ": "g", "ş": "sh", "ç": "ch", "ŏ": "o",
     "â": "a", "î": "i", "û": "u", "é": "e", "è": "e", "ñ": "n",
 })
 

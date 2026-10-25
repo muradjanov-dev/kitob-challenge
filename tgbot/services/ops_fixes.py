@@ -132,6 +132,117 @@ def user_dates(telegram_id, since) -> dict:
             "dates": sorted(d.isoformat() for d in days)}
 
 
+def coverage_plan(rows) -> list:
+    """Streak-freeze days the old server recorded that this database lacks.
+
+    `rows` = [{"telegram_id", "date"}] from the old server's final dump: the
+    server move restored reports but not these, so a frozen day became a
+    hole in the streak again."""
+    from tgbot.models import StreakFreezeCoverage, TelegramProfile
+    tg_ids = {int(r["telegram_id"]) for r in rows}
+    pid = dict(TelegramProfile.objects.filter(telegram_id__in=tg_ids).values_list("telegram_id", "id"))
+    have = set(StreakFreezeCoverage.objects.filter(user_id__in=pid.values()).values_list("user_id", "date"))
+    out = []
+    for r in rows:
+        uid = pid.get(int(r["telegram_id"]))
+        day = _d(r["date"])
+        if uid and (uid, day) not in have:
+            out.append({"user_id": uid, "date": day})
+            have.add((uid, day))
+    return out
+
+
+def apply_coverage(missing) -> int:
+    from tgbot.models import StreakFreezeCoverage
+    with transaction.atomic():
+        before = StreakFreezeCoverage.objects.count()
+        StreakFreezeCoverage.objects.bulk_create(
+            [StreakFreezeCoverage(user_id=m["user_id"], date=m["date"]) for m in missing],
+            ignore_conflicts=True)
+        return StreakFreezeCoverage.objects.count() - before
+
+
+def _max_streaks(user_ids=None) -> dict:
+    """{user_id: longest run of reported-or-covered days}, in two queries."""
+    from tgbot.models import ConfirmationReport, StreakFreezeCoverage
+    days = defaultdict(set)
+    q = ConfirmationReport.objects.all()
+    c = StreakFreezeCoverage.objects.all()
+    if user_ids is not None:
+        q, c = q.filter(user_id__in=user_ids), c.filter(user_id__in=user_ids)
+    for uid, day in q.annotate(_day=TruncDate("date")).values_list("user_id", "_day").distinct():
+        days[uid].add(day)
+    for uid, day in c.values_list("user_id", "date"):
+        days[uid].add(day)
+    out = {}
+    for uid, ds in days.items():
+        ds = sorted(ds)
+        best = cur = 1
+        for a, b in zip(ds, ds[1:]):
+            cur = cur + 1 if (b - a).days == 1 else 1
+            best = max(best, cur)
+        out[uid] = best
+    return out
+
+
+def streak_achievement_plan() -> list:
+    """Streak achievements (st_*) readers now qualify for but never got --
+    the outage broke the run that would have unlocked them."""
+    from tgbot.models import TelegramProfile, UserAchievement
+    from tgbot.services.achievements import ACHIEVEMENTS_RAW
+    streak_achs = [a for a in ACHIEVEMENTS_RAW if a["code"].startswith("st_")]
+    best = _max_streaks()
+    have = defaultdict(set)
+    for uid, code in UserAchievement.objects.filter(code__startswith="st_").values_list("user_id", "code"):
+        have[uid].add(code)
+    plan = []
+    for uid, n in best.items():
+        due = [a for a in streak_achs if a["code"] not in have[uid] and a["cond"]({"max_streak": n})]
+        if due:
+            plan.append({"user_id": uid, "max_streak": n,
+                         "codes": [a["code"] for a in due], "points": sum(a.get("points", 0) for a in due)})
+    names = dict(TelegramProfile.objects.filter(id__in=[p["user_id"] for p in plan]).values_list("id", "full_name"))
+    for p in plan:
+        p["name"] = names.get(p["user_id"]) or "—"
+    plan.sort(key=lambda p: -p["points"])
+    return plan
+
+
+def apply_streak_achievements(plan, paid_before=()) -> dict:
+    """Award them the way check_user_achievements does (Kitobcha via
+    update_ball, so Premium gets 2x) but without the group Tabriklash -- dozens
+    of those at once would flood the groups.
+
+    `paid_before` = {(telegram_id, code)} the old server had already awarded:
+    the move lost those rows but the data restore re-credited their Kitobcha
+    through the ledger, so they come back as rows only, unpaid."""
+    from tgbot.models import TelegramProfile, UserAchievement
+    from tgbot.services.achievements import ACHIEVEMENTS_RAW
+    points = {a["code"]: a.get("points", 0) for a in ACHIEVEMENTS_RAW}
+    paid_before = {(int(t), c) for t, c in paid_before}
+    users = achievements = restored_only = paid = 0
+    for p in plan:
+        user = TelegramProfile.objects.filter(id=p["user_id"]).first()
+        if not user:
+            continue
+        got = 0
+        for code in p["codes"]:
+            _, created = UserAchievement.objects.get_or_create(
+                user=user, code=code, defaults={"congratulated": True})
+            if not created:
+                continue
+            achievements += 1
+            if (int(user.telegram_id), code) in paid_before:
+                restored_only += 1
+            elif points.get(code):
+                got += user.update_ball(True, points[code])
+        if got:
+            users += 1
+            paid += got
+    return {"users_paid": users, "achievements": achievements,
+            "restored_without_pay": restored_only, "kitobcha": paid}
+
+
 # ── Market themes ──────────────────────────────────────────────────────────
 
 def theme_plan(old_owners=None) -> list:

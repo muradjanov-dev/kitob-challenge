@@ -91,6 +91,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'admin_reorder.middleware.ModelAdminReorder',
+    # Last, so it edits the page before GZipMiddleware compresses it.
+    'tgbot.services.alphabet.AlphabetPageMiddleware',
 ]
 
 ROOT_URLCONF = 'src.urls'

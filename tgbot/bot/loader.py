@@ -155,6 +155,27 @@ try:
 except Exception:
     pass
 
+
+# New alphabet (services/alphabet.py): everything the bot sends is converted
+# on the way out, and what users send -- reply-keyboard taps included, whose
+# labels are now shown in the new letters -- is turned back into the current
+# spelling before any handler compares it.
+class AlphabetMiddleware(BaseMiddleware):
+    async def on_pre_process_message(self, message: types.Message, data: dict):
+        from tgbot.services import alphabet
+        if message.text:
+            old = alphabet.to_old(message.text)
+            if old != message.text:
+                message.text = old
+
+
+try:
+    from tgbot.services import alphabet as _alphabet
+    _alphabet.wrap_bot(bot)
+    dp.middleware.setup(AlphabetMiddleware())
+except Exception as _e:
+    print(f"alphabet bot hook failed: {_e}")
+
 # NOTE: a GroupMessageFilter middleware used to live here (added 2026-06-15,
 # commit b4eae1d), deleting any group message from a user who had ANY active
 # FSM state in their private chat with the bot -- meant to stop "mid-flow

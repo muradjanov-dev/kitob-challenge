@@ -6902,22 +6902,29 @@ def _headliner_key(day, slot):
     return f"slot_headliner:{day}:{slot}"
 
 
+# Owner-approved headliners, kept in code too so a cache flush cannot lose
+# one. A cache entry (internal/ops/headliner/) takes precedence; clearing a
+# slot there stores "" to override this table.
+_SLOT_HEADLINERS = {
+    ("2026-10-26", "morning"): "muallif",
+}
+
+
 def slot_headliner(day, slot):
     from django.core.cache import cache
     try:
-        return cache.get(_headliner_key(day, slot))
+        value = cache.get(_headliner_key(day, slot))
     except Exception:
-        return None
+        value = None
+    if value is None:
+        value = _SLOT_HEADLINERS.get((str(day), slot))
+    return value or None
 
 
 def set_slot_headliner(day, slot, game_type):
     """Make `game_type` the first game of `slot` on `day` (None clears it)."""
     from django.core.cache import cache
-    key = _headliner_key(day, slot)
-    if game_type:
-        cache.set(key, game_type, 3 * 86400)
-    else:
-        cache.delete(key)
+    cache.set(_headliner_key(day, slot), game_type or "", 3 * 86400)
 
 
 @shared_task

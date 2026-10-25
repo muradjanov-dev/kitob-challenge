@@ -711,6 +711,36 @@ def internal_ops(request: HttpRequest, action: str):
                 out["created"] = ops_fixes.apply_streak_gap(plan)
         return JsonResponse(out)
 
+    if action == "coverage":
+        missing = ops_fixes.coverage_plan(body.get("rows") or [])
+        out = {"ok": True, "missing": len(missing), "users": len({m["user_id"] for m in missing})}
+        if apply:
+            out["created"] = ops_fixes.apply_coverage(missing)
+        return JsonResponse(out)
+
+    if action == "streak-achievements":
+        from tgbot.models import TelegramProfile
+        plan = ops_fixes.streak_achievement_plan()
+        paid_before =[(r["telegram_id"], r["code"]) for r in body.get("paid_before") or []]
+        pb = {(int(t), c) for t, c in paid_before}
+        tg = dict(TelegramProfile.objects.filter(id__in=[p["user_id"] for p in plan])
+                  .values_list("id", "telegram_id"))
+        out = {"ok": True, "users": len(plan), "achievements": sum(len(p["codes"]) for p in plan),
+               "points": sum(p["points"] for p in plan),
+               "already_paid_on_old_server": sum(1 for p in plan for c in p["codes"]
+                                                 if (int(tg.get(p["user_id"], 0)), c) in pb),
+               "plan": plan[:60]}
+        if apply:
+            out["applied"] = ops_fixes.apply_streak_achievements(plan, paid_before)
+        return JsonResponse(out)
+
+    if action == "alphabet":
+        from tgbot.services import alphabet
+        if "on" in body and apply:
+            alphabet.set_enabled(bool(body["on"]))
+        return JsonResponse({"ok": True, "on": alphabet.enabled(),
+                             "sample": alphabet.to_new(body.get("text") or "")})
+
     if action == "user-dates":
         return JsonResponse({"ok": True, **ops_fixes.user_dates(body["telegram_id"], body.get("since") or "2026-08-01")})
 

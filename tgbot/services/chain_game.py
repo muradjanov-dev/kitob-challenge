@@ -150,6 +150,12 @@ def _pick_round(used_book_ids) -> dict | None:
     # Some catalog titles are in Cyrillic; the round is always played in
     # Latin, so the blanked letter is one a Latin keyboard can type.
     title = to_latin(title)
+    # In the new alphabet ş/ç/ğ/ŏ are single letters. Converting here (not
+    # only on the page) keeps a blank from landing on half of an "sh"; the
+    # blanks themselves stay plain letters (is_guessable_letter).
+    from tgbot.services import alphabet
+    if alphabet.enabled():
+        title = alphabet.to_new(title)
 
     # Never blank an apostrophe: "O_tkan kunlar" asks the player to type a
     # punctuation mark, and answer_key() drops apostrophes anyway, so such a
