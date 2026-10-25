@@ -227,13 +227,29 @@ def api_set_theme(request: HttpRequest) -> JsonResponse:
     except Exception:
         return JsonResponse({"ok": False, "error": "Invalid JSON"})
 
-    profile, err = _resolve_profile(_read_init_data(request))
+    # The cabinet page used to send initData only in the JSON body, which
+    # _read_init_data never looks at -- every theme switch was rejected and
+    # the choice lived only in the WebView's localStorage.
+    profile, err = _resolve_profile(_read_init_data(request) or data.get("initData") or "")
     if err:
         return JsonResponse({"ok": False, "error": err})
-    
+
     if theme and theme not in (profile.unlocked_themes or []):
         return JsonResponse({"ok": False, "error": "Siz bu mavzuni sotib olmagansiz."})
-        
+
     profile.active_theme = theme if theme else None
     profile.save(update_fields=["active_theme"])
     return JsonResponse({"ok": True, "active_theme": profile.active_theme})
+
+
+@require_GET
+def api_theme(request: HttpRequest) -> JsonResponse:
+    """The reader's active Market theme, for _theme_sync.html on every Mini
+    App tab. A theme the reader no longer owns is never returned."""
+    profile, err = _resolve_profile(_read_init_data(request))
+    if err:
+        return JsonResponse({"ok": False, "error": err})
+    theme = profile.active_theme
+    if theme and theme not in (profile.unlocked_themes or []):
+        theme = None
+    return JsonResponse({"ok": True, "active_theme": theme})

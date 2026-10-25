@@ -5,12 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Kitob Challenge Shop</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script>
-    (function(){
-      var t = localStorage.getItem('kc_theme');
-      if (t) document.documentElement.setAttribute('data-theme', t);
-    })();
-  </script>
+  {% include "_theme_sync.html" %}
   <style>
     :root {
       --bg-0: #0f1714;

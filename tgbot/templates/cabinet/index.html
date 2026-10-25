@@ -5,12 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Mening Kabinetim — Kitob Challenge</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script>
-    (function(){
-      var t = localStorage.getItem('kc_theme');
-      if (t) document.documentElement.setAttribute('data-theme', t);
-    })();
-  </script>
+  {% include "_theme_sync.html" %}
   <style>
     :root {
       --bg-0: #0f1714; --bg-1: #14201b; --bg-2: #1b2a23;
@@ -614,15 +609,10 @@
               const theme = el.dataset.theme;
               themeContainer.querySelectorAll('.theme-item').forEach(x => x.classList.remove('active'));
               el.classList.add('active');
-              if (theme) {
-                document.documentElement.setAttribute('data-theme', theme);
-                localStorage.setItem('kc_theme', theme);
-              } else {
-                document.documentElement.removeAttribute('data-theme');
-                localStorage.removeItem('kc_theme');
-              }
+              window.kcApplyTheme(theme || null);
               fetch('/kabinet/api/set-theme/', {
                 method: 'POST',
+                headers: { 'X-Telegram-Init-Data': initData },
                 body: JSON.stringify({ initData, theme: theme || null })
               });
             });

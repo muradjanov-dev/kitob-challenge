@@ -140,7 +140,8 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=3, minute=0, day_of_week=0),
     },
 
-    # ── Live games — 3 auto-chained per slot, twice a day (10:00 & 22:00) ────
+    # ── Live games — 3 auto-chained per slot, twice a day (10:00 & 21:30) ────
+    # (The evening slot moved 22:00 -> 21:30 on 2026-10-26.)
     # Each slot randomly picks 3 of the 4 live games (Kitob Zanjiri / Ko'pchilik
     # nima dedi / Bilim Qal'asi / Emoji Kitob), no repeats, and runs them back
     # to back: game #2 starts only once #1 finishes, then #3 (see
@@ -173,7 +174,7 @@ app.conf.beat_schedule = {
     },
     'games-teaser-evening': {
         'task': 'tgbot.tasks.send_game_teaser',
-        'schedule': crontab(hour=21, minute=50),
+        'schedule': crontab(hour=21, minute=20),
         'args': ('evening',),
     },
     'games-random-morning': {
@@ -183,7 +184,7 @@ app.conf.beat_schedule = {
     },
     'games-random-evening': {
         'task': 'tgbot.tasks.start_game_sequence',
-        'schedule': crontab(hour=22, minute=0),
+        'schedule': crontab(hour=21, minute=30),
         'args': ('evening',),
     },
     'chain-game-tick': {

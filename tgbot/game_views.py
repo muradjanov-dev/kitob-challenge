@@ -474,13 +474,13 @@ def _game_participant_count(game_type: str, game_id: int) -> int:
 
 
 def _next_slot_at():
-    """Next occurrence of 10:00 or 22:00 Tashkent time, as an aware datetime."""
+    """Next occurrence of 10:00 or 21:30 Tashkent time, as an aware datetime."""
     import datetime as _dt
     from django.utils import timezone as _tz
 
     now = _tz.localtime()
-    for hour in (10, 22):
-        candidate = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+    for hour, minute in ((10, 0), (21, 30)):
+        candidate = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         if candidate > now:
             return candidate
     # Both today's slots have passed -- tomorrow's 10:00.

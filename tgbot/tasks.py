@@ -363,6 +363,11 @@ def _is_user_in_chat(chat_id, user_id) -> bool:
         return False
 
 
+# Never named in the public "hisobot yubormaganlar" list: 917456291 is the
+# bosh admin (asked 2026-10-25), 631751797 was excluded before that.
+UNREAD_LIST_EXCLUDED_IDS = {917456291, 631751797}
+
+
 @shared_task
 def users_unread_book():
     """Per-group reminder: in each gender group, list ONLY members of that
@@ -417,7 +422,7 @@ def users_unread_book():
                 except Exception:
                     pass
                 continue
-            if u.telegram_id == 631751797:
+            if u.telegram_id in UNREAD_LIST_EXCLUDED_IDS:
                 continue
             if _is_user_in_chat(chat_id, u.telegram_id):
                 members_present.append(u)
@@ -5682,7 +5687,7 @@ def announce_top_game_players():
         shown += 1
     if not shown:
         return
-    lines.append("\n👏 Barchangizni tabriklaymiz! Ertaga ham 10:00 va 22:00 dagi o'yinlarda faol bo'ling — navbatdagi tantanali e'londa sizning ismingiz bo'lsin! 🔥📚")
+    lines.append("\n👏 Barchangizni tabriklaymiz! Ertaga ham 10:00 va 21:30 dagi o'yinlarda faol bo'ling — navbatdagi tantanali e'londa sizning ismingiz bo'lsin! 🔥📚")
     text = "\n".join(lines)
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -6139,7 +6144,7 @@ def chain_game_tick():
 # this one is to pull people who are not watching the groups back in.
 #
 # NOTE ON THE DM BUDGET: celery_app.py documents a hard cap of 3 reminder DMs
-# per user per day. This adds up to 2 more (09:50 and 21:50), so a
+# per user per day. This adds up to 2 more (09:50 and 21:20), so a
 # non-reporting user can now see 5. That was a deliberate product call, not an
 # oversight -- see the commit that introduced it.
 GAME_TEASER_LEAD_MINUTES = 10
@@ -6187,7 +6192,7 @@ def _game_teaser_text(slot):
     start_game_sequence draws them at slot time, so the suspense is real."""
     from tgbot.services.chain_game import REWARD_TIERS, PARTICIPATION
 
-    when = "22:00" if slot == "evening" else "10:00"
+    when = "21:30" if slot == "evening" else "10:00"
     head = ("\U0001f319 <b>KECHKI O'YINLAR BOSHLANISHIGA 10 DAQIQA!</b>"
             if slot == "evening" else
             "\u2600\ufe0f <b>KUNDUZGI O'YINLAR BOSHLANISHIGA 10 DAQIQA!</b>")
@@ -6614,7 +6619,7 @@ def _dm_vip_arena_invite(game_title, deep_link, lead_seconds):
 # Maps a game-type slug to the task that starts it (each returns the created
 # Maps a game-type slug to the task that starts it (each returns the created
 # game instance). Shared by start_game_sequence and _advance_game_sequence to
-# run the daily 10:00/22:00 slot: 3 different types, back to back, no repeats.
+# run the daily 10:00/21:30 slot: 3 different types, back to back, no repeats.
 from tgbot.game_views import _QUIZ_FLAVORS
 
 _BASE_GAME_STARTERS = {
@@ -6699,7 +6704,7 @@ VIP_GAME_NAMES = {
 
 @shared_task
 def start_game_sequence(slot, count=3, pool=None):
-    """Kick off today's `slot` ('morning' 10:00, 'evening' 22:00, or 'vip_2230') sequence."""
+    """Kick off today's `slot` ('morning' 10:00, 'evening' 21:30, or 'vip_2230') sequence."""
     from tgbot.models import GameSequence
 
     today = timezone.localdate()
@@ -6757,7 +6762,7 @@ def start_game_sequence(slot, count=3, pool=None):
 
 @shared_task
 def start_vip_premium_evening_event():
-    """Daily right after 22:00 evening games wrap up (3 regular games):
+    """Daily right after the 21:30 evening games wrap up (3 regular games):
     Kicks off 1 Random Prestigious VIP Premium Game for Premium subscribers only,
     with massive 350-500 Kitobcha prizes and Gold badges!"""
     from tgbot.models import GameSequence
@@ -6770,7 +6775,7 @@ def start_vip_premium_evening_event():
 def start_special_evening_event(count=5, bonus_count=2):
     text = (
         f"🎉 <b>BUGUN KECHQURUN MAXSUS O'YIN TUNI!</b>\n\n"
-        f"Bugun 22:00 da odatdagi 3 ta o'rniga <b>{count} ta YANGI o'yin</b> ketma-ket "
+        f"Bugun 21:30 da odatdagi 3 ta o'rniga <b>{count} ta YANGI o'yin</b> ketma-ket "
         f"o'tkaziladi — oxirgi <b>{bonus_count} tasi BONUS o'yin</b>! 🎁\n\n"
         "Barchasida qatnashib, ko'proq Kitobcha va sovg'alar yutib oling! 👇"
     )
@@ -7465,7 +7470,7 @@ def broadcast_major_update_to_all():
         "• 🧠 <b>Mantiq & Farosat:</b> Fikr Tuzog'i, Ongli Hayot, Podadan Ajral, Axloqiy Dilemma, Sabab va Oqibat...\n"
         "• ✨ <b>Tasavvuf & Ishqulloh:</b> Simurg' Parvozi (7 vodiy), Parvona va Sham, Nafs Tarbiyasi, Qalb Sayqali, Xalvat dar Anjuman...\n"
         "• 🎧 <b>Ovozli Iqtibos:</b> Jonli audio eshitib asarni topish.\n\n"
-        "👑 <b>VIP Premium Arena (Har kuni 22:30 da):</b>\n"
+        "👑 <b>VIP Premium Arena (har kuni kechki o'yinlardan so'ng):</b>\n"
         "• 5 ta eng zo'r o'yin ketma-ket!\n"
         "• 🥇 <b>+500 Kitobcha</b> — Premium 2× bilan <b>1000 Kitobcha</b>!\n\n"
         "🧹 <b>Guruhlarda toza muhit:</b>\n"

@@ -265,30 +265,18 @@ async def process_ai_input(message: types.Message, state: FSMContext):
     q_count = state_data.get("question_count", 5)
     t_limit = state_data.get("time_limit", 30)
     
-    # Daily cap, tiered by plan: regular Premium = 1/day (~30/month), Extra/
-    # Super Premium = 6/day — both comfortably inside the OpenAI cost budget
-    # for their respective subscription price (see cost note in the PR).
-    # Trial-window users (non-Premium, granted via grant_daily_ai_quiz_trial)
-    # get the regular 1/day cap for their trial hour.
-    from tgbot.bot.handlers.users.payment import SUPER_PREMIUM_PRICE
+    # Who pays (services/ai_quiz_billing.py): Premium / trial readers inside
+    # their daily allowance and a first-timer's free try are free; everyone
+    # else pays AI_QUIZ_PRICE Kitobcha, Premium readers past the allowance
+    # included. Text, photo and PDF are all allowed on every plan.
+    from tgbot.services import ai_quiz_billing as billing
 
-    @sync_to_async
-    def _is_extra_premium():
-        p = (
-            Payment.objects.filter(user=user, status="paid", end_date__gte=timezone.localdate())
-            .order_by("-end_date").first()
-        )
-        return bool(p and p.amount >= SUPER_PREMIUM_PRICE)
-
-    daily_cap = 6 if await _is_extra_premium() else 1
-
-    cache_key = f"ai_quiz_limit_{user.id}"
-    today_count = cache.get(cache_key, 0)
-    if today_count >= daily_cap:
+    how = await sync_to_async(billing.plan)(user)
+    if how == billing.PAID and int(user.ball or 0) < billing.AI_QUIZ_PRICE:
         await message.answer(
-            f"⚠️ <b>Bugungi limit tugadi!</b>\n\n"
-            f"Sizning tarifingizda kuniga <b>{daily_cap} ta</b> AI quiz yaratish mumkin. "
-            "Ertaga qayta urinib ko'ring.",
+            "⚠️ <b>Bepul limit tugagan, Kitobcha esa yetarli emas.</b>\n\n"
+            f"Navbatdagi AI quiz narxi: <b>{billing.AI_QUIZ_PRICE} Kitobcha</b>, "
+            f"hisobingizda: <b>{int(user.ball or 0)}</b>.",
             parse_mode="HTML"
         )
         await state.finish()
@@ -307,33 +295,8 @@ async def process_ai_input(message: types.Message, state: FSMContext):
         return
 
     if message.document:
-        if not message.document.file_name.lower().endswith('.pdf'):
+        if not (message.document.file_name or "").lower().endswith('.pdf'):
             await message.answer("⚠️ Iltimos, faqat PDF formatidagi fayllarni yuboring.")
-            return
-
-        # PDF input requires active Premium (any tier) OR an AI-quiz trial/
-        # free-try grant — the same eligibility as starting the AI-quiz flow
-        # at all (offer_ai_quiz_start), since the trial's own promo text
-        # explicitly offers "matn, rasm yoki PDF". Super-premium check has
-        # been retired — all Premium subscribers get one PDF/day.
-        @sync_to_async
-        def check_premium():
-            return Payment.objects.filter(
-                user=user,
-                status="paid",
-                end_date__gte=timezone.localdate(),
-            ).exists()
-
-        has_trial = bool(user.trial_ai_quiz_until and user.trial_ai_quiz_until >= timezone.now())
-        has_free_try = not user.free_ai_quiz_used
-        if not await check_premium() and not has_trial and not has_free_try:
-            await message.answer(
-                "💎 <b>Premium funksiyasi!</b>\n\n"
-                "PDF kitoblar orqali avtomatik quiz yaratish uchun sizda "
-                "<b>Premium</b> obunasi bo'lishi kerak.\n\n"
-                "Obuna bo'lish uchun Asosiy menyudan <i>💎 Premium</i> bo'limiga o'ting.",
-                parse_mode="HTML"
-            )
             return
 
         # Telegram bots can only download files up to 20 MB via getFile. A
@@ -349,6 +312,16 @@ async def process_ai_input(message: types.Message, state: FSMContext):
                 parse_mode="HTML",
             )
             return
+
+    charged = False
+    if how == billing.PAID:
+        if not await sync_to_async(billing.charge)(user):
+            await message.answer(
+                f"⚠️ Hisobingizda {billing.AI_QUIZ_PRICE} Kitobcha yetarli emas.",
+            )
+            await state.finish()
+            return
+        charged = True
 
     msg = await message.answer("⏳ AI ma'lumotni tahlil qilib, quiz generatsiya qilmoqda... Iltimos kuting.")
     anim_task = asyncio.create_task(_animate_loading(msg))
@@ -439,19 +412,25 @@ Return ONLY valid JSON in the following format:
         openai_client = AsyncOpenAI(api_key=api_key)
         # gpt-5-mini is a reasoning model: it rejects `temperature` (fixed
         # internally) and `max_tokens` — must use `max_completion_tokens`.
-        # max_tokens=1500 was overflowing for 15-20 question requests on the
-        # old model — the model emitted ~120+ JSON fields and the response
-        # got truncated mid-string, hitting "Unterminated string at line
-        # 98..." on json.loads. 8000 is plenty for ~30 questions with hints
-        # and options.
+        # Its hidden reasoning tokens count against that same budget, so at
+        # the default effort a 20-25 question quiz from a long PDF could
+        # spend most of 8000 thinking and come back empty or cut off (shown
+        # as "AI javobi to'liq kelmadi"). Low effort plus a larger budget
+        # leaves room for the JSON itself. reasoning_effort goes through
+        # extra_body because the pinned openai==1.55.3 predates the kwarg.
         response = await openai_client.chat.completions.create(
             model=model,
             messages=messages,
-            max_completion_tokens=8000,
+            max_completion_tokens=16000,
             response_format={"type": "json_object"},
+            extra_body={"reasoning_effort": "low"},
+            timeout=180,
         )
 
-        result_text = response.choices[0].message.content.strip()
+        choice = response.choices[0]
+        result_text = (choice.message.content or "").strip()
+        if not result_text:
+            raise json.JSONDecodeError(f"empty content, finish_reason={choice.finish_reason}", "", 0)
         # Clean markdown code block if present
         if result_text.startswith("```json"):
             result_text = result_text.split("```json", 1)[1]
@@ -491,12 +470,8 @@ Return ONLY valid JSON in the following format:
             return q
 
         quiz = await create_quiz_from_ai(data)
-
-        # Increment usage counter
-        if today_count == 0:
-            cache.set(cache_key, 1, timeout=86400) # Reset after 24 hours
-        else:
-            cache.incr(cache_key)
+        charged = False  # delivered — from here on the charge stands
+        await sync_to_async(billing.note_used)(user, how)
 
         await msg.delete()
 
@@ -511,32 +486,19 @@ Return ONLY valid JSON in the following format:
             reply_markup=_quiz_view_kb(quiz)
         )
 
-        # If neither Premium nor an active trial let them in, this must have
-        # been their one free lifetime try (see offer_ai_quiz_start's gate) —
-        # burn it and pitch Premium for next time.
-        from tgbot.services.premium import is_premium as _is_prem
-        is_premium_now = await sync_to_async(_is_prem)(user)
-        has_trial_now = bool(user.trial_ai_quiz_until and user.trial_ai_quiz_until >= timezone.now())
-        if not is_premium_now and not has_trial_now:
-            if not user.free_ai_quiz_used:
-                await sync_to_async(
-                    lambda: TelegramProfile.objects.filter(id=user.id).update(free_ai_quiz_used=True)
-                )()
-                await message.answer(
-                    "🎉 Bepul sinovingizdan foydalandingiz!\n\n"
-                    "💎 <b>Premium</b>'ga o'ting — AI yordamida kengaytirilgan quiz tuzing "
-                    "yoki navbatdagi AI quiz uchun 3000 Kitobcha to'lang.",
-                    parse_mode="HTML",
-                )
-            else:
-                await sync_to_async(user.update_ball)(True, -3000)
-                from tgbot.models import KitobchaLedger
-                await sync_to_async(KitobchaLedger.objects.create)(user=user, delta=-3000, reason="ai_quiz_creation")
-                await message.answer(
-                    "🤖 <b>AI Quiz yaratildi (3000 Kitobcha yechildi).</b>\n\n"
-                    "💎 <b>Premium</b>'ga o'tib, bu imkoniyatdan ko'proq foydalanishingiz mumkin.",
-                    parse_mode="HTML",
-                )
+        if how == billing.FREE_TRY:
+            await message.answer(
+                "🎉 Bepul sinovingizdan foydalandingiz!\n\n"
+                "💎 <b>Premium</b>'ga o'ting — har kuni bepul AI quiz tuzing — "
+                f"yoki navbatdagisi uchun {billing.AI_QUIZ_PRICE} Kitobcha to'lang.",
+                parse_mode="HTML",
+            )
+        elif how == billing.PAID:
+            await message.answer(
+                f"🤖 <b>AI Quiz yaratildi ({billing.AI_QUIZ_PRICE} Kitobcha yechildi).</b>\n\n"
+                "💎 <b>Premium</b> a'zolar har kuni bepul tuzadi.",
+                parse_mode="HTML",
+            )
 
         await state.finish()
 
@@ -550,13 +512,17 @@ Return ONLY valid JSON in the following format:
             "Iltimos qaytadan urinib ko'ring yoki:\n"
             "• Kamroq savol soni tanlang (masalan 10)\n"
             "• Kichikroq matn / PDF yuboring"
+            + (f"\n\n🪙 {billing.AI_QUIZ_PRICE} Kitobcha hisobingizga qaytarildi." if charged else "")
         )
     except Exception as e:
-        print(f"quiz_ai unexpected error: {e}")
+        print(f"quiz_ai unexpected error: {e!r}")
         await msg.edit_text(
             "❌ Xatolik yuz berdi. Iltimos qaytadan urinib ko'ring "
             "yoki admin bilan bog'laning."
+            + (f"\n\n🪙 {billing.AI_QUIZ_PRICE} Kitobcha hisobingizga qaytarildi." if charged else "")
         )
         await state.finish()
     finally:
         anim_task.cancel()
+        if charged:
+            await sync_to_async(billing.refund)(user)

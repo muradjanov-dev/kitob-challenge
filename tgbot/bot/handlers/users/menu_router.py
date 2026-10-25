@@ -752,7 +752,7 @@ _HOW_IT_WORKS_UZ = (
     "   «Yigirma bet», «Kunlik marafon», «Birinchi kitob»... Kolleksioner bo'ling!\n\n"
 
     "🎮 <b>5. JONLI O'YINLAR — eng qizig'i!</b>\n"
-    "   Har kuni <b>10:00</b> va <b>22:00</b> da saytda 3 tasodifiy o'yin ketma-ket:\n"
+    "   Har kuni <b>10:00</b> va <b>21:30</b> da saytda 3 tasodifiy o'yin ketma-ket:\n"
     "   🔗 <b>Kitob Zanjiri</b>, 🗣 <b>Ko'pchilik nima dedi?</b>, 🏰 <b>Bilim Qal'asi</b>, "
     "🎬 <b>Emoji Kitob</b>, ☪️ <b>Hikmat Xazinasi</b>, 📖 <b>Kitob Detektivi</b>, "
     "💀 <b>Omon qolish</b>, 👥 <b>Jamoa Jangi</b> va yana boshqalari!\n"
@@ -798,7 +798,7 @@ _HOW_IT_WORKS_RU = (
     "коллекционером!\n\n"
 
     "🎮 <b>5. ЖИВЫЕ ИГРЫ — самое интересное!</b>\n"
-    "   Каждый день в <b>10:00</b> и <b>22:00</b> на сайте проходят 3 "
+    "   Каждый день в <b>10:00</b> и <b>21:30</b> на сайте проходят 3 "
     "случайные игры подряд:\n"
     "   🔗 <b>Kitob Zanjiri</b>, 🗣 <b>Ko'pchilik nima dedi?</b>, 🏰 <b>Bilim "
     "Qal'asi</b>, 🎬 <b>Emoji Kitob</b>, ☪️ <b>Hikmat Xazinasi</b>, 📖 "
@@ -1918,7 +1918,13 @@ async def _menu_quiz(call, user, _state: FSMContext):
             text="➕ Yangi quiz yaratish", callback_data="qz:new",
         ))
     if can_ai:
-        ai_label = "🤖 AI yordamida yaratish" if can_create else "🤖 AI yordamida yaratish (bepul sinov)"
+        from tgbot.services import ai_quiz_billing as billing
+        how = await sync_to_async(billing.plan)(user)
+        ai_label = "🤖 AI yordamida yaratish"
+        if how == billing.FREE_TRY:
+            ai_label += " (bepul sinov)"
+        elif how == billing.PAID:
+            ai_label += f" ({billing.AI_QUIZ_PRICE} Kitobcha)"
         kb.add(InlineKeyboardButton(text=ai_label, callback_data="qz:ai"))
     if can_create:
         kb.add(InlineKeyboardButton(

@@ -675,7 +675,80 @@ def internal_broadcast_auction_announcement(request: HttpRequest):
     return HttpResponse("started", status=202)
 
 
+@csrf_exempt
+def internal_ops(request: HttpRequest, action: str):
+    """Data repairs and approved announcements (services/ops_fixes.py,
+    services/ops_broadcast.py). POST a JSON body; nothing changes unless it
+    carries "apply": true, so every call can be made as a dry run first."""
+    import json as _json
+    import os as _os
 
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not secret or secret != _os.environ.get("API_TOKEN", ""):
+        return HttpResponse(status=403)
+    try:
+        body = _json.loads(request.body or b"{}")
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
+    apply = bool(body.get("apply"))
+
+    from tgbot.services import ops_fixes, ops_broadcast
+
+    def _iso(rows):
+        return [{**r, "last_before": str(r["last_before"]), "first_after": str(r["first_after"]),
+                 "fill": [str(d) for d in r["fill"]]} for r in rows]
+
+    if action == "streak-gap":
+        out = {"ok": True, "daily": ops_fixes.daily_reporters(body.get("since") or "2026-08-25")}
+        if body.get("gap_start") and body.get("gap_end"):
+            plan = ops_fixes.streak_gap_plan(body["gap_start"], body["gap_end"], int(body.get("grace", 2)))
+            out["users"] = len(plan)
+            out["days"] = sum(len(p["fill"]) for p in plan)
+            out["plan"] = _iso(plan) if body.get("full") else _iso(plan[:40])
+            if apply:
+                out["created"] = ops_fixes.apply_streak_gap(plan)
+        return JsonResponse(out)
+
+    if action == "user-dates":
+        return JsonResponse({"ok": True, **ops_fixes.user_dates(body["telegram_id"], body.get("since") or "2026-08-01")})
+
+    if action == "themes":
+        plan = ops_fixes.theme_plan(body.get("old_owners"))
+        out = {"ok": True, "buyers": len(plan),
+               "to_grant": sum(len(r["grant"]) for r in plan),
+               "refund_total": sum(r["refund_total"] for r in plan), "plan": plan}
+        if apply:
+            out["applied"] = ops_fixes.apply_themes(plan, refund=bool(body.get("refund")))
+        return JsonResponse(out)
+
+    if action == "set-admin":
+        return JsonResponse({"ok": True, **ops_fixes.set_admin(body["telegram_id"], apply)})
+
+    if action == "broadcast":
+        campaign, text = body.get("campaign", ""), body.get("text", "")
+        if not campaign or not text:
+            return JsonResponse({"ok": False, "error": "campaign_and_text_required"}, status=400)
+        if not apply:
+            return JsonResponse({"ok": True, "preview": text, "status": ops_broadcast.status(campaign)})
+
+        def _run():
+            try:
+                ops_broadcast.run(campaign, text, groups=body.get("groups", True),
+                                  users=body.get("users", True),
+                                  button_text=body.get("button_text", ""),
+                                  button_url=body.get("button_url", ""))
+            except Exception:
+                print("internal_ops broadcast failed:\n" + traceback.format_exc())
+
+        threading.Thread(target=_run, daemon=True).start()
+        return JsonResponse({"ok": True, "started": campaign}, status=202)
+
+    if action == "broadcast-status":
+        return JsonResponse({"ok": True, "status": ops_broadcast.status(body.get("campaign", ""))})
+
+    return JsonResponse({"ok": False, "error": "unknown_action"}, status=404)
 
 
 @csrf_exempt

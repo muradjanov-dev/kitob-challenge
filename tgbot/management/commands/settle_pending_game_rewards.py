@@ -183,6 +183,6 @@ class Command(BaseCommand):
             "✅ Kirish to'lovi olinib, mukofot berilmagan <b>barcha ishtirokchilarga "
             f"({count} nafar)</b> Kitobcha qo'shildi — shaxsiy xabarni tekshiring! 🪙\n"
             "✅ Bundan buyon <b>barcha 58 ta o'yin</b> natijasi avtomatik e'lon qilinadi.\n\n"
-            "Noqulaylik uchun uzr so'raymiz. Har kuni <b>10:00</b> va <b>22:00</b> dagi "
+            "Noqulaylik uchun uzr so'raymiz. Har kuni <b>10:00</b> va <b>21:30</b> dagi "
             "o'yinlarda ko'rishguncha! 🎮📚"
         )

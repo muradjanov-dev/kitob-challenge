@@ -1,3 +1,5 @@
+import html
+
 from asgiref.sync import sync_to_async
 from aiogram import types
 from aiogram.dispatcher import FSMContext
@@ -59,10 +61,24 @@ def _claim_inbox_thread(thread_id, admin_user):
         return True, thread
 
 
-async def _lock_out_other_admins(thread, answering_admin_id, answerer_name):
+def _reply_summary(message: types.Message) -> str:
+    """What an admin's reply said, for the other admins' copies of the
+    question: the text itself, or the media kind plus its caption."""
+    if message.text:
+        return message.text
+    kind = {
+        "photo": "🖼 rasm", "video": "🎬 video", "document": "📎 fayl",
+        "voice": "🎤 ovozli xabar", "audio": "🎵 audio", "sticker": "stiker",
+        "video_note": "📹 video xabar", "animation": "GIF",
+    }.get(message.content_type, message.content_type)
+    return f"[{kind}] {message.caption}" if message.caption else f"[{kind}]"
+
+
+async def _lock_out_other_admins(thread, answering_admin_id, answerer_name, reply_summary=""):
     """Once one admin answers a broadcast inbox thread, clear the reply button
-    on every OTHER admin's copy and note who answered, so a second admin can't
-    also send a reply to the same question."""
+    on every OTHER admin's copy, and write on every copy who answered and what
+    they said -- the admins asked to see each other's answers in place, not
+    as extra messages."""
     sender = thread.from_user
     if sender:
         username_str = f"@{sender.username}" if getattr(sender, "username", None) else "—"
@@ -75,20 +91,26 @@ async def _lock_out_other_admins(thread, answering_admin_id, answerer_name):
     else:
         orig_header = "📩 <b>Foydalanuvchidan xabar</b>"
 
+    note = f"\n\n✅ <b>{html.escape(answerer_name)}</b> javob berdi"
+    if reply_summary:
+        summary = reply_summary if len(reply_summary) <= 3000 else reply_summary[:2999] + "…"
+        note += f":\n<blockquote>{html.escape(summary)}</blockquote>"
+    else:
+        note += "."
+
     for copy in (thread.copies or []):
-        if copy.get("admin_id") == answering_admin_id:
-            continue
-        try:
-            await bot.edit_message_reply_markup(
-                chat_id=copy["admin_id"], message_id=copy["content_message_id"],
-                reply_markup=None,
-            )
-        except Exception:
-            pass
+        if copy.get("admin_id") != answering_admin_id:
+            try:
+                await bot.edit_message_reply_markup(
+                    chat_id=copy["admin_id"], message_id=copy["content_message_id"],
+                    reply_markup=None,
+                )
+            except Exception:
+                pass
         try:
             await bot.edit_message_text(
                 chat_id=copy["admin_id"], message_id=copy["header_message_id"],
-                text=orig_header + f"\n\n✅ <i>{answerer_name} javob berdi.</i>",
+                text=orig_header + note,
                 parse_mode="HTML",
             )
         except Exception:
@@ -455,6 +477,7 @@ async def admin_reply_preview(message: types.Message, state: FSMContext):
     await state.update_data(
         ar_draft_chat_id=message.chat.id,
         ar_draft_message_id=message.message_id,
+        ar_draft_summary=_reply_summary(message),
     )
     data = await state.get_data()
     target_user_id = data.get("reply_target_user_id") or "—"
@@ -570,7 +593,10 @@ async def admin_reply_confirm_send(call: types.CallbackQuery, state: FSMContext)
             answerer_name = (admin_user.full_name if admin_user else None) or call.from_user.full_name or "Admin"
             fresh_thread = await _get_inbox_thread(inbox_thread_id)
             if fresh_thread:
-                await _lock_out_other_admins(fresh_thread, call.from_user.id, answerer_name)
+                await _lock_out_other_admins(
+                    fresh_thread, call.from_user.id, answerer_name,
+                    data.get("ar_draft_summary") or "",
+                )
     except Exception as e:
         print(f"admin_reply: send to {target_user_id} failed: {e}")
         await call.message.answer(f"❌ Yuborib bo'lmadi: {e}")

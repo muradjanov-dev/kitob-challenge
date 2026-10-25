@@ -543,7 +543,7 @@ ACHIEVEMENTS_RAW = [
     # ── NEW ACHIEVEMENTS ROUND 2 — 30 entries, new behavioral dimensions ──────
 
     # — Live games participation —
-    {"code": "lg_1",   "emoji": "🎲", "title_uz": "Birinchi jonli o'yin",          "title_ru": "Первая live-игра",           "hint_uz": "Har kuni 10:00/22:00dagi jonli o'yinlardan (Zanjiri, Ko'pchilik va h.k.) biriga qatnashing.", "hint_ru": "Поучаствуйте в одной из live-игр (10:00/22:00).", "cond": _at_least("live_games_played", 1),   "points": 20},
+    {"code": "lg_1",   "emoji": "🎲", "title_uz": "Birinchi jonli o'yin",          "title_ru": "Первая live-игра",           "hint_uz": "Har kuni 10:00/21:30dagi jonli o'yinlardan (Zanjiri, Ko'pchilik va h.k.) biriga qatnashing.", "hint_ru": "Поучаствуйте в одной из live-игр (10:00/21:30).", "cond": _at_least("live_games_played", 1),   "points": 20},
     {"code": "lg_10",  "emoji": "🕹", "title_uz": "O'n jonli o'yin",               "title_ru": "Десять live-игр",            "hint_uz": "Jonli o'yinlarda jami 10 marta qatnashing (istalgan turdagi).", "hint_ru": "Поучаствуйте в live-играх 10 раз.", "cond": _at_least("live_games_played", 10),  "points": 100},
     {"code": "lg_50",  "emoji": "🎰", "title_uz": "Ellik jonli o'yin — faol o'yinchi", "title_ru": "Пятьдесят live-игр",     "hint_uz": "Jonli o'yinlarda jami 50 marta qatnashing.", "hint_ru": "Поучаствуйте в live-играх 50 раз.", "cond": _at_least("live_games_played", 50),  "points": 350},
     {"code": "lg_200", "emoji": "🎳", "title_uz": "Ikki yuz jonli o'yin — afsonaviy o'yinchi", "title_ru": "Двести live-игр — легенда", "hint_uz": "Jonli o'yinlarda jami 200 marta qatnashing.", "hint_ru": "Поучаствуйте в live-играх 200 раз.", "cond": _at_least("live_games_played", 200), "points": 800},

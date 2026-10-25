@@ -4,7 +4,7 @@ from .views import (
     internal_diag_challenge_boom_state, internal_retire_challenge_and_launch_boom,
     internal_diag_challenge_reward_history, internal_broadcast_mystery_box_update,
     internal_broadcast_update_announcement,
-    internal_broadcast_auction_announcement,
+    internal_broadcast_auction_announcement, internal_ops,
     internal_diag_achievements, internal_diag_ai_quiz_trial_backlog, internal_fix_ai_quiz_trial_backlog,
     internal_grant_ai_quiz_bonus_everyone, internal_ai_quiz_bonus_status,
 )
@@ -19,7 +19,7 @@ from tgbot.library_views import (
     api_get_progress, api_save_progress, api_start_reading, api_premium_access,
     api_top_active_readers,
 )
-from tgbot.cabinet_views import cabinet_index, api_cabinet_me, api_set_theme
+from tgbot.cabinet_views import cabinet_index, api_cabinet_me, api_set_theme, api_theme
 from tgbot.report_views import api_submit_report, api_my_report_books
 from tgbot.analytics_views import api_track_event
 from tgbot.game_views import (
@@ -65,6 +65,7 @@ urlpatterns = [
     path("internal/broadcast/mystery-box-update/", internal_broadcast_mystery_box_update, name="internal-broadcast-mystery-box-update"),
     path("internal/broadcast/update-announcement/", internal_broadcast_update_announcement, name="internal-broadcast-update-announcement"),
     path("internal/broadcast/auction-announcement/", internal_broadcast_auction_announcement, name="internal-broadcast-auction-announcement"),
+    path("internal/ops/<slug:action>/", internal_ops, name="internal-ops"),
     path("health-check/redis/", health_check_redis, name="health-check-redis"),
     path("health-check/celery/", health_check_celery, name="health-check-celery"),
     path('api/cabinet/me/', api_cabinet_me, name='api-cabinet-me'),
@@ -81,6 +82,7 @@ urlpatterns = [
     path("kabinet/api/report/", api_submit_report, name="cabinet-api-submit-report"),
     path("kabinet/api/report/books/", api_my_report_books, name="cabinet-api-report-books"),
     path("kabinet/api/set-theme/", api_set_theme, name="cabinet-api-set-theme"),
+    path("kabinet/api/theme/", api_theme, name="cabinet-api-theme"),
     path("zanjir/", chain_index, name="chain"),
     path("zanjir/api/state/", api_chain_state, name="chain-api-state"),
     path("zanjir/api/submit/", api_chain_submit, name="chain-api-submit"),

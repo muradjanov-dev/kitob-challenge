@@ -1,6 +1,6 @@
 """
 Schedule tonight's one-off "N-game bonus night" event a few seconds before
-the regular 22:00 evening slot, so it wins the GameSequence creation race and
+the regular 21:30 evening slot, so it wins the GameSequence creation race and
 the regular auto-sequence quietly no-ops instead of double-starting.
 
 Ishlatish (Railway console yoki SSH):
@@ -20,7 +20,7 @@ class Command(BaseCommand):
         parser.add_argument("--count", type=int, default=5)
         parser.add_argument("--bonus", type=int, default=2)
         parser.add_argument("--hour", type=int, default=21)
-        parser.add_argument("--minute", type=int, default=59)
+        parser.add_argument("--minute", type=int, default=29)
         parser.add_argument("--second", type=int, default=50)
 
     def handle(self, *args, **options):

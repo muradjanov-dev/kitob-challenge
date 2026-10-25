@@ -325,6 +325,11 @@ async def market_buy_item(call: types.CallbackQuery):
         if slots <= 0:
             await call.answer("Bugungi 7 ta joy allaqachon tugagan 😔", show_alert=True)
             return
+    # An old "Sotib olish" button for a theme already owned used to charge
+    # again and grant nothing.
+    if key.startswith("theme_") and key in (user.unlocked_themes or []):
+        await call.answer("✅ Bu mavzu sizda allaqachon bor — Kabinetdan tanlang.", show_alert=True)
+        return
 
     ok = await sync_to_async(market_service.charge, thread_sensitive=True)(user, item["price"])
     if not ok:

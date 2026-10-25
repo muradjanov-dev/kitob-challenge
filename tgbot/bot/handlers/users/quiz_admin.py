@@ -39,20 +39,17 @@ async def _can_manage_quizzes(user) -> bool:
 
 
 async def _has_ai_quiz_access(user) -> bool:
-    """Admin, active Premium, an active AI-quiz trial window (Market 'Sirli
-    quti' win or the daily giveaway — see TelegramProfile.trial_ai_quiz_until),
-    or an unused free lifetime try. Distinct from _can_manage_quizzes: this
-    only gates the AI-quiz feature, not manual quiz creation/management,
-    since a trial/free-try grant is explicitly just "make one AI quiz",
-    not full quiz-management access."""
-    from django.utils import timezone
+    """Admin, or anyone whose next AI quiz is free (Premium / trial window /
+    unused lifetime try) or who can pay AI_QUIZ_PRICE Kitobcha for it — see
+    services/ai_quiz_billing.py. Distinct from _can_manage_quizzes: this
+    only gates the AI-quiz feature, not manual quiz creation/management.
+
+    It used to stop at Premium/trial/free-try, so a reader with plenty of
+    Kitobcha was turned away at the button the paid path was built for."""
+    from tgbot.services import ai_quiz_billing
     if _is_admin(user):
         return True
-    if await _is_active_premium(user):
-        return True
-    has_trial = bool(user.trial_ai_quiz_until and user.trial_ai_quiz_until >= timezone.now())
-    has_free_try = not user.free_ai_quiz_used
-    return has_trial or has_free_try
+    return await sync_to_async(ai_quiz_billing.can_start)(user)
 
 
 def _visible_quizzes(user):
@@ -103,24 +100,19 @@ async def offer_ai_quiz_start(target_message, user, state: FSMContext):
     link (start.py). Access: active Premium, an active trial window (see
     tasks.grant_daily_ai_quiz_trial), or — once ever — every non-Premium
     user's free lifetime try (TelegramProfile.free_ai_quiz_used)."""
-    from django.utils import timezone
-    from tgbot.models import Payment
     from tgbot.bot.states.main import AIQuizCreateState
+    from tgbot.services import ai_quiz_billing as billing
 
-    from tgbot.services.premium import is_premium as _is_prem
-    is_premium = await sync_to_async(_is_prem)(user)
-    has_trial = bool(user.trial_ai_quiz_until and user.trial_ai_quiz_until >= timezone.now())
-    has_free_try = not user.free_ai_quiz_used
-
-    if not is_premium and not has_trial and not has_free_try:
-        if int(user.ball or 0) < 3000:
-            await target_message.answer(
-                "⭐ <b>Hisobingizda Kitobcha yetarli emas!</b>\n\n"
-                "AI yordamida yana bitta quiz tuzish narxi: <b>3000 Kitobcha</b>. "
-                "Yoki 💎 Premium xarid qilib, ko'proq foydalanishingiz mumkin.",
-                parse_mode="HTML",
-            )
-            return
+    how = await sync_to_async(billing.plan)(user)
+    if how == billing.PAID and int(user.ball or 0) < billing.AI_QUIZ_PRICE:
+        await target_message.answer(
+            "⭐ <b>Hisobingizda Kitobcha yetarli emas!</b>\n\n"
+            f"AI yordamida bitta quiz tuzish narxi: <b>{billing.AI_QUIZ_PRICE} Kitobcha</b>. "
+            f"Hisobingizda: <b>{int(user.ball or 0)}</b>.\n"
+            "💎 Premium a'zolar har kuni bepul tuzadi.",
+            parse_mode="HTML",
+        )
+        return
 
     await state.finish()
 
@@ -133,9 +125,15 @@ async def offer_ai_quiz_start(target_message, user, state: FSMContext):
         InlineKeyboardButton("25", callback_data="aiqz_q:25"),
     )
     intro = "🤖 <b>AI yordamida Quiz yaratish</b>\n\n"
-    if not is_premium and not has_trial and has_free_try:
+    if how == billing.FREE_TRY:
         intro += (
-            "🎁 Bu — sizning <b>bepul sinovingiz</b>! Keyingi safar 💎 Premium kerak bo'ladi.\n\n"
+            "🎁 Bu — sizning <b>bepul sinovingiz</b>! Keyingisi "
+            f"<b>{billing.AI_QUIZ_PRICE} Kitobcha</b> yoki 💎 Premium bilan.\n\n"
+        )
+    elif how == billing.PAID:
+        intro += (
+            f"🪙 Bu quiz narxi: <b>{billing.AI_QUIZ_PRICE} Kitobcha</b> — AI ishga tushishidan "
+            "oldin yechiladi, xatolik bo'lsa qaytariladi.\n\n"
         )
     intro += "Nechta savol bo'lishini xohlaysiz? Quyidagi tugmalardan birini tanlang:"
     await target_message.answer(intro, parse_mode="HTML", reply_markup=kb)
@@ -319,9 +317,10 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
     # manual-quiz-management Premium wall below.
     if action == "ai":
         if not await _has_ai_quiz_access(user):
+            from tgbot.services.ai_quiz_billing import AI_QUIZ_PRICE
             await call.answer(
-                "🤖 AI yordamida quiz yaratish — admin, 💎 Premium yoki faol sinov "
-                "muddati bo'lgan foydalanuvchilar uchun.",
+                f"🤖 AI quiz narxi — {AI_QUIZ_PRICE} Kitobcha (💎 Premium a'zolarga "
+                "har kuni bepul). Hisobingizda Kitobcha yetarli emas.",
                 show_alert=True,
             )
             return
