@@ -28,7 +28,7 @@ from django.db.models import Sum, Count
 from django.utils import timezone
 
 from tgbot.models import ChainGame, ChainScore, TelegramProfile, GlobalBook
-from tgbot.services.chain_text import answer_key, is_guessable_letter, _GUESSABLE_APOS
+from tgbot.services.chain_text import answer_key, is_guessable_letter, to_latin, _GUESSABLE_APOS
 
 ENTRY_FEE = 0  # Barcha jonli o'yinlar bepul (2026-08-19)
 POINTS_PER_ROUND = 10
@@ -147,6 +147,9 @@ def _pick_round(used_book_ids) -> dict | None:
         return None
     fresh = [b for b in all_books if b[0] not in (used_book_ids or [])]
     book_id, title = random.choice(fresh or all_books)
+    # Some catalog titles are in Cyrillic; the round is always played in
+    # Latin, so the blanked letter is one a Latin keyboard can type.
+    title = to_latin(title)
 
     # Never blank an apostrophe: "O_tkan kunlar" asks the player to type a
     # punctuation mark, and answer_key() drops apostrophes anyway, so such a

@@ -31,6 +31,48 @@ def _translit(t: str) -> str:
     return "".join(_CYR.get(c, c) for c in t)
 
 
+# Display transliteration (case-preserving, standard Uzbek Latin spelling),
+# unlike _CYR above, which only builds lowercase comparison keys.
+_CYR_LATIN = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "yo",
+    "ж": "j", "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m",
+    "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
+    "ф": "f", "х": "x", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "shch", "ъ": "'",
+    "ы": "i", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+    "ў": "o'", "қ": "q", "ғ": "g'", "ҳ": "h",
+}
+_HAS_CYR = re.compile("[Ѐ-ӿ]")
+_YE_AFTER = set("аеёиоуэюяўъь")
+
+
+def to_latin(text):
+    """Uzbek Cyrillic -> Latin for anything a game shows or asks the player
+    to type: "Ўтган кунлар" -> "O'tgan kunlar", "ШАЙТАНАТ" -> "SHAYTANAT".
+    Latin text comes back unchanged -- which also strips the odd Cyrillic
+    look-alike letter hidden inside a Latin word (a Cyrillic "О" in
+    "RUBОIY" looks right and cannot be typed on a Latin keyboard)."""
+    if not text or not isinstance(text, str) or not _HAS_CYR.search(text):
+        return text
+    out = []
+    for i, ch in enumerate(text):
+        low = ch.lower()
+        lat = _CYR_LATIN.get(low)
+        if lat is None:
+            out.append(ch)
+            continue
+        if low == "е":
+            prev = text[i - 1].lower() if i else ""
+            if not prev.isalpha() or prev in _YE_AFTER:
+                lat = "ye"
+        if ch != low and lat:
+            nxt = text[i + 1] if i + 1 < len(text) else ""
+            prv = text[i - 1] if i else ""
+            all_caps = nxt.isupper() or (not nxt.isalpha() and prv.isupper())
+            lat = lat.upper() if all_caps else lat[0].upper() + lat[1:]
+        out.append(lat)
+    return "".join(out)
+
+
 def normalize(text: str) -> str:
     """Lowercase, unify apostrophes, transliterate Uzbek Cyrillic to Latin, and
     collapse whitespace. Used as the dedupe / lookup key so 'O‘tkan Kunlar',

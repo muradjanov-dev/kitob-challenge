@@ -14,7 +14,7 @@ WORDLOCK_QUESTIONS = [
     {"word": "QUTADG'U", "hint": "Yusuf Xos Hojibning «Baxt keltiruvchi bilim» asari nomi", "distractors": ["HIBAT", "LUG'AT", "DEVON", "MAHBUB"]},
     {"word": "CHO'LPON", "hint": "«Kecha va kunduz» romani muallifi bo'lgan otashin shoir", "distractors": ["FITRAT", "USMON", "BOTU", "AVFIY"]},
     {"word": "FITRAT", "hint": "«Chin sevish», «Hind ixtilolchilari» asarlarining jadid muallifi", "distractors": ["BEHBUDIY", "AVLONIY", "QODIRIY", "HAMZA"]},
-    {"word": "MASNAVIY", "hint": "Mavlono Jaloliddin Rumiyning ma'naviy durdona asari", "distractors": ["GULISTON", "BOSTON", "RUBОIY", "QASIDA"]},
+    {"word": "MASNAVIY", "hint": "Mavlono Jaloliddin Rumiyning ma'naviy durdona asari", "distractors": ["GULISTON", "BOSTON", "RUBOIY", "QASIDA"]},
     {"word": "GULISTON", "hint": "Shayx Sa'diy Sheroziyning axloqiy hikoyatlar to'plami", "distractors": ["BAHORISTON", "SEHRISTON", "NIGORISTON", "SHOHISTON"]},
     {"word": "TEMUR", "hint": "«Kuch — adolatdadir» shioriga amal qilgan buyuk jahongir sohibqiron", "distractors": ["ULUG'BEK", "BOBUR", "SHOHRUH", "XUDOYOR"]},
     {"word": "ULUG'BEK", "hint": "Samarqandda yulduzlar jadvalini tuzgan alloma hukmdor", "distractors": ["BERUNIY", "XORAZMIY", "FARG'ONIY", "QOZIZODA"]},

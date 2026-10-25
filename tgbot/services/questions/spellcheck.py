@@ -59,7 +59,7 @@ SPELLCHECK_QUESTIONS = [
     {"q": "Qaysi atama TO'G'RI yozilgan?", "options": ["Epilog (Xotima)", "Epiloq", "Epilog'", "Epilok"], "correct": 0, "hint": "Asar yakuniy xulosasi"},
     {"q": "Qaysi so'z TO'G'RI yozilgan?", "options": ["Kulminatsiya (Eng yuqori cho'qqi)", "Kulminatseya", "Kulmenatsiya", "Koolminatsiya"], "correct": 0, "hint": "Syujet rivojining eng keskin nuqtasi"},
     {"q": "Qaysi so'z TO'G'RI yozilgan?", "options": ["Ekspozitsiya (Boshlang'ich holat)", "Ekspazitsiya", "Ekspozitseya", "Eksspozitsiya"], "correct": 0, "hint": "Voqealar boshlanishidagi tanishtiruv"},
-    {"q": "Qaysi so'z TO'G'RI yozilgan?", "options": ["Renessans (Uyg'onish davri)", "Renesans", "Ranessans", "Renessanс"], "correct": 0, "hint": "Sharq va G'arb uyg'onish davri"},
+    {"q": "Qaysi so'z TO'G'RI yozilgan?", "options": ["Renessans (Uyg'onish davri)", "Renesans", "Ranessans", "Rennesans"], "correct": 0, "hint": "Sharq va G'arb uyg'onish davri"},
     {"q": "Qaysi atama TO'G'RI yozilgan?", "options": ["Ensiklopediya (Qomus)", "Ensiklapedya", "Insiklopediya", "Ensiklopedeya"], "correct": 0, "hint": "Barcha ilmlar majmuasi"},
     {"q": "Qaysi atama TO'G'RI yozilgan?", "options": ["Xrestomatiya (Tanlangan namunalar)", "Xrestamateya", "Hrestomatiya", "Xristomatiya"], "correct": 0, "hint": "Adabiy namunalar majmuasi"}
 ]

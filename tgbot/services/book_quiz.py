@@ -143,8 +143,17 @@ def build_quiz_round():
         if len(conclusion) > MAX_CONCLUSION_LEN:
             conclusion = conclusion[:MAX_CONCLUSION_LEN].rstrip() + "…"
 
-        decoys = random.sample(decoy_pool, 3)
+        # Shown in Latin like every other game: Cyrillic catalog titles are
+        # transliterated, and so is an Uzbek-Cyrillic conclusion (ў/қ/ғ/ҳ
+        # tell it apart from a Russian one, which is left as written).
+        from tgbot.services.chain_text import to_latin
+        correct = to_latin(correct)
+        decoys = [to_latin(t) for t in random.sample(decoy_pool, 3)]
+        if any(c in conclusion.lower() for c in "ўқғҳ"):
+            conclusion = to_latin(conclusion)
         options = decoys + [correct]
+        if len({o.lower() for o in options}) < len(options):
+            continue  # a Cyrillic decoy turned into a copy of another option
         random.shuffle(options)
         correct_index = options.index(correct)
 

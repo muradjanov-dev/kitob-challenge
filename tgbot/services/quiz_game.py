@@ -554,11 +554,25 @@ def _prep_one(flavor, item):
             out["items"] = item["items"]
         return out
 
-    result = _do_prep()
+    result = _latinize(_do_prep())
     result["key"] = _identity(flavor, item)
     if flavor in TEXT_FLAVORS:
         result["mask"] = _answer_mask(flavor, result)
     return result
+
+
+def _latinize(q: dict) -> dict:
+    """Every question is shown -- and typed -- in Latin. Library titles
+    (cover/pixel options) can be Cyrillic, and a Cyrillic look-alike letter
+    inside a Latin word cannot be typed at all."""
+    from tgbot.services.chain_text import to_latin
+    for k in ("q", "hint", "explanation"):
+        if isinstance(q.get(k), str):
+            q[k] = to_latin(q[k])
+    for k in ("options", "items"):
+        if isinstance(q.get(k), list):
+            q[k] = [to_latin(v) if isinstance(v, str) else v for v in q[k]]
+    return q
 
 
 def correct_text(q) -> str:
