@@ -243,6 +243,12 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.post_daily_joke',
         'schedule': crontab(hour=17, minute=0),
     },
+    # Countdown to the 1 November launch, 26-31 October (approved texts in
+    # services.launch_countdown); a no-op on any other date.
+    'post-launch-countdown': {
+        'task': 'tgbot.tasks.post_launch_countdown',
+        'schedule': crontab(hour=19, minute=0),
+    },
 
     # Single daily inspiration — personalized hour wins; fixed 10:00 is the
     # fallback for users whose optimal_send_hour hasn't been computed yet.

@@ -5086,6 +5086,38 @@ def post_daily_joke():
 
 
 @shared_task
+def post_launch_countdown():
+    """One teaser a day in the groups counting down to the 1 November launch
+    (services.launch_countdown, texts approved 2026-10-25). Nothing is posted
+    on dates without a text, and the cache key keeps a retried or doubled beat
+    run from posting the same day twice."""
+    from django.core.cache import cache
+    from tgbot.services.launch_countdown import countdown_text_for
+
+    today = timezone.localdate()
+    text = countdown_text_for(today)
+    if not text:
+        return
+    if not cache.add(f"launch_countdown_posted:{today.isoformat()}", 1, 60 * 60 * 26):
+        return
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    posted = 0
+    for group_id, thread_id in _announce_targets():
+        try:
+            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
+                    "disable_web_page_preview": "true"}
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            resp = requests.post(url, data=data, timeout=10)
+            posted += resp.ok
+            if not resp.ok:
+                print(f"post_launch_countdown group {group_id}: {resp.status_code} {resp.text[:200]}")
+        except Exception as e:
+            print(f"post_launch_countdown group {group_id}: {e}")
+    print(f"post_launch_countdown: {today} posted to {posted} group(s)")
+
+
+@shared_task
 def send_viktorina_promo():
     """Promote the Viktorina to everyone: once a day for the first 10 days after
     launch, then only on a random ~40% of days. Each send pulls a fresh creative
