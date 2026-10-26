@@ -92,6 +92,14 @@ def grant_premium(user, *, days: int = 0, hours: int = 0) -> object:
     if days <= 0 and hours <= 0:
         return getattr(user, "trial_premium_until", None)
 
+    # Premium no longer exists after the wallet launch. Refusing here sends
+    # every prize down its existing "Premium refused" fallback (Kitobcha + a
+    # free game entry) instead of handing out wallet money.
+    from tgbot.services import wallet
+    if wallet.is_live_launch():
+        print(f"grant_premium: Premium retired, fallback for user={getattr(user, 'id', None)}")
+        return None
+
     reason = free_premium_blocked_reason(user)
     if reason:
         print(f"grant_premium: refused for user={getattr(user, 'id', None)} ({reason})")
@@ -178,7 +186,7 @@ def is_premium_by_id(profile_id) -> bool:
     """TelegramProfile birlamchi kaliti bo'yicha."""
     from tgbot.models import TelegramProfile
     p = TelegramProfile.objects.filter(id=profile_id).only(
-        "id", "trial_premium_until").first()
+        "id", "telegram_id", "trial_premium_until", "wallet_balance").first()
     return is_premium(p)
 
 
@@ -186,13 +194,17 @@ def is_premium_by_telegram_id(telegram_id) -> bool:
     """Telegram ID bo'yicha (handlerlarda ko'pincha faqat shu bo'ladi)."""
     from tgbot.models import TelegramProfile
     p = TelegramProfile.objects.filter(telegram_id=telegram_id).only(
-        "id", "trial_premium_until").first()
+        "id", "telegram_id", "trial_premium_until", "wallet_balance").first()
     return is_premium(p)
 
 
 def active_premium_user_ids() -> set:
-    """Hozir Premium hisoblanadigan barcha TelegramProfile id lari."""
+    """Hozir Premium hisoblanadigan barcha TelegramProfile id lari.
+    1-noyabrdan: hamyon a'zolari (wallet.member_ids)."""
     from tgbot.models import Payment, TelegramProfile
+    from tgbot.services import wallet
+    if wallet.is_live_launch():
+        return wallet.member_ids()
     ids = set(
         Payment.objects.filter(
             status="paid", end_date__gte=timezone.localdate(),
@@ -209,6 +221,10 @@ def active_premium_user_ids() -> set:
 def active_premium_telegram_ids() -> set:
     """Xuddi shu ro'yxat, lekin telegram_id lar bilan."""
     from tgbot.models import Payment, TelegramProfile
+    from tgbot.services import wallet
+    if wallet.is_live_launch():
+        return set(TelegramProfile.objects.filter(id__in=wallet.member_ids())
+                   .values_list("telegram_id", flat=True))
     ids = set(
         Payment.objects.filter(
             status="paid", end_date__gte=timezone.localdate(),

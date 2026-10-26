@@ -822,6 +822,34 @@ class WisdomScoreAdmin(admin.ModelAdmin):
     search_fields = ('user__full_name', 'user__telegram_id')
 
 
+@admin.register(models.WalletTransaction)
+class WalletTransactionAdmin(admin.ModelAdmin):
+    """Read-only: every wallet change is written by services/wallet.py."""
+    list_display = ('id', 'user', 'kind', 'delta', 'kitobcha', 'day', 'balance_after', 'note', 'created_at')
+    list_filter = ('kind',)
+    search_fields = ('user__full_name', 'user__telegram_id', 'note')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(models.WalletTopup)
+class WalletTopupAdmin(admin.ModelAdmin):
+    """Approve/reject from the bot buttons -- they credit the wallet; editing
+    the status here would not."""
+    list_display = ('id', 'user', 'amount', 'status', 'reviewed_by', 'reviewed_at', 'created_at')
+    list_filter = ('status',)
+    search_fields = ('user__full_name', 'user__telegram_id')
+    readonly_fields = ('user', 'amount', 'status', 'photo_file_id', 'reviewed_by', 'reviewed_at',
+                       'reject_reason', 'created_at', 'updated_at')
+
+    def has_add_permission(self, request):
+        return False
+
+
 @admin.register(models.AuthorGame)
 class AuthorGameAdmin(admin.ModelAdmin):
     list_display = ('id', 'status', 'starts_at', 'writing_ends_at', 'ends_at', 'rewarded')

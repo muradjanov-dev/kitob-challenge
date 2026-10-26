@@ -259,6 +259,10 @@ async def _menu_report(call, user, state: FSMContext):
     )()
     reading_day = distinct_days if already else distinct_days + 1
 
+    from tgbot.bot.handlers.users.wallet import report_allowed
+    if not await report_allowed(call.message, user):
+        return
+
     await state.finish()
     await state.update_data(reading_day=reading_day, selected_book_ids=[])
     await ReportState.select_book.set()
@@ -623,6 +627,13 @@ async def _menu_premium(call, user, state: FSMContext):
     await call.answer()
     await state.finish()
     lang = _user_lang(user)
+
+    # From the wallet launch the Premium button opens the wallet instead.
+    from tgbot.services import wallet as _wallet
+    if user and _wallet.launched(user):
+        from tgbot.bot.handlers.users.wallet import show_wallet
+        await show_wallet(call.message, user)
+        return
 
     # Always a plain upsell — buy/extend/gift — with no "you already have
     # Premium" framing that stops short of the menu. A purchase now extends

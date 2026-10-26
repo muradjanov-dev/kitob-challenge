@@ -748,6 +748,11 @@
         .then(r => r.json().then(data => ({ status: r.status, data })))
         .then(({ status, data }) => {
           rfSubmit.disabled = false;
+          if (data.error === 'wallet_insufficient') {
+            rfMsg.textContent = data.message || "👛 Hamyoningizda mablag' yetarli emas. Botda 👛 Hamyon bo'limidan to'ldiring.";
+            rfMsg.classList.add('error');
+            return;
+          }
           if (status === 409 || data.error === 'already_reported_today') {
             rfMsg.textContent = "Siz bugungi hisobotingizni allaqachon yubordingiz. 💎 Premium a'zolar kuniga bir necha marta yubora oladi.";
             rfMsg.classList.add('error');

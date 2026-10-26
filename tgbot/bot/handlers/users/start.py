@@ -252,6 +252,16 @@ async def do_start(message: types.Message, state: FSMContext):
         await start_ad_submission(message, state)
         return
 
+    # Hamyon deep link: /start hamyon -- from top-up buttons in group posts
+    # and the launch announcement.
+    if args == "hamyon" and already_registered:
+        await state.finish()
+        from tgbot.bot.handlers.users.wallet import show_wallet
+        from tgbot.services import wallet as _wallet
+        if _wallet.launched(user):
+            await show_wallet(message, user)
+            return
+
     # AI quiz deep link: /start aiquiz — from the AI-quiz-upgrade broadcast's
     # inline button, lands the user straight in AI quiz creation (same gate
     # as the "🤖 AI yordamida Quiz yaratish" button: Premium, trial window,
@@ -440,7 +450,7 @@ async def do_start(message: types.Message, state: FSMContext):
     # inviter's referral code -- harmless (process_referral just fails to
     # find a matching referrer) but permanently occupies pending_referral_code
     # so a *real* referral link tapped afterwards can no longer register.
-    _RESERVED_START_ARGS = {"report", "market", "referral", "aiquiz", "yaxshilik-ulashuvchi", "zanjir"} | set(_GAME_DEEPLINKS)
+    _RESERVED_START_ARGS = {"report", "market", "referral", "aiquiz", "yaxshilik-ulashuvchi", "zanjir", "hamyon"} | set(_GAME_DEEPLINKS)
     if args and args not in _RESERVED_START_ARGS and not args.startswith(("quiz_", "prof_", "msg_", "shop_")):
         await state.update_data(referral_code=args)
 

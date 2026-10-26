@@ -734,6 +734,52 @@ def internal_ops(request: HttpRequest, action: str):
             out["applied"] = ops_fixes.apply_streak_achievements(plan, paid_before)
         return JsonResponse(out)
 
+    if action == "wallet-testers":
+        from tgbot.services import wallet
+        if apply:
+            wallet.set_testers(body.get("telegram_ids") or [])
+        return JsonResponse({"ok": True, "testers": sorted(wallet._testers()) if not apply
+                             else sorted(int(t) for t in body.get("telegram_ids") or [])})
+
+    if action == "wallet-preview":
+        # What the launch will credit, without crediting anything.
+        from django.db.models import Max
+        from tgbot.models import Payment, TelegramProfile
+        from tgbot.services import wallet
+        registered = TelegramProfile.objects.filter(is_registered=True).count()
+        ends = (Payment.objects.filter(status="paid", end_date__gte=wallet.LAUNCH_DATE)
+                .values("user_id").annotate(m=Max("end_date")))
+        days = [(r["m"] - wallet.LAUNCH_DATE).days + 1 for r in ends]
+        return JsonResponse({"ok": True, "registered": registered,
+                             "bonus_total": registered * wallet.LAUNCH_BONUS,
+                             "premium_users": len(days), "premium_days": sum(days),
+                             "premium_total": sum(days) * wallet.DAY_FEE})
+
+    if action == "wallet-credit":
+        # Support tool: credit (or, negative, debit) one reader's wallet.
+        from tgbot.models import TelegramProfile, WalletTransaction
+        from tgbot.services import wallet
+        p = TelegramProfile.objects.filter(telegram_id=int(body["telegram_id"])).first()
+        if not p:
+            return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+        amount = int(body.get("amount") or 0)
+        out = {"ok": True, "name": p.full_name, "balance": p.wallet_balance, "amount": amount}
+        if apply and amount:
+            if amount > 0:
+                out["balance"] = wallet.credit(p, amount, WalletTransaction.KIND_ADMIN, body.get("note") or "")
+            else:
+                from django.db import transaction as _txn
+                with _txn.atomic():
+                    q = TelegramProfile.objects.select_for_update().get(id=p.id)
+                    take = min(-amount, q.wallet_balance)
+                    q.wallet_balance -= take
+                    q.save(update_fields=["wallet_balance"])
+                    WalletTransaction.objects.create(user=q, kind=WalletTransaction.KIND_ADMIN, delta=-take,
+                                                     balance_after=q.wallet_balance,
+                                                     note=(body.get("note") or "")[:120])
+                out["balance"] = q.wallet_balance
+        return JsonResponse(out)
+
     if action == "alphabet":
         from tgbot.services import alphabet
         if "on" in body and apply:

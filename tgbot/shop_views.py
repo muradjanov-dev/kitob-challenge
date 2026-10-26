@@ -275,10 +275,13 @@ def api_bid(request: HttpRequest) -> JsonResponse:
             # Advertising slots are a Premium-only privilege. Checked here, on
             # the write path, not just hidden in the UI.
             if product.premium_only and not user.has_active_premium():
+                from tgbot.services import wallet as _wallet
                 return JsonResponse({
                     "ok": False,
                     "error": "premium_required",
-                    "message": "⭐️ Bu auksionda faqat Premium a'zolar qatnasha oladi.",
+                    "message": ("👛 Bu auksionda hamyonida 1 000 so'm va undan ko'p bo'lgan kitobxonlar qatnasha oladi."
+                                if _wallet.launched(user) else
+                                "⭐️ Bu auksionda faqat Premium a'zolar qatnasha oladi."),
                 }, status=403)
 
             min_start = max(product.min_start_bid or 0, MIN_BID_STEP)

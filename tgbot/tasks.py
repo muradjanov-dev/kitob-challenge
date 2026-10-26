@@ -5378,6 +5378,9 @@ def send_premium_upsell():
     Only the top 200 scoring free users are contacted per run to keep the
     volume manageable and avoid spamming low-signal users.
     """
+    from tgbot.services import wallet as _wallet
+    if _wallet.is_live_launch():
+        return  # Premium retired at the wallet launch -- nothing to sell or grant
     import time as _time
     from tgbot.services.premium_conversion import (
         get_top_candidates,
@@ -5468,6 +5471,9 @@ def send_premium_expiry_reminders():
     exactly 3 days. A funny, retention-focused nudge with a one-tap renew
     button, since losing 2x Kitobcha / AI report / growth charts is a real
     downgrade most users won't notice coming until it's already gone."""
+    from tgbot.services import wallet as _wallet
+    if _wallet.is_live_launch():
+        return  # Premium retired at the wallet launch -- nothing to sell or grant
     import datetime as _dt
     from django.db.models import Max
     from tgbot.models import Payment as _Pay
@@ -5533,7 +5539,52 @@ def _trial_premium_intro_text() -> str:
     )
 
 
+@shared_task
+def wallet_launch_tick():
+    """Daily 00:03: on (and after) the wallet launch date, credit every
+    registered reader's launch bonus and Premium conversion -- once; the
+    wallet's own unique constraints make re-runs no-ops -- and DM the admins
+    the totals the first time."""
+    from django.core.cache import cache
+    from tgbot.services import wallet as _wallet
+    if not _wallet.is_live_launch():
+        return None
+    if not cache.add("wallet_launch_running", 1, 3600):
+        return None
+    try:
+        summary = _wallet.run_launch()
+    finally:
+        cache.delete("wallet_launch_running")
+    print(f"wallet_launch_tick: {summary}")
+    if summary["users"] and cache.add("wallet_launch_reported", 1, None):
+        import os as _os
+        # Same set as tgbot.bot.utils.get_admin_ids_sync, without importing
+        # the bot package into the worker.
+        admin_ids = set(TelegramProfile.objects.filter(is_admin=True).values_list("telegram_id", flat=True))
+        admin_ids |= {int(a) for a in _os.environ.get("ADMINS", "").split(",") if a.strip().isdigit()}
+        text = (
+            "👛 <b>Hamyon ishga tushdi</b>\n\n"
+            f"👥 Bonus olganlar: <b>{summary['users']}</b> "
+            f"(jami {summary['bonus_total']:,} so'm)\n"
+            f"💎 Premium → hamyon: <b>{summary['premium_users']}</b> kishi, "
+            f"{summary['premium_total']:,} so'm"
+        ).replace(",", " ")
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        for admin_id in admin_ids:
+            try:
+                requests.post(url, data={"chat_id": admin_id, "text": text, "parse_mode": "HTML"}, timeout=8)
+            except Exception as e:
+                print(f"wallet_launch_tick admin DM {admin_id}: {e}")
+    return summary
+
+
 def _trial_premium_expiry_markup() -> str:
+    from tgbot.services import wallet as _wallet
+    if _wallet.is_live_launch():
+        return json.dumps({"inline_keyboard": [[
+            {"text": "👛 Hamyonni to'ldirish", "callback_data": "wallet:open"},
+            {"text": "🎁 Referal havolamni olish", "callback_data": "referral:link"},
+        ]]})
     keyboard = {
         "inline_keyboard": [[
             {"text": "💎 Premium xarid qilish", "callback_data": "buy_plan:premium"},
@@ -5552,6 +5603,9 @@ def grant_daily_trial_premium():
 
     Skips users who already have real Premium or are already mid-trial.
     """
+    from tgbot.services import wallet as _wallet
+    if _wallet.is_live_launch():
+        return  # Premium retired at the wallet launch -- nothing to sell or grant
     import datetime as _dt
 
     now = timezone.now()
@@ -6359,6 +6413,8 @@ def send_game_teaser(slot="evening"):
 # buy it. Appended to every game announcement rather than repeated in each
 # engine's own copy.
 PREMIUM_2X_NOTE = "\n\n💎 <i>Premium a'zolar bu o'yinda <b>2 barobar</b> Kitobcha oladi.</i>"
+# After the wallet launch the 2x belongs to readers with a funded wallet.
+WALLET_2X_NOTE = "\n\n💎 <i>Hamyonida 1 000 so'm va undan ko'p bo'lganlar bu o'yinda <b>2 barobar</b> Kitobcha oladi.</i>"
 
 
 def _announce_game(text, start_param, premium_note=True):
@@ -6367,8 +6423,10 @@ def _announce_game(text, start_param, premium_note=True):
     from tgbot.models import ScheduledMessageDeletion
 
     # Pointless in the VIP arena — everyone in there is already Premium.
-    if premium_note and PREMIUM_2X_NOTE not in text and "VIP PREMIUM ARENA" not in text:
-        text += PREMIUM_2X_NOTE
+    from tgbot.services import wallet as _wallet
+    note = WALLET_2X_NOTE if _wallet.is_live_launch() else PREMIUM_2X_NOTE
+    if premium_note and note not in text and "VIP PREMIUM ARENA" not in text:
+        text += note
     username = _get_bot_username()
     rows = []
     if username:
@@ -7631,6 +7689,10 @@ def _premium_missed_line(w, prem_ids) -> str:
     mukofot allaqachon qo'lda, farq esa aniq raqamda."""
     if not w.get("reward") or w.get("user_id") in prem_ids:
         return ""
+    from tgbot.services import wallet as _wallet
+    if _wallet.is_live_launch():
+        return (f"\n\n💎 <i>Hamyoningizda 1 000 so'm bo'lganida bu o'yinda "
+                f"<b>+{w['reward'] * 2} Kitobcha</b> olardingiz — ikki barobar.</i>")
     return (f"\n\n💎 <i>Premium bo'lganingizda bu o'yinda "
             f"<b>+{w['reward'] * 2} Kitobcha</b> olardingiz — ikki barobar.</i>")
 

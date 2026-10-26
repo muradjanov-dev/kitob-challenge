@@ -280,14 +280,29 @@ class TelegramProfile(BaseModel):
         help_text="Faol mini-app mavzusi (masalan: 'dark', 'matrix')"
     )
     unlocked_themes = models.JSONField(
-        default=list, 
-        blank=True, 
+        default=list,
+        blank=True,
         help_text="Foydalanuvchi sotib olgan mavzular ro'yxati"
+    )
+    # Hamyon (from 1 Nov 2026, see services/wallet.py): real money in so'm,
+    # moved only through wallet.* so every change has a WalletTransaction.
+    wallet_balance = models.PositiveIntegerField(
+        default=0, help_text="Hamyon balansi, so'm. Faqat services/wallet orqali o'zgaradi.",
+    )
+    wallet_use_kitobcha = models.BooleanField(
+        default=True,
+        help_text="Kunlik to'lovning 30% gacha qismini Kitobcha bilan to'lash.",
     )
 
     def has_active_premium(self) -> bool:
         """True if the user has a paid Payment active today, OR is inside a
-        temporary trial Premium window (see `trial_premium_until`)."""
+        temporary trial Premium window (see `trial_premium_until`).
+
+        From the wallet launch on, Premium no longer exists: its perks belong
+        to readers with a funded wallet -- see wallet.is_member()."""
+        from tgbot.services import wallet
+        if wallet.launched(self):
+            return wallet.is_member(self)
         if self.trial_premium_until and self.trial_premium_until >= timezone.now():
             return True
         # Payment is defined later in this module.
@@ -1532,6 +1547,79 @@ class KitobchaLedger(BaseModel):
 
     def __str__(self):
         return f"{self.user.full_name} — {self.delta:+d} ({self.reason})"
+
+
+class WalletTransaction(BaseModel):
+    """Every change to TelegramProfile.wallet_balance (so'm), written by
+    services/wallet.py in the same transaction as the balance update.
+
+    A day's report fee is one `report_fee` row per (user, day) -- the unique
+    constraint is what makes "charged at most once a day" hold even when two
+    reports race. `kitobcha` is the part of that fee paid in Kitobcha (debited
+    from TelegramProfile.ball, not from the wallet)."""
+    KIND_TOPUP = "topup"
+    KIND_BONUS = "bonus"
+    KIND_PREMIUM = "premium_conversion"
+    KIND_REPORT_FEE = "report_fee"
+    KIND_ADMIN = "admin"
+    KIND_CHOICES = [
+        (KIND_TOPUP, "To'ldirish"), (KIND_BONUS, "Bonus"),
+        (KIND_PREMIUM, "Premium → hamyon"), (KIND_REPORT_FEE, "Kunlik to'lov"),
+        (KIND_ADMIN, "Admin tuzatishi"),
+    ]
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="wallet_transactions")
+    kind = models.CharField(max_length=24, choices=KIND_CHOICES)
+    delta = models.IntegerField(help_text="So'm: musbat — kirim, manfiy — chiqim.")
+    kitobcha = models.PositiveIntegerField(default=0, help_text="Kunlik to'lovning Kitobcha qismi.")
+    day = models.DateField(null=True, blank=True, help_text="Kunlik to'lov qaysi kun uchun.")
+    balance_after = models.PositiveIntegerField(default=0)
+    note = models.CharField(max_length=120, blank=True, default="")
+
+    class Meta:
+        db_table = "wallet_transactions"
+        verbose_name = "Hamyon tranzaksiyasi"
+        verbose_name_plural = "Hamyon tranzaksiyalari"
+        ordering = ("-created_at",)
+        constraints = [
+            models.UniqueConstraint(fields=["user", "day"], condition=models.Q(kind="report_fee"),
+                                    name="wallet_one_fee_per_day"),
+            models.UniqueConstraint(fields=["user"], condition=models.Q(kind="bonus"),
+                                    name="wallet_one_launch_bonus"),
+            models.UniqueConstraint(fields=["user"], condition=models.Q(kind="premium_conversion"),
+                                    name="wallet_one_premium_conversion"),
+        ]
+
+    def __str__(self):
+        return f"{self.user.full_name} — {self.delta:+d} so'm ({self.kind})"
+
+
+class WalletTopup(BaseModel):
+    """A top-up receipt waiting for (or past) an admin's decision. The wallet
+    is credited only by the approve click that moves it out of `pending`."""
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Kutilmoqda"), (STATUS_APPROVED, "Tasdiqlangan"),
+        (STATUS_REJECTED, "Rad etilgan"),
+    ]
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="wallet_topups")
+    amount = models.PositiveIntegerField(help_text="So'm.")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    photo_file_id = models.CharField(max_length=255, blank=True, default="")
+    reviewed_by = models.ForeignKey(TelegramProfile, null=True, blank=True, on_delete=models.SET_NULL,
+                                    related_name="reviewed_wallet_topups")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reject_reason = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "wallet_topups"
+        verbose_name = "Hamyonni to'ldirish"
+        verbose_name_plural = "Hamyonni to'ldirishlar"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"#{self.id} {self.user.full_name} — {self.amount} so'm ({self.status})"
 
 
 class ReaderTitleAnnouncement(BaseModel):

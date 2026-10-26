@@ -84,6 +84,11 @@ def main_markup(language="uz", is_admin=False):
             "how": "❓ Qanday ishlaydi?",
         }
 
+    # Premium is retired at the wallet launch; the same slot opens the wallet.
+    from tgbot.services import wallet as _wallet
+    if _wallet.is_live_launch():
+        labels["premium"] = "👛 Кошелёк" if language == "ru" else "👛 Hamyon"
+
     kb = InlineKeyboardMarkup(row_width=2)
     kb.row(InlineKeyboardButton(text=labels["report_big"], callback_data="menu:report"))
     # Dedicated, prominent entry while a Referral BOOM is live -- separate

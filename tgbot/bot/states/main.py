@@ -53,6 +53,12 @@ class PaymentStates(StatesGroup):
     receipt = State()
 
 
+class WalletStates(StatesGroup):
+    amount = State()
+    receipt = State()
+    reject_reason = State()
+
+
 class SendMessageInBot(StatesGroup):
     content = State()
     message = State()

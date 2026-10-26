@@ -246,6 +246,12 @@ async def premium_menu_handler(message: types.Message, state: FSMContext):
     user = await aget_user(telegram_id=message.from_user.id)
     lang = user.language if user else "uz"
 
+    from tgbot.services import wallet as _wallet
+    if user and _wallet.launched(user):
+        from tgbot.bot.handlers.users.wallet import show_wallet
+        await show_wallet(message, user)
+        return
+
     text = premium_features_text(lang)
 
     # Active users can still extend early or gift a friend from the same

@@ -513,6 +513,10 @@ async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.finish()
 
+    from tgbot.bot.handlers.users.wallet import report_allowed
+    if not await report_allowed(call.message, user):
+        return
+
     reading_day = await _compute_reading_day(user, today)
     await state.update_data(reading_day=reading_day, selected_book_ids=[])
 
@@ -546,6 +550,10 @@ async def send_daily_report_handler(message: types.Message, state: FSMContext):
         await message.answer(
             _("Siz bugungi kun uchun allaqachon hisobotingizni yubordingiz.\n\n💎 Premium foydalanuvchilar kuniga bir necha marotaba hisobot yubora oladi — barcha hisobotlar avtomatik jamlanadi va guruhdagi xabar yangilanadi."),
         )
+        return await state.finish()
+
+    from tgbot.bot.handlers.users.wallet import report_allowed
+    if not await report_allowed(message, user):
         return await state.finish()
 
     reading_day = await _compute_reading_day(user, today)
@@ -1454,6 +1462,20 @@ async def _do_confirm_report(message, user, state: FSMContext):
         live_book = ", ".join(live_titles) or book
         audio_book = ", ".join(audio_titles) or book
 
+    # Hamyon: the day's fee is taken here, right before the report is
+    # written (at most once a day -- wallet.charge_day). The entry points
+    # already checked the balance; this catches money spent in between.
+    from tgbot.services import wallet as _wallet
+    wallet_note = ""
+    if _wallet.launched(user):
+        from tgbot.bot.handlers.users.wallet import charged_text, insufficient_text, topup_kb
+        charge = await sync_to_async(_wallet.charge_day)(user)
+        if not charge["ok"]:
+            await message.answer(insufficient_text(user), parse_mode="HTML", reply_markup=topup_kb(user))
+            await state.finish()
+            return
+        wallet_note = charged_text(user, charge)
+
     datetime_now = timezone.now()
 
     report = await create_confirmation_report(
@@ -1661,6 +1683,8 @@ async def _do_confirm_report(message, user, state: FSMContext):
         confirmation_text = f'{done_text}\n\n<a href="{link}">{link_label}</a>'
     else:
         confirmation_text = done_text
+    if wallet_note:
+        confirmation_text += f"\n\n{wallet_note}"
 
     await message.answer(
         confirmation_text,
@@ -1678,12 +1702,13 @@ async def _do_confirm_report(message, user, state: FSMContext):
     if first_today_id == report.id:
         try:
             awarded = await sync_to_async(user.update_ball)(True, 25)
-            premium_note = " 💎 ×2 premium!" if awarded > 25 else ""
+            premium_note = (" 💎 ×2!" if _wallet.launched(user) else " 💎 ×2 premium!") if awarded > 25 else ""
             # Only nudge users who don't already have Premium (awarded == 25
             # means the 2x multiplier in update_ball did NOT apply), and only
             # sometimes — a CTA on every single report would be spammy.
+            # There is no Premium to sell after the wallet launch.
             cta = ""
-            if awarded == 25 and random.random() < PREMIUM_CTA_CHANCE:
+            if awarded == 25 and not _wallet.launched(user) and random.random() < PREMIUM_CTA_CHANCE:
                 cta = "\n\n" + random.choice(PREMIUM_CTAS)
             await message.answer(
                 f"🪙 +{awarded} Kitobcha qo'shildi!{premium_note} Joriy balans: <b>{int(user.ball)}</b>{cta}",

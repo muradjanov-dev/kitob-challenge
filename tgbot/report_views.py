@@ -207,6 +207,22 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
     if already_today and not is_premium:
         return JsonResponse({"ok": False, "error": "already_reported_today"}, status=409)
 
+    # Hamyon: the day's fee, once a day, before anything is written.
+    from tgbot.services import wallet
+    wallet_charge = None
+    if wallet.launched(profile):
+        wallet.ensure_launch_credit(profile)
+        wallet_charge = wallet.charge_day(profile)
+        if not wallet_charge["ok"]:
+            return JsonResponse({
+                "ok": False, "error": "wallet_insufficient",
+                "need": wallet_charge["need"], "balance": wallet_charge["balance"],
+                "message": (f"👛 Hamyoningizda mablag' yetarli emas: bugungi hisobot uchun "
+                            f"{wallet_charge['cash']} so'm kerak, balansda {wallet_charge['balance']} so'm. "
+                            "Botda 👛 Hamyon bo'limidan to'ldiring."),
+            }, status=402)
+        is_premium = profile.has_active_premium()
+
     reading_day = _compute_reading_day(profile, today)
     now = timezone.now()
 

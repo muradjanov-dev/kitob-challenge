@@ -11,6 +11,9 @@ from tgbot.bot.consts import ADMIN_GROUP_ID, TECHNICAL_SUPPORT_THREAD_ID, REFERR
 # Every confirmed referral pays Premium days, not Kitobcha -- Kitobcha was
 # inflating, and a day of Premium is a taste of what they'd otherwise buy.
 REFERRAL_PREMIUM_DAYS = 1
+# From the wallet launch (1 Nov 2026) Premium no longer exists and each
+# confirmed referral pays Kitobcha instead (same monthly cap).
+REFERRAL_KITOBCHA = 500
 # Anti-farming cap: at most this many referral-paid days per calendar month.
 REFERRAL_PREMIUM_MONTHLY_CAP = 30
 
@@ -146,9 +149,10 @@ class ReferralService:
         # Award rewards to referrer
         @sync_to_async
         def _award():
-            """Grant the referral's Premium days. Returns the days granted:
-            0 once this month's cap is reached (the UserReferal created above
-            already counts toward it)."""
+            """Grant the referral's reward. Returns the Premium days granted,
+            or minus the Kitobcha credited after the wallet launch; 0 once this
+            month's cap is reached (the UserReferal created above already
+            counts toward it)."""
             from tgbot.models import Payment
 
             now = timezone.localtime()
@@ -158,6 +162,10 @@ class ReferralService:
             ).count()
             if this_month > REFERRAL_PREMIUM_MONTHLY_CAP:
                 return 0
+            from tgbot.services import wallet
+            if wallet.is_live_launch():
+                # update_ball: members get 2x, like every other reward.
+                return -referrer.update_ball(True, REFERRAL_KITOBCHA)
             # Straight onto the subscription, not services.premium.grant_premium:
             # this is earned, like a shop purchase, so the prize scarcity
             # limits (1/week, not while already Premium) must not swallow it.
@@ -273,7 +281,9 @@ class ReferralService:
     @staticmethod
     async def _notify_referrer(referrer: TelegramProfile, new_user: TelegramProfile, ref_count: int = 0, awarded_days: int = 0):
         try:
-            if awarded_days:
+            if awarded_days < 0:
+                reward_lines = [f"🪙 <b>+{-awarded_days} Kitobcha</b> qo'shildi!"]
+            elif awarded_days:
                 from tgbot.services.premium import premium_left_text
                 left = await sync_to_async(premium_left_text)(referrer)
                 reward_lines = [
@@ -282,8 +292,8 @@ class ReferralService:
                 ]
             else:
                 reward_lines = [
-                    f"💎 Bu oy uchun referal Premium limiti "
-                    f"(<b>{REFERRAL_PREMIUM_MONTHLY_CAP} kun</b>) to'ldi — keyingi "
+                    f"💎 Bu oy uchun referal mukofoti limiti "
+                    f"(<b>{REFERRAL_PREMIUM_MONTHLY_CAP} ta</b>) to'ldi — keyingi "
                     "oydan yana davom etadi. Taklif qilishda davom eting, "
                     "reytingingizga baribir qo'shiladi!",
                 ]

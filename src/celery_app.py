@@ -167,6 +167,13 @@ app.conf.beat_schedule = {
         'schedule': crontab(minute='*/5'),
     },
 
+    # Hamyon launch (1 Nov 2026): bonus + Premium conversion for everyone,
+    # once -- a no-op every other day (services/wallet.py).
+    'wallet-launch': {
+        'task': 'tgbot.tasks.wallet_launch_tick',
+        'schedule': crontab(hour=0, minute=3),
+    },
+
     'games-teaser-morning': {
         'task': 'tgbot.tasks.send_game_teaser',
         'schedule': crontab(hour=9, minute=50),
