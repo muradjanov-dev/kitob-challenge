@@ -1161,7 +1161,8 @@
         return;
       }
       const d = r.data;
-      balance = d.balance; balanceLoaded = true; renderBalance(false);
+      // Details are public now; only a signed-in viewer gets a balance.
+      if (d.signed_in && typeof d.balance === "number") { balance = d.balance; balanceLoaded = true; renderBalance(false); }
       const pct = Math.min(100, d.progress * 100 / d.step).toFixed(1);
 
       let doneHtml = '';
@@ -1464,7 +1465,23 @@
       setTimeout(() => welcomeEl.remove(), 2200);
     }
 
-    loadProductsPublic();
+    // Opened on one product: /shop/?p=<id> (group-post buttons, see
+    // services/shop_links.py) or start_param shop_<id> when the Main Mini App
+    // was launched straight onto this page.
+    function pendingProductId() {
+      const q = new URLSearchParams(window.location.search).get("p");
+      const sp = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || "";
+      const m = /^shop_(\d+)$/.exec(sp);
+      return parseInt(q || (m && m[1]) || "", 10) || null;
+    }
+    const wantProduct = pendingProductId();
+
+    loadProductsPublic().then(() => {
+      if (!wantProduct) return;
+      const p = products.find(x => x.id === wantProduct);
+      // After the welcome splash, or the sheet opens underneath it.
+      if (p) setTimeout(() => openProductSheet(p), welcomeEl ? 2300 : 0);
+    });
     loadMe();
   </script>
 

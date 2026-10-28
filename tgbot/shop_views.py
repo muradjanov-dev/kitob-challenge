@@ -187,10 +187,19 @@ def _charity_raised(p: ShopProduct) -> int:
     return raised_total(p.id)
 
 
+def _optional_profile(request: HttpRequest):
+    """The signed-in reader, or None. The product, bid board and fund
+    totals are public -- only "my bid" and the balance need a session -- so a
+    detail sheet opened from a browser link, or before a slow Telegram client
+    has handed over initData, still loads instead of "yuklab bo'lmadi"."""
+    profile, _err = _resolve_profile(_read_init_data(request))
+    return profile
+
+
 @csrf_exempt
 @require_GET
-@_require_authed_admin
 def api_auction_details(request: HttpRequest) -> JsonResponse:
+    viewer = _optional_profile(request)
     try:
         product_id = int(request.GET.get("product_id", 0))
     except (ValueError, TypeError):
@@ -210,10 +219,10 @@ def api_auction_details(request: HttpRequest) -> JsonResponse:
             "user_id": b.user.id,
             "name": name,
             "amount": b.amount,
-            "is_me": b.user_id == request.tg_profile.id,
+            "is_me": bool(viewer and b.user_id == viewer.id),
         })
 
-    my_bid_obj = product.auction_bids.filter(user=request.tg_profile).first()
+    my_bid_obj = product.auction_bids.filter(user=viewer).first() if viewer else None
     my_bid = my_bid_obj.amount if my_bid_obj else 0
     my_rank = None
     if my_bid_obj:
@@ -229,7 +238,8 @@ def api_auction_details(request: HttpRequest) -> JsonResponse:
         "my_bid": my_bid,
         "my_rank": my_rank,
         "is_ended": is_ended,
-        "balance": int(request.tg_profile.ball or 0),
+        "balance": int(viewer.ball or 0) if viewer else None,
+        "signed_in": bool(viewer),
     })
 
 
@@ -402,9 +412,9 @@ def _notify_outbid(product, loser, loser_amount: int, new_amount: int) -> None:
 
 @csrf_exempt
 @require_GET
-@_require_authed
 def api_charity_details(request: HttpRequest) -> JsonResponse:
     from tgbot.services import charity
+    viewer = _optional_profile(request)
     try:
         product_id = int(request.GET.get("product_id", 0))
     except (ValueError, TypeError):
@@ -415,8 +425,9 @@ def api_charity_details(request: HttpRequest) -> JsonResponse:
     return JsonResponse({
         "ok": True,
         "product": _product_payload(product, request),
-        "balance": int(request.tg_profile.ball or 0),
-        **charity.details(product, request.tg_profile.id),
+        "balance": int(viewer.ball or 0) if viewer else None,
+        "signed_in": bool(viewer),
+        **charity.details(product, viewer.id if viewer else None),
     })
 
 

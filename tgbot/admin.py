@@ -571,13 +571,19 @@ def _announce_new_shop_product(product):
         "Sotib olish uchun: «🛒 Do'kon» bo'limiga o'ting!"
     )
 
+    # Straight to this product's page (services/shop_links.py).
+    import json as _json
+    from tgbot.services.shop_links import button as _product_button
+    btn = _product_button("🔥 Taklif berish" if product.is_auction else "🛍 Mahsulotni ko'rish", product.id)
+    markup = {"reply_markup": _json.dumps({"inline_keyboard": [[btn]]})} if btn else {}
+
     for gid in group_ids:
         try:
             if product.image:
                 with product.image.open("rb") as f:
                     requests.post(
                         f"https://api.telegram.org/bot{token}/sendPhoto",
-                        data={"chat_id": gid, "caption": text, "parse_mode": "HTML"},
+                        data={"chat_id": gid, "caption": text, "parse_mode": "HTML", **markup},
                         files={"photo": f},
                         timeout=15,
                     )
@@ -585,7 +591,7 @@ def _announce_new_shop_product(product):
                 requests.post(
                     f"https://api.telegram.org/bot{token}/sendMessage",
                     data={"chat_id": gid, "text": text, "parse_mode": "HTML",
-                          "disable_web_page_preview": "true"},
+                          "disable_web_page_preview": "true", **markup},
                     timeout=10,
                 )
         except Exception as e:

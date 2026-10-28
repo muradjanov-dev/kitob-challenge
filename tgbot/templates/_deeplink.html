@@ -1,0 +1,23 @@
+{% comment %}
+  Main Mini App deep link (services/shop_links.py): a group post's button
+  t.me/<bot>?startapp=shop_<id> opens the Mini App here with start_param
+  "shop_<id>"; forward once per session to that product's page. initData
+  rides along in the query string, like the in-app tab navigation does.
+  Include after telegram-web-app.js.
+{% endcomment %}
+<script>
+  (function () {
+    try {
+      var tg = window.Telegram && window.Telegram.WebApp;
+      var sp = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) ||
+               new URLSearchParams(location.search).get('tgWebAppStartParam') || '';
+      var m = /^shop_(\d+)$/.exec(sp);
+      if (!m || location.pathname.indexOf('/shop/') === 0) return;
+      var key = 'kc_startapp_' + sp;
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+      var q = '?p=' + m[1] + (tg && tg.initData ? '&tgWebAppData=' + encodeURIComponent(tg.initData) : '');
+      location.replace('/shop/' + q);
+    } catch (e) {}
+  })();
+</script>

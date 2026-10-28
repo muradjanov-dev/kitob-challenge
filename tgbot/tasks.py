@@ -8169,17 +8169,16 @@ def open_ad_auctions(force=False):
     lines.append("🥇 Eng yuqori taklif bergan g'olib bo'ladi.")
     lines.append("💸 Yutqazsangiz — <b>Kitobchangiz to'liq qaytariladi</b>, hech narsa yo'qotmaysiz.")
     lines.append("🛡 Havola administrator <b>moderatsiyasidan</b> o'tadi.")
+    from tgbot.services.shop_links import button as _product_button
     lines.append("⭐️ <b>Faqat Premium a'zolar</b> qatnasha oladi.\n")
     lines.append("👇 <b>Taklifingizni hoziroq qo'ying — joy bittagina!</b>")
 
+    # One button per slot, each opening that auction's own page.
     username = _get_bot_username()
-    kb = None
+    rows = [[b] for b in (_product_button(f"🔥 {p.name} — taklif qo'yish", p.id) for p in created) if b]
     if username:
-        kb = json.dumps({"inline_keyboard": [
-            [{"text": "🔥 TAKLIF QO'YISH — joyimni yutib olaman",
-              "url": f"https://t.me/{username}?start=dokon"}],
-            [{"text": "⭐️ Premium olish", "url": f"https://t.me/{username}?start=dokon"}],
-        ]})
+        rows.append([{"text": "⭐️ Premium olish", "url": f"https://t.me/{username}?start=dokon"}])
+    kb = json.dumps({"inline_keyboard": rows}) if rows else None
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     text = "\n".join(lines)
     for gid, tid in set(list(_announce_targets()) + list(_game_targets())):

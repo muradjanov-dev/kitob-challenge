@@ -1,8 +1,12 @@
-{# Market themes (theme_dark, theme_matrix, ...). The server's
-   TelegramProfile.active_theme is the source of truth: a theme bought in the
-   bot is switched on there, and Telegram's WebView can drop localStorage at
-   any time. The localStorage copy only paints the page before the API
-   answers. Include it in <head>; each page defines its own [data-theme] CSS. #}
+{% comment %}
+  Market themes (theme_dark, theme_matrix, ...). The server's
+  TelegramProfile.active_theme is the source of truth: a theme bought in the
+  bot is switched on there, and Telegram's WebView can drop localStorage at
+  any time. The localStorage copy only paints the page before the API
+  answers. Include it in the page head; each page defines its own
+  [data-theme] CSS. (Django's short comment tag is single-line only -- a
+  multi-line one was printed at the top of every page.)
+{% endcomment %}
 <script>
   (function () {
     function apply(t) {

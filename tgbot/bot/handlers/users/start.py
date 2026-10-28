@@ -176,6 +176,17 @@ async def do_start(message: types.Message, state: FSMContext):
         await send_daily_report_handler(message, state)
         return
 
+    # One product: /start shop_<id> -- the group announcement's button while
+    # the bot has no Main Mini App to open directly (services/shop_links.py).
+    from tgbot.services.shop_links import parse_param as _shop_param, product_page as _shop_page
+    _product_id = _shop_param(args)
+    if _product_id and already_registered:
+        await state.finish()
+        from aiogram.types import InlineKeyboardMarkup as _IKM3, InlineKeyboardButton as _IKB3, WebAppInfo as _WAI3
+        kb = _IKM3().add(_IKB3("🛍 Mahsulotni ochish", web_app=_WAI3(url=_shop_page(_product_id))))
+        await message.answer("👇 Mahsulot sahifasini ochish uchun tugmani bosing:", reply_markup=kb)
+        return
+
     # Market / Shop deep links: /start market, /start shop, /start dokon
     if args in ("market", "shop", "dokon") and already_registered:
         if user and not user.is_registered:
@@ -430,7 +441,7 @@ async def do_start(message: types.Message, state: FSMContext):
     # find a matching referrer) but permanently occupies pending_referral_code
     # so a *real* referral link tapped afterwards can no longer register.
     _RESERVED_START_ARGS = {"report", "market", "referral", "aiquiz", "yaxshilik-ulashuvchi", "zanjir"} | set(_GAME_DEEPLINKS)
-    if args and args not in _RESERVED_START_ARGS and not args.startswith(("quiz_", "prof_", "msg_")):
+    if args and args not in _RESERVED_START_ARGS and not args.startswith(("quiz_", "prof_", "msg_", "shop_")):
         await state.update_data(referral_code=args)
 
     await message.answer(

@@ -435,16 +435,24 @@ async def _announce_new_product_to_groups(product: ShopProduct):
             "Sotib olish uchun: «🛒 Do'kon» bo'limiga o'ting!"
         )
 
+    # Straight to this product's page (services/shop_links.py).
+    from aiogram.types import InlineKeyboardMarkup as _IKM, InlineKeyboardButton as _IKB
+    from tgbot.services.shop_links import product_url
+    link = await sync_to_async(product_url)(product.id)
+    label = "🔥 Taklif berish" if product.is_auction else "🛍 Mahsulotni ko'rish"
+    kb = _IKM().add(_IKB(label, url=link)) if link else None
+
     for gid, tid in _announce_targets():
         try:
             if product.image:
                 await _bot.send_photo(
                     gid, types.InputFile(product.image.path),
-                    caption=text, parse_mode="HTML", message_thread_id=tid,
+                    caption=text, parse_mode="HTML", message_thread_id=tid, reply_markup=kb,
                 )
             else:
                 await _bot.send_message(gid, text, parse_mode="HTML",
-                                         disable_web_page_preview=True, message_thread_id=tid)
+                                         disable_web_page_preview=True, message_thread_id=tid,
+                                         reply_markup=kb)
         except Exception as e:
             print(f"shop_admin: new product group announce to {gid} failed: {e}")
 
