@@ -8231,14 +8231,18 @@ def open_ad_auctions(force=False):
     lines.append("🥇 Eng yuqori taklif bergan g'olib bo'ladi.")
     lines.append("💸 Yutqazsangiz — <b>Kitobchangiz to'liq qaytariladi</b>, hech narsa yo'qotmaysiz.")
     lines.append("🛡 Havola administrator <b>moderatsiyasidan</b> o'tadi.")
+    from tgbot.services import wallet as _wallet
     from tgbot.services.shop_links import button as _product_button
-    lines.append("⭐️ <b>Faqat Premium a'zolar</b> qatnasha oladi.\n")
+    if _wallet.is_live_launch():
+        lines.append("👛 <b>Hamyonida 1 000 so'm va undan ko'p</b> bo'lgan kitobxonlar qatnasha oladi.\n")
+    else:
+        lines.append("⭐️ <b>Faqat Premium a'zolar</b> qatnasha oladi.\n")
     lines.append("👇 <b>Taklifingizni hoziroq qo'ying — joy bittagina!</b>")
 
     # One button per slot, each opening that auction's own page.
     username = _get_bot_username()
     rows = [[b] for b in (_product_button(f"🔥 {p.name} — taklif qo'yish", p.id) for p in created) if b]
-    if username:
+    if username and not _wallet.is_live_launch():
         rows.append([{"text": "⭐️ Premium olish", "url": f"https://t.me/{username}?start=dokon"}])
     kb = json.dumps({"inline_keyboard": rows}) if rows else None
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
