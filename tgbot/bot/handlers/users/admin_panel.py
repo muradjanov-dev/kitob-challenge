@@ -2236,7 +2236,6 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
         kb = InlineKeyboardMarkup(row_width=2)
         kb.add(
             InlineKeyboardButton("📅 Bugun",    callback_data="admin:top_readers:daily"),
-            InlineKeyboardButton("📅 3 kun",    callback_data="admin:top_readers:3days"),
             InlineKeyboardButton("📅 Hafta",    callback_data="admin:top_readers:weekly"),
             InlineKeyboardButton("📅 Oy",       callback_data="admin:top_readers:monthly"),
             InlineKeyboardButton("📅 3 oy",     callback_data="admin:top_readers:3monthly"),
@@ -2250,7 +2249,7 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
         import datetime as _dt
         import json as _json
         from asgiref.sync import sync_to_async
-        from tgbot.tasks import _build_top_readers_message, _toplist_congrats_keyboard
+        from tgbot.tasks import TOP_LIST_SIZES, _build_top_readers_message, _toplist_congrats_keyboard
         from tgbot.bot.loader import bot
         from tgbot.bot.consts import BOYS_GROUP_ID, GIRLS_GROUP_ID
 
@@ -2258,12 +2257,12 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
         from django.utils import timezone as _tz
         today = _tz.localdate()
         period_cfg = {
-            "daily":    (today,                              today, "Bugun 🔥",        20),
+            "daily":    (today,                              today, "Bugun 🔥",        TOP_LIST_SIZES["daily"]),
             "3days":    (today - _dt.timedelta(days=2),     today, "Oxirgi 3 kunda",  20),
-            "weekly":   (today - _dt.timedelta(days=6),     today, "Bu hafta 🏆",     25),
-            "monthly":  (today - _dt.timedelta(days=29),    today, "Bu oy 📅",        30),
-            "3monthly": (today - _dt.timedelta(days=89),    today, "3 oylik 📊",      40),
-            "yearly":   (today - _dt.timedelta(days=364),   today, "Yillik 🏅",       60),
+            "weekly":   (today - _dt.timedelta(days=6),     today, "Bu hafta 🏆",     TOP_LIST_SIZES["weekly"]),
+            "monthly":  (today - _dt.timedelta(days=29),    today, "Bu oy 📅",        TOP_LIST_SIZES["monthly"]),
+            "3monthly": (today - _dt.timedelta(days=89),    today, "3 oylik 📊",      TOP_LIST_SIZES["3monthly"]),
+            "yearly":   (today - _dt.timedelta(days=364),   today, "Yillik 🏅",       TOP_LIST_SIZES["yearly"]),
         }
         if period_key not in period_cfg:
             await call.message.answer("Noma'lum davr.")

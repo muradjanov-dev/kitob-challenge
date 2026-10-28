@@ -1521,6 +1521,13 @@ async def _do_confirm_report(message, user, state: FSMContext):
             print(f"Error updating book {bid}: {e}")
 
     prem_badge = "💎 " if is_premium else ""
+    # 🏅 for readers on the latest weekly Top list (tasks.weekly_top_tg_ids).
+    try:
+        from tgbot.tasks import weekly_top_tg_ids
+        if int(user.telegram_id) in await sync_to_async(weekly_top_tg_ids)():
+            prem_badge += "🏅 "
+    except Exception as e:
+        print(f"weekly badge lookup failed: {e}")
 
     # Refresh today's report list (now includes the row we just created) to
     # compute cumulative totals for the aggregated group message.

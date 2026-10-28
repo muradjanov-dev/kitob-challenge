@@ -267,6 +267,13 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
     # message even for a Premium user's Nth report today -- no in-place
     # group-message editing/aggregation on the web form yet). ──
     prem_badge = "💎 " if is_premium else ""
+    # 🏅 for readers on the latest weekly Top list (tasks.weekly_top_tg_ids).
+    try:
+        from tgbot.tasks import weekly_top_tg_ids
+        if int(profile.telegram_id) in weekly_top_tg_ids():
+            prem_badge += "🏅 "
+    except Exception as e:
+        print(f"weekly badge lookup failed: {e}")
     motivation = random.choice(MOTIVATIONS)
     conclusion_block = (
         f"<b>💡 Olingan xulosa:</b>\n<blockquote expandable>{conclusion}</blockquote>"

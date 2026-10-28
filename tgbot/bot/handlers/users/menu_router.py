@@ -1424,13 +1424,16 @@ async def toplist_congrats_handler(call: types.CallbackQuery, state: FSMContext)
     congratulator_tg_id = call.from_user.id
     presser_name = _esc(user.full_name or "Kitobxon")
 
+    # Must match the posted lists (tasks.TOP_LIST_SIZES), or a congrats goes
+    # to readers the post never named.
+    from tgbot.tasks import TOP_LIST_SIZES as _SIZES
     period_map = {
-        "daily":    (_dt.timedelta(days=0),   "Kunlik",   20),
+        "daily":    (_dt.timedelta(days=0),   "Kunlik",   _SIZES["daily"]),
         "3days":    (_dt.timedelta(days=2),   "3 kunlik", 20),
-        "weekly":   (_dt.timedelta(days=6),   "Haftalik", 30),
-        "monthly":  (_dt.timedelta(days=29),  "Oylik",    30),
-        "3monthly": (_dt.timedelta(days=89),  "3 oylik",  40),
-        "yearly":   (_dt.timedelta(days=364), "Yillik",   60),
+        "weekly":   (_dt.timedelta(days=6),   "Haftalik", _SIZES["weekly"]),
+        "monthly":  (_dt.timedelta(days=29),  "Oylik",    _SIZES["monthly"]),
+        "3monthly": (_dt.timedelta(days=89),  "3 oylik",  _SIZES["3monthly"]),
+        "yearly":   (_dt.timedelta(days=364), "Yillik",   _SIZES["yearly"]),
     }
     if period not in period_map:
         return

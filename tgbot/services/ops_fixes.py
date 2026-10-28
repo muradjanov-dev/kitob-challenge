@@ -243,6 +243,147 @@ def apply_streak_achievements(plan, paid_before=()) -> dict:
             "restored_without_pay": restored_only, "kitobcha": paid}
 
 
+def restore_streak_days(rows, apply: bool) -> dict:
+    """Every day the old server counted for a reader's streak must still
+    count. `rows` = [{"telegram_id", "dates": ["YYYY-MM-DD", ...]}] -- the
+    reader's report and freeze days in the old server's final dump. A day
+    that is neither a report nor a freeze day here any more becomes a
+    StreakFreezeCoverage, so no system loss shortens anyone's streak."""
+    from tgbot.models import StreakFreezeCoverage, TelegramProfile
+    tg_ids = {int(r["telegram_id"]) for r in rows}
+    pid = dict(TelegramProfile.objects.filter(telegram_id__in=tg_ids).values_list("telegram_id", "id"))
+    days_by_uid = {pid[int(r["telegram_id"])]: {_d(x) for x in r["dates"]}
+                   for r in rows if int(r["telegram_id"]) in pid}
+    if not days_by_uid:
+        return {"matched_users": 0, "missing_days": 0, "users": 0, "created": 0}
+    lo = min(min(v) for v in days_by_uid.values() if v)
+    hi = max(max(v) for v in days_by_uid.values() if v)
+    have = _covered_dates(list(days_by_uid), lo, hi)
+    missing = [(uid, d) for uid, days in days_by_uid.items() for d in sorted(days - have.get(uid, set()))]
+    created = 0
+    if apply and missing:
+        with transaction.atomic():
+            before = StreakFreezeCoverage.objects.count()
+            StreakFreezeCoverage.objects.bulk_create(
+                [StreakFreezeCoverage(user_id=uid, date=d) for uid, d in missing], ignore_conflicts=True)
+            created = StreakFreezeCoverage.objects.count() - before
+    return {"matched_users": len(days_by_uid), "missing_days": len(missing),
+            "users": len({m[0] for m in missing}), "created": created,
+            "sample": [(uid, str(d)) for uid, d in missing[:10]]}
+
+
+def achievement_audit(apply: bool = False, active_days: int = 120) -> dict:
+    """For every reader active in the last `active_days`: achievements they
+    qualify for but never got (paid now when apply -- Kitobcha through
+    update_ball, no group Tabriklash), and ones they hold without
+    qualifying any more (reported, never taken away)."""
+    import datetime as _dt
+    from tgbot.models import ConfirmationReport, TelegramProfile, UserAchievement
+    from tgbot.services.achievements import ACHIEVEMENTS_RAW, compute_user_stats
+    since = timezone.now() - _dt.timedelta(days=active_days)
+    uids = set(ConfirmationReport.objects.filter(date__gte=since).values_list("user_id", flat=True))
+    have = defaultdict(set)
+    for uid, code in UserAchievement.objects.filter(user_id__in=uids).values_list("user_id", "code"):
+        have[uid].add(code)
+    points = {a["code"]: a.get("points", 0) for a in ACHIEVEMENTS_RAW}
+    missing_by_code, extra_by_code = defaultdict(int), defaultdict(int)
+    paid_users = paid_total = awarded = 0
+    errors = 0
+    for user in TelegramProfile.objects.filter(id__in=uids):
+        try:
+            stats = compute_user_stats(user)
+        except Exception:
+            errors += 1
+            continue
+        eligible = {a["code"] for a in ACHIEVEMENTS_RAW if a["cond"](stats)}
+        missing = eligible - have[user.id]
+        for code in have[user.id] - eligible:
+            if code in points:
+                extra_by_code[code] += 1
+        for code in missing:
+            missing_by_code[code] += 1
+        if apply and missing:
+            got = 0
+            for code in missing:
+                _, created = UserAchievement.objects.get_or_create(
+                    user=user, code=code, defaults={"congratulated": True})
+                if created:
+                    awarded += 1
+                    if points.get(code):
+                        got += user.update_ball(True, points[code], reason="achievement")
+            if got:
+                paid_users += 1
+                paid_total += got
+    return {"active_users": len(uids), "errors": errors,
+            "missing": dict(sorted(missing_by_code.items(), key=lambda kv: -kv[1])),
+            "missing_total": sum(missing_by_code.values()),
+            "extra": dict(sorted(extra_by_code.items(), key=lambda kv: -kv[1])),
+            "applied": {"awarded": awarded, "users_paid": paid_users, "kitobcha": paid_total} if apply else None}
+
+
+def game_reward_audit(days: int = 14) -> dict:
+    """Finished live games of the last `days` that were never settled, and
+    scores with points but no reward -- the two ways a prize goes missing."""
+    import datetime as _dt
+    from django.apps import apps
+    since = timezone.now() - _dt.timedelta(days=days)
+    out = {}
+    for game_model, score_model, score_field in (
+        ("ChainGame", "ChainScore", "points"), ("FeudGame", "FeudScore", "points"),
+        ("EmojiGame", "EmojiScore", "points"), ("WisdomGame", "WisdomScore", "points"),
+        ("DetectiveGame", "DetectiveScore", "points"), ("QuizGame", "QuizScore", "points"),
+        ("AuthorGame", "AuthorEntry", None),
+    ):
+        try:
+            G = apps.get_model("tgbot", game_model)
+            S = apps.get_model("tgbot", score_model)
+        except LookupError:
+            continue
+        ended = G.objects.filter(ends_at__gte=since, ends_at__lt=timezone.now())
+        unsettled = ended.filter(rewarded=False).count()
+        unpaid = 0
+        if score_field:
+            unpaid = S.objects.filter(game__in=ended.filter(rewarded=True), **{f"{score_field}__gt": 0},
+                                      reward=0).count()
+        out[game_model] = {"ended": ended.count(), "unsettled": unsettled, "scores_without_reward": unpaid}
+    return out
+
+
+def restore_achievements(rows, apply: bool) -> dict:
+    """Achievements the old server had awarded that the move lost (645 per
+    the restore notes): the cabinet showed them gone. Brought back as rows
+    only, already congratulated and unpaid -- the 2026-10-13 data restore
+    re-credited their Kitobcha through the ledger.
+
+    `rows` = [{"telegram_id", "code", "awarded_at"}] from the old final dump."""
+    from django.utils.dateparse import parse_datetime
+    from tgbot.models import TelegramProfile, UserAchievement
+    tg_ids = {int(r["telegram_id"]) for r in rows}
+    pid = dict(TelegramProfile.objects.filter(telegram_id__in=tg_ids).values_list("telegram_id", "id"))
+    have = set(UserAchievement.objects.filter(user_id__in=pid.values()).values_list("user_id", "code"))
+    missing = []
+    for r in rows:
+        uid = pid.get(int(r["telegram_id"]))
+        if uid and (uid, r["code"]) not in have:
+            missing.append((uid, r["code"], r.get("awarded_at")))
+            have.add((uid, r["code"]))
+    created = 0
+    if apply and missing:
+        with transaction.atomic():
+            before = UserAchievement.objects.count()
+            UserAchievement.objects.bulk_create(
+                [UserAchievement(user_id=uid, code=code, congratulated=True) for uid, code, _ in missing],
+                ignore_conflicts=True)
+            created = UserAchievement.objects.count() - before
+            # awarded_at is auto_now_add, so the original date goes in afterwards.
+            for uid, code, at in missing:
+                when = parse_datetime(at) if at else None
+                if when:
+                    UserAchievement.objects.filter(user_id=uid, code=code).update(awarded_at=when)
+    return {"matched_users": len(pid), "missing": len(missing),
+            "users": len({m[0] for m in missing}), "created": created}
+
+
 # ── Market themes ──────────────────────────────────────────────────────────
 
 def theme_plan(old_owners=None) -> list:

@@ -210,6 +210,31 @@ def _build_combined_top_rows(start_date, end_date, limit):
     return ordered[:limit]
 
 
+# How many readers each "Top kitobxonlar" list names (owner, 2026-10-28).
+# Lists were so long that nearly everyone who reported made the daily one
+# (Top 20 of ~27 daily reporters); a short list is one worth getting onto.
+# The 3-day and 6-month lists keep their old sizes.
+TOP_LIST_SIZES = {"daily": 5, "weekly": 10, "monthly": 10, "3monthly": 10, "yearly": 20}
+
+
+def weekly_top_tg_ids() -> set:
+    """Readers named on the latest weekly Top list (the Saturday 23:05 post,
+    Sunday..Saturday). They carry a 🏅 on every group report post until the
+    next list replaces them -- staying on the list keeps it."""
+    import datetime as _dt
+    from django.core.cache import cache
+    today = timezone.localdate()
+    days_back = (today.weekday() - 5) % 7 or 7  # latest Saturday before today
+    end = today - _dt.timedelta(days=days_back)
+    key = f"weekly_top_ids:{end}"
+    ids = cache.get(key)
+    if ids is None:
+        rows = _build_combined_top_rows(end - _dt.timedelta(days=6), end, TOP_LIST_SIZES["weekly"])
+        ids = [int(r["tg_id"]) for r in rows]
+        cache.set(key, ids, 8 * 86400)
+    return set(ids)
+
+
 def _format_top_stat(pages, minutes):
     """Render `502 bet 📚 · 2326 daq 🎧`, omitting any zero column."""
     parts = []
@@ -229,7 +254,7 @@ async def _daily_top_read_user_action_button():
     today = timezone.now().date()
     premium_ids = _get_premium_tg_ids()
 
-    rows = _build_combined_top_rows(today, today, 20)
+    rows = _build_combined_top_rows(today, today, TOP_LIST_SIZES["daily"])
 
     if rows:
         message = "📚 Bugun eng faol kitobxonlar (📚 Kitob va 🎧 Audio):\n\n"
@@ -282,7 +307,7 @@ def daily_top_read_user():
     # _broadcast_top_to_groups_and_users covers both group posts AND user DMs
     # with a Tabriklash button. Calling _send_period_report on top of it was
     # producing duplicate identical group posts.
-    msg = _build_top_readers_message(today, today, "Bugun 🔥", limit=20)
+    msg = _build_top_readers_message(today, today, "Bugun 🔥", limit=TOP_LIST_SIZES["daily"])
     if msg:
         _broadcast_top_to_groups_and_users(msg, "daily", date_str)
 
@@ -301,7 +326,7 @@ def weekly_top_read_user():
     end_date = timezone.localdate()
     start_date = end_date - _dt.timedelta(days=6)
     date_str = end_date.strftime("%Y%m%d")
-    msg = _build_top_readers_message(start_date, end_date, "Bu hafta 🏆", limit=30)
+    msg = _build_top_readers_message(start_date, end_date, "Bu hafta 🏆", limit=TOP_LIST_SIZES["weekly"])
     if msg:
         _broadcast_top_to_groups_and_users(msg, "weekly", date_str)
 
@@ -312,7 +337,7 @@ def monthly_top_read_user():
     end_date = timezone.localdate()
     start_date = end_date - _dt.timedelta(days=29)
     date_str = end_date.strftime("%Y%m%d")
-    msg = _build_top_readers_message(start_date, end_date, "Bu oy 📅", limit=30)
+    msg = _build_top_readers_message(start_date, end_date, "Bu oy 📅", limit=TOP_LIST_SIZES["monthly"])
     if msg:
         _broadcast_top_to_groups_and_users(msg, "monthly", date_str)
 
@@ -323,7 +348,7 @@ def three_months_top_read_user():
     end_date = timezone.localdate()
     start_date = end_date - _dt.timedelta(days=89)
     date_str = end_date.strftime("%Y%m%d")
-    msg = _build_top_readers_message(start_date, end_date, "3 oylik 📊", limit=40)
+    msg = _build_top_readers_message(start_date, end_date, "3 oylik 📊", limit=TOP_LIST_SIZES["3monthly"])
     if msg:
         _broadcast_top_to_groups_and_users(msg, "3monthly", date_str)
 
@@ -342,7 +367,7 @@ def yearly_top_read_user():
     end_date = timezone.localdate()
     start_date = end_date - _dt.timedelta(days=364)
     date_str = end_date.strftime("%Y%m%d")
-    msg = _build_top_readers_message(start_date, end_date, "Yillik 🏅", limit=60)
+    msg = _build_top_readers_message(start_date, end_date, "Yillik 🏅", limit=TOP_LIST_SIZES["yearly"])
     if msg:
         _broadcast_top_to_groups_and_users(msg, "yearly", date_str)
 
@@ -663,18 +688,18 @@ def three_day_top_report():
 
 @shared_task
 def seven_day_top_report():
-    """7 kunlik Top 25 Kitobxonlar — scheduled weekly."""
+    """7 kunlik Top kitobxonlar (TOP_LIST_SIZES["weekly"]) — scheduled weekly."""
     import datetime as _dt
     end_date = timezone.localdate()
-    _post_period_top(end_date - _dt.timedelta(days=6), end_date, "Oxirgi 7 kunda", 25)
+    _post_period_top(end_date - _dt.timedelta(days=6), end_date, "Oxirgi 7 kunda", TOP_LIST_SIZES["weekly"])
 
 
 @shared_task
 def thirty_day_top_report():
-    """30 kunlik Top 30 Kitobxonlar — scheduled monthly."""
+    """30 kunlik Top kitobxonlar (TOP_LIST_SIZES["monthly"]) — scheduled monthly."""
     import datetime as _dt
     end_date = timezone.localdate()
-    _post_period_top(end_date - _dt.timedelta(days=29), end_date, "Oxirgi 30 kunda", 30)
+    _post_period_top(end_date - _dt.timedelta(days=29), end_date, "Oxirgi 30 kunda", TOP_LIST_SIZES["monthly"])
 
 
 @shared_task
@@ -755,10 +780,10 @@ def send_daily_features():
 
 @shared_task
 def broadcast_top_readers_to_all():
-    """Admin-triggered: send weekly top-20 readers DM to every registered user."""
+    """Admin-triggered: send the weekly top readers DM to every registered user."""
     end_date = timezone.localdate()
     start_date = end_date - timezone.timedelta(days=6)
-    msg = _build_top_readers_message(start_date, end_date, "Bu hafta", limit=20)
+    msg = _build_top_readers_message(start_date, end_date, "Bu hafta", limit=TOP_LIST_SIZES["weekly"])
     if not msg:
         print("broadcast_top_readers_to_all: no data")
         return
@@ -788,12 +813,12 @@ def broadcast_period_top(period_key: str):
     import datetime as _dt
     today = timezone.localdate()
     period_cfg = {
-        "daily":    (today,                           today, "Bugun 🔥 Top kitobxonlar",    20),
+        "daily":    (today,                           today, "Bugun 🔥 Top kitobxonlar",    TOP_LIST_SIZES["daily"]),
         "3days":    (today - _dt.timedelta(days=2),   today, "3 kunlik Top kitobxonlar",    20),
-        "weekly":   (today - _dt.timedelta(days=6),   today, "Bu hafta 🏆 Top kitobxonlar", 30),
-        "monthly":  (today - _dt.timedelta(days=29),  today, "Bu oy 📅 Top kitobxonlar",    30),
-        "3monthly": (today - _dt.timedelta(days=89),  today, "3 oylik 📊 Top kitobxonlar",  40),
-        "yearly":   (today - _dt.timedelta(days=364), today, "Yillik 🏅 Top kitobxonlar",   60),
+        "weekly":   (today - _dt.timedelta(days=6),   today, "Bu hafta 🏆 Top kitobxonlar", TOP_LIST_SIZES["weekly"]),
+        "monthly":  (today - _dt.timedelta(days=29),  today, "Bu oy 📅 Top kitobxonlar",    TOP_LIST_SIZES["monthly"]),
+        "3monthly": (today - _dt.timedelta(days=89),  today, "3 oylik 📊 Top kitobxonlar",  TOP_LIST_SIZES["3monthly"]),
+        "yearly":   (today - _dt.timedelta(days=364), today, "Yillik 🏅 Top kitobxonlar",   TOP_LIST_SIZES["yearly"]),
     }
     if period_key not in period_cfg:
         print(f"broadcast_period_top: unknown period {period_key!r}")
@@ -2414,11 +2439,13 @@ def send_daily_personal_report():
     # otherwise someone inside their 3-hour daily-giveaway trial window gets
     # the free-tier teaser report instead of the full Premium one they're
     # currently entitled to.
-    premium_user_ids = set(
-        _Pay.objects.filter(status="paid", end_date__gte=today).values_list("user_id", flat=True)
-    ) | set(
-        TelegramProfile.objects.filter(trial_premium_until__gte=timezone.now()).values_list("id", flat=True)
-    )
+    # After the wallet launch the full report belongs to wallet members --
+    # active_premium_user_ids() already switches; reading Payment here
+    # directly would have given everyone the teaser from 1 Nov.
+    from tgbot.services import wallet as _wallet
+    from tgbot.services.premium import active_premium_user_ids as _prem_ids
+    premium_user_ids = _prem_ids()
+    _wallet_era = _wallet.is_live_launch()
 
     # Today's live-book reporters, ranked by pages (blocked excluded)
     today_rows = list(
@@ -2471,6 +2498,17 @@ def send_daily_personal_report():
         if p < 0: return f"▼ {p}%"
         return "→ 0%"
 
+    # How far each reader is from today's Top list (same page ranking as the
+    # 23:35 "Bugun" post).
+    top_n = TOP_LIST_SIZES["daily"]
+    top_cut = (today_rows[top_n - 1]["today_pages"] or 0) if len(today_rows) >= top_n else 0
+
+    def _near_top_line(rank, pages):
+        if rank <= top_n:
+            return f"\n\n🏅 Bugungi <b>Top {top_n}</b> dasiz — {rank}-o'rin!"
+        return (f"\n\n🎯 Bugun {rank}-o'rindasiz — Top {top_n} ga "
+                f"<b>{max(1, top_cut - pages + 1)} bet</b> qoldi.")
+
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     sent = 0
     for rank, row in enumerate(today_rows, start=1):
@@ -2508,7 +2546,8 @@ def send_daily_personal_report():
                     motiv = "📖 Har bir bet — kelajakka investitsiya. Davom eting!"
 
                 text = (
-                    f"💎 <b>Premium Hisobot — {today.strftime('%d.%m.%Y')}</b>\n\n"
+                    (f"💎 <b>Kengaytirilgan hisobot — {today.strftime('%d.%m.%Y')}</b>\n\n" if _wallet_era else
+                     f"💎 <b>Premium Hisobot — {today.strftime('%d.%m.%Y')}</b>\n\n") +
                     f"✨ {motiv}\n\n"
                     f"📊 <b>Bugungi natijalar:</b>\n"
                     f"📖 Bugun o'qidingiz: <b>{today_p} bet</b>\n"
@@ -2518,7 +2557,9 @@ def send_daily_personal_report():
                     f"🗃 Bu oy: {month_p} bet (o'tgan oy: {pm_p} bet) → <b>{_pct_str(pm_p, month_p)}</b>\n"
                     f"📈 Bu yil: {year_p} bet (o'tgan yil: {py_p} bet) → <b>{_pct_str(py_p, year_p)}</b>\n\n"
                     f"📚 <b>Umumiy:</b> Jami <b>{total_p} bet</b> o'qilgan\n\n"
-                    f"<i>💎 Premium a'zo sifatida bu hisobotni har kuni 23:57 da olasiz.\n"
+                    + (f"<i>👛 Hamyon a'zosi sifatida bu hisobotni har kuni 23:57 da olasiz.\n"
+                       if _wallet_era else
+                       f"<i>💎 Premium a'zo sifatida bu hisobotni har kuni 23:57 da olasiz.\n") +
                     f"Davom eting — har bet kelajakka investitsiya! 🚀</i>"
                 )
             else:
@@ -2534,13 +2575,18 @@ def send_daily_personal_report():
                     f"📖 <b>Bugun o'qidingiz:</b> <b>{today_p} bet</b>\n"
                     f"📈 <b>Trend:</b> {trend}\n"
                     f"📚 <b>Jami o'qilgan:</b> <b>{total_p} bet</b>\n\n"
-                    f"💎 <b>Premium a'zolar har kuni quyidagilarni oladi:</b>\n"
+                    + (f"💎 <b>Hamyonida 1 000 so'm bo'lgan kitobxonlar har kuni quyidagilarni oladi:</b>\n"
+                       if _wallet_era else
+                       f"💎 <b>Premium a'zolar har kuni quyidagilarni oladi:</b>\n") +
                     f"  • Bugun vs kecha, hafta, oy, yil taqqoslama (%)\n"
                     f"  • To'liq shaxsiy tahlil va motivatsion xat\n"
                     f"  • O'sish dinamikasi va batafsil tahlil\n\n"
-                    f"<i>Premium obuna: menyudan 💎 Premium tugmasini bosing!</i>"
+                    + (f"<i>Hamyon: menyudan 👛 Hamyon tugmasini bosing!</i>"
+                       if _wallet_era else
+                       f"<i>Premium obuna: menyudan 💎 Premium tugmasini bosing!</i>")
                 )
 
+            text += _near_top_line(rank, today_p)
             text += new_books_block
             resp = requests.post(
                 url,

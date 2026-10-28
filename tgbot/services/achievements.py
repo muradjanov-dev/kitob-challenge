@@ -583,9 +583,10 @@ ACHIEVEMENTS_RAW = [
     {"code": "auth_30", "emoji": "📙", "title_uz": "O'ttiz muallif — bilimdon",   "title_ru": "Тридцать авторов — знаток",  "hint_uz": "Turli 30 ta mualliflardan kitob tugating.", "hint_ru": "Завершите книги 30 разных авторов.", "cond": _at_least("distinct_authors", 30), "points": 600},
     {"code": "auth_50", "emoji": "📕", "title_uz": "Ellik muallif — universal kitobxon", "title_ru": "Пятьдесят авторов — универсал", "hint_uz": "Turli 50 ta mualliflardan kitob tugating.", "hint_ru": "Завершите книги 50 разных авторов.", "cond": _at_least("distinct_authors", 50), "points": 1200},
 
-    # — Comeback: a long silent gap followed by a fresh streak —
-    {"code": "cmb_1", "emoji": "🌅", "title_uz": "Qaytgan qahramon",              "title_ru": "Вернувшийся герой",          "hint_uz": "Kamida 14 kun uzilishdan so'ng, qayta 7 kun ketma-ket hisobot bering.", "hint_ru": "После перерыва от 14 дней читайте 7 дней подряд.", "cond": lambda s: s.get("comeback", False), "points": 150},
-    {"code": "cmb_2", "emoji": "🔥", "title_uz": "Feniks — qayta tug'ilish",      "title_ru": "Феникс — возрождение",       "hint_uz": "Kamida 30 kun uzilishdan so'ng, qayta 14 kun ketma-ket hisobot bering.", "hint_ru": "После перерыва от 30 дней читайте 14 дней подряд.", "cond": lambda s: s.get("phoenix", False),  "points": 400},
+    # Comeback achievements (cmb_1 "Qaytgan qahramon", cmb_2 "Feniks") were
+    # removed 2026-10-28 at the owner's request: they rewarded a 14/30-day
+    # break, and the whole point of the challenge is reporting every day.
+    # Rows already awarded stay in the database; they are no longer listed.
 
     # — Hikmat Xazinasi consecutive-correct streak (personal best) —
     {"code": "wst_3",  "emoji": "🧠", "title_uz": "Hikmat seriyasi — 3",          "title_ru": "Серия мудрости — 3",         "hint_uz": "☪️ Hikmat Xazinasi jonli o'yinida ketma-ket 3 marta to'g'ri javob bering.", "hint_ru": "В игре «Hikmat Xazinasi» ответьте правильно 3 раза подряд.", "cond": _at_least("wisdom_best_streak", 3),  "points": 50},

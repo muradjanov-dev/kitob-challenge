@@ -734,6 +734,36 @@ def internal_ops(request: HttpRequest, action: str):
             out["applied"] = ops_fixes.apply_streak_achievements(plan, paid_before)
         return JsonResponse(out)
 
+    if action == "restore-streak-days":
+        return JsonResponse({"ok": True, **ops_fixes.restore_streak_days(body.get("rows") or [], apply)})
+
+    if action == "game-reward-audit":
+        return JsonResponse({"ok": True, "games": ops_fixes.game_reward_audit(int(body.get("days") or 14))})
+
+    if action == "achievement-audit":
+        # compute_user_stats runs ~30 queries a reader: background job,
+        # result in the cache, poll with {"poll": true}.
+        from django.core.cache import cache
+        key = "ops_achievement_audit"
+        if body.get("poll"):
+            return JsonResponse({"ok": True, "result": cache.get(key)})
+        cache.set(key, {"state": "running", "apply": apply}, 3600)
+
+        def _run_audit():
+            try:
+                res = ops_fixes.achievement_audit(apply=apply, active_days=int(body.get("active_days") or 120))
+                cache.set(key, {"state": "done", "apply": apply, **res}, 86400)
+            except Exception:
+                cache.set(key, {"state": "error", "trace": traceback.format_exc()[-1500:]}, 86400)
+            finally:
+                connections.close_all()
+
+        threading.Thread(target=_run_audit, daemon=True).start()
+        return JsonResponse({"ok": True, "started": True, "apply": apply}, status=202)
+
+    if action == "restore-achievements":
+        return JsonResponse({"ok": True, **ops_fixes.restore_achievements(body.get("rows") or [], apply)})
+
     if action == "kitobcha-economy":
         from tgbot.services import economy
         r = economy.report(int(body.get("days") or 7))

@@ -74,10 +74,8 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.three_months_top_read_user',
         'schedule': crontab(hour=0, minute=10, day_of_month=1, month_of_year='1,4,7,10'),
     },
-    'send-3-day-top-readers': {
-        'task': 'tgbot.tasks.three_day_top_report',
-        'schedule': crontab(hour=19, minute=0, day_of_month='*/3'),
-    },
+    # The 3-day list was dropped (owner, 2026-10-28): fewer lists, each worth
+    # more. Daily, weekly, monthly, 3-monthly and yearly remain.
     'send-7-day-top-readers': {
         'task': 'tgbot.tasks.seven_day_top_report',
         'schedule': crontab(hour=20, minute=0, day_of_week=0),
