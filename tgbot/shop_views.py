@@ -279,7 +279,7 @@ def api_bid(request: HttpRequest) -> JsonResponse:
                 return JsonResponse({
                     "ok": False,
                     "error": "premium_required",
-                    "message": ("👛 Bu auksionda hamyonida 1 000 so'm va undan ko'p bo'lgan kitobxonlar qatnasha oladi."
+                    "message": ("👛 Bu auksionda hamyonida 15 000 so'm va undan ko'p bo'lgan kitobxonlar qatnasha oladi."
                                 if _wallet.launched(user) else
                                 "⭐️ Bu auksionda faqat Premium a'zolar qatnasha oladi."),
                 }, status=403)

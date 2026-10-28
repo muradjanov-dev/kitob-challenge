@@ -116,7 +116,14 @@ def compute_user_stats(user: TelegramProfile) -> Stats:
 
     live_games_played, live_games_won = _live_games_stats(user)
     shop_purchases = ShopPurchase.objects.filter(user=user).count()
-    premium_payments = Payment.objects.filter(user=user, status="paid").count()
+    # Paid memberships: Premium payments before the wallet launch, approved
+    # wallet top-ups after it (prem_1/3/6 "a'zo" achievements count both).
+    # Only money actually paid: gifted Premium days (referrals, prizes, the
+    # everyone-gets-24h gift) are Payment rows with amount 0 and made 369
+    # readers "qualify" for "Premium sotib oling" in the 2026-10-28 audit.
+    from tgbot.models import WalletTopup
+    premium_payments = (Payment.objects.filter(user=user, status="paid", amount__gt=0).count()
+                        + WalletTopup.objects.filter(user=user, status=WalletTopup.STATUS_APPROVED).count())
     account_age_days = (timezone.now() - user.created_at).days
     report_dates = list(
         ConfirmationReport.objects.filter(user=user)
@@ -184,8 +191,12 @@ def _creative_website_stats(user: TelegramProfile) -> dict:
 
     # 2. Yubiley kitobxoni -- read on the same calendar month+day as the
     #    account's own registration date (any year).
+    # At least a year after joining: without the year check, a book added on
+    # the registration day itself counted as the "anniversary" (285 readers
+    # qualified that way in the 2026-10-28 audit).
     anniversary_reading = BooksToRead.objects.filter(
         user=user, updated_at__month=user.created_at.month, updated_at__day=user.created_at.day,
+        updated_at__gte=user.created_at + timedelta(days=364),
     ).exists()
 
     # 3/4. Sirli sahifa -- reached at least page 100 / 500 in some book.
@@ -560,9 +571,9 @@ ACHIEVEMENTS_RAW = [
     {"code": "shop_15", "emoji": "🏪", "title_uz": "O'n besh xarid — VIP mijoz",   "title_ru": "Пятнадцать покупок — VIP",   "hint_uz": "🏪 Do'kondan 15 marta xarid qiling.", "hint_ru": "Совершите 15 покупок в магазине.", "cond": _at_least("shop_purchases", 15), "points": 500},
 
     # — Premium loyalty (count of paid Payment rows) —
-    {"code": "prem_1", "emoji": "⭐", "title_uz": "Premium a'zo",                  "title_ru": "Premium-участник",           "hint_uz": "💎 Premium obuna sotib oling.", "hint_ru": "Оформите 💎 Premium подписку.", "cond": _at_least("premium_payments", 1), "points": 100},
-    {"code": "prem_3", "emoji": "🌠", "title_uz": "Sodiq Premium a'zo",            "title_ru": "Верный Premium-участник",    "hint_uz": "💎 Premium obunani jami 3 marta sotib oling/uzaytiring.", "hint_ru": "Оформите/продлите 💎 Premium 3 раза.", "cond": _at_least("premium_payments", 3), "points": 400},
-    {"code": "prem_6", "emoji": "💫", "title_uz": "Premium faxriysi",              "title_ru": "Ветеран Premium",            "hint_uz": "💎 Premium obunani jami 6 marta sotib oling/uzaytiring.", "hint_ru": "Оформите/продлите 💎 Premium 6 раз.", "cond": _at_least("premium_payments", 6), "points": 900},
+    {"code": "prem_1", "emoji": "⭐", "title_uz": "Faol a'zo",                     "title_ru": "Активный участник",          "hint_uz": "👛 Hamyonni birinchi marta to'ldiring (yoki avval 💎 Premium olgan bo'ling).", "hint_ru": "Пополните 👛 кошелёк впервые (или ранее оформите 💎 Premium).", "cond": _at_least("premium_payments", 1), "points": 100},
+    {"code": "prem_3", "emoji": "🌠", "title_uz": "Sodiq a'zo",                    "title_ru": "Верный участник",            "hint_uz": "👛 Hamyonni jami 3 marta to'ldiring (Premium to'lovlari ham hisoblanadi).", "hint_ru": "Пополните 👛 кошелёк 3 раза (оплаты Premium тоже считаются).", "cond": _at_least("premium_payments", 3), "points": 400},
+    {"code": "prem_6", "emoji": "💫", "title_uz": "A'zolik faxriysi",              "title_ru": "Ветеран клуба",              "hint_uz": "👛 Hamyonni jami 6 marta to'ldiring (Premium to'lovlari ham hisoblanadi).", "hint_ru": "Пополните 👛 кошелёк 6 раз (оплаты Premium тоже считаются).", "cond": _at_least("premium_payments", 6), "points": 900},
 
     # — Anniversary —
     {"code": "anniv_1", "emoji": "🎂", "title_uz": "Bir yillik a'zo",              "title_ru": "Год с нами",                 "cond": _at_least("account_age_days", 365), "points": 200},

@@ -8,8 +8,11 @@ Owner's decisions (2026-10-25):
 - everyone gets LAUNCH_BONUS (3 000) once; paid Premium days left at the
   launch become DAY_FEE each in the wallet, and Premium ends;
 - Premium's perks (2x Kitobcha, VIP arena, many reports a day, AI quiz
-  allowance) go to members: wallet >= MEMBER_MIN, or today's fee paid --
-  see is_member(), which TelegramProfile.has_active_premium() defers to;
+  allowance) go to members: wallet >= MEMBER_MIN (15 000 so'm, owner
+  2026-10-28) -- see is_member(), which has_active_premium() defers to;
+- a Premium bought before the launch keeps those perks until its own end
+  date, whatever the wallet holds -- that was the promise when it was sold.
+  Its days left are ALSO credited to the wallet (DAY_FEE each);
 - top-ups: preset or typed amount, card transfer, receipt approved by an admin.
 
 Money only moves here, each move with a WalletTransaction written in the
@@ -30,7 +33,7 @@ LAUNCH_DATE = datetime.date(2026, 11, 1)
 DAY_FEE = 1000
 LAUNCH_BONUS = 3000
 KITOBCHA_SHARE_PCT = 30
-MEMBER_MIN = DAY_FEE
+MEMBER_MIN = 15000
 TOPUP_PRESETS = (1000, 2000, 5000, 10000, 30000)
 MIN_TOPUP = 1000
 MAX_TOPUP = 2_000_000
@@ -99,16 +102,22 @@ def can_report(user) -> bool:
     return int(user.wallet_balance or 0) >= cash
 
 
+def legacy_premium(user) -> bool:
+    """A Premium paid for before the launch, still inside its term."""
+    from tgbot.models import Payment
+    return Payment.objects.filter(user_id=user.id, status="paid", end_date__gte=timezone.localdate()).exists()
+
+
 def is_member(user) -> bool:
-    return int(user.wallet_balance or 0) >= MEMBER_MIN or paid_on(user)
+    return int(user.wallet_balance or 0) >= MEMBER_MIN or legacy_premium(user)
 
 
 def member_ids() -> set:
     """Bulk is_member() for broadcasts and leaderboards."""
-    from tgbot.models import TelegramProfile, WalletTransaction
+    from tgbot.models import Payment, TelegramProfile
     ids = set(TelegramProfile.objects.filter(wallet_balance__gte=MEMBER_MIN).values_list("id", flat=True))
-    ids |= set(WalletTransaction.objects.filter(kind=WalletTransaction.KIND_REPORT_FEE,
-                                                day=timezone.localdate()).values_list("user_id", flat=True))
+    ids |= set(Payment.objects.filter(status="paid", end_date__gte=timezone.localdate())
+               .values_list("user_id", flat=True))
     return ids
 
 
@@ -210,10 +219,10 @@ def ensure_launch_credit(user) -> dict:
         if is_live_launch() and WalletTransaction.KIND_PREMIUM not in kinds:
             days = premium_days_left(p)
             if days > 0:
+                # The days are credited AND the Premium runs to its end date:
+                # its perks were promised for that term (legacy_premium()).
                 _credit_locked(p, days * DAY_FEE, WalletTransaction.KIND_PREMIUM,
                                f"{days} kunlik Premium → hamyon")
-                Payment.objects.filter(user=p, status="paid", end_date__gte=LAUNCH_DATE) \
-                    .update(end_date=LAUNCH_DATE - datetime.timedelta(days=1))
                 out["premium_days"], out["premium"] = days, days * DAY_FEE
             if p.trial_premium_until:
                 p.trial_premium_until = None

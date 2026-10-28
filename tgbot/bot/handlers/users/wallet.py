@@ -392,6 +392,12 @@ async def wallet_topup_approve(call: types.CallbackQuery):
         await bot.send_message(user.telegram_id, text, parse_mode="HTML")
     except Exception as e:
         print(f"wallet topup #{topup.id} approve notify failed: {e}")
+    # A top-up counts towards the prem_1/3/6 membership achievements.
+    try:
+        from tgbot.tasks import check_user_achievements
+        check_user_achievements.delay(user.id)
+    except Exception as e:
+        print(f"wallet topup #{topup.id} achievement check failed: {e}")
 
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("wtop_no:"), state="*")
