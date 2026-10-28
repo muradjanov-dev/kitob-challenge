@@ -155,7 +155,9 @@ def _product_payload(p: ShopProduct, request: HttpRequest) -> dict:
         except Exception:
             img = None
 
-    top_bid = p.auction_bids.first() if p.is_auction else None
+    # A refunded bid (auction paused and its bids handed back) no longer counts.
+    live_bids = p.auction_bids.filter(is_refunded=False)
+    top_bid = live_bids.first() if p.is_auction else None
     highest_bid = top_bid.amount if top_bid else (p.min_start_bid or 100)
 
     from django.utils import timezone
@@ -173,7 +175,7 @@ def _product_payload(p: ShopProduct, request: HttpRequest) -> dict:
         "min_start_bid": p.min_start_bid or 100,
         "auction_end_at": p.auction_end_at.isoformat() if p.auction_end_at else None,
         "highest_bid": highest_bid,
-        "bids_count": p.auction_bids.count() if p.is_auction else 0,
+        "bids_count": live_bids.count() if p.is_auction else 0,
         "is_ended": is_ended,
         "grants_premium_days": p.grants_premium_days,
         "is_charity": p.is_charity,
@@ -210,7 +212,8 @@ def api_auction_details(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"ok": False, "error": "auction_not_found"}, status=404)
 
     # Top 20 bids
-    bids_qs = product.auction_bids.select_related("user").order_by("-amount", "created_at")[:20]
+    live_bids = product.auction_bids.filter(is_refunded=False)
+    bids_qs = live_bids.select_related("user").order_by("-amount", "created_at")[:20]
     top_bids = []
     for idx, b in enumerate(bids_qs, 1):
         name = b.user.full_name or f"User #{b.user.telegram_id}"
@@ -222,11 +225,11 @@ def api_auction_details(request: HttpRequest) -> JsonResponse:
             "is_me": bool(viewer and b.user_id == viewer.id),
         })
 
-    my_bid_obj = product.auction_bids.filter(user=viewer).first() if viewer else None
+    my_bid_obj = live_bids.filter(user=viewer).first() if viewer else None
     my_bid = my_bid_obj.amount if my_bid_obj else 0
     my_rank = None
     if my_bid_obj:
-        my_rank = product.auction_bids.filter(amount__gt=my_bid_obj.amount).count() + 1
+        my_rank = live_bids.filter(amount__gt=my_bid_obj.amount).count() + 1
 
     from django.utils import timezone
     is_ended = bool(product.auction_end_at and timezone.now() >= product.auction_end_at)
@@ -295,7 +298,7 @@ def api_bid(request: HttpRequest) -> JsonResponse:
             # Taklif qabul qilinishidan OLDINGI yetakchi: yangi taklif uni
             # 1-o'rindan surib chiqarsa, pastda unga xabar yuboriladi.
             prev_leader_bid = (
-                ShopAuctionBid.objects.filter(product=product)
+                ShopAuctionBid.objects.filter(product=product, is_refunded=False)
                 .select_related("user")
                 .order_by("-amount", "created_at")
                 .first()
@@ -305,7 +308,8 @@ def api_bid(request: HttpRequest) -> JsonResponse:
             existing_bid = ShopAuctionBid.objects.select_for_update().filter(
                 product=product, user=user
             ).first()
-            old_bid_amount = existing_bid.amount if existing_bid else 0
+            # A bid already handed back (the auction was paused) starts from zero.
+            old_bid_amount = existing_bid.amount if existing_bid and not existing_bid.is_refunded else 0
 
             # Every Kitobcha a user puts in anywhere is at least 100 -- an
             # opening bid and each raise alike.
@@ -337,7 +341,8 @@ def api_bid(request: HttpRequest) -> JsonResponse:
             # Save / update the user's bid
             if existing_bid:
                 existing_bid.amount = bid_amount
-                existing_bid.save(update_fields=["amount", "updated_at"])
+                existing_bid.is_refunded = False
+                existing_bid.save(update_fields=["amount", "is_refunded", "updated_at"])
             else:
                 ShopAuctionBid.objects.create(
                     product=product,

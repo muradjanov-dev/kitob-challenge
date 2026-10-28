@@ -837,6 +837,12 @@ def internal_ops(request: HttpRequest, action: str):
     if action == "set-admin":
         return JsonResponse({"ok": True, **ops_fixes.set_admin(body["telegram_id"], apply)})
 
+    if action == "kitobcha-credit":
+        if not body.get("tag"):
+            return JsonResponse({"ok": False, "error": "tag_required"}, status=400)
+        return JsonResponse({"ok": True, **ops_fixes.kitobcha_credit(
+            body.get("rows") or [], body["tag"], apply, body.get("notify_text") or "")})
+
     if action == "broadcast":
         campaign, text = body.get("campaign", ""), body.get("text", "")
         if not campaign or not text:

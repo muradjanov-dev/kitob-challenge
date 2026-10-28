@@ -13,6 +13,8 @@ class TgbotConfig(AppConfig):
             alphabet.install()
         except Exception as e:
             print(f"alphabet install failed: {e}")
+        # Refund the bids of an auction switched off or deleted before it settles.
+        from tgbot.services import auction_guard  # noqa: F401
         try:
             from django.db import connection
             with connection.cursor() as cursor:

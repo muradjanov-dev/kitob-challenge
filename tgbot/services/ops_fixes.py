@@ -465,6 +465,55 @@ def apply_themes(plan, refund: bool) -> dict:
             "refunded_total": refunded_total}
 
 
+# ── One-off Kitobcha credits ───────────────────────────────────────────────
+
+def kitobcha_credit(rows, tag: str, apply: bool, notify_text: str = "") -> dict:
+    """Credit fixed amounts owed to named readers, once per reader per `tag`.
+
+    Used for auction #26 on the old server: it was due 09-20 but the server
+    stopped on 09-18, so it never settled and nobody got their bids back.
+    `rows` = [{"telegram_id", "amount"}] worked out from the old final dump
+    (kept outside the public repo). The ledger row carrying `tag` is the
+    marker: a second run credits nobody twice. `notify_text` (optional, may
+    use {amount} and {balance}) is sent to each credited reader."""
+    import os
+
+    import requests
+    from tgbot.models import KitobchaLedger, TelegramProfile
+
+    tag = tag[:40]
+    out = []
+    for r in rows:
+        tg, amount = int(r["telegram_id"]), int(r["amount"])
+        p = TelegramProfile.objects.filter(telegram_id=tg).first()
+        row = {"telegram_id": tg, "amount": amount, "found": bool(p),
+               "name": p.full_name if p else None, "balance": int(p.ball or 0) if p else None,
+               "done_before": bool(p and KitobchaLedger.objects.filter(user=p, reason=tag).exists())}
+        if apply and p and amount > 0 and not row["done_before"]:
+            with transaction.atomic():
+                q = TelegramProfile.objects.select_for_update().get(id=p.id)
+                if not KitobchaLedger.objects.filter(user=q, reason=tag).exists():
+                    q.ball = (q.ball or 0) + amount
+                    q.save(update_fields=["ball"])
+                    KitobchaLedger.objects.create(user=q, delta=amount, reason=tag)
+                    row["credited"] = True
+                    row["balance"] = int(q.ball)
+            if row.get("credited") and notify_text:
+                try:
+                    requests.post(
+                        f"https://api.telegram.org/bot{os.environ.get('API_TOKEN', '')}/sendMessage",
+                        data={"chat_id": tg, "parse_mode": "HTML",
+                              "text": notify_text.format(amount=f"{amount:,}".replace(",", " "),
+                                                         balance=f"{row['balance']:,}".replace(",", " "))},
+                        timeout=10)
+                except Exception as e:
+                    row["notify_error"] = str(e)[:80]
+        out.append(row)
+    return {"tag": tag, "rows": out,
+            "owed_total": sum(r["amount"] for r in out if r["found"] and not r["done_before"]),
+            "credited_total": sum(r["amount"] for r in out if r.get("credited"))}
+
+
 # ── Admins ─────────────────────────────────────────────────────────────────
 
 def set_admin(telegram_id, apply: bool) -> dict:
