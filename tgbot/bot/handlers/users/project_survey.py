@@ -52,7 +52,7 @@ def _complete_and_reward(resp_id, user_id, rating):
         if resp.completed:
             return 0
         user = TelegramProfile.objects.select_for_update().get(id=user_id)
-        awarded = user.update_ball(True, SURVEY_REWARD)
+        awarded = user.update_ball(True, SURVEY_REWARD, reason="survey")
         resp.rating = rating
         resp.completed = True
         resp.rewarded = True

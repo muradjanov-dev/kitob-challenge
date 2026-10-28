@@ -329,7 +329,7 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
     awarded = 0
     premium_cta = None
     if todays_first_id in {r.id for r in reports}:
-        awarded = profile.update_ball(True, 25)
+        awarded = profile.update_ball(True, 25, reason="report_reward")
         if awarded == 25 and random.random() < PREMIUM_CTA_CHANCE:
             premium_cta = random.choice(PREMIUM_CTAS)
 

@@ -40,12 +40,12 @@ REWARD_TIERS = {0: 150, 1: 90, 2: 45}
 PARTICIPATION = 15  # guest Kitobcha for participants who didn't place in top 3
 
 
-def _add_ball_reward(user, amount: int) -> int:
+def _add_ball_reward(user, amount: int, reason: str = "game_reward") -> int:
     """Add Kitobcha for a live-game reward. Premium users get the same 2×
     multiplier here as everywhere else (see TelegramProfile.update_ball) —
     rank/tier is decided first on raw points, then this only scales the
     payout, so a Premium 2nd place still can't out-earn a non-Premium 1st."""
-    return user.update_ball(True, amount)
+    return user.update_ball(True, amount, reason=reason)
 
 
 # Seconds a finished game is given to be settled by the Celery tick before a

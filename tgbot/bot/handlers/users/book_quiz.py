@@ -65,7 +65,7 @@ def _process_answer(user_id: int, round_id: int, chosen_idx: int) -> str:
 
     fee_note = f"🎟 Ovoz: −{VOTE_FEE_KITOBCHA} Kitobcha\n"
     if is_correct:
-        awarded = profile.update_ball(True, quiz_round.reward)
+        awarded = profile.update_ball(True, quiz_round.reward, reason="viktorina")
         answer.rewarded = True
         answer.save(update_fields=["rewarded"])
         prem_note = " 💎 ×2!" if awarded > quiz_round.reward else ""
@@ -81,7 +81,7 @@ def _process_answer(user_id: int, round_id: int, chosen_idx: int) -> str:
                 names = []
                 for a in newly:
                     pts = a.get("points", 0)
-                    aw = profile.update_ball(True, pts) if pts else 0
+                    aw = profile.update_ball(True, pts, reason="viktorina") if pts else 0
                     prem_note = " 💎×2" if aw > pts else ""
                     names.append(f"{a['emoji']} {a['title_uz']} (+{aw} 🪙{prem_note})" if aw else f"{a['emoji']} {a['title_uz']}")
                 ach_note = "\n\n🏆 Yangi yutuq: " + ", ".join(names) + "!"
@@ -93,7 +93,7 @@ def _process_answer(user_id: int, round_id: int, chosen_idx: int) -> str:
                 f"{fee_note}"
                 f"💰 Balans: {int(profile.ball)}{ach_note}{promo}")
     else:
-        awarded = profile.update_ball(True, quiz_round.consolation)
+        awarded = profile.update_ball(True, quiz_round.consolation, reason="viktorina")
         answer.rewarded = True
         answer.save(update_fields=["rewarded"])
         prem_note = " 💎 ×2!" if awarded > quiz_round.consolation else ""

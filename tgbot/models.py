@@ -310,9 +310,10 @@ class TelegramProfile(BaseModel):
             user=self, status="paid", end_date__gte=timezone.localdate()
         ).exists()
 
-    def update_ball(self, is_completed: bool, ball: int) -> int:
+    def update_ball(self, is_completed: bool, ball: int, reason: str = "update_ball") -> int:
         """Add or subtract Kitobcha. Premium users earn 2× on every add.
-        Returns the effective amount actually applied."""
+        Returns the effective amount actually applied. `reason` labels the
+        ledger row (services/economy.py groups the weekly report by it)."""
         ball_decimal = Decimal(str(ball))
         if is_completed:
             if self.has_active_premium():
@@ -323,7 +324,7 @@ class TelegramProfile(BaseModel):
             self.save(update_fields=["ball"])
             KitobchaLedger.objects.create(
                 user=self, delta=int(ball_decimal) if is_completed else -int(ball_decimal),
-                reason="update_ball",
+                reason=(reason or "update_ball")[:40],
             )
         return int(ball_decimal)
 

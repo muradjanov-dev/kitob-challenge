@@ -1146,7 +1146,7 @@ async def _finish_group_session(session_id: int, chat_id: int):
         awarded_map = {}
         for i, p in enumerate(participants, 1):
             amount = _GROUP_QUIZ_RANK_REWARDS.get(i, _GROUP_QUIZ_DEFAULT_REWARD)
-            awarded_map[p.id] = p.user.update_ball(True, amount)
+            awarded_map[p.id] = p.user.update_ball(True, amount, reason="quiz_play")
 
         return session, participants, total, awarded_map
 

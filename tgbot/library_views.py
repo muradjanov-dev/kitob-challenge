@@ -438,7 +438,7 @@ def api_save_progress(request: HttpRequest):
             time_allowed_pages = record.active_seconds // SECONDS_PER_PAGE
             pages_to_credit = min(pending_pages, max(0, time_allowed_pages - record.credited_pages))
             if pages_to_credit > 0:
-                granted_now = profile.update_ball(True, pages_to_credit)
+                granted_now = profile.update_ball(True, pages_to_credit, reason="reading")
                 record.credited_pages += pages_to_credit
                 record.page_reward_total_granted += granted_now
 

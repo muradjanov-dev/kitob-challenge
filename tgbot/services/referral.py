@@ -165,7 +165,7 @@ class ReferralService:
             from tgbot.services import wallet
             if wallet.is_live_launch():
                 # update_ball: members get 2x, like every other reward.
-                return -referrer.update_ball(True, REFERRAL_KITOBCHA)
+                return -referrer.update_ball(True, REFERRAL_KITOBCHA, reason="referral")
             # Straight onto the subscription, not services.premium.grant_premium:
             # this is earned, like a shop purchase, so the prize scarcity
             # limits (1/week, not while already Premium) must not swallow it.
@@ -233,7 +233,7 @@ class ReferralService:
                 base_reward = max(base_reward, 500)
             # update_ball applies the premium 2× multiplier consistently with the
             # rest of the economy and returns the amount actually credited.
-            awarded = referrer.update_ball(True, base_reward)
+            awarded = referrer.update_ball(True, base_reward, reason="boom")
 
             participant.referrals_count = referral_number
             participant.kitobcha_earned = participant.kitobcha_earned + awarded

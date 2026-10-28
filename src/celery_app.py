@@ -173,6 +173,11 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.wallet_launch_tick',
         'schedule': crontab(hour=0, minute=3),
     },
+    # Weekly Kitobcha economy (issued / spent / supply) to the admins.
+    'economy-report': {
+        'task': 'tgbot.tasks.send_economy_report',
+        'schedule': crontab(hour=9, minute=0, day_of_week=1),
+    },
 
     'games-teaser-morning': {
         'task': 'tgbot.tasks.send_game_teaser',

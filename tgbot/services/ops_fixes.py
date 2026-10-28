@@ -235,7 +235,7 @@ def apply_streak_achievements(plan, paid_before=()) -> dict:
             if (int(user.telegram_id), code) in paid_before:
                 restored_only += 1
             elif points.get(code):
-                got += user.update_ball(True, points[code])
+                got += user.update_ball(True, points[code], reason="achievement")
         if got:
             users += 1
             paid += got

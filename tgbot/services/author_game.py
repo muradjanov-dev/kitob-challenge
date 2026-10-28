@@ -19,7 +19,9 @@ from django.db.models import F
 from django.utils import timezone
 
 from tgbot.models import AuthorEntry, AuthorGame, AuthorVote
-from tgbot.services.chain_game import _add_ball_reward, request_finalize
+from tgbot.services.chain_game import (
+    PARTICIPATION as _GAME_PARTICIPATION, REWARD_TIERS as _GAME_TIERS, _add_ball_reward, request_finalize,
+)
 
 LEAD_SECONDS = 60
 WRITE_SECONDS = 8 * 60
@@ -27,8 +29,10 @@ VOTE_SECONDS = 4 * 60
 MIN_CHARS = 120
 MAX_CHARS = 1500
 VOTES_PER_READER = 3
-REWARD_TIERS = [500, 300, 200]
-PARTICIPATION = 50
+# Same prizes as every other live game (owner, 2026-10-28: no game may pay
+# more than the rest -- the Kitobcha economy must stay balanced).
+REWARD_TIERS = [_GAME_TIERS[0], _GAME_TIERS[1], _GAME_TIERS[2]]
+PARTICIPATION = _GAME_PARTICIPATION
 
 # Scenes are retold in our own words (no quoted book text), each ending where
 # the reader takes over. Keys are stable: the least-recently-used pick and

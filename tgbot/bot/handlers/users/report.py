@@ -1701,7 +1701,7 @@ async def _do_confirm_report(message, user, state: FSMContext):
     first_today_id = todays[0].id if todays else None
     if first_today_id == report.id:
         try:
-            awarded = await sync_to_async(user.update_ball)(True, 25)
+            awarded = await sync_to_async(user.update_ball)(True, 25, "report_reward")
             premium_note = (" 💎 ×2!" if _wallet.launched(user) else " 💎 ×2 premium!") if awarded > 25 else ""
             # Only nudge users who don't already have Premium (awarded == 25
             # means the 2x multiplier in update_ball did NOT apply), and only

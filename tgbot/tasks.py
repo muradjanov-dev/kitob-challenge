@@ -1280,7 +1280,7 @@ def check_user_achievements(user_id: int):
         awarded_points = 0
         if points:
             try:
-                awarded_points = user.update_ball(True, points)
+                awarded_points = user.update_ball(True, points, reason="achievement")
             except Exception as e:
                 print(f"award kitobcha for achievement {ach['code']} failed: {e}")
                 awarded_points = points
@@ -1518,7 +1518,7 @@ def daily_top_readers_reward():
             user = TelegramProfile.objects.filter(id=user_id).first()
             if not user:
                 return
-            awarded = user.update_ball(True, kitobcha)
+            awarded = user.update_ball(True, kitobcha, reason="leaderboard")
             prem_note = " 💎 ×2!" if awarded > kitobcha else ""
             # Rank-agnostic DM: tell the user they earned Kitobcha for today's
             # reading. The "top kitobxonlar" framing now lives only in the
@@ -1796,7 +1796,7 @@ def _award_level_rewards(user: TelegramProfile, pages: int):
         if pages >= thr and code not in awarded:
             try:
                 UserAchievement.objects.create(user=user, code=code, congratulated=True)
-                aw = user.update_ball(True, points)
+                aw = user.update_ball(True, points, reason="achievement")
                 prem_note = " 💎 ×2!" if aw > points else ""
                 dm = (
                     f"{emoji} <b>Yangi daraja: {name}!</b>\n\n"
@@ -3227,7 +3227,7 @@ def _finalize_challenge_results(challenge_id: int):
 
         if kitobcha > 0:
             try:
-                p.user.update_ball(True, kitobcha)
+                p.user.update_ball(True, kitobcha, reason="challenge")
             except Exception as e:
                 print(f"challenge reward failed uid={p.user.id}: {e}")
 
@@ -4258,7 +4258,7 @@ def retire_challenge_and_launch_boom(challenge_id=None, boom_days=7):
     credited = 0
     for user, made in transfers:
         participant, _created = ReferralBoomParticipant.objects.get_or_create(boom=boom, user=user)
-        awarded = user.update_ball(True, made * boom.tier1_reward)
+        awarded = user.update_ball(True, made * boom.tier1_reward, reason="boom")
         participant.referrals_count = made
         participant.kitobcha_earned = awarded
         participant.save(update_fields=["referrals_count", "kitobcha_earned"])
@@ -5537,6 +5537,24 @@ def _trial_premium_intro_text() -> str:
         "💎 <b>Premium belgisi</b> — guruhdagi hisobotingizda 💎 belgisi bilan ajralib turasiz\n\n"
         "Yoqdimi? Muddat tugagach buni doimiy saqlab qolishning 2 ta yo'li bo'ladi — kuting! 🚀"
     )
+
+
+@shared_task
+def send_economy_report():
+    """Monday 09:00: last week's Kitobcha issued/spent/supply to the admins
+    (services/economy.py)."""
+    import os as _os
+    from tgbot.services import economy
+    text = economy.report_text(economy.report(7))
+    admin_ids = set(TelegramProfile.objects.filter(is_admin=True).values_list("telegram_id", flat=True))
+    admin_ids |= {int(a) for a in _os.environ.get("ADMINS", "").split(",") if a.strip().isdigit()}
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    for admin_id in admin_ids:
+        try:
+            requests.post(url, data={"chat_id": admin_id, "text": text, "parse_mode": "HTML"}, timeout=8)
+        except Exception as e:
+            print(f"send_economy_report {admin_id}: {e}")
+    return text
 
 
 @shared_task

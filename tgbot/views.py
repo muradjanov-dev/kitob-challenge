@@ -734,6 +734,11 @@ def internal_ops(request: HttpRequest, action: str):
             out["applied"] = ops_fixes.apply_streak_achievements(plan, paid_before)
         return JsonResponse(out)
 
+    if action == "kitobcha-economy":
+        from tgbot.services import economy
+        r = economy.report(int(body.get("days") or 7))
+        return JsonResponse({"ok": True, **r, "text": economy.report_text(r)})
+
     if action == "wallet-testers":
         from tgbot.services import wallet
         if apply:
