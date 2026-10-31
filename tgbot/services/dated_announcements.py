@@ -17,19 +17,11 @@ ANNOUNCEMENTS = {
     # internal/ops/broadcast campaign changes_2026_10_26), so the 11:00 entry
     # was removed to avoid sending it twice.
 
-    # Wallet launch: told in four short parts, warmly and always with "Siz"
-    # (owner, 2026-11-01).
+    # Wallet launch: told in parts, warmly and always with "Siz" (owner,
+    # 2026-11-01). Part 1 went out by hand at 04:20 ("Assalomu alaykum",
+    # internal/ops/broadcast campaign wallet_launch_2026_11_01) instead of
+    # the 08:00 entry, which was removed so it is not sent twice.
     _dt.date(2026, 11, 1): {
-        8: ((
-            "🌅 <b>Xayrli tong, azizlarim!</b>\n\n"
-            "Bugun — 1-noyabr, Kitob Challenge'da yangi sahifa ochildi 📖✨\n\n"
-            "1️⃣ Endi har birimizda <b>👛 Hamyon</b> bor.\n"
-            "2️⃣ Sovg'amiz: hamyoningizga <b>3 000 so'm</b> bonus tushdi 🎁 "
-            "Bu — kamida 3 kunlik hisobot degani.\n"
-            "3️⃣ Premium endi yo'q, uning imtiyozlari hamyon orqali ishlaydi.\n\n"
-            "Kun davomida hammasini qismlarga bo'lib, oddiy tilda tushuntirib boramiz. "
-            "Hozircha hamyoningizga bir qarab qo'ying 👇"
-        ), _HAMYON),
         12: ((
             "📚 <b>Hisobot endi qanday ishlaydi?</b> (2/4)\n\n"
             "Juda oddiy, azizlarim:\n"
