@@ -562,6 +562,17 @@ async def send_daily_report_handler(message: types.Message, state: FSMContext):
     await send_book_selection_menu(message, state)
 
 
+async def start_report_flow(call: CallbackQuery, state: FSMContext, user):
+    """Continue to book selection once the reader said yes to today's fee
+    (wallet.fee_confirm_kb); the entry point that asked already checked the
+    rest."""
+    await state.finish()
+    reading_day = await _compute_reading_day(user, timezone.localdate())
+    await state.update_data(reading_day=reading_day, selected_book_ids=[])
+    await ReportState.select_book.set()
+    await send_book_selection_menu(call, state)
+
+
 # ── Book selection callbacks ──────────────────────────────────────────────────
 
 @dp.callback_query_handler(state=ReportState.select_book)

@@ -738,16 +738,41 @@
         return;
       }
 
+      rfSendReport(entries, false);
+    });
+
+    // Yes/no before the day's fee: Telegram's native popup (WebApp 6.2+),
+    // the browser's confirm() anywhere else.
+    function rfAskConfirm(message, done) {
+      const wa = window.Telegram && window.Telegram.WebApp;
+      try {
+        if (wa && wa.showConfirm && wa.isVersionAtLeast && wa.isVersionAtLeast('6.2')) {
+          wa.showConfirm(message, ok => done(!!ok));
+          return;
+        }
+      } catch (e) {}
+      done(window.confirm(message));
+    }
+
+    function rfSendReport(entries, feeConfirmed) {
       rfSubmit.disabled = true;
       rfMsg.textContent = 'Yuborilmoqda…';
       fetch('/kabinet/api/report/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData, entries, conclusion: rfConclusion.value.trim() }),
+        body: JSON.stringify({ initData, entries, conclusion: rfConclusion.value.trim(), fee_confirmed: feeConfirmed }),
       })
         .then(r => r.json().then(data => ({ status: r.status, data })))
         .then(({ status, data }) => {
           rfSubmit.disabled = false;
+          if (data.error === 'fee_confirm') {
+            rfMsg.textContent = '';
+            rfAskConfirm(data.message, ok => {
+              if (ok) rfSendReport(entries, true);
+              else rfMsg.textContent = "Bekor qilindi — hech narsa yechilmadi.";
+            });
+            return;
+          }
           if (data.error === 'wallet_insufficient') {
             rfMsg.textContent = data.message || "👛 Hamyoningizda mablag' yetarli emas. Botda 👛 Hamyon bo'limidan to'ldiring.";
             rfMsg.classList.add('error');
@@ -778,7 +803,7 @@
           rfMsg.textContent = "Internetga ulanishda muammo. Qayta urinib ko'ring.";
           rfMsg.classList.add('error');
         });
-    });
+    }
 
   // Shared tab-bar swipe + keyboard nav (identical to the other 3 pages).
   const tabs = ['/', '/kutubxona/', '/shop/', '/kabinet/'];

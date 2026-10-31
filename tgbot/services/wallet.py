@@ -102,6 +102,36 @@ def can_report(user) -> bool:
     return int(user.wallet_balance or 0) >= cash
 
 
+def _fee_ok_key(user, day=None) -> str:
+    return f"wallet_fee_ok:{user.id}:{(day or timezone.localdate()).isoformat()}"
+
+
+def fee_confirmed(user, day=None) -> bool:
+    """The reader agreed to today's fee (or it is already paid): the fee is
+    never taken without a yes first (owner, 2026-11-01)."""
+    from django.core.cache import cache
+    return paid_on(user, day) or bool(cache.get(_fee_ok_key(user, day)))
+
+
+def confirm_fee(user, day=None) -> None:
+    from django.core.cache import cache
+    cache.set(_fee_ok_key(user, day), 1, 60 * 60 * 24)
+
+
+def fee_confirm_plain(user) -> str:
+    """Short question for the site's native confirm popup (Telegram allows
+    256 characters there)."""
+    cash, kit = fee_split(user)
+    som = lambda n: f"{int(n or 0):,}".replace(",", " ")  # noqa: E731
+    part = f"{som(cash)} so'm" + (f" + {kit} Kitobcha" if kit else "")
+    if (getattr(user, "language", None) or "uz") == "ru":
+        part = f"{som(cash)} сум" + (f" + {kit} Kitobcha" if kit else "")
+        return (f"За сегодняшний отчёт спишется {part} (один раз в день). "
+                f"В кошельке: {som(user.wallet_balance)} сум. Подтверждаете?")
+    return (f"Bugungi hisobotingiz uchun {part} yechiladi (kuniga faqat bir marta). "
+            f"Hamyoningizda: {som(user.wallet_balance)} so'm. Tasdiqlaysizmi?")
+
+
 def legacy_premium(user) -> bool:
     """A Premium paid for before the launch, still inside its term."""
     from tgbot.models import Payment

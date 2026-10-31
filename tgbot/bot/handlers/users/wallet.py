@@ -126,15 +126,48 @@ async def show_wallet(message: types.Message, user) -> None:
     await message.answer(text, parse_mode="HTML", reply_markup=wallet_kb(user))
 
 
+def fee_confirm_text(user) -> str:
+    cash, kit = wallet.fee_split(user)
+    bal, ball = int(user.wallet_balance or 0), int(user.ball or 0)
+    if _lang(user) == "ru":
+        part = f"<b>{_som(cash)} сум</b>" + (f" + <b>{kit} Kitobcha</b>" if kit else "")
+        return (
+            "💳 <b>Оплата за сегодняшний отчёт</b>\n\n"
+            f"Когда отчёт будет принят, за сегодня спишется {part} — только один раз в день.\n"
+            f"👛 В кошельке: <b>{_som(bal)} сум</b> · 🪙 <b>{_som(ball)}</b> Kitobcha\n\n"
+            "Продолжаем? 😊"
+        )
+    part = f"<b>{_som(cash)} so'm</b>" + (f" + <b>{kit} Kitobcha</b>" if kit else "")
+    return (
+        "💳 <b>Bugungi hisobot uchun to'lov</b>\n\n"
+        f"Hisobotingiz qabul qilinganda bugungi kun uchun {part} yechiladi — kuniga faqat bir marta.\n"
+        f"👛 Hamyoningizda: <b>{_som(bal)} so'm</b> · 🪙 <b>{_som(ball)}</b> Kitobcha\n\n"
+        "Davom etamizmi? 😊"
+    )
+
+
+def fee_confirm_kb(user) -> InlineKeyboardMarkup:
+    ru = _lang(user) == "ru"
+    return InlineKeyboardMarkup(row_width=2).add(
+        InlineKeyboardButton("✅ Да, продолжить" if ru else "✅ Ha, davom etamiz", callback_data="wallet:feeok"),
+        InlineKeyboardButton("❌ Нет" if ru else "❌ Yo'q", callback_data="wallet:feeno"),
+    )
+
+
 async def report_allowed(message: types.Message, user) -> bool:
     """Gate for every report entry point: True when the reader may start a
-    report (wallet not launched yet, today already paid, or it can be paid)."""
+    report (wallet not launched yet, today already paid, or it can be paid
+    and the reader said yes to the fee -- asked once a day, before anything
+    is taken; the fee itself is taken when the report is saved)."""
     if not user or not wallet.launched(user):
         return True
     await sync_to_async(wallet.ensure_launch_credit)(user)
-    if await sync_to_async(wallet.can_report)(user):
+    if not await sync_to_async(wallet.can_report)(user):
+        await message.answer(insufficient_text(user), parse_mode="HTML", reply_markup=topup_kb(user))
+        return False
+    if await sync_to_async(wallet.fee_confirmed)(user):
         return True
-    await message.answer(insufficient_text(user), parse_mode="HTML", reply_markup=topup_kb(user))
+    await message.answer(fee_confirm_text(user), parse_mode="HTML", reply_markup=fee_confirm_kb(user))
     return False
 
 
@@ -167,6 +200,36 @@ async def wallet_open(call: types.CallbackQuery, state: FSMContext):
     if user and wallet.launched(user):
         await state.finish()
         await show_wallet(call.message, user)
+
+
+@dp.callback_query_handler(lambda c: c.data == "wallet:feeok", state="*")
+async def wallet_fee_ok(call: types.CallbackQuery, state: FSMContext):
+    user = await aget_user(call.from_user.id)
+    if not user or not wallet.launched(user):
+        await call.answer()
+        return
+    await sync_to_async(wallet.confirm_fee)(user)
+    await call.answer("✅")
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    from tgbot.bot.handlers.users.report import start_report_flow
+    await start_report_flow(call, state, user)
+
+
+@dp.callback_query_handler(lambda c: c.data == "wallet:feeno", state="*")
+async def wallet_fee_no(call: types.CallbackQuery, state: FSMContext):
+    user = await aget_user(call.from_user.id)
+    await call.answer()
+    await state.finish()
+    try:
+        await call.message.edit_text(
+            "👌 Отменено — ничего не списано." if _lang(user) == "ru"
+            else "👌 Bekor qilindi — hech narsa yechilmadi. Istalgan payt qaytishingiz mumkin 📖"
+        )
+    except Exception:
+        pass
 
 
 @dp.callback_query_handler(lambda c: c.data == "wallet:kitobcha", state="*")

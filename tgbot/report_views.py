@@ -212,6 +212,13 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
     wallet_charge = None
     if wallet.launched(profile):
         wallet.ensure_launch_credit(profile)
+        # Never take the fee without a yes: the page asks with a native
+        # confirm popup and sends the report again with fee_confirmed.
+        if body.get("fee_confirmed"):
+            wallet.confirm_fee(profile)
+        elif wallet.can_report(profile) and not wallet.fee_confirmed(profile):
+            return JsonResponse({"ok": False, "error": "fee_confirm",
+                                 "message": wallet.fee_confirm_plain(profile)}, status=428)
         wallet_charge = wallet.charge_day(profile)
         if not wallet_charge["ok"]:
             return JsonResponse({
