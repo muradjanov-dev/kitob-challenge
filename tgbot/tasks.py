@@ -1835,11 +1835,16 @@ def _format_uz_number(n: int) -> str:
 
 
 def _referral_platform_stats() -> dict:
-    """Live platform totals for the social-proof share-text variants —
-    queried fresh every call (never hardcoded) so the numbers can't go
-    stale. Kitobcha-given uses the same current-balance + shop-spent
-    approximation as the admin "Kitobcha bo'yicha reyting" report, for
-    consistency across the app."""
+    """Live platform totals for the social-proof share-text variants — never
+    hardcoded, cached for 10 minutes: the daily pin to every reader and each
+    balance refresh would otherwise sum whole tables per message.
+    Kitobcha-given uses the same current-balance + shop-spent approximation as
+    the admin "Kitobcha bo'yicha reyting" report, for consistency across the
+    app."""
+    from django.core.cache import cache
+    cached = cache.get("referral_platform_stats")
+    if cached:
+        return cached
     from tgbot.models import ShopPurchase as _SP
 
     total_pages = ConfirmationReport.objects.filter(is_audio=False).aggregate(
@@ -1852,11 +1857,13 @@ def _referral_platform_stats() -> dict:
     shop_spent = _SP.objects.aggregate(s=Sum("price_at_purchase"))["s"] or 0
     total_kitobcha = int(balance_sum) + int(shop_spent)
 
-    return {
+    stats = {
         "pages": _format_uz_number(int(total_pages)),
         "readers": _format_uz_number(total_readers),
         "kitobcha": _format_uz_number(total_kitobcha),
     }
+    cache.set("referral_platform_stats", stats, 600)
+    return stats
 
 
 def _referral_share_texts(user) -> list:
@@ -1913,19 +1920,35 @@ def _referral_share_texts(user) -> list:
     ]
 
 
-def _send_and_pin_progress(user) -> int:
-    """Send fresh progress message to a user, unpin the previous, pin the new
-    one, persist the new message_id to user.last_progress_msg_id. Returns the
-    new message_id (or 0 on failure)."""
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    pin_url = f"https://api.telegram.org/bot{BOT_TOKEN}/pinChatMessage"
-    unpin_url = f"https://api.telegram.org/bot{BOT_TOKEN}/unpinChatMessage"
+def _pinned_balance_text(user) -> str:
+    """The wallet lines heading the pinned progress message, from the launch
+    on (empty before). refresh_pinned_balance keeps them current."""
+    from tgbot.services import wallet as _wallet
+    if not _wallet.launched(user):
+        return ""
 
-    pages = (
-        ConfirmationReport.objects.filter(user=user)
-        .aggregate(s=Sum("pages_read"))["s"] or 0
-    )
-    _award_level_rewards(user, pages)
+    def _n(v):
+        return f"{int(v or 0):,}".replace(",", " ")
+
+    days = _wallet.days_left(user)
+    text = f"👛 Hamyon: <b>{_n(user.wallet_balance)} so'm</b> · 🪙 <b>{_n(user.ball)}</b> Kitobcha\n"
+    if days:
+        return text + f"📅 Yana <b>{days}</b> kunlik hisobotga yetadi"
+    if _wallet.paid_on(user):
+        return text + "✅ Bugungi hisobot to'langan. Ertangi kun uchun hamyonni to'ldirib qo'ying 👇"
+    return text + "⚠️ Hisobot yuborish uchun hamyonni to'ldiring 👇"
+
+
+def _progress_payload(user, pages=None) -> tuple:
+    """(text, reply_markup) of the user's pinned progress message. The blurbs
+    are picked with a per-user, per-day seed, so refresh_pinned_balance edits
+    the message in place without reshuffling the rest of it."""
+    rng = random.Random(f"{user.id}:{timezone.localdate().isoformat()}")
+    if pages is None:
+        pages = (
+            ConfirmationReport.objects.filter(user=user)
+            .aggregate(s=Sum("pages_read"))["s"] or 0
+        )
 
     from django.conf import settings as _settings
     from urllib.parse import quote as _urlquote
@@ -1942,13 +1965,13 @@ def _send_and_pin_progress(user) -> int:
     code = _ensure_referral_code(user) if bot_username else None
     if bot_username and code:
         ref_link = f"https://t.me/{bot_username}?start={code}"
-        blurb = random.choice(_referral_share_texts(user))
+        blurb = rng.choice(_referral_share_texts(user))
         text += (
             "\n\n🌟 <b>Sizning referal havolangiz:</b>\n"
             f"<code>{ref_link}</code>\n\n"
             f"{blurb}"
         )
-        share_text = _urlquote(random.choice(_referral_share_texts(user)))
+        share_text = _urlquote(rng.choice(_referral_share_texts(user)))
         buttons.append([{
             "text": "📤 Referalni ulashish",
             "url": f"https://t.me/share/url?url={_urlquote(ref_link)}&text={share_text}",
@@ -1980,7 +2003,34 @@ def _send_and_pin_progress(user) -> int:
             "callback_data": f"join_boom:{active_boom.id}",
         }])
 
-    site_button = json.dumps({"inline_keyboard": buttons})
+    balance = _pinned_balance_text(user)
+    if balance:
+        # First: the pinned bar at the top of the chat shows this line.
+        text = balance + "\n\n" + text
+        buttons[0].append({"text": "👛 Hamyon", "callback_data": "wallet:open"})
+    return text, json.dumps({"inline_keyboard": buttons})
+
+
+def _remember_pinned_balance(user, msg_id) -> None:
+    from django.core.cache import cache
+    cache.set(f"pinbal_shown:{user.id}", f"{msg_id}:{_pinned_balance_text(user)}", 60 * 60 * 26)
+
+
+def _send_and_pin_progress(user) -> int:
+    """Send fresh progress message to a user, unpin the previous, pin the new
+    one, persist the new message_id to user.last_progress_msg_id. Returns the
+    new message_id (or 0 on failure)."""
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    pin_url = f"https://api.telegram.org/bot{BOT_TOKEN}/pinChatMessage"
+    unpin_url = f"https://api.telegram.org/bot{BOT_TOKEN}/unpinChatMessage"
+
+    pages = (
+        ConfirmationReport.objects.filter(user=user)
+        .aggregate(s=Sum("pages_read"))["s"] or 0
+    )
+    _award_level_rewards(user, pages)
+
+    text, site_button = _progress_payload(user, pages)
     resp = requests.post(
         url,
         data={
@@ -2026,9 +2076,43 @@ def _send_and_pin_progress(user) -> int:
     try:
         TelegramProfile.objects.filter(id=user.id).update(last_progress_msg_id=msg_id)
         user.last_progress_msg_id = msg_id
+        _remember_pinned_balance(user, msg_id)
     except Exception as e:
         print(f"failed to save last_progress_msg_id for {user.id}: {e}")
     return msg_id
+
+
+@shared_task(rate_limit="15/s", ignore_result=True)
+def refresh_pinned_balance(user_id):
+    """Bring the balance lines of the reader's pinned progress message up to
+    date with one editMessageText. Queued by services.pinned_balance when the
+    wallet or Kitobcha moves, at most one pending per reader, so a burst of
+    moves costs one edit -- and none when the lines would not change."""
+    from django.core.cache import cache
+    cache.delete(f"pinbal:{user_id}")  # moves from now on queue a new refresh
+    user = TelegramProfile.objects.filter(id=user_id, is_registered=True, is_blocked=False).first()
+    if not user or not user.last_progress_msg_id:
+        return
+    balance = _pinned_balance_text(user)
+    mark = f"{user.last_progress_msg_id}:{balance}"
+    if not balance or cache.get(f"pinbal_shown:{user_id}") == mark:
+        return
+    text, markup = _progress_payload(user)
+    try:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText",
+            data={"chat_id": user.telegram_id, "message_id": user.last_progress_msg_id,
+                  "text": text, "parse_mode": "HTML", "reply_markup": markup},
+            timeout=5,
+        )
+    except Exception as e:
+        print(f"refresh_pinned_balance {user_id}: {e}")
+        return
+    if resp.ok or "not modified" in resp.text:
+        cache.set(f"pinbal_shown:{user_id}", mark, 60 * 60 * 26)
+    elif resp.status_code == 429:
+        retry = int(resp.json().get("parameters", {}).get("retry_after", 5))
+        refresh_pinned_balance.apply_async((user_id,), countdown=retry + 1)
 
 
 @shared_task
