@@ -862,55 +862,11 @@ def broadcast_period_top(period_key: str):
     print(f"broadcast_period_top({period_key}): user DMs sent={sent} failed={failed}")
 
 
-INSPIRATION_POOL = [
-    "📚 Bir bet — bir qadam. Bugungi qadamingizni tashladingizmi?",
-    "🔥 Mutolaa — aqlning sport zali. Bugungi mashqni hisobotda qayd eting!",
-    "⏳ Vaqt o'tib ketadi, o'qilgan betlar esa siz bilan qoladi. Bugun nechta bet o'qidingiz?",
-    "💡 Eng foydali sarmoya — kitob. Eng oson hisobot — bitta tugma 👇",
-    "🌱 Har kuni bir necha bet — yil oxirida butun boshli kutubxona. Bugungisini unutmang!",
-    "📖 «Kitob — eng sodiq do'st.» Bugun do'stingizdan xabar oldingizmi?",
-    "💪 Har kuni o'qiydigan odam sekin-asta o'zgaradi. Siz ham shu yo'ldasiz — davom eting!",
-    "✨ Bilim — nur. Hisobot esa shu nurni har kuni yoqib turadigan chiroq.",
-    "🏆 Reytingda siz uchun joy bor — bugungi hisobot bilan bir pog'ona yuqoriga!",
-    "🧠 Aql ham xuddi muskul: ishlatgan sari kuchayadi. Bugun unga ozgina mashq bering 😊",
-    "🌟 Buyuk insonlarning umumiy odati — har kuni o'qish. Siz ham ular safidasiz!",
-    "🔖 Kecha qayerda to'xtagan edingiz? Kitobingiz sizni o'sha betda kutib turibdi 📖",
-    "🎁 Bugun o'qilgan har bir bet — ertangi o'zingizga sovg'a.",
-    "⚡ 10 daqiqa mutolaa + 1 tugma = bugungi hisobot tayyor!",
-    "💎 Har bir o'qilgan bet — xazinangizga qo'shilgan bir dur. Qayd etib qo'ying!",
-    "🌍 Dunyoni o'zgartirgan har bir g'oya kitobdan boshlangan. Sizning g'oyangiz qaysi kitobda ekan?",
-    "🛤 Yo'l uzoq bo'lsa ham, har bet — oldinga bir qadam. Bugungi qadamni yozib qo'ying!",
-    "🔋 Charchadingizmi? Bir necha bet yaxshi kitob — eng yaxshi dam olish 🙂",
-    "📝 Bugun o'qigan bo'lsangiz, hisobotni yuborib qo'ying — mehnatingiz bekorga ketmasin!",
-    "🎬 Ertangi siz bugungi mutolaangizdan boshlanadi.",
-    "🌈 Kitob — sehrli eshik. Bugun qaysi olamga sayohat qildingiz?",
-    "🧩 Har kungi hisobot — katta suratning bir bo'lagi. Bugungi bo'lakni joyiga qo'yamizmi?",
-    "☕️ Bir piyola choy va yaxshi kitob — kunning eng shirin daqiqalari. Hisobotni ham unutmang!",
-    "🦁 Kitob o'qigan qalb kuchli bo'ladi. Bugun ham o'sha kuchni oshiring!",
-    "🌙 Kun yakunlanmoqda. Yotishdan oldin bir necha bet o'qib, hisobot yuborsangiz — qanday yaxshi!",
-    "💌 Kelajakdagi o'zingizga xat: «Bugun ham o'qidim.» Hisobot — shu xatning muhri.",
-    "🎯 Bugungi maqsad juda oddiy: bir necha bet va bitta tugma.",
-    "🥷 Har kuni jimgina o'qiydiganlar — haqiqiy qahramonlar. Siz ham shulardansiz!",
-    "📿 «Tomchi-tomchi ko'l bo'lur.» Bet-bet esa — butun bir kutubxona!",
-    "🚂 Mutolaa poyezdi yo'lda — bugun ham bekatda qolib ketmang 😊",
-    "🪴 Bilim — daraxt, har bir bet — unga suv. Bugun ham sug'oramizmi?",
-    "🦋 Katta o'zgarishlar kichik odatlardan boshlanadi. Bugungi odat — bir necha bet.",
-    "🏔 Cho'qqiga bir kunda chiqilmaydi, lekin har kungi qadam albatta yetkazadi!",
-    "🎨 Hayotingiz — siz chizayotgan surat. Kitoblar esa eng chiroyli bo'yoqlaringiz.",
-    "🌅 Yangi kun — yangi bet. Uni mutolaa bilan boshlang, xursandchilik bilan yakunlang!",
-    "📮 Hisobot tugmasi sizni kutyapti 👇 Bugun nima o'qidingiz?",
-    "🤍 Har bir hisobotingiz bizni ham quvontiradi. Bugun ham xursand qilasizmi? 😊",
-    "📚 Bitta yaxshi kitob ming suhbatga arziydi. Bugungi suhbatdoshingiz kim?",
-    "🕯 Kitob o'qilgan kuni ko'ngil boshqacha yorishadi. Kuningiz yorug' bo'lsin!",
-    "🌿 Shoshilmang: ozdan bo'lsa ham, lekin har kuni. Eng muhimi — to'xtab qolmaslik 💛",
-    "👣 Kecha o'qidingiz, bugun ham o'qisangiz — bu endi odat. Odat esa — kuch!",
-    "📖 Bugun bir bet bo'lsa ham o'qing — bir bet ham hisob 🙂",
-    # ── Hamyon va Kitobcha (2026-11-01 dan) ───────────────────────────────
-    "🪙 Bilasizmi? Kitobchangiz har kungi hisobot to'lovining 300 so'migacha qismini o'zi to'laydi. O'qing, yuting, tejang!",
-    "👛 Hamyoningiz yana necha kunga yetishini bilmoqchimisiz? «👛 Hamyon» tugmasi hammasini ko'rsatadi.",
-    "🎁 Kitobxon do'stingizni taklif qiling: u birinchi hisobotini yuborganda sizga <b>500 Kitobcha</b>! Havola: «Kabinet → 🌟 Yaxshilik ulashuvchi».",
-    "👥 Birga o'qish yanada qiziq! Do'stingizni chaqiring — har bir faol do'st uchun <b>500 Kitobcha</b> 🎁",
-]
+# Reminder texts live in services/reminder_texts (rubrics, one-liners,
+# streak reminders); pick_inspiration avoids repeats.
+from tgbot.services.reminder_texts import (  # noqa: E402
+    INSPIRATION_POOL, STREAK_WARNING_POOL, pick_inspiration,
+)
 
 
 def _cta_reply_markup():
@@ -941,7 +897,7 @@ def send_random_inspiration():
     else:
         threshold = 1  # 21:00 slot
 
-    text = random.choice(INSPIRATION_POOL)
+    text = pick_inspiration()
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     qs = TelegramProfile.objects.filter(
         is_registered=True, is_blocked=False, reminder_count__gte=threshold,
@@ -1001,7 +957,7 @@ def send_personalized_inspiration():
         return
 
     import time as _t
-    text = random.choice(INSPIRATION_POOL)
+    text = pick_inspiration()
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     reply_markup = _cta_reply_markup()
     sent = failed = 0
@@ -1068,31 +1024,6 @@ def broadcast_reminder(text: str):
     print(f"broadcast_reminder: sent={sent} failed={failed}")
 
 
-# ────────────────────────────────────────────────────────────────────────
-# Streak reminder — sent at 20:00 to users who haven't reported today.
-# Warm and encouraging, always with "Siz" (owner, 2026-11-01).
-# ────────────────────────────────────────────────────────────────────────
-STREAK_WARNING_POOL = [
-    "🔥 Bugungi hisobotingiz hali yo'q... Streakingiz sizni kutyapti — bir necha bet o'qib, uni asrab qoling!",
-    "😊 Kun hali tugamadi! Bir necha bet o'qing va hisobotni yuboring — streakingiz saqlanib qoladi.",
-    "⏰ Eslatib qo'yamiz: bugun hali hisobot yubormadingiz. Bir-ikki bet ham kifoya — streakingizni asrang!",
-    "🌙 Kech kirdi, streakingiz esa sizni kutmoqda. Bir necha bet — va kun chiroyli yakunlanadi 💛",
-    "🤍 Shuncha kun yiqqan streakingizni bugun yo'qotib qo'ymang! Bir necha bet yetarli.",
-    "📖 Kitobingiz ochilishini kutyapti, streakingiz esa — hisobotingizni. Ikkalasini ham xursand qiling 😊",
-    "🕯 Kun yakuniga oz qoldi. Uxlashdan oldin bir necha bet o'qib, hisobotni yuborsangiz — streak omon!",
-    "💪 Bugun band bo'lgandirsiz, tushunamiz. Lekin 5 daqiqa topilsa — streakingiz saqlanib qoladi!",
-    "🌱 Har kuni ozgina — butun sir shu. Bugungi ozginani hali qo'shmadingiz 🙂",
-    "🔔 Do'stona eslatma: bugungi hisobot hali yo'q. Streakingiz uzilib qolmasin!",
-    "🏃 Hali ulgurasiz! Bir necha bet o'qing — streakingiz yana bir kunga uzayadi 🔥",
-    "☕️ Bir piyola choy, bir necha bet va bitta hisobot — bugungi kun ham streakka qo'shiladi!",
-    "🌟 Siz har kuni o'qiydiganlardansiz — buni bugun ham isbotlab qo'ying 😊",
-    "📚 Streak — kunma-kun yig'ilgan mehnatingiz. Bugun ham bir g'isht qo'yib qo'ying!",
-    "🫶 Sizni eslab turibmiz: bugungi hisobotingiz hali kelmadi. Kutib qolamiz!",
-    "🔥 Olovni o'chirmang! Bir necha bet — va streakingiz yana yonib turadi.",
-    "😌 Kun qanchalik og'ir o'tgan bo'lsa ham, bir necha bet kitob ko'ngilni yengil qiladi. Hisobotni ham unutmang!",
-    "⏳ Bugun tugashiga oz qoldi — streakingiz o'z qo'lingizda. Bir necha bet bilan uni saqlab qoling!",
-    "🧊 Bugun umuman imkon bo'lmasa — Market'dagi «Streak muzlatish» streakingizni asrab qoladi.",
-]
 
 
 @shared_task
