@@ -46,8 +46,9 @@ ANNOUNCEMENTS = {
         18: ((
             "💎 <b>Imtiyozlar qayerga ketdi?</b> (4/4)\n\n"
             "Hech qayerga, ular endi hamyonda 😊\n"
-            "1️⃣ Hamyonida <b>15 000 so'm</b> va undan ko'p bo'lganlarga sobiq Premium'ning "
-            "hamma imtiyozlari: 2× Kitobcha, VIP arena, kuniga bir necha hisobot.\n"
+            "1️⃣ Hamyonni bir martada <b>15 000 so'm</b> va undan ko'p to'ldirsangiz — har 1 000 so'm "
+            "uchun 1 kunlik imtiyoz: 2× Kitobcha, VIP arena, kuniga bir necha hisobot. "
+            "Masalan, 30 000 so'm — butun 30 kun 💎\n"
             "2️⃣ Premium muddatingiz hali tugamagan bo'lsa, qolgan har bir kuningiz uchun "
             "hamyoningizga <b>1 000 so'm</b> qo'shildi. Premium imtiyozlari esa "
             "muddati tugaguncha saqlanadi 🤝\n"

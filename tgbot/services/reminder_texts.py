@@ -164,8 +164,8 @@ RUBRIC_TEXTS = [
     "Kitob bilimingizni sinab, Kitobcha yutishingiz mumkin. Bugun ham qatnashing!",
 
     "🤔 <b>Bilasizmi?</b>\n\n"
-    "Hamyoningizda 15 000 so'm va undan ko'p bo'lsa — Kitobchalar ikki barobar 💎, VIP arena ochiladi "
-    "va kuniga bir necha hisobot yubora olasiz.",
+    "Hamyonni bir martada 15 000 so'm va undan ko'p to'ldirsangiz — har 1 000 so'm uchun 1 kunlik imtiyoz: "
+    "Kitobchalar ikki barobar 💎, VIP arena va kuniga bir necha hisobot. 30 000 so'm — butun 30 kun!",
 
     "🤔 <b>Bilasizmi?</b>\n\n"
     "Audiokitob tinglaganingiz ham hisobot bo'ladi 🎧 Yo'lda, oshxonada, sayrda — "

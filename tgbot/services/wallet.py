@@ -8,8 +8,12 @@ Owner's decisions (2026-10-25):
 - everyone gets LAUNCH_BONUS (3 000) once; paid Premium days left at the
   launch become DAY_FEE each in the wallet, and Premium ends;
 - Premium's perks (2x Kitobcha, VIP arena, many reports a day, AI quiz
-  allowance) go to members: wallet >= MEMBER_MIN (15 000 so'm, owner
-  2026-10-28) -- see is_member(), which has_active_premium() defers to;
+  allowance) go to members -- see is_member(), which has_active_premium()
+  defers to. Membership is bought, not held (owner, 2026-11-01): a single
+  top-up of MEMBER_MIN (15 000 so'm) or more gives one perk day per DAY_FEE,
+  added after any days still left (wallet_member_until). Holding a balance
+  earns nothing -- a perk for keeping money parked would look like a benefit
+  on a loan, and a balance threshold took the perks away at the first fee;
 - a Premium bought before the launch keeps those perks until its own end
   date, whatever the wallet holds -- that was the promise when it was sold.
   Its days left are ALSO credited to the wallet (DAY_FEE each);
@@ -34,7 +38,7 @@ DAY_FEE = 1000
 LAUNCH_BONUS = 3000
 KITOBCHA_SHARE_PCT = 30
 MEMBER_MIN = 15000
-TOPUP_PRESETS = (1000, 2000, 5000, 10000, 30000)
+TOPUP_PRESETS = (1000, 2000, 5000, 10000, 15000, 30000)
 MIN_TOPUP = 1000
 MAX_TOPUP = 2_000_000
 
@@ -138,14 +142,43 @@ def legacy_premium(user) -> bool:
     return Payment.objects.filter(user_id=user.id, status="paid", end_date__gte=timezone.localdate()).exists()
 
 
+def member_until(user):
+    """Last day of the perks a top-up bought, or None when none are left."""
+    until = getattr(user, "wallet_member_until", None)
+    return until if until and until >= timezone.localdate() else None
+
+
+_UZ_MONTHS = ("yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul",
+              "avgust", "sentyabr", "oktyabr", "noyabr", "dekabr")
+
+
+def uz_date(d) -> str:
+    """16-noyabr"""
+    return f"{d.day}-{_UZ_MONTHS[d.month - 1]}"
+
+
+def member_days_for(amount) -> int:
+    """Perk days one top-up buys: one per DAY_FEE, from MEMBER_MIN up."""
+    return int(amount) // DAY_FEE if int(amount) >= MEMBER_MIN else 0
+
+
+def _extend_membership_locked(p, days: int) -> None:
+    """Add `days` after the perk days still left (or from today)."""
+    yesterday = timezone.localdate() - datetime.timedelta(days=1)
+    start = max(p.wallet_member_until or yesterday, yesterday)
+    p.wallet_member_until = start + datetime.timedelta(days=days)
+    p.save(update_fields=["wallet_member_until"])
+
+
 def is_member(user) -> bool:
-    return int(user.wallet_balance or 0) >= MEMBER_MIN or legacy_premium(user)
+    return member_until(user) is not None or legacy_premium(user)
 
 
 def member_ids() -> set:
     """Bulk is_member() for broadcasts and leaderboards."""
     from tgbot.models import Payment, TelegramProfile
-    ids = set(TelegramProfile.objects.filter(wallet_balance__gte=MEMBER_MIN).values_list("id", flat=True))
+    ids = set(TelegramProfile.objects.filter(wallet_member_until__gte=timezone.localdate())
+              .values_list("id", flat=True))
     ids |= set(Payment.objects.filter(status="paid", end_date__gte=timezone.localdate())
                .values_list("user_id", flat=True))
     return ids
@@ -296,7 +329,11 @@ def approve_topup(topup_id: int, admin=None):
         t.save(update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"])
         p = TelegramProfile.objects.select_for_update().get(id=t.user_id)
         _credit_locked(p, t.amount, WalletTransaction.KIND_TOPUP, f"To'ldirish #{t.id}")
+        days = member_days_for(t.amount)
+        if days:
+            _extend_membership_locked(p, days)
         t.user.wallet_balance = p.wallet_balance
+        t.user.wallet_member_until = p.wallet_member_until
     return t, True
 
 

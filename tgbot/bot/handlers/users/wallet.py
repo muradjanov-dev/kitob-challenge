@@ -38,6 +38,15 @@ def wallet_text(user) -> str:
         today = ("✅ Сегодняшний день уже оплачен." if paid else
                  f"⏳ С первого отчёта сегодня спишется {_som(wallet.DAY_FEE)} сум.")
         kit = "используются" if user.wallet_use_kitobcha else "не используются"
+        until = wallet.member_until(user)
+        if until:
+            perks = (f"💎 Привилегии активны до <b>{until:%d.%m}</b>: 2× Kitobcha, VIP-арена, несколько "
+                     f"отчётов в день. Новое пополнение от {_som(wallet.MEMBER_MIN)} сум продлит их.\n\n")
+        elif wallet.legacy_premium(user):
+            perks = "💎 Привилегии Premium активны до конца его срока.\n\n"
+        else:
+            perks = (f"💎 Пополнение за один раз от <b>{_som(wallet.MEMBER_MIN)} сум</b> даёт привилегии на "
+                     f"1 день за каждые {_som(wallet.DAY_FEE)} сум: 2× Kitobcha, VIP-арена, несколько отчётов в день.\n\n")
         return (
             "👛 <b>Ваш кошелёк</b>\n\n"
             f"💰 Баланс: <b>{_som(bal)} сум</b>\n"
@@ -46,13 +55,23 @@ def wallet_text(user) -> str:
             f"{today}\n\n"
             f"ℹ️ Один день отчётов стоит <b>{_som(wallet.DAY_FEE)} сум</b> и списывается один раз в день "
             f"при первом отчёте. До {wallet.KITOBCHA_SHARE_PCT}% ({max_k}) можно оплатить Kitobcha.\n"
-            f"💎 При балансе от {_som(wallet.MEMBER_MIN)} сум — все бывшие Premium-возможности: "
-            "2× Kitobcha, VIP-арена, несколько отчётов в день.\n\n"
+            f"{perks}"
             "Выберите сумму пополнения 👇"
         )
     today = ("✅ Bugungi kun to'langan." if paid else
              f"⏳ Bugun birinchi hisobotda {_som(wallet.DAY_FEE)} so'm yechiladi.")
     kit = "ishlatiladi" if user.wallet_use_kitobcha else "ishlatilmaydi"
+    until = wallet.member_until(user)
+    if until:
+        perks = (f"💎 Imtiyozlaringiz <b>{wallet.uz_date(until)}gacha</b> faol: 2× Kitobcha, VIP arena, "
+                 f"kuniga bir necha hisobot. Yana {_som(wallet.MEMBER_MIN)} so'm va undan ko'p to'ldirsangiz, "
+                 "muddat uzayadi.\n\n")
+    elif wallet.legacy_premium(user):
+        perks = "💎 Premium imtiyozlaringiz muddati tugaguncha faol.\n\n"
+    else:
+        perks = (f"💎 Bir martada <b>{_som(wallet.MEMBER_MIN)} so'm</b> va undan ko'p to'ldirsangiz — har "
+                 f"{_som(wallet.DAY_FEE)} so'm uchun 1 kunlik imtiyoz: 2× Kitobcha, VIP arena, kuniga bir "
+                 "necha hisobot.\n\n")
     return (
         "👛 <b>Hamyoningiz</b>\n\n"
         f"💰 Balans: <b>{_som(bal)} so'm</b>\n"
@@ -62,8 +81,7 @@ def wallet_text(user) -> str:
         f"ℹ️ Bir kunlik hisobot <b>{_som(wallet.DAY_FEE)} so'm</b> — kuniga bir marta, birinchi "
         f"hisobotda yechiladi. Uning {wallet.KITOBCHA_SHARE_PCT}% gachasini ({max_k} tagacha) "
         "Kitobcha bilan to'lash mumkin.\n"
-        f"💎 Hamyonida {_som(wallet.MEMBER_MIN)} so'm va undan ko'p bo'lganlarga barcha sobiq Premium "
-        "imtiyozlari: 2× Kitobcha, VIP arena, kuniga bir necha hisobot.\n\n"
+        f"{perks}"
         "To'ldirish uchun summani tanlang 👇"
     )
 
@@ -444,12 +462,20 @@ async def wallet_topup_approve(call: types.CallbackQuery):
     user = topup.user
     days = await sync_to_async(wallet.days_left)(user)
     ru = _lang(user) == "ru"
+    until = wallet.member_until(user) if wallet.member_days_for(topup.amount) else None
+    if until:
+        perks = (f"💎 Привилегии активны до <b>{until:%d.%m}</b>: 2× Kitobcha, VIP-арена, несколько отчётов в день.\n\n"
+                 if ru else
+                 f"💎 Imtiyozlaringiz <b>{wallet.uz_date(until)}gacha</b> faol: 2× Kitobcha, VIP arena, "
+                 "kuniga bir necha hisobot.\n\n")
+    else:
+        perks = ""
     text = (
         f"✅ <b>Кошелёк пополнен!</b>\n\n➕ {_som(topup.amount)} сум\n"
-        f"💰 Баланс: <b>{_som(user.wallet_balance)} сум</b> (≈ {days} дн. отчётов)\n\nЧитайте дальше! 📚"
+        f"💰 Баланс: <b>{_som(user.wallet_balance)} сум</b> (≈ {days} дн. отчётов)\n\n{perks}Читайте дальше! 📚"
         if ru else
         f"✅ <b>Hamyoningiz to'ldirildi!</b>\n\n➕ {_som(topup.amount)} so'm\n"
-        f"💰 Balans: <b>{_som(user.wallet_balance)} so'm</b> (≈ {days} kunlik hisobot)\n\nKitob o'qishda davom eting! 📚"
+        f"💰 Balans: <b>{_som(user.wallet_balance)} so'm</b> (≈ {days} kunlik hisobot)\n\n{perks}Kitob o'qishda davom eting! 📚"
     )
     try:
         await bot.send_message(user.telegram_id, text, parse_mode="HTML")

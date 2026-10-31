@@ -293,6 +293,11 @@ class TelegramProfile(BaseModel):
         default=True,
         help_text="Kunlik to'lovning 30% gacha qismini Kitobcha bilan to'lash.",
     )
+    wallet_member_until = models.DateField(
+        null=True, blank=True,
+        help_text="Imtiyozlar shu kungacha (shu kun ham) faol. Bir martada 15 000 so'm "
+                  "va undan ko'p to'ldirish har 1 000 so'm uchun 1 kun qo'shadi.",
+    )
 
     def has_active_premium(self) -> bool:
         """True if the user has a paid Payment active today, OR is inside a

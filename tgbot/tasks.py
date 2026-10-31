@@ -1863,6 +1863,9 @@ def _pinned_balance_text(user) -> str:
 
     days = _wallet.days_left(user)
     text = f"👛 Hamyon: <b>{_n(user.wallet_balance)} so'm</b> · 🪙 <b>{_n(user.ball)}</b> Kitobcha\n"
+    until = _wallet.member_until(user)
+    if until:
+        text += f"💎 Imtiyozlar <b>{_wallet.uz_date(until)}gacha</b> faol\n"
     if days:
         return text + f"📅 Yana <b>{days}</b> kunlik hisobotga yetadi"
     if _wallet.paid_on(user):
@@ -2580,7 +2583,7 @@ def send_daily_personal_report():
                     f"📖 <b>Bugun o'qidingiz:</b> <b>{today_p} bet</b>\n"
                     f"📈 <b>Trend:</b> {trend}\n"
                     f"📚 <b>Jami o'qilgan:</b> <b>{total_p} bet</b>\n\n"
-                    + (f"💎 <b>Hamyonida 15 000 so'm bo'lgan kitobxonlar har kuni quyidagilarni oladi:</b>\n"
+                    + (f"💎 <b>Hamyonini bir martada 15 000 so'm va undan ko'p to'ldirganlar har kuni quyidagilarni oladi:</b>\n"
                        if _wallet_era else
                        f"💎 <b>Premium a'zolar har kuni quyidagilarni oladi:</b>\n") +
                     f"  • Bugun vs kecha, hafta, oy, yil taqqoslama (%)\n"
@@ -5814,7 +5817,7 @@ def grant_daily_ai_quiz_trial():
     text = (
         "🎁 <b>Tabriklaymiz! Sizga maxsus sovg'a!</b>\n\n"
         f"Keyingi <b>{AI_QUIZ_TRIAL_HOURS} soat</b> davomida 🤖 <b>AI yordamida quiz "
-        "yaratish</b> — odatda hamyonida 15 000 so'm bo'lganlarga bepul ochiladigan funksiya — siz uchun ham ochiq!\n\n"
+        "yaratish</b> — odatda hamyonini bir martada 15 000 so'm to'ldirganlarga bepul ochiladigan funksiya — siz uchun ham ochiq!\n\n"
         "Matn, rasm yoki PDF yuboring — AI o'zi savollar tuzib beradi. "
         "Asosiy menyu → 📝 Kitob Quiz → 🤖 AI yordamida Quiz yaratish.\n\n"
         "⏳ Imkoniyat 1 soatdan keyin tugaydi — hoziroq sinab ko'ring!"
@@ -6499,7 +6502,7 @@ def send_game_teaser(slot="evening"):
 # engine's own copy.
 PREMIUM_2X_NOTE = "\n\n💎 <i>Premium a'zolar bu o'yinda <b>2 barobar</b> Kitobcha oladi.</i>"
 # After the wallet launch the 2x belongs to readers with a funded wallet.
-WALLET_2X_NOTE = "\n\n💎 <i>Hamyonida 15 000 so'm va undan ko'p bo'lganlar bu o'yinda <b>2 barobar</b> Kitobcha oladi.</i>"
+WALLET_2X_NOTE = "\n\n💎 <i>Hamyonini bir martada 15 000 so'm va undan ko'p to'ldirganlar bu o'yinda <b>2 barobar</b> Kitobcha oladi.</i>"
 
 
 def _announce_game(text, start_param, premium_note=True):
@@ -7776,7 +7779,7 @@ def _premium_missed_line(w, prem_ids) -> str:
         return ""
     from tgbot.services import wallet as _wallet
     if _wallet.is_live_launch():
-        return (f"\n\n💎 <i>Hamyoningizda 15 000 so'm bo'lganida bu o'yinda "
+        return (f"\n\n💎 <i>Hamyonni bir martada 15 000 so'm to'ldirganingizda bu o'yinda "
                 f"<b>+{w['reward'] * 2} Kitobcha</b> olardingiz — ikki barobar.</i>")
     return (f"\n\n💎 <i>Premium bo'lganingizda bu o'yinda "
             f"<b>+{w['reward'] * 2} Kitobcha</b> olardingiz — ikki barobar.</i>")
@@ -8319,7 +8322,7 @@ def open_ad_auctions(force=False):
     from tgbot.services import wallet as _wallet
     from tgbot.services.shop_links import button as _product_button
     if _wallet.is_live_launch():
-        lines.append("👛 <b>Hamyonida 15 000 so'm va undan ko'p</b> bo'lgan kitobxonlar qatnasha oladi.\n")
+        lines.append("👛 <b>Hamyonini bir martada 15 000 so'm va undan ko'p</b> to'ldirgan kitobxonlar qatnasha oladi.\n")
     else:
         lines.append("⭐️ <b>Faqat Premium a'zolar</b> qatnasha oladi.\n")
     lines.append("👇 <b>Taklifingizni hoziroq qo'ying — joy bittagina!</b>")
