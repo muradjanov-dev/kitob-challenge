@@ -863,63 +863,53 @@ def broadcast_period_top(period_key: str):
 
 
 INSPIRATION_POOL = [
-    "📚 Bir bet — bir qadam. Bugungi qadamingni tashladingmi?",
-    "🚀 Kitob o'qiganingni unutma — hisobotni jo'natsang, ball ham, faxr ham seniki!",
-    "🔥 Mutolaa — miyangning sport zali. Bugungi mashqni yozib qoldir!",
-    "⏳ Vaqt o'tadi, betlar qoladi. Bugun nechta bet o'qiding?",
-    "💡 Eng zo'r investitsiya — kitob. Eng oson hisobot — bitta tugma!",
-    "🌱 Har kuni bir bet — yil oxiriga 365 bet. Hisobotni unutma!",
-    "📖 \"Kitob — eng sodiq do'st\" (xalq maqoli). Do'stingni bugun ziyorat qildingmi?",
-    "💪 Kuchli odamlar har kuni o'qiydi. Sen ham kuchlilardansan — isbotla!",
-    "🎯 Maqsad — kun bo'yi bir bet. Ortig'i bonus, kami — bahonadan boshqa narsa emas.",
-    "✨ Bilim — yorug'lik. Hisobot — uni ko'rsatuvchi shamchiroq.",
-    "📊 Statistikani ko'rdingmi? Senikini ham qo'shaylik!",
-    "🏆 Chempionlar reytingida bo'shliq seni kutyapti — hisobot bilan to'ldir!",
-    "🧠 Miya muskuldek — ishlatmasang, semiradi. Bugun mashq qildingmi?",
-    "🌟 Bill Gates yiliga 50 ta kitob o'qiydi. Sen-chi?",
-    "📚 Mark Tven aytgan: \"O'qimagan odam — o'qiy olmaydigan odamdan farq qilmaydi.\" Farqni ko'rsat!",
-    "🔖 \"Kitob — qalbning oynasi.\" Bugun oynaga qaradingmi?",
-    "🎁 Hisobot yuborgan har bir kun — kelajak senga sovg'a.",
-    "⚡ 5 daqiqa vaqt + 1 tugma = bugungi hisobot tayyor!",
-    "🎓 Buyuklar kitobdan tug'iladi. Bugun bir bet ham yozilmagan tarixing yo'q.",
-    "💎 Bir bet o'qish — bir olmos. Kolleksiyangni boyitding-ku, qayd et!",
-    "🌍 Dunyoni o'zgartirgan har bir g'oya kitobdan boshlangan. Senikini boshlaylik!",
-    "🛤 Yo'l uzoq, lekin har bet — bir qadam. Bugungi qadamni yozib ket!",
-    "🔋 Energiya bormi? Kitob — eng yaxshi quvvatlovchi. Hisobotni unutma!",
-    "🥇 Bugun reytingda yuqoriga ko'tarilishni xohlaysanmi? Hisobot — eng tez yo'l!",
-    "📝 Eslatma: hisobotsiz kun — yo'qotilgan kun. Yo'qotma!",
-    "🎬 Ertangi sen bugungi mutolaadan tug'iladi. Kim bo'lishni xohlaysan?",
-    "🏃‍♂️ Mutolaa — to'xtab qolmaslikning eng zo'r usuli. Yana bir bet!",
-    "🌈 \"Kitob — sehrli eshik.\" Bugun qaysi olamga sayohat qilding?",
-    "🧩 Har kun — bir bo'lakcha. Hisobotsiz rasm to'liq bo'lmaydi!",
-    "☕ Choy + kitob = mukammal kun. Hisobot esa muhrlaydi!",
-    "🎙 Hech kim seni majburlamayapti, lekin hech kim o'rningga ham o'qimaydi.",
-    "🦁 Kitob o'qigan odam — qalbi sher. Bugun sher bo'l!",
-    "📈 Daromadingni ikki barobarga oshirishni xohlaysanmi? Yiliga 12 ta kitob o'qi!",
-    "🛡 Jaholat — eng katta dushman. Qurolib ol — kitob bilan!",
-    "🌙 Tun tushdi — kitob ochildi. Ertaga hisobot bilan kunni boshla!",
-    "🎈 Hisobot yubormoq — yengil, vijdoning xotirjam. Sinab ko'r!",
-    "💌 Kelajakdagi senga xat: \"Bugun hisobotni jo'natdim!\" — yozib ber.",
-    "🎯 Aniq maqsad: bugun bir bet. Aniq harakat: hisobot tugmasi.",
-    "🔮 Bashorat: hisobot yuborgan odam — ertaga ham yuboradi. Boshlanishi shu yerda!",
-    "🥷 Sukutdagi qahramon — har kuni o'qiyotgan odam. Sen ham shulardanmisan?",
-    "📿 \"Tomchi-tomchi yig'ilib ko'l bo'ladi.\" Bet-bet yig'ilib — kutubxona!",
-    "🚂 Mutolaa poyezdi to'xtamasdan ketyapti — chiqib qolma, hisobot ber!",
-    "🪴 Bilim — daraxt. Har bet — bir suv. Suvsiz qoldirma!",
-    "🦋 O'zgarish kichik harakatlardan boshlanadi. Bugungi harakat — hisobot.",
-    "🧭 Yo'lingni yo'qotma — kitob ko'rsatadi. Qadamingni yoz — hisobot esda tutadi.",
-    "🏔 Tog'lar bir kunda zabt etilmaydi. Lekin har kun bir qadam — albatta cho'qqida!",
-    "🍀 Omad — tayyorgarlik bilan uchrashishdir. O'qib tayyor bo'l!",
-    "🎨 Hayot — sen chizayotgan rasm. Kitob — eng zo'r bo'yoqlar to'plami.",
-    "🪄 Sehr yo'q, mehnat bor. Bugungi mehnat — bir bet va bir tugma.",
-    "🌅 Yangi kun — yangi imkoniyat. Hisobot bilan boshla, faxr bilan tugat!",
-    "📮 Hisobot tugmasi seni kutmoqda. Bosishga tayyormisan? 👇",
-    # ── Referral → Premium reminders ──────────────────────────────────────
-    "💎 Premiumni PULSIZ oling! Do'stlarni taklif qiling: <b>har bir taklif = 1 kun Premium</b>. Havolangiz: «📊 Reyting → 🌟 Referal».",
-    "🎁 Yolg'iz o'qima — do'st taklif qil! <b>Har bir taklif uchun 1 kun Premium</b> 💎. «📊 Reyting → 🌟 Referal».",
-    "👥 Do'stingiz ham kitobxon bo'lsin! Referal havolangizni ulashing — har biri uchun <b>1 kun 💎 Premium</b> sovg'a!",
-    "🚀 Premium olishning eng oson yo'li — do'st taklif qilish! Har do'st = 1 kun Premium. Havola «📊 Reyting → 🌟 Referal»da.",
-    "💌 Kitobxon do'stingizni chaqiring — u o'qiy boshlasa, sizga <b>1 kun 💎 Premium</b>!",
+    "📚 Bir bet — bir qadam. Bugungi qadamingizni tashladingizmi?",
+    "🔥 Mutolaa — aqlning sport zali. Bugungi mashqni hisobotda qayd eting!",
+    "⏳ Vaqt o'tib ketadi, o'qilgan betlar esa siz bilan qoladi. Bugun nechta bet o'qidingiz?",
+    "💡 Eng foydali sarmoya — kitob. Eng oson hisobot — bitta tugma 👇",
+    "🌱 Har kuni bir necha bet — yil oxirida butun boshli kutubxona. Bugungisini unutmang!",
+    "📖 «Kitob — eng sodiq do'st.» Bugun do'stingizdan xabar oldingizmi?",
+    "💪 Har kuni o'qiydigan odam sekin-asta o'zgaradi. Siz ham shu yo'ldasiz — davom eting!",
+    "✨ Bilim — nur. Hisobot esa shu nurni har kuni yoqib turadigan chiroq.",
+    "🏆 Reytingda siz uchun joy bor — bugungi hisobot bilan bir pog'ona yuqoriga!",
+    "🧠 Aql ham xuddi muskul: ishlatgan sari kuchayadi. Bugun unga ozgina mashq bering 😊",
+    "🌟 Buyuk insonlarning umumiy odati — har kuni o'qish. Siz ham ular safidasiz!",
+    "🔖 Kecha qayerda to'xtagan edingiz? Kitobingiz sizni o'sha betda kutib turibdi 📖",
+    "🎁 Bugun o'qilgan har bir bet — ertangi o'zingizga sovg'a.",
+    "⚡ 10 daqiqa mutolaa + 1 tugma = bugungi hisobot tayyor!",
+    "💎 Har bir o'qilgan bet — xazinangizga qo'shilgan bir dur. Qayd etib qo'ying!",
+    "🌍 Dunyoni o'zgartirgan har bir g'oya kitobdan boshlangan. Sizning g'oyangiz qaysi kitobda ekan?",
+    "🛤 Yo'l uzoq bo'lsa ham, har bet — oldinga bir qadam. Bugungi qadamni yozib qo'ying!",
+    "🔋 Charchadingizmi? Bir necha bet yaxshi kitob — eng yaxshi dam olish 🙂",
+    "📝 Bugun o'qigan bo'lsangiz, hisobotni yuborib qo'ying — mehnatingiz bekorga ketmasin!",
+    "🎬 Ertangi siz bugungi mutolaangizdan boshlanadi.",
+    "🌈 Kitob — sehrli eshik. Bugun qaysi olamga sayohat qildingiz?",
+    "🧩 Har kungi hisobot — katta suratning bir bo'lagi. Bugungi bo'lakni joyiga qo'yamizmi?",
+    "☕️ Bir piyola choy va yaxshi kitob — kunning eng shirin daqiqalari. Hisobotni ham unutmang!",
+    "🦁 Kitob o'qigan qalb kuchli bo'ladi. Bugun ham o'sha kuchni oshiring!",
+    "🌙 Kun yakunlanmoqda. Yotishdan oldin bir necha bet o'qib, hisobot yuborsangiz — qanday yaxshi!",
+    "💌 Kelajakdagi o'zingizga xat: «Bugun ham o'qidim.» Hisobot — shu xatning muhri.",
+    "🎯 Bugungi maqsad juda oddiy: bir necha bet va bitta tugma.",
+    "🥷 Har kuni jimgina o'qiydiganlar — haqiqiy qahramonlar. Siz ham shulardansiz!",
+    "📿 «Tomchi-tomchi ko'l bo'lur.» Bet-bet esa — butun bir kutubxona!",
+    "🚂 Mutolaa poyezdi yo'lda — bugun ham bekatda qolib ketmang 😊",
+    "🪴 Bilim — daraxt, har bir bet — unga suv. Bugun ham sug'oramizmi?",
+    "🦋 Katta o'zgarishlar kichik odatlardan boshlanadi. Bugungi odat — bir necha bet.",
+    "🏔 Cho'qqiga bir kunda chiqilmaydi, lekin har kungi qadam albatta yetkazadi!",
+    "🎨 Hayotingiz — siz chizayotgan surat. Kitoblar esa eng chiroyli bo'yoqlaringiz.",
+    "🌅 Yangi kun — yangi bet. Uni mutolaa bilan boshlang, xursandchilik bilan yakunlang!",
+    "📮 Hisobot tugmasi sizni kutyapti 👇 Bugun nima o'qidingiz?",
+    "🤍 Har bir hisobotingiz bizni ham quvontiradi. Bugun ham xursand qilasizmi? 😊",
+    "📚 Bitta yaxshi kitob ming suhbatga arziydi. Bugungi suhbatdoshingiz kim?",
+    "🕯 Kitob o'qilgan kuni ko'ngil boshqacha yorishadi. Kuningiz yorug' bo'lsin!",
+    "🌿 Shoshilmang: ozdan bo'lsa ham, lekin har kuni. Eng muhimi — to'xtab qolmaslik 💛",
+    "👣 Kecha o'qidingiz, bugun ham o'qisangiz — bu endi odat. Odat esa — kuch!",
+    "📖 Bugun bir bet bo'lsa ham o'qing — bir bet ham hisob 🙂",
+    # ── Hamyon va Kitobcha (2026-11-01 dan) ───────────────────────────────
+    "🪙 Bilasizmi? Kitobchangiz har kungi hisobot to'lovining 300 so'migacha qismini o'zi to'laydi. O'qing, yuting, tejang!",
+    "👛 Hamyoningiz yana necha kunga yetishini bilmoqchimisiz? «👛 Hamyon» tugmasi hammasini ko'rsatadi.",
+    "🎁 Kitobxon do'stingizni taklif qiling: u birinchi hisobotini yuborganda sizga <b>500 Kitobcha</b>! Havola: «Kabinet → 🌟 Yaxshilik ulashuvchi».",
+    "👥 Birga o'qish yanada qiziq! Do'stingizni chaqiring — har bir faol do'st uchun <b>500 Kitobcha</b> 🎁",
 ]
 
 
@@ -1079,35 +1069,35 @@ def broadcast_reminder(text: str):
 
 
 # ────────────────────────────────────────────────────────────────────────
-# Streak-burning warning — sent at 22:00 to users who haven't reported today.
+# Streak reminder — sent at 20:00 to users who haven't reported today.
+# Warm and encouraging, always with "Siz" (owner, 2026-11-01).
 # ────────────────────────────────────────────────────────────────────────
 STREAK_WARNING_POOL = [
-    "🔥 Voyyy, streak kuyib ketmoqda! Hali ham hisobot yo'q... 1 bet o'qi, qoqindiq bo'lib qolma!",
-    "😬 Streak — bu qo'lga kiritilmaydi, asrash kerak. Bugun hali 0 bet. Shoshil, kuyib ketadi!",
-    "🚨 OGOHLANTIRISH: Streakin bugun xavf ostida! Bitta bet o'qi, bitta tugma bos. Qoqindiq emassan-ku?",
-    "😤 Boshqalar hisobot yuborib bo'ldi, sen-chi? Streak 1-kundan boshlansa uyalamaysanmi? 1 bet kifoya!",
-    "🫠 Streak = mehnat. Bugun mehnat qilmadingmi? Hech bo'lmasa 1 bet o'qi, qoqindiq bo'lib qolma!",
-    "⚠️ Diqqat! Streak yonmoqda... Yaxshi kitobxonlarga bu xabar kerak emas, lekin sen hali hisobot bermagansan. Tez bo'l!",
-    "🐢 Sekin-sekin bo'lsa ham, lekin bugun hali 0 bet? Streak kuymoqda! 1 bet o'qi, qoqindiq!",
-    "😅 Kech bo'lsa ham kech emas! Hali vaqt bor, 1 bet o'qi va streak'ni qutqar. Qoqindiq bo'lma!",
-    "🤦 Uh, bugun hisobot yo'q... Streak 1-kundan boshlanishini xohlaysanmi? Hech bo'lmasa 1 bet — bitta tugma!",
-    "🔔 Eslatma: Streakin bugun kuyib ketmoqda. Ertaga \"ey nima bo'ldi\" dema. 1 bet o'qi, qoqindiq!",
-    "💀 Streak murdaga aylanmoqda! Uni tiriltirishning yagona yo'li — hisobot. Hoziroq, 1 bet ham yetadi!",
-    "😒 Kuniga 1 bet... 1 ta! Buni qilolmasan — qoqindiqsan, to'g'rimi? Isbotla, streak'ni qutqar!",
-    "🥴 Hisobotsiz kun = yo'qotilgan streak. Bugungi sen ertangi senga xiyonat qilmoqda. 1 bet, 1 tugma!",
-    "🫡 Odam kitob o'qiydi, qoqindiq bahona topadi. Sen qaysi tomondasanda? Streak kutmoqda!",
-    "😩 Streakin bugun halok bo'lishi mumkin. Oilangg, do'stlaring bilsa uyalmasmidin? 1 bet o'qi!",
-    "🧨 BOOM — streak portlab ketmoqda! Hali vaqt bor, 1 bet bilan uni qutqar. Dangasa bo'lma!",
-    "🫵 Ha, sen! Hisobot bermagansan bugun. Streakin 1-kundan boshlanishini xohlaysanmi? 1 bet yetadi!",
-    "🤡 Streak nol bo'lsa? Qiziq ko'rinadi. Bugun 1 bet o'qib, \"Men qoqindiq emasman\" de — isbotla!",
-    "🕙 Soat 22:00, hali ham hisobot yo'q. Streakin kuymoqda. 1 bet o'qi — shu qadar oson!",
-    "🌙 Tun kirib kelmoqda, streak esa kuymoqda... Bugun 1 bet o'qib hisobot yubor, qoqindiq bo'lib qolma!",
+    "🔥 Bugungi hisobotingiz hali yo'q... Streakingiz sizni kutyapti — bir necha bet o'qib, uni asrab qoling!",
+    "😊 Kun hali tugamadi! Bir necha bet o'qing va hisobotni yuboring — streakingiz saqlanib qoladi.",
+    "⏰ Eslatib qo'yamiz: bugun hali hisobot yubormadingiz. Bir-ikki bet ham kifoya — streakingizni asrang!",
+    "🌙 Kech kirdi, streakingiz esa sizni kutmoqda. Bir necha bet — va kun chiroyli yakunlanadi 💛",
+    "🤍 Shuncha kun yiqqan streakingizni bugun yo'qotib qo'ymang! Bir necha bet yetarli.",
+    "📖 Kitobingiz ochilishini kutyapti, streakingiz esa — hisobotingizni. Ikkalasini ham xursand qiling 😊",
+    "🕯 Kun yakuniga oz qoldi. Uxlashdan oldin bir necha bet o'qib, hisobotni yuborsangiz — streak omon!",
+    "💪 Bugun band bo'lgandirsiz, tushunamiz. Lekin 5 daqiqa topilsa — streakingiz saqlanib qoladi!",
+    "🌱 Har kuni ozgina — butun sir shu. Bugungi ozginani hali qo'shmadingiz 🙂",
+    "🔔 Do'stona eslatma: bugungi hisobot hali yo'q. Streakingiz uzilib qolmasin!",
+    "🏃 Hali ulgurasiz! Bir necha bet o'qing — streakingiz yana bir kunga uzayadi 🔥",
+    "☕️ Bir piyola choy, bir necha bet va bitta hisobot — bugungi kun ham streakka qo'shiladi!",
+    "🌟 Siz har kuni o'qiydiganlardansiz — buni bugun ham isbotlab qo'ying 😊",
+    "📚 Streak — kunma-kun yig'ilgan mehnatingiz. Bugun ham bir g'isht qo'yib qo'ying!",
+    "🫶 Sizni eslab turibmiz: bugungi hisobotingiz hali kelmadi. Kutib qolamiz!",
+    "🔥 Olovni o'chirmang! Bir necha bet — va streakingiz yana yonib turadi.",
+    "😌 Kun qanchalik og'ir o'tgan bo'lsa ham, bir necha bet kitob ko'ngilni yengil qiladi. Hisobotni ham unutmang!",
+    "⏳ Bugun tugashiga oz qoldi — streakingiz o'z qo'lingizda. Bir necha bet bilan uni saqlab qoling!",
+    "🧊 Bugun umuman imkon bo'lmasa — Market'dagi «Streak muzlatish» streakingizni asrab qoladi.",
 ]
 
 
 @shared_task
 def send_streak_warning():
-    """22:00 da hisobot bermaganlarni streak kuyib ketishi haqida ogohlantiradi."""
+    """20:00 da hisobot bermaganlarga streakini asrashni muloyim eslatadi."""
     today = timezone.localdate()
     reported_ids = set(
         ConfirmationReport.objects.filter(date__date=today)
@@ -4863,9 +4853,11 @@ def announce_reader_titles():
         return {"user_id": row["achievement__user_id"], "c": row["c"]} if row else None
 
     def _top_streak():
-        """Longest unbroken run of consecutive report-days, across all time."""
+        """Longest unbroken run of consecutive report-days, across all time.
+        Covered days (streak freeze, system outages) count, as everywhere else."""
         from collections import defaultdict
         from django.db.models.functions import TruncDate
+        from tgbot.models import StreakFreezeCoverage
         rows = (
             ConfirmationReport.objects.filter(user__is_blocked=False)
             .annotate(d=TruncDate("date")).values_list("user_id", "d").distinct()
@@ -4874,6 +4866,8 @@ def announce_reader_titles():
         for uid, d in rows:
             if d:
                 days[uid].add(d)
+        for uid, d in StreakFreezeCoverage.objects.filter(user__is_blocked=False).values_list("user_id", "date"):
+            days[uid].add(d)
         best_uid, best = None, 0
         for uid, dset in days.items():
             sd = sorted(dset)
@@ -4897,10 +4891,11 @@ def announce_reader_titles():
     receiver = _top_receiver()
     streak   = _top_streak()
 
+    # One quote block per category, a blank line between them: easy to read.
     lines = [
-        "🏅 <b>KITOBXON NOMINATSIYALARI</b>\n<i>(oxirgi 30 kun natijalari)</i>\n",
+        "🏅 <b>KITOBXON NOMINATSIYALARI</b>\n<i>oxirgi 30 kun natijalari</i>",
         "<i>Quyidagi g'oliblar har bir toifada eng faol bo'lgan kitobxonlardir. "
-        "Ularni bitta tugma bilan tabriklashingiz mumkin 👇</i>\n",
+        "Ularni bitta tugma bilan tabriklashingiz mumkin 👇</i>",
     ]
     # Collect winners for the single shared "Tabriklash" button.
     # Each entry: {"k": category_key, "t": winner_telegram_id}.
@@ -4910,15 +4905,15 @@ def announce_reader_titles():
         if row:
             uid = row["user_id"]
             lines.append(
-                f"{emoji} <b>{title}</b>\n"
-                f"   <i>{desc}</i>\n"
-                f"   🏆 {_name(uid)} — <b>{row[statkey]} {unit}</b>"
+                f"<blockquote>{emoji} <b>{title}</b>\n"
+                f"<i>{desc}</i>\n"
+                f"🏆 {_name(uid)} — <b>{row[statkey]} {unit}</b></blockquote>"
             )
             w = TelegramProfile.objects.filter(id=uid).first()
             if w and w.telegram_id:
                 winners.append({"k": key, "t": w.telegram_id})
         else:
-            lines.append(f"{emoji} <b>{title}</b>\n   <i>{desc}</i>\n   — hali nomzod yo'q —")
+            lines.append(f"<blockquote>{emoji} <b>{title}</b>\n<i>{desc}</i>\n— hali nomzod yo'q —</blockquote>")
 
     _add("night",    "🌙", "Tungi kitobxon",        "Tunda (22:00–05:00) eng ko'p hisobot yuborgan", night,    "ta hisobot")
     _add("morning",  "🌅", "Saharxez kitobxon",     "Saharda (05:00–10:00) eng faol — erta turar", morning,  "ta hisobot")
@@ -4928,8 +4923,8 @@ def announce_reader_titles():
     _add("giver",    "🤝", "Sahiy tabriklovchi",    "Boshqalarni eng ko'p tabriklagan sahiy inson", giver,    "ta tabrik")
     _add("receiver", "🎁", "Eng ko'p tabriklangan", "Yutuqlari uchun eng ko'p tabrik olgan",        receiver, "ta tabrik")
     _add("streak",   "🔥", "Eng intizomli",         "Eng uzoq uzluksiz (har kuni) o'qigan — intizom timsoli", streak, "kun streak")
-    lines.append("\n📚 Siz ham hisobot yuboring va o'z nominatsiyangizni egallang! 🔥")
-    text = "\n".join(lines)
+    lines.append("📚 Siz ham hisobot yuboring va o'z nominatsiyangizni egallang! 🔥")
+    text = "\n\n".join(lines)
 
     # Persist the winners so the single shared button can DM all of them.
     from tgbot.models import ReaderTitleAnnouncement
@@ -5225,26 +5220,37 @@ def post_launch_countdown():
 
 @shared_task
 def send_dated_announcement():
-    """11:00 daily: if services.dated_announcements has an approved text for
-    today, post it to the groups and DM it to every registered user, once.
-    The cache claim makes a retried or doubled beat run a no-op, and a user
-    who blocked the bot is marked is_blocked like in every other broadcast."""
+    """Hourly: if services.dated_announcements has an approved text for this
+    hour today, post it to the groups and DM it to every registered user,
+    once. The cache claim makes a retried or doubled beat run a no-op, and a
+    user who blocked the bot is marked is_blocked like in every other
+    broadcast."""
     import time as _t
     from django.core.cache import cache
     from tgbot.services.dated_announcements import announcement_for
 
-    today = timezone.localdate()
-    text = announcement_for(today)
-    if not text:
+    now = timezone.localtime()
+    today = now.date()
+    due = announcement_for(today, now.hour)
+    if not due:
         return
-    if not cache.add(f"dated_announcement_sent:{today.isoformat()}", 1, 60 * 60 * 24 * 3):
+    text, start_arg = due
+    if not cache.add(f"dated_announcement_sent:{today.isoformat()}:{now.hour}", 1, 60 * 60 * 24 * 3):
         return
+    markup = {}
+    if start_arg:
+        from tgbot.services.shop_links import _get_me
+        username = _get_me().get("username")
+        label = "👛 Hamyonni ochish" if start_arg == "hamyon" else "📖 Botni ochish"
+        if username:
+            markup = {"reply_markup": json.dumps({"inline_keyboard": [[
+                {"text": label, "url": f"https://t.me/{username}?start={start_arg}"}]]})}
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     groups = 0
     for group_id, thread_id in _announce_targets():
         try:
             data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
-                    "disable_web_page_preview": "true"}
+                    "disable_web_page_preview": "true", **markup}
             if thread_id:
                 data["message_thread_id"] = thread_id
             groups += requests.post(url, data=data, timeout=10).ok
@@ -5256,12 +5262,12 @@ def send_dated_announcement():
         .values_list("telegram_id", flat=True).distinct()
     for chat_id in ids.iterator():
         try:
-            resp = requests.post(url, data={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
-                                            "disable_web_page_preview": "true"}, timeout=8)
+            data = {"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                    "disable_web_page_preview": "true", **markup}
+            resp = requests.post(url, data=data, timeout=8)
             if resp.status_code == 429:
                 _t.sleep(int(resp.json().get("parameters", {}).get("retry_after", 3)) + 1)
-                resp = requests.post(url, data={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
-                                                "disable_web_page_preview": "true"}, timeout=8)
+                resp = requests.post(url, data=data, timeout=8)
             if resp.ok:
                 sent += 1
             else:
@@ -5271,7 +5277,7 @@ def send_dated_announcement():
         except Exception:
             failed += 1
         _t.sleep(0.04)
-    print(f"send_dated_announcement {today}: groups={groups} sent={sent} failed={failed}")
+    print(f"send_dated_announcement {today} {now.hour}:00: groups={groups} sent={sent} failed={failed}")
 
 
 @shared_task
@@ -5793,7 +5799,7 @@ def grant_daily_ai_quiz_trial():
     text = (
         "🎁 <b>Tabriklaymiz! Sizga maxsus sovg'a!</b>\n\n"
         f"Keyingi <b>{AI_QUIZ_TRIAL_HOURS} soat</b> davomida 🤖 <b>AI yordamida quiz "
-        "yaratish</b> — odatda faqat Premium'da mavjud bo'lgan funksiya — siz uchun ham ochiq!\n\n"
+        "yaratish</b> — odatda hamyonida 15 000 so'm bo'lganlarga bepul ochiladigan funksiya — siz uchun ham ochiq!\n\n"
         "Matn, rasm yoki PDF yuboring — AI o'zi savollar tuzib beradi. "
         "Asosiy menyu → 📝 Kitob Quiz → 🤖 AI yordamida Quiz yaratish.\n\n"
         "⏳ Imkoniyat 1 soatdan keyin tugaydi — hoziroq sinab ko'ring!"
