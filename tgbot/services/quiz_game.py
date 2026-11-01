@@ -313,10 +313,89 @@ def _raw_pool(flavor):
     raise ValueError(f"unknown flavor {flavor}")
 
 
+# Length leak (owner, 2026-11-01): in many banks the right answer was the
+# longest option, so players picked it without reading the question. A flavor
+# whose bank leaks that way more than LENGTH_LEAK_MAX of the time stays out of
+# the draw until its options are rewritten (measured, so it comes back on its
+# own); every game also keeps its leaking questions near chance level.
+LENGTH_LEAK_MAX = 0.6
+_TAG_RE = re.compile(r"<[^>]+>")
+_leak_memo = {}
+
+
+def _visible_len(text) -> int:
+    return len(_TAG_RE.sub("", str(text)).strip())
+
+
+def leaks_length(q) -> bool:
+    """The right option is the single longest one -- answerable unread."""
+    opts, ci = q.get("options") or [], q.get("correct")
+    if len(opts) < 2 or ci is None or not (0 <= ci < len(opts)):
+        return False
+    lens = [_visible_len(o) for o in opts]
+    return lens[ci] > max(l for i, l in enumerate(lens) if i != ci)
+
+
+def length_leak_share(flavor: str) -> float:
+    """Share of the flavor's bank that leaks; cached an hour per process."""
+    import time as _time
+    hit = _leak_memo.get(flavor)
+    if hit and _time.monotonic() - hit[0] < 3600:
+        return hit[1]
+    n = leak = 0
+    seen = set()
+    try:
+        for item in _raw_pool(flavor):
+            key = _identity(flavor, item)  # banks repeat rows; count each question once
+            if key in seen:
+                continue
+            seen.add(key)
+            try:
+                q = _prep_one(flavor, item)
+            except Exception:
+                continue
+            if len(q.get("options") or []) < 2:
+                continue
+            n += 1
+            leak += leaks_length(q)
+    except Exception as e:
+        print(f"length_leak_share({flavor}): {e}")
+    share = leak / n if n else 0.0
+    _leak_memo[flavor] = (_time.monotonic(), share)
+    return share
+
+
+def _balance_length_leaks(prepped: list, count: int) -> list:
+    """Pick `count` of the prepared questions (kept in their order) with at
+    most chance-level leaking ones: one per option count, rounded."""
+    if not prepped:
+        return []
+    k = max(2.0, sum(len(q.get("options") or []) or 4 for q in prepped) / len(prepped))
+    cap = max(1, round(count / k))
+    chosen, spare, leaks = [], [], 0
+    for q in prepped:
+        if len(chosen) >= count:
+            break
+        if leaks_length(q):
+            if leaks >= cap:
+                spare.append(q)
+                continue
+            leaks += 1
+        chosen.append(q)
+    for q in spare:  # a bank without enough clean questions still fills the game
+        if len(chosen) >= count:
+            break
+        chosen.append(q)
+    return chosen
+
+
 def flavor_is_playable(flavor: str) -> bool:
     """Can this flavor actually build a game in *this* process?
 
-    Only `cover` can answer no. It blurs real cover images at creation time,
+    A flavor whose answers leak by length (length_leak_share above
+    LENGTH_LEAK_MAX) answers no until its options are rewritten.
+
+    Otherwise only `cover` can answer no. It blurs real cover images at creation time,
     and the media volume is mounted on the web service alone -- the Celery
     worker, which is what starts every scheduled game, has no /app/media at
     all. So picking `cover` for a slot guaranteed a FileNotFoundError, and
@@ -329,6 +408,10 @@ def flavor_is_playable(flavor: str) -> bool:
     slots only start twice a day.
     """
     if flavor != "cover":
+        share = length_leak_share(flavor)
+        if share > LENGTH_LEAK_MAX:
+            print(f"flavor_is_playable: {flavor} left out, right answer is the longest in {share:.0%}")
+            return False
         return True
 
     from django.core.cache import cache
@@ -655,14 +738,18 @@ def create_scheduled_quiz(flavor: str, lead_seconds: int = LEAD_SECONDS, is_vip:
                 keys.append(q.get("q"))
         return keys
 
+    # Three times the least-recently-used candidates, so the game can keep its
+    # length-leaking questions (right answer = longest option) near chance.
+    # (Not for `cover`: preparing one blurs and stores a real cover image.)
+    widen = 1 if flavor == "cover" else 3
     raw = pick_least_recently_used(
         pool=pool,
         get_key_fn=lambda it: _identity(flavor, it),
         recent_games=recent_games,
         get_game_keys_fn=_extract_game_keys,
-        count=num_questions,
+        count=min(len(pool), num_questions * widen),
     )
-    qs = [_prep_one(flavor, it) for it in raw]
+    qs = _balance_length_leaks([_prep_one(flavor, it) for it in raw], num_questions)
 
     now = timezone.now()
     starts = now + timedelta(seconds=lead_seconds)
