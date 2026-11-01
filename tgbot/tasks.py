@@ -603,7 +603,13 @@ def _broadcast_top_to_groups_and_users(message: str, period: str, date_str: str)
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
     sent = failed = 0
+    from tgbot.services import dm_budget
+    if period == "daily":
+        # The daily Top stays in the groups: a DM every night was too many.
+        qs = qs.none()
     for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        if not dm_budget.take(chat_id):
+            continue
         try:
             resp = requests.post(
                 url,
@@ -742,12 +748,12 @@ _FEATURES_TEXT = (
     "📣 <b>Kitob Challenge boti imkoniyatlari</b>\n\n"
     "📚 <b>Kitob hisoboti</b> — har kuni o'qigan sahifalaringizni kiriting va reytingda ko'taring\n\n"
     "👤 <b>Kabinet</b> — statistika: jami betlar, reytingdagi o'rin, o'qish tezligi, streak kalendar\n\n"
-    "🏆 <b>Yutuqlar</b> — 30+ yutuq: hisobotlar, betlar, streak, referrallar, tezlik va boshqalar\n\n"
+    "🏆 <b>Yutuqlar</b> — 100 dan ortiq yutuq: hisobotlar, betlar, streak, referallar va boshqalar\n\n"
     "📊 <b>Reyting</b> — kunlik, haftalik, oylik, 3 oylik va yillik top kitobxonlar\n\n"
     "📈 <b>Darajalar</b> — 100 → 500 → 1000 → ... bet bosib o'tganda daraja va Kitobcha mukofoti!\n\n"
-    "💎 <b>Premium</b> — qo'shimcha imkoniyatlar uchun obuna\n\n"
+    "👛 <b>Hamyon</b> — hisobot to'lovi, to'ldirish, 1% keshbek va imtiyozlar\n\n"
     "⚙️ <b>Sozlamalar</b> — eslatmalar soni, til, tabriqlash filtrlari\n\n"
-    "👥 <b>Referral</b> — do'stingizni taklif qiling va bonus oling"
+    "👥 <b>Referal</b> — do'stingizni taklif qiling: har biri uchun hamyoningizga 500 so'm"
 )
 
 
@@ -763,7 +769,7 @@ def _features_keyboard():
                 {"text": "📊 Reyting",  "callback_data": "menu:reyting"},
             ],
             [
-                {"text": "💎 Premium",    "callback_data": "menu:premium"},
+                {"text": "👛 Hamyon",     "callback_data": "wallet:open"},
                 {"text": "⚙️ Sozlamalar", "callback_data": "menu:settings"},
             ],
             [{"text": "❓ Qanday ishlaydi?", "callback_data": "menu:how"}],
@@ -779,7 +785,10 @@ def send_daily_features():
     keyboard = _features_keyboard()
     qs = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
     sent = failed = 0
+    from tgbot.services import dm_budget
     for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        if not dm_budget.take(chat_id):
+            continue
         try:
             resp = requests.post(
                 url,
@@ -921,12 +930,18 @@ def send_random_inspiration():
 
     text = pick_inspiration()
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    from tgbot.services import dm_budget
+    reported = ConfirmationReport.objects.filter(date__date=timezone.localdate()).values_list("user_id", flat=True)
+    # One reminder a day: readers with a personal hour get it then; nobody who
+    # already reported today is reminded.
     qs = TelegramProfile.objects.filter(
-        is_registered=True, is_blocked=False, reminder_count__gte=threshold,
-    )
+        is_registered=True, is_blocked=False, reminder_count__gte=threshold, optimal_send_hour__isnull=True,
+    ).exclude(id__in=reported)
     sent, failed = 0, 0
     reply_markup = _cta_reply_markup()
     for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        if not dm_budget.take(chat_id):
+            continue
         try:
             resp = requests.post(
                 url,
@@ -979,12 +994,17 @@ def send_personalized_inspiration():
         return
 
     import time as _t
+    from tgbot.services import dm_budget
     text = pick_inspiration()
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     reply_markup = _cta_reply_markup()
     sent = failed = 0
+    reported = ConfirmationReport.objects.filter(date__date=timezone.localdate()).values_list("user_id", flat=True)
+    qs = qs.exclude(id__in=reported)
 
     for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        if not dm_budget.take(chat_id):
+            continue
         try:
             resp = requests.post(
                 url,
@@ -1063,8 +1083,11 @@ def send_streak_warning():
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     reply_markup = _cta_reply_markup()
+    from tgbot.services import dm_budget
     sent = failed = 0
     for chat_id in qs.values_list("telegram_id", flat=True).iterator():
+        if not dm_budget.take(chat_id, high=True):
+            continue
         try:
             text = random.choice(STREAK_WARNING_POOL)
             resp = requests.post(
@@ -1116,8 +1139,11 @@ def ask_streak_gifts():
              for d in ku.STREAK_GIFT_DAY_OPTIONS],
             [{"text": "Bu safar emas", "callback_data": "sgift:no"}],
         ]})
+        from tgbot.services import dm_budget
         for d in ku.streak_gift_donors(p, exclude=asked):
             if not cache.add(f"streak_gift_asked:{d.id}:{today}", 1, 60 * 60 * 26):
+                continue
+            if not dm_budget.take(d.telegram_id):
                 continue
             asked.add(d.id)
             try:
@@ -2117,16 +2143,34 @@ def refresh_pinned_balance(user_id):
 
 @shared_task
 def daily_progress_broadcast():
-    """At 00:01 Tashkent: refresh each user's pinned progress bar."""
+    """At 00:01 Tashkent: refresh each user's pinned progress bar -- edited in
+    place, which makes no new message and no sound (one DM a day fewer); a
+    fresh one is sent and pinned only when there is nothing to edit."""
+    import time as _t
     users = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
-    sent = 0
+    edit_url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText"
+    edited = sent = 0
     for user in users.iterator():
         try:
+            if user.last_progress_msg_id:
+                pages = (ConfirmationReport.objects.filter(user=user)
+                         .aggregate(s=Sum("pages_read"))["s"] or 0)
+                _award_level_rewards(user, pages)
+                text, markup = _progress_payload(user, pages)
+                resp = requests.post(edit_url, data={
+                    "chat_id": user.telegram_id, "message_id": user.last_progress_msg_id,
+                    "text": text, "parse_mode": "HTML", "reply_markup": markup}, timeout=5)
+                if resp.ok or "not modified" in resp.text:
+                    _remember_pinned_balance(user, user.last_progress_msg_id)
+                    edited += 1
+                    _t.sleep(0.04)
+                    continue
             if _send_and_pin_progress(user):
                 sent += 1
         except Exception as e:
             print(f"daily_progress_broadcast failed for {user.id}: {e}")
-    print(f"daily_progress_broadcast: sent={sent}")
+        _t.sleep(0.04)
+    print(f"daily_progress_broadcast: edited={edited} sent={sent}")
 
 
 @shared_task
@@ -2662,6 +2706,9 @@ def send_daily_personal_report():
 
             text += _near_top_line(rank, today_p)
             text += new_books_block
+            from tgbot.services import dm_budget
+            if not dm_budget.take(user.telegram_id, high=True):
+                continue
             resp = requests.post(
                 url,
                 data={"chat_id": user.telegram_id, "text": text, "parse_mode": "HTML"},
@@ -3057,7 +3104,10 @@ def send_weekly_ai_report():
     print(f"[weekly_ai_report] Sending to {len(users)} premium users...")
 
     sent = failed = 0
+    from tgbot.services import dm_budget
     for user in users:
+        if not dm_budget.take(user.telegram_id):
+            continue
         try:
             ok = _send_weekly_report_to_user(
                 user=user,
@@ -3129,7 +3179,10 @@ def send_book_recommendations():
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     sent = skipped = failed = 0
 
+    from tgbot.services import dm_budget
     for user in users:
+        if not dm_budget.take(user.telegram_id):
+            continue
         recs = get_recommendations(user_id=user.id, top_n=3)
         if not recs:
             skipped += 1
@@ -5344,7 +5397,10 @@ def send_dated_announcement():
     sent = failed = 0
     ids = TelegramProfile.objects.filter(is_registered=True, is_blocked=False) \
         .values_list("telegram_id", flat=True).distinct()
+    from tgbot.services import dm_budget
     for chat_id in ids.iterator():
+        if not dm_budget.take(chat_id):
+            continue
         try:
             data = {"chat_id": chat_id, "text": text, "parse_mode": "HTML",
                     "disable_web_page_preview": "true", **markup}
@@ -5890,10 +5946,11 @@ def grant_daily_ai_quiz_trial():
     )
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     sent = 0
+    from tgbot.services import dm_budget
     for uid in chosen:
         try:
             profile = TelegramProfile.objects.filter(id=uid).only("telegram_id").first()
-            if not profile:
+            if not profile or not dm_budget.take(profile.telegram_id):
                 continue
             TelegramProfile.objects.filter(id=uid).update(trial_ai_quiz_until=until)
             requests.post(
@@ -6517,7 +6574,7 @@ def _game_teaser_text(slot):
         f"hozircha hech kim bilmaydi \U0001f60f\n\n"
         f"\U0001fa99 1/2/3-o'rin: <b>{REWARD_TIERS[0]}/{REWARD_TIERS[1]}/{REWARD_TIERS[2]} Kitobcha</b>, "
         f"ochko olgan hammaga <b>{PARTICIPATION}</b>\n"
-        f"\U0001f48e Premium a'zolar <b>2 barobar</b> oladi\n"
+        f"\U0001f48e Hamyonini bir martada 15 000 so'm va undan ko'p to'ldirganlar <b>2 barobar</b> oladi\n"
         f"\U0001f381 Kirish <b>BEPUL</b>\n\n"
         f"\u23f0 Boshlanish: <b>{when}</b>\n"
         f"O'yin guruhda e'lon qilinadi \u2014 hoziroq kirib turing \U0001f447"
@@ -6537,8 +6594,15 @@ def send_game_teaser(slot="evening"):
         .filter(is_registered=True, is_blocked=False)
         .values_list("telegram_id", flat=True).distinct()
     )
+    from django.core.cache import cache as _cache
+    from tgbot.services import dm_budget
+    today_s = timezone.localdate().isoformat()
     sent = blocked = failed = 0
     for uid in ids:
+        # One teaser a day per reader, within the daily DM budget.
+        if _cache.get(f"teaser_sent:{today_s}:{uid}") or not dm_budget.take(uid):
+            continue
+        _cache.set(f"teaser_sent:{today_s}:{uid}", 1, 60 * 60 * 30)
         data = {"chat_id": uid, "text": text, "parse_mode": "HTML",
                 "disable_web_page_preview": "true"}
         if keyboard:
