@@ -393,6 +393,10 @@ def _is_user_in_chat(chat_id, user_id) -> bool:
 UNREAD_LIST_EXCLUDED_IDS = {917456291, 631751797}
 
 
+# Telegram notifies mentions reliably in modest batches.
+UNREAD_MENTIONS_PER_MESSAGE = 60
+
+
 @shared_task
 def users_unread_book():
     """Per-group reminder: in each gender group, list ONLY members of that
@@ -456,11 +460,20 @@ def users_unread_book():
         if not members_present:
             continue
 
-        message = f"‼️ Bugun hisobot yubormaganlar: {len(members_present)}ta\n\n"
-        for u in members_present:
-            handle = f"@{u.username}" if u.username else f'<a href="tg://user?id={u.telegram_id}">{u.full_name}</a>'
-            message += f"-{handle} (<b>{u.full_name}</b>)\n"
-        message += suffix
+        # Everyone in the group who hasn't reported, each one mentioned, in
+        # collapsed quotes; as many messages as the list needs.
+        mentions = [f'<a href="tg://user?id={u.telegram_id}">{_clip(u.full_name or "Kitobxon", 40)}</a>'
+                    for u in members_present]
+        chunks, cur, size = [], [], 0
+        for i, m in enumerate(mentions, 1):
+            line = f"{i}. {m}"
+            if cur and (size + len(line) > 3700 or len(cur) >= UNREAD_MENTIONS_PER_MESSAGE):
+                chunks.append(cur)
+                cur, size = [], 0
+            cur.append(line)
+            size += len(line) + 1
+        if cur:
+            chunks.append(cur)
 
         # Idempotency guard: post the unread list to each group AT MOST once
         # per day, even if the task somehow runs twice (Celery redelivery on a
@@ -471,10 +484,19 @@ def users_unread_book():
             print(f"users_unread_book: already posted to {chat_id} today, skipping")
             continue
 
-        try:
-            send_message(chat_id, message)
-        except Exception as e:
-            print(f"users_unread_book send to {chat_id} failed: {e}")
+        for n, chunk in enumerate(chunks, 1):
+            part = f" ({n}/{len(chunks)})" if len(chunks) > 1 else ""
+            message = (f"‼️ Bugun hisobot yubormaganlar: <b>{len(members_present)}</b> ta{part}\n"
+                       "<blockquote expandable>" + "\n".join(chunk) + "</blockquote>")
+            if n == len(chunks):
+                message += suffix
+            try:
+                send_message(chat_id, message)
+            except Exception as e:
+                print(f"users_unread_book send to {chat_id} part {n} failed: {e}")
+            _time.sleep(0.3)
+
+
 
 
 def _build_top_readers_message(start_date, end_date, period_label, limit=20):
@@ -6026,22 +6048,15 @@ def build_rewards_report(for_date=None) -> str | None:
     if not wins and not vip_games:
         return None
 
-    lines = [
-        f"🧾 <b>MUKOFOTLAR HISOBOTI — {day.strftime('%d.%m.%Y')}</b>\n",
-        "<i>Bugun tarqatilgan barcha yutuqlar — ochiq va to'liq. "
-        "Hamma nima yutgani va nima olgani shu yerda ko'rinadi.</i>\n",
-    ]
+    # A short summary on top, the full list folded into a collapsed quote.
+    head = [f"🧾 <b>MUKOFOTLAR HISOBOTI — {day.strftime('%d.%m.%Y')}</b>"]
+    details = []
 
     # ── Sirli quti ──────────────────────────────────────────────────────────
     if wins:
         total_kitobcha = sum(w.kitobcha for w in wins)
-        prem_winners = [w for w in wins if w.premium_days or w.premium_hours]
-        lines.append(f"🎁 <b>SIRLI QUTI</b> — {len(wins)} marta ochildi")
-        lines.append(f"🪙 Jami berilgan Kitobcha: <b>{total_kitobcha}</b>")
-        if prem_winners:
-            lines.append(f"💎 Premium yutganlar: <b>{len(prem_winners)}</b> nafar — hammasiga faollashtirildi ✅")
-        lines.append("")
-        lines.append("<b>Eng katta yutuqlar:</b>")
+        head.append(f"🎁 Sirli quti: <b>{len(wins)}</b> marta · 🪙 <b>{total_kitobcha}</b> Kitobcha")
+        details.append("<b>🎁 Sirli quti — eng katta yutuqlar:</b>")
         for w in wins[:MYSTERY_REPORT_TOP]:
             extra = ""
             if w.kitobcha:
@@ -6050,10 +6065,11 @@ def build_rewards_report(for_date=None) -> str | None:
                 extra = f" — <b>{w.premium_days} kun Premium</b> 💎"
             elif w.premium_hours:
                 extra = f" — <b>{w.premium_hours} soat Premium</b> 💎"
-            lines.append(f"• {_clip(w.user.full_name or 'Kitobxon', 40)} — {_clip(w.label, 80)}{extra}")
+            details.append(f"• {_clip(w.user.full_name or 'Kitobxon', 40)} — "
+                           f"{_clip(w.label, 60)}{extra}")
         if len(wins) > MYSTERY_REPORT_TOP:
-            lines.append(f"<i>… va yana {len(wins) - MYSTERY_REPORT_TOP} ta yutuq</i>")
-        lines.append("")
+            details.append(f"<i>… va yana {len(wins) - MYSTERY_REPORT_TOP} ta yutuq</i>")
+        details.append("")
 
     # ── VIP Premium arena ───────────────────────────────────────────────────
     medals = ["🥇", "🥈", "🥉"]
@@ -6061,28 +6077,25 @@ def build_rewards_report(for_date=None) -> str | None:
         rows = _qg.ranked_scores(g)[:VIP_REPORT_TOP]
         if not rows:
             continue
-        lines.append(f"⭐️ <b>VIP PREMIUM ARENA — {escape(g.title)}</b>")
-        nq = len(g.questions or [])
-        for i, s in enumerate(rows):
-            m = medals[i] if i < 3 else f"{i + 1}."
-            prem = f" + <b>{s.premium_days} kun Premium</b> 💎" if s.premium_days else ""
-            lines.append(
-                f"{m} {escape(s.user.full_name or 'Kitobxon')} — "
-                f"✅ {s.points // _qg.POINTS}/{nq} · ⏱ {round(s.effective_time, 1)}s → "
-                f"<b>+{s.reward or 0} 🪙</b>{prem}"
-            )
         paid = QuizScore.objects.filter(game=g, rewarded=True).count()
-        lines.append(f"<i>Jami {paid} ishtirokchiga mukofot o'tkazildi.</i>")
-        lines.append("")
+        head.append(f"⭐️ {escape(g.title)}: <b>{paid}</b> kishiga mukofot")
+        details.append(f"<b>⭐️ {escape(g.title)}</b>")
+        nq = len(g.questions or [])
+        for i, sc in enumerate(rows):
+            m = medals[i] if i < 3 else f"{i + 1}."
+            prem = f" + <b>{sc.premium_days} kun Premium</b> 💎" if sc.premium_days else ""
+            details.append(
+                f"{m} {_clip(sc.user.full_name or 'Kitobxon', 40)} — "
+                f"✅ {sc.points // _qg.POINTS}/{nq} · ⏱ {round(sc.effective_time, 1)}s → "
+                f"<b>+{sc.reward or 0} 🪙</b>{prem}"
+            )
+        details.append("")
 
-    lines.append(
-        "✅ Barcha Kitobcha va Premiumlar <b>avtomatik</b> ravishda egalarining "
-        "hisobiga o'tkazildi — hech kim qo'lda tanlanmaydi.\n"
-        "⏱ O'yin reytingi faqat <b>to'g'ri javob soni</b>, keyin esa <b>sarflangan vaqt</b> "
-        "bo'yicha tuziladi. Javob berilmagan savol to'liq vaqt deb hisoblanadi — "
-        "jim turish urinishdan arzon tushmaydi."
-    )
-    return _trim_telegram("\n".join(lines))
+    details.append("✅ Hammasi avtomatik hisoblarga o'tkazildi. Reyting: avval to'g'ri javoblar, keyin vaqt.")
+    body = "\n".join(details).strip()
+    if len(body) > 3300:  # never cut inside the quote's tags
+        body = body[:3300].rsplit("\n", 1)[0] + "\n<i>…</i>"
+    return "\n".join(head) + "\n<blockquote expandable>" + body + "</blockquote>"
 
 
 @shared_task
