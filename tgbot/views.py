@@ -790,6 +790,64 @@ def internal_ops(request: HttpRequest, action: str):
                              "premium_users": len(days), "premium_days": sum(days),
                              "premium_total": sum(days) * wallet.DAY_FEE})
 
+    if action == "wallet-refund":
+        # Support tool: what a reader may take back (dry), or take it out of
+        # the wallet once the money has gone back to their card (apply).
+        from tgbot.models import TelegramProfile
+        from tgbot.services import wallet
+        p = TelegramProfile.objects.filter(telegram_id=int(body["telegram_id"])).first()
+        if not p:
+            return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+        out = {"ok": True, "name": p.full_name, "balance": p.wallet_balance, "refundable": wallet.refundable(p)}
+        if apply:
+            out["result"] = wallet.refund(p, body.get("amount"), body.get("note") or "")
+        return JsonResponse(out)
+
+    if action == "premium-notify":
+        # One personal DM to every reader whose Premium days became so'm at the
+        # launch, once each (cache marker); `text` uses {name} {days} {som} {until}.
+        import html
+        import os as _os
+        import re as _re
+
+        import requests
+        from django.core.cache import cache
+        from django.db.models import Max
+        from tgbot.models import Payment, WalletTransaction
+        from tgbot.services import wallet
+        rows = WalletTransaction.objects.filter(kind=WalletTransaction.KIND_PREMIUM).select_related("user")
+        template = body.get("text") or ""
+        out = []
+        for t in rows:
+            p = t.user
+            m = _re.match(r"(\d+)", t.note or "")
+            days = int(m.group(1)) if m else t.delta // wallet.DAY_FEE
+            until = Payment.objects.filter(user=p, status="paid").aggregate(m=Max("end_date"))["m"]
+            text = template.format(name=html.escape(p.full_name or "Kitobxon"), days=days,
+                                   som=f"{t.delta:,}".replace(",", " "),
+                                   until=wallet.uz_date(until) if until else "")
+            row = {"telegram_id": p.telegram_id, "name": p.full_name, "days": days, "som": t.delta,
+                   "until": str(until), "sent_before": bool(cache.get(f"premium_notify:{p.id}"))}
+            if apply and template and not row["sent_before"] and not p.is_blocked:
+                r = requests.post(f"https://api.telegram.org/bot{_os.environ.get('API_TOKEN', '')}/sendMessage",
+                                  data={"chat_id": p.telegram_id, "text": text, "parse_mode": "HTML"}, timeout=8)
+                row["sent"] = r.ok
+                if r.ok:
+                    cache.set(f"premium_notify:{p.id}", 1, None)
+                elif r.status_code == 403:
+                    p.__class__.objects.filter(id=p.id).update(is_blocked=True)
+                time.sleep(0.05)
+            out.append(row)
+        preview = template.format(name="Kitobxon", days=10, som="10 000", until="10-noyabr") if template else ""
+        return JsonResponse({"ok": True, "count": len(out), "rows": out, "preview": preview})
+
+    if action == "wallet-audit":
+        # One day of money: wallet moves, top-ups, report charges against
+        # report submissions (unpaid lists any report without its charge).
+        from tgbot.services import wallet
+        s = wallet.day_summary(body.get("date"))
+        return JsonResponse({"ok": True, **s, "text": wallet.day_summary_text(s)})
+
     if action == "wallet-credit":
         # Support tool: credit (or, negative, debit) one reader's wallet.
         from tgbot.models import TelegramProfile, WalletTransaction

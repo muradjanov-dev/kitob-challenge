@@ -31,57 +31,66 @@ def _lang(user) -> str:
 
 def wallet_text(user) -> str:
     bal, ball = int(user.wallet_balance or 0), int(user.ball or 0)
+    back = wallet.refundable(user)
+    if _lang(user) == "ru":
+        refund_line = (f"💸 Можно вернуть: <b>{_som(back)} сум</b> — неизрасходованные оплаченные деньги "
+                       "(бонусы проекта не возвращаются). Напишите через «📞 Связь с админом».\n\n" if back else "")
+    else:
+        refund_line = (f"💸 Qaytarib olish mumkin: <b>{_som(back)} so'm</b> — to'lagan pulingizning ishlatilmagan "
+                       "qismi (loyiha bonuslari qaytarilmaydi). «📞 Admin bilan bog'lanish» orqali yozing.\n\n"
+                       if back else "")
     paid = wallet.paid_on(user)
     days = wallet.days_left(user)
     max_k = wallet.DAY_FEE * wallet.KITOBCHA_SHARE_PCT // 100
     if _lang(user) == "ru":
-        today = ("✅ Сегодняшний день уже оплачен." if paid else
+        today = (f"✅ Сегодня уже оплачено. Следующий отчёт: {_som(wallet.report_price(user))} сум." if paid else
                  f"⏳ С первого отчёта сегодня спишется {_som(wallet.DAY_FEE)} сум.")
         kit = "используются" if user.wallet_use_kitobcha else "не используются"
         until = wallet.member_until(user)
         if until:
-            perks = (f"💎 Привилегии активны до <b>{until:%d.%m}</b>: 2× Kitobcha, VIP-арена, несколько "
-                     f"отчётов в день. Новое пополнение от {_som(wallet.MEMBER_MIN)} сум продлит их.\n\n")
+            perks = (f"💎 Привилегии активны до <b>{until:%d.%m}</b>: 2× Kitobcha, VIP-арена, следующие "
+                     f"отчёты дня по {_som(wallet.EXTRA_FEE_MEMBER)} сум. Новое пополнение от {_som(wallet.MEMBER_MIN)} сум продлит их.\n\n")
         elif wallet.legacy_premium(user):
             perks = "💎 Привилегии Premium активны до конца его срока.\n\n"
         else:
             perks = (f"💎 Пополнение за один раз от <b>{_som(wallet.MEMBER_MIN)} сум</b> даёт привилегии на "
-                     f"1 день за каждые {_som(wallet.DAY_FEE)} сум: 2× Kitobcha, VIP-арена, несколько отчётов в день.\n\n")
+                     f"1 день за каждые {_som(wallet.DAY_FEE)} сум: 2× Kitobcha, VIP-арена, следующие отчёты дня по {_som(wallet.EXTRA_FEE_MEMBER)} сум.\n\n")
         return (
             "👛 <b>Ваш кошелёк</b>\n\n"
             f"💰 Баланс: <b>{_som(bal)} сум</b>\n"
             f"🪙 Kitobcha: <b>{_som(ball)}</b> (для оплаты {kit})\n"
             f"📅 Хватит ещё на <b>{days}</b> дн. отчётов\n"
             f"{today}\n\n"
-            f"ℹ️ Один день отчётов стоит <b>{_som(wallet.DAY_FEE)} сум</b> и списывается один раз в день "
-            f"при первом отчёте. До {wallet.KITOBCHA_SHARE_PCT}% ({max_k}) можно оплатить Kitobcha.\n"
+            f"ℹ️ Каждый отчёт стоит <b>{_som(wallet.DAY_FEE)} сум</b>, отправлять можно сколько угодно раз в день. "
+            f"До {wallet.KITOBCHA_SHARE_PCT}% цены можно оплатить Kitobcha.\n"
             f"{perks}"
+            f"{refund_line}"
             "Выберите сумму пополнения 👇"
         )
-    today = ("✅ Bugungi kun to'langan." if paid else
+    today = (f"✅ Bugungi hisobot to'langan. Keyingi hisobot: {_som(wallet.report_price(user))} so'm." if paid else
              f"⏳ Bugun birinchi hisobotda {_som(wallet.DAY_FEE)} so'm yechiladi.")
     kit = "ishlatiladi" if user.wallet_use_kitobcha else "ishlatilmaydi"
     until = wallet.member_until(user)
     if until:
         perks = (f"💎 Imtiyozlaringiz <b>{wallet.uz_date(until)}gacha</b> faol: 2× Kitobcha, VIP arena, "
-                 f"kuniga bir necha hisobot. Yana {_som(wallet.MEMBER_MIN)} so'm va undan ko'p to'ldirsangiz, "
+                 f"kunning keyingi hisobotlari {_som(wallet.EXTRA_FEE_MEMBER)} so'mdan. Yana {_som(wallet.MEMBER_MIN)} so'm va undan ko'p to'ldirsangiz, "
                  "muddat uzayadi.\n\n")
     elif wallet.legacy_premium(user):
         perks = "💎 Premium imtiyozlaringiz muddati tugaguncha faol.\n\n"
     else:
         perks = (f"💎 Bir martada <b>{_som(wallet.MEMBER_MIN)} so'm</b> va undan ko'p to'ldirsangiz — har "
-                 f"{_som(wallet.DAY_FEE)} so'm uchun 1 kunlik imtiyoz: 2× Kitobcha, VIP arena, kuniga bir "
-                 "necha hisobot.\n\n")
+                 f"{_som(wallet.DAY_FEE)} so'm uchun 1 kunlik imtiyoz: 2× Kitobcha, VIP arena, kunning keyingi "
+                 f"hisobotlari {_som(wallet.EXTRA_FEE_MEMBER)} so'mdan.\n\n")
     return (
         "👛 <b>Hamyoningiz</b>\n\n"
         f"💰 Balans: <b>{_som(bal)} so'm</b>\n"
         f"🪙 Kitobcha: <b>{_som(ball)}</b> (to'lovda {kit})\n"
         f"📅 Yana <b>{days}</b> kunlik hisobotga yetadi\n"
         f"{today}\n\n"
-        f"ℹ️ Bir kunlik hisobot <b>{_som(wallet.DAY_FEE)} so'm</b> — kuniga bir marta, birinchi "
-        f"hisobotda yechiladi. Uning {wallet.KITOBCHA_SHARE_PCT}% gachasini ({max_k} tagacha) "
-        "Kitobcha bilan to'lash mumkin.\n"
+        f"ℹ️ Har bir hisobot <b>{_som(wallet.DAY_FEE)} so'm</b>, bir kunda istalgancha yuborish mumkin. "
+        f"Narxning {wallet.KITOBCHA_SHARE_PCT}% gachasini Kitobcha bilan to'lash mumkin.\n"
         f"{perks}"
+        f"{refund_line}"
         "To'ldirish uchun summani tanlang 👇"
     )
 
@@ -127,15 +136,15 @@ def insufficient_text(user) -> str:
 
 
 def charged_text(user, res) -> str:
-    if res.get("already") or not res.get("ok"):
+    if not res.get("ok"):
         return ""
     parts = [f"{_som(res['cash'])} so'm"] + ([f"{res['kitobcha']} Kitobcha"] if res.get("kitobcha") else [])
     if _lang(user) == "ru":
         parts = [f"{_som(res['cash'])} сум"] + ([f"{res['kitobcha']} Kitobcha"] if res.get("kitobcha") else [])
-        return (f"👛 За сегодняшний день списано: {' + '.join(parts)}. "
-                f"Остаток: <b>{_som(res['balance'])} сум</b>.")
-    return (f"👛 Bugungi kun uchun yechildi: {' + '.join(parts)}. "
-            f"Qoldiq: <b>{_som(res['balance'])} so'm</b>.")
+        what = "За этот отчёт" if res.get("extra") else "За сегодняшний день"
+        return f"👛 {what} списано: {' + '.join(parts)}. Остаток: <b>{_som(res['balance'])} сум</b>."
+    what = "Bu hisobot uchun" if res.get("extra") else "Bugungi kun uchun"
+    return f"👛 {what} yechildi: {' + '.join(parts)}. Qoldiq: <b>{_som(res['balance'])} so'm</b>."
 
 
 async def show_wallet(message: types.Message, user) -> None:
@@ -147,19 +156,29 @@ async def show_wallet(message: types.Message, user) -> None:
 def fee_confirm_text(user) -> str:
     cash, kit = wallet.fee_split(user)
     bal, ball = int(user.wallet_balance or 0), int(user.ball or 0)
+    n = wallet.fees_today(user)
+    member = wallet.is_member(user)
     if _lang(user) == "ru":
         part = f"<b>{_som(cash)} сум</b>" + (f" + <b>{kit} Kitobcha</b>" if kit else "")
+        which = "за сегодня" if n == 0 else f"за {n + 1}-й отчёт сегодня"
+        hint = ("" if n == 0 or member else
+                f"\n💡 Пополнение за один раз от {_som(wallet.MEMBER_MIN)} сум — и следующие отчёты дня "
+                f"будут по {_som(wallet.EXTRA_FEE_MEMBER)} сум.\n")
         return (
-            "💳 <b>Оплата за сегодняшний отчёт</b>\n\n"
-            f"Когда отчёт будет принят, за сегодня спишется {part} — только один раз в день.\n"
-            f"👛 В кошельке: <b>{_som(bal)} сум</b> · 🪙 <b>{_som(ball)}</b> Kitobcha\n\n"
+            "💳 <b>Оплата отчёта</b>\n\n"
+            f"Когда отчёт будет принят, {which} спишется {part}.\n"
+            f"👛 В кошельке: <b>{_som(bal)} сум</b> · 🪙 <b>{_som(ball)}</b> Kitobcha\n{hint}\n"
             "Продолжаем? 😊"
         )
     part = f"<b>{_som(cash)} so'm</b>" + (f" + <b>{kit} Kitobcha</b>" if kit else "")
+    which = "bugungi kun uchun" if n == 0 else f"bugungi {n + 1}-hisobotingiz uchun"
+    hint = ("" if n == 0 or member else
+            f"\n💡 Bir martada {_som(wallet.MEMBER_MIN)} so'm va undan ko'p to'ldirsangiz, kunning keyingi "
+            f"hisobotlari atigi {_som(wallet.EXTRA_FEE_MEMBER)} so'm bo'ladi.\n")
     return (
-        "💳 <b>Bugungi hisobot uchun to'lov</b>\n\n"
-        f"Hisobotingiz qabul qilinganda bugungi kun uchun {part} yechiladi — kuniga faqat bir marta.\n"
-        f"👛 Hamyoningizda: <b>{_som(bal)} so'm</b> · 🪙 <b>{_som(ball)}</b> Kitobcha\n\n"
+        "💳 <b>Hisobot uchun to'lov</b>\n\n"
+        f"Hisobotingiz qabul qilinganda {which} {part} yechiladi.\n"
+        f"👛 Hamyoningizda: <b>{_som(bal)} so'm</b> · 🪙 <b>{_som(ball)}</b> Kitobcha\n{hint}\n"
         "Davom etamizmi? 😊"
     )
 
@@ -464,10 +483,11 @@ async def wallet_topup_approve(call: types.CallbackQuery):
     ru = _lang(user) == "ru"
     until = wallet.member_until(user) if wallet.member_days_for(topup.amount) else None
     if until:
-        perks = (f"💎 Привилегии активны до <b>{until:%d.%m}</b>: 2× Kitobcha, VIP-арена, несколько отчётов в день.\n\n"
+        perks = (f"💎 Привилегии активны до <b>{until:%d.%m}</b>: 2× Kitobcha, VIP-арена, следующие отчёты дня "
+                 f"по {_som(wallet.EXTRA_FEE_MEMBER)} сум.\n\n"
                  if ru else
                  f"💎 Imtiyozlaringiz <b>{wallet.uz_date(until)}gacha</b> faol: 2× Kitobcha, VIP arena, "
-                 "kuniga bir necha hisobot.\n\n")
+                 f"kunning keyingi hisobotlari {_som(wallet.EXTRA_FEE_MEMBER)} so'mdan.\n\n")
     else:
         perks = ""
     text = (

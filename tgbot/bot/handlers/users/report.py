@@ -502,8 +502,10 @@ async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
         return
 
     today = timezone.localdate()
+    from tgbot.services import wallet as _wallet
     already_today = await get_confirmation_report_exists(user, today)
-    if already_today and not await _is_premium_user(user):
+    # From the wallet launch any number of reports a day, each paid.
+    if already_today and not _wallet.launched(user) and not await _is_premium_user(user):
         await call.answer(
             _("Siz bugungi kun uchun allaqachon hisobotingizni yubordingiz. 💎 Premium foydalanuvchilar kuniga bir nechta hisobot yubora oladi."),
             show_alert=True,
@@ -545,8 +547,9 @@ async def send_daily_report_handler(message: types.Message, state: FSMContext):
         return await state.finish()
 
     today = timezone.localdate()
+    from tgbot.services import wallet as _wallet
     already_today = await get_confirmation_report_exists(user, today)
-    if already_today and not await _is_premium_user(user):
+    if already_today and not _wallet.launched(user) and not await _is_premium_user(user):
         await message.answer(
             _("Siz bugungi kun uchun allaqachon hisobotingizni yubordingiz.\n\n💎 Premium foydalanuvchilar kuniga bir necha marotaba hisobot yubora oladi — barcha hisobotlar avtomatik jamlanadi va guruhdagi xabar yangilanadi."),
         )
@@ -1435,9 +1438,12 @@ async def _do_confirm_report(message, user, state: FSMContext):
     today = timezone.localdate()
     is_premium = await _is_premium_user(user)
     prior_reports = await _today_reports_qs(user, today)
-    is_aggregating = bool(prior_reports) and is_premium
+    from tgbot.services import wallet as _wallet
+    # From the wallet launch every reader may send more reports (each paid)
+    # and all of a day's reports merge into one group message.
+    is_aggregating = bool(prior_reports) and (is_premium or _wallet.launched(user))
 
-    if prior_reports and not is_premium:
+    if prior_reports and not is_aggregating:
         await message.answer(
             _("Siz bugungi kun uchun allaqachon hisobotingizni yubordingiz."),
             reply_markup=main_markup(),
@@ -1473,16 +1479,20 @@ async def _do_confirm_report(message, user, state: FSMContext):
         live_book = ", ".join(live_titles) or book
         audio_book = ", ".join(audio_titles) or book
 
-    # Hamyon: the day's fee is taken here, right before the report is
-    # written (at most once a day -- wallet.charge_day). The entry points
-    # already checked the balance; this catches money spent in between.
-    from tgbot.services import wallet as _wallet
+    # Hamyon: the report's price is taken here, right before it is written,
+    # with the yes the reader gave at the entry point (wallet.charge_report
+    # uses it up, so one yes pays once).
     wallet_note = ""
     if _wallet.launched(user):
-        from tgbot.bot.handlers.users.wallet import charged_text, insufficient_text, topup_kb
-        charge = await sync_to_async(_wallet.charge_day)(user)
+        from tgbot.bot.handlers.users.wallet import (
+            charged_text, fee_confirm_kb, fee_confirm_text, insufficient_text, topup_kb,
+        )
+        charge = await sync_to_async(_wallet.charge_report)(user)
         if not charge["ok"]:
-            await message.answer(insufficient_text(user), parse_mode="HTML", reply_markup=topup_kb(user))
+            if charge.get("error") == "confirm":
+                await message.answer(fee_confirm_text(user), parse_mode="HTML", reply_markup=fee_confirm_kb(user))
+            else:
+                await message.answer(insufficient_text(user), parse_mode="HTML", reply_markup=topup_kb(user))
             await state.finish()
             return
         wallet_note = charged_text(user, charge)
@@ -1562,7 +1572,7 @@ async def _do_confirm_report(message, user, state: FSMContext):
     aggregate_note = ""
     if is_aggregating:
         n = len(todays)
-        aggregate_note = f"\n\n<i>💎 {n} ta hisobot jamlandi</i>"
+        aggregate_note = f"\n\n<i>🗂 {n} ta hisobot jamlandi</i>"
 
     motivation = data.get("motivation") or random.choice(MOTIVATIONS)
 
@@ -1575,7 +1585,7 @@ async def _do_confirm_report(message, user, state: FSMContext):
 
     report_message = (
         f"<b><a href='tg://user?id={user.telegram_id}'>{prem_badge}{user.full_name}</a></b>:\n\n"
-        f"📊#kun - {reading_day}  ({report.date.strftime('%Y-%m-%d')})\n\n"
+        f"📊#kun - {reading_day}  ({timezone.localtime(report.date).strftime('%Y-%m-%d')})\n\n"
         f"{books_block}\n\n"
         f"{conclusions_block}\n\n"
         f"<b>{motivation}</b>"
@@ -1683,7 +1693,7 @@ async def _do_confirm_report(message, user, state: FSMContext):
     lang = user.language or "uz"
     if is_aggregating:
         done_text = (
-            "Hisobotingiz jamlandi va guruhdagi xabar yangilandi. 💎"
+            "Hisobotingiz jamlandi va guruhdagi xabar yangilandi. 🗂"
             if lang != "ru" else
             "Отчёт суммирован и групповое сообщение обновлено. 💎"
         )

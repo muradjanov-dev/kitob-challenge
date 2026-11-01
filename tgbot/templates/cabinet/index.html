@@ -738,7 +738,7 @@
         return;
       }
 
-      rfSendReport(entries, false);
+      rfSendReport(entries, null);
     });
 
     // Yes/no before the day's fee: Telegram's native popup (WebApp 6.2+),
@@ -760,7 +760,7 @@
       fetch('/kabinet/api/report/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData, entries, conclusion: rfConclusion.value.trim(), fee_confirmed: feeConfirmed }),
+        body: JSON.stringify({ initData, entries, conclusion: rfConclusion.value.trim(), fee_confirmed: (typeof feeConfirmed === 'number' ? feeConfirmed : null) }),
       })
         .then(r => r.json().then(data => ({ status: r.status, data })))
         .then(({ status, data }) => {
@@ -768,7 +768,7 @@
           if (data.error === 'fee_confirm') {
             rfMsg.textContent = '';
             rfAskConfirm(data.message, ok => {
-              if (ok) rfSendReport(entries, true);
+              if (ok) rfSendReport(entries, data.fee_n);
               else rfMsg.textContent = "Bekor qilindi — hech narsa yechilmadi.";
             });
             return;

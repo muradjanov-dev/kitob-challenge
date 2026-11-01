@@ -234,7 +234,8 @@ async def _menu_report(call, user, state: FSMContext):
             __import__("tgbot.services.premium", fromlist=["is_premium"]).is_premium(user),
         )
     )()
-    if already and not is_prem:
+    from tgbot.services import wallet as _wallet
+    if already and not is_prem and not _wallet.launched(user):
         await call.message.answer(
             _t(
                 lang,

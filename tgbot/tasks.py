@@ -6139,6 +6139,15 @@ def send_admin_daily_report():
         _KL.objects.filter(created_at__date=today, delta__lt=0).aggregate(s=_Sum("delta"))["s"] or 0
     )
 
+    # ── Hamyon + Kitobcha transactions (services.wallet.day_summary) ─────────
+    wallet_block = ""
+    try:
+        from tgbot.services import wallet as _wallet
+        if _wallet.is_live_launch():
+            wallet_block = _wallet.day_summary_text(_wallet.day_summary(today)) + "\n\n"
+    except Exception as e:
+        print(f"[admin_daily_report] wallet block failed: {e}")
+
     # ── Build message ─────────────────────────────────────────────────────────
     text = (
         f"📋 <b>Admin kunlik hisobot — {today.strftime('%d.%m.%Y')}</b>\n\n"
@@ -6172,7 +6181,7 @@ def send_admin_daily_report():
         f"🪙 <b>Kitobcha:</b>\n"
         f"  Bugun qabul qilindi: <b>+{kitobcha_earned_today:,}</b>\n"
         f"  Bugun ishlatildi: <b>-{kitobcha_spent_today:,}</b>\n\n"
-
+        f"{wallet_block}"
         f"<i>Ushbu hisobot har kuni 23:55 da avtomatik yuboriladi.</i>"
     )
 

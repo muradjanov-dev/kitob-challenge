@@ -30,7 +30,9 @@ from tgbot.bot.consts import (
     C_BOYS_THREAD_ID, C_GIRLS_THREAD_ID,
     E_BOYS_THREAD_ID, E_GIRLS_THREAD_ID,
 )
-from tgbot.bot.handlers.users.report import MOTIVATIONS, PREMIUM_CTAS, PREMIUM_CTA_CHANCE, _pick_praise
+from tgbot.bot.handlers.users.report import (
+    MOTIVATIONS, PREMIUM_CTAS, PREMIUM_CTA_CHANCE, _format_books_block, _format_conclusions_block, _pick_praise,
+)
 from tgbot.models import (
     BookReport, BooksToRead, ConfirmationReport, GlobalBook, TelegramProfile, normalize_uzbek_text,
 )
@@ -172,6 +174,17 @@ def _entry_book_obj(profile, entry):
     return book_obj, is_audio, amount
 
 
+def _today_books_sync(profile, today) -> list:
+    """(title, is_audio, total) for the day's BookReport rows -- the sync twin
+    of report._get_today_books_aggregated, for the merged group message."""
+    from tgbot.models import BooksToRead
+    sums = {}
+    for title, pages in BookReport.objects.filter(user=profile, created_at__date=today).values_list("book", "pages_read"):
+        sums[title] = sums.get(title, 0) + (pages or 0)
+    audio = dict(BooksToRead.objects.filter(user=profile, title__in=list(sums)).values_list("title", "is_audio"))
+    return [(t, bool(audio.get(t)), v) for t, v in sums.items()]
+
+
 @csrf_exempt
 @require_POST
 def api_submit_report(request: HttpRequest) -> JsonResponse:
@@ -203,28 +216,32 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
 
     is_premium = profile.has_active_premium()
     today = timezone.localdate()
+    from tgbot.services import wallet
     already_today = ConfirmationReport.objects.filter(user=profile, date__date=today).exists()
-    if already_today and not is_premium:
+    if already_today and not is_premium and not wallet.launched(profile):
         return JsonResponse({"ok": False, "error": "already_reported_today"}, status=409)
 
-    # Hamyon: the day's fee, once a day, before anything is written.
-    from tgbot.services import wallet
+    # Hamyon: each report paid before anything is written, never without a
+    # yes -- the page asks with a native confirm popup and sends the report
+    # again with fee_confirmed = the charge number it was asked about.
     wallet_charge = None
     if wallet.launched(profile):
         wallet.ensure_launch_credit(profile)
-        # Never take the fee without a yes: the page asks with a native
-        # confirm popup and sends the report again with fee_confirmed.
-        if body.get("fee_confirmed"):
-            wallet.confirm_fee(profile)
-        elif wallet.can_report(profile) and not wallet.fee_confirmed(profile):
-            return JsonResponse({"ok": False, "error": "fee_confirm",
+        asked = body.get("fee_confirmed")
+        if isinstance(asked, int) and not isinstance(asked, bool):
+            wallet.confirm_fee(profile, asked)
+        if wallet.can_report(profile) and not wallet.fee_confirmed(profile):
+            return JsonResponse({"ok": False, "error": "fee_confirm", "fee_n": wallet.fees_today(profile),
                                  "message": wallet.fee_confirm_plain(profile)}, status=428)
-        wallet_charge = wallet.charge_day(profile)
+        wallet_charge = wallet.charge_report(profile)
+        if not wallet_charge["ok"] and wallet_charge.get("error") == "confirm":
+            return JsonResponse({"ok": False, "error": "fee_confirm", "fee_n": wallet.fees_today(profile),
+                                 "message": wallet.fee_confirm_plain(profile)}, status=428)
         if not wallet_charge["ok"]:
             return JsonResponse({
                 "ok": False, "error": "wallet_insufficient",
                 "need": wallet_charge["need"], "balance": wallet_charge["balance"],
-                "message": (f"👛 Hamyoningizda mablag' yetarli emas: bugungi hisobot uchun "
+                "message": (f"👛 Hamyoningizda mablag' yetarli emas: hisobot uchun "
                             f"{wallet_charge['cash']} so'm kerak, balansda {wallet_charge['balance']} so'm. "
                             "Botda 👛 Hamyon bo'limidan to'ldiring."),
             }, status=402)
@@ -270,9 +287,13 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
         icon = "🎧" if is_audio else "📖"
         lines.append(f"{icon} {book_obj.title}: {amount} {unit}")
 
-    # ── Group post (same gender/page-tier routing as the bot; posts a fresh
-    # message even for a Premium user's Nth report today -- no in-place
-    # group-message editing/aggregation on the web form yet). ──
+    # ── Group post (same gender/page-tier routing as the bot). A day's later
+    # reports merge into its one group message, like the bot does: edited in
+    # place, or the old ones deleted and a fresh total posted. ──
+    new_ids = {r.id for r in reports}
+    todays = list(ConfirmationReport.objects.filter(user=profile, date__date=today)
+                  .prefetch_related("books").order_by("date"))
+    prior = [r for r in todays if r.id not in new_ids]
     prem_badge = "💎 " if is_premium else ""
     # 🏅 for readers on the latest weekly Top list (tasks.weekly_top_tg_ids).
     try:
@@ -282,21 +303,26 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
     except Exception as e:
         print(f"weekly badge lookup failed: {e}")
     motivation = random.choice(MOTIVATIONS)
-    conclusion_block = (
+    conclusion_block = _format_conclusions_block(todays) or (
         f"<b>💡 Olingan xulosa:</b>\n<blockquote expandable>{conclusion}</blockquote>"
         if conclusion else ""
     )
-    books_block = "<b>O'qilgan kitoblar:</b>\n\n" + "\n".join(lines)
+    if prior:
+        books_block = _format_books_block(_today_books_sync(profile, today))
+    else:
+        books_block = "<b>O'qilgan kitoblar:</b>\n\n" + "\n".join(lines)
+    aggregate_note = f"\n\n<i>🗂 {len(todays)} ta hisobot jamlandi</i>" if prior else ""
     report_message = (
         f"<b><a href='tg://user?id={profile.telegram_id}'>{prem_badge}{profile.full_name}</a></b>:\n\n"
-        f"📊#kun - {reading_day}  ({now.strftime('%Y-%m-%d')})\n\n"
+        f"📊#kun - {reading_day}  ({timezone.localtime(now).strftime('%Y-%m-%d')})\n\n"
         f"{books_block}\n\n"
         f"{conclusion_block}\n\n"
         f"<b>{motivation}</b>"
+        f"{aggregate_note}"
         f"\n\n<i>🌌 Parallel olam orqali yuborildi</i>"
     )
 
-    routing_pages = sum(a for _, a in text_entries)
+    routing_pages = sum((r.pages_read or 0) for r in todays if not r.is_audio)
     if profile.gender == "male":
         target_chat_id = BOYS_GROUP_ID
         target_thread_id = (
@@ -313,7 +339,28 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
         )
 
     group_message_id = None
-    if target_chat_id:
+    api = f"https://api.telegram.org/bot{BOT_TOKEN}"
+    if prior:
+        latest = next((p for p in reversed(prior) if p.group_chat_id and p.group_message_id), None)
+        if latest and latest.group_chat_id == target_chat_id:
+            try:
+                resp = requests.post(f"{api}/editMessageText", data={
+                    "chat_id": latest.group_chat_id, "message_id": latest.group_message_id,
+                    "text": report_message, "parse_mode": "HTML"}, timeout=8)
+                if resp.ok or "not modified" in resp.text:
+                    group_message_id = latest.group_message_id
+                    target_thread_id = latest.group_thread_id
+            except Exception as e:
+                print(f"web report: edit group msg failed: {e}")
+        if not group_message_id:
+            for key in {(p.group_chat_id, p.group_message_id) for p in prior if p.group_chat_id and p.group_message_id}:
+                try:
+                    requests.post(f"{api}/deleteMessage", data={"chat_id": key[0], "message_id": key[1]}, timeout=5)
+                except Exception as e:
+                    print(f"web report: delete prior group msg failed {key}: {e}")
+        ConfirmationReport.objects.filter(id__in=[p.id for p in prior]).update(
+            group_chat_id=None, group_message_id=None, group_thread_id=None)
+    if target_chat_id and not group_message_id:
         try:
             resp = requests.post(
                 f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
