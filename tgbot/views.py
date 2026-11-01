@@ -131,6 +131,9 @@ def _build_landing_context():
 
 
 def library_view(request: HttpRequest):
+    from tgbot.services import app_shell
+    if app_shell.wanted(request):
+        return app_shell.render_shell(request, "/kutubxona/")
     from django.db.models import Count, Q, F
     from tgbot.models import GlobalBook, BooksToRead
 
@@ -217,6 +220,9 @@ def library_view(request: HttpRequest):
 
 
 def home(request: HttpRequest):
+    from tgbot.services import app_shell
+    if app_shell.wanted(request):
+        return app_shell.render_shell(request, "/")
     from django.core.cache import cache
     ctx = cache.get("landing_ctx_v1")
     if ctx is None:
@@ -968,6 +974,14 @@ def internal_ops(request: HttpRequest, action: str):
             out.append(row)
         preview = template.format(name="Kitobxon", days=10, som="10 000", until="10-noyabr") if template else ""
         return JsonResponse({"ok": True, "count": len(out), "rows": out, "preview": preview})
+
+    if action == "app-shell":
+        # The site's swipe shell (services/app_shell.py): {"on": true|false}
+        # with apply switches it for everyone; without apply, the state.
+        from tgbot.services import app_shell
+        if apply and "on" in body:
+            app_shell.set_enabled(bool(body.get("on")))
+        return JsonResponse({"ok": True, "on": app_shell.enabled()})
 
     if action == "wallet-audit":
         # One day of money: wallet moves, top-ups, report charges against

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>{{ title }}</title>
+  <script>
+    // Read by each section (templates/app/_embed.html) before its own
+    // scripts run, so it must exist before any iframe loads.
+    window.KC_SHELL = true;
+  </script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #f7f1e6; overscroll-behavior: none; }
+    #kcTrack { position: fixed; top: 0; left: 0; height: 100%; display: flex; will-change: transform; }
+    #kcTrack.anim { transition: transform .26s cubic-bezier(.2, .8, .2, 1); }
+    .kc-slot { position: relative; height: 100%; flex: 0 0 auto; background: #f7f1e6; }
+    .kc-slot iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: #f7f1e6; }
+  </style>
+</head>
+<body>
+  <div id="kcTrack">
+    {% for path in sections %}<div class="kc-slot"><iframe title="{{ path }}" data-path="{{ path }}" allow="clipboard-write; autoplay; fullscreen"></iframe></div>{% endfor %}
+  </div>
+  <script>
+  (function () {
+    // services/app_shell.py: the four sections side by side, each loaded
+    // once; the visible one sends its swipe as it happens (kc:'drag'), the
+    // shell moves the track with the finger and settles on release.
+    var SECTIONS = {{ sections|safe }};
+    var idx = {{ initial_idx }};
+    var initialQuery = "{{ initial_query|escapejs }}";
+    var shellParam = "{{ shell_param|escapejs }}";
+    var COMMIT_FRACTION = .32, COMMIT_VELOCITY = .55;
+    var track = document.getElementById('kcTrack');
+    var slots = Array.prototype.slice.call(track.children);
+    var frames = slots.map(function (s) { return s.firstChild; });
+    var loaded = frames.map(function () { return null; });   // query each slot was loaded with
+
+    var tg = window.Telegram && window.Telegram.WebApp;
+    try { tg && tg.ready(); tg && tg.expand(); } catch (e) {}
+
+    // Main Mini App deep link (t.me/<bot>?startapp=shop_<id>): open the shop
+    // on that product directly (same once-per-session key as _deeplink.html).
+    try {
+      var sp = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
+      var m = /^shop_(\d+)$/.exec(sp);
+      if (m && idx === 0 && !sessionStorage.getItem('kc_startapp_' + sp)) {
+        sessionStorage.setItem('kc_startapp_' + sp, '1');
+        idx = 2;
+        initialQuery = 'p=' + m[1];
+      }
+    } catch (e) {}
+
+    function width() { return window.innerWidth; }
+    function layout() {
+      var w = width();
+      track.style.width = (w * SECTIONS.length) + 'px';
+      slots.forEach(function (s) { s.style.width = w + 'px'; });
+    }
+    function place(offset, animate) {
+      track.classList.toggle('anim', !!animate);
+      track.style.transform = 'translate3d(' + (-idx * width() + (offset || 0)) + 'px,0,0)';
+    }
+    function load(i, query) {
+      query = query || '';
+      if (loaded[i] === query) return;
+      loaded[i] = query;
+      frames[i].src = SECTIONS[i] + '?embed=1' + (query ? '&' + query : '');
+    }
+    // A section that finishes loading offscreen rests until it is shown.
+    frames.forEach(function (f, i) {
+      f.addEventListener('load', function () { if (i !== idx) tell(i, 'hidden'); });
+    });
+    function tell(i, kc) {
+      try { frames[i].contentWindow.postMessage({ kc: kc }, location.origin); } catch (e) {}
+    }
+    function show(i) {
+      if (i !== idx) tell(idx, 'hidden');
+      idx = i;
+      place(0, true);
+      var url = SECTIONS[i] + (shellParam ? '?' + shellParam : '');
+      try { history.replaceState(null, '', url); } catch (e) {}
+      document.title = frames[i].contentDocument && frames[i].contentDocument.title || document.title;
+      tell(i, 'shown');
+    }
+    function go(i, query) {
+      if (i < 0 || i >= SECTIONS.length) return place(0, true);
+      // A query (e.g. one product, p=54) reloads that section on it; a plain
+      // tab switch keeps whatever the section was showing.
+      if (query) { loaded[i] = null; load(i, query); } else if (loaded[i] === null) { load(i, ''); }
+      show(i);
+    }
+
+    layout();
+    place(0, false);
+    load(idx, initialQuery);
+    // The rest load once the first one is up, neighbours first, so a swipe
+    // never waits.
+    var preloaded = false;
+    function preload() {
+      if (preloaded) return;
+      preloaded = true;
+      [idx + 1, idx - 1, idx + 2, idx - 2, idx + 3, idx - 3].forEach(function (i, n) {
+        if (i >= 0 && i < SECTIONS.length) setTimeout(function () { if (loaded[i] === null) load(i, ''); }, 250 + n * 350);
+      });
+    }
+    frames[idx].addEventListener('load', preload, { once: true });
+    setTimeout(preload, 2500);
+
+    window.addEventListener('resize', function () { layout(); place(0, false); });
+
+    window.addEventListener('message', function (e) {
+      if (e.origin !== location.origin) return;
+      var d = e.data;
+      if (!d || typeof d !== 'object' || !d.kc) return;
+      if (frames[idx].contentWindow !== e.source) return;   // only the visible section steers
+      var w = width();
+      if (d.kc === 'drag') {
+        var dx = +d.dx || 0;
+        var edge = (idx === 0 && dx > 0) || (idx === SECTIONS.length - 1 && dx < 0);
+        place(edge ? dx * .25 : Math.max(-w, Math.min(w, dx)), false);
+      } else if (d.kc === 'release') {
+        var rdx = +d.dx || 0, v = +d.v || 0;
+        var next = rdx < 0 ? idx + 1 : idx - 1;
+        if ((Math.abs(rdx) > w * COMMIT_FRACTION || v > COMMIT_VELOCITY) && next >= 0 && next < SECTIONS.length) go(next, '');
+        else place(0, true);
+      } else if (d.kc === 'go') {
+        var i = SECTIONS.indexOf(d.path);
+        if (i >= 0) go(i, d.query || '');
+      }
+    });
+  })();
+  </script>
+</body>
+</html>

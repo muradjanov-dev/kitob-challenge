@@ -7,6 +7,7 @@
 {% endcomment %}
 <script>
   (function () {
+    if (window.KC_EMBED) return;   // inside the app shell, which opens the product itself
     try {
       var tg = window.Telegram && window.Telegram.WebApp;
       var sp = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) ||

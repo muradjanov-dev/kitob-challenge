@@ -1,0 +1,83 @@
+{% comment %}
+  Include right after telegram-web-app.js in each of the four section pages.
+  Inside the app shell (services/app_shell.py) the page uses the shell's
+  Telegram SDK -- initData, popups and links go through the one window
+  Telegram talks to -- and leaves navigation to the shell, so switching
+  sections never reloads them. Outside the shell nothing changes:
+  kcNav(url) is a plain navigation.
+{% endcomment %}
+<script>
+  (function () {
+    var embed = false;
+    try { embed = window.parent !== window && !!window.parent.KC_SHELL; } catch (e) {}
+    window.KC_EMBED = embed;
+    if (embed) window.Telegram = window.parent.Telegram;
+    var SECTIONS = ['/', '/kutubxona/', '/shop/', '/kabinet/'];
+    var ALIASES = { '/library/': '/kutubxona/', '/dokon/': '/shop/' };
+
+    function toShell(msg) { window.parent.postMessage(msg, location.origin); }
+    window.kcShell = function (msg) { if (embed) toShell(msg); };
+
+    // A section: slide to it in the shell. Anything else (a game, a file):
+    // open it in the whole window, as before.
+    window.kcNav = function (url) {
+      if (!embed) { window.location.href = url; return; }
+      var u = new URL(url, location.href);
+      var path = ALIASES[u.pathname] || u.pathname;
+      if (u.origin === location.origin && SECTIONS.indexOf(path) >= 0) {
+        u.searchParams.delete('tgWebAppData');
+        u.searchParams.delete('embed');
+        toShell({ kc: 'go', path: path, query: u.searchParams.toString() });
+      } else {
+        window.top.location.href = u.href;
+      }
+    };
+
+    if (!embed) return;
+
+    // Plain same-origin links (the tab bar, cards): through kcNav, unless the
+    // page's own handler already took the click. Added after the page's
+    // scripts, so those run first.
+    document.addEventListener('DOMContentLoaded', function () {
+      document.addEventListener('click', function (e) {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey) return;
+        var a = e.target.closest && e.target.closest('a[href]');
+        if (!a || a.target === '_blank' || a.hasAttribute('download')) return;
+        var u = new URL(a.href, location.href);
+        if (u.origin !== location.origin) return;
+        if (u.pathname === location.pathname && u.hash) return;
+        e.preventDefault();
+        window.kcNav(u.href);
+      });
+    });
+
+    // Offscreen sections rest: KC_OFFSCREEN plus a visibilitychange event,
+    // which a page's animation already listens to.
+    window.KC_OFFSCREEN = false;
+    function setOffscreen(off) {
+      if (window.KC_OFFSCREEN === off) return;
+      window.KC_OFFSCREEN = off;
+      try { document.dispatchEvent(new Event('visibilitychange')); } catch (e) {}
+    }
+
+    // Shown again after a while: refresh the tab bar's balance, which may
+    // have changed in another section.
+    var lastBalance = Date.now();
+    window.addEventListener('message', function (e) {
+      if (e.origin !== location.origin || e.source !== window.parent) return;
+      if (!e.data) return;
+      if (e.data.kc === 'hidden') { setOffscreen(true); return; }
+      if (e.data.kc !== 'shown') return;
+      setOffscreen(false);
+      if (typeof window.kcOnShown === 'function') window.kcOnShown();
+      var el = document.getElementById('stbBalanceVal');
+      var tg = window.Telegram && window.Telegram.WebApp;
+      if (!el || !tg || !tg.initData || Date.now() - lastBalance < 15000) return;
+      lastBalance = Date.now();
+      fetch('/shop/api/me/', { headers: { 'X-Telegram-Init-Data': tg.initData } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d.ok) el.textContent = d.balance; })
+        .catch(function () {});
+    });
+  })();
+</script>

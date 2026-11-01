@@ -136,6 +136,9 @@ def shop_index(request: HttpRequest) -> HttpResponse:
     (the Telegram WebApp SDK injects it client-side); the actual gate is on
     every API call. This keeps initial render fast and lets us show a friendly
     'not authorized' state instead of a 403 wall."""
+    from tgbot.services import app_shell
+    if app_shell.wanted(request):
+        return app_shell.render_shell(request, "/shop/")
     resp = render(request, "shop/index.html", {
         "shop_currency_label": "Kitobcha",
     })

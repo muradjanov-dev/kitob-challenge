@@ -62,6 +62,9 @@ def _resolve_profile(init_data: str):
 
 
 def cabinet_index(request: HttpRequest) -> HttpResponse:
+    from tgbot.services import app_shell
+    if app_shell.wanted(request):
+        return app_shell.render_shell(request, "/kabinet/")
     resp = render(request, "cabinet/index.html", {})
     resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp["Pragma"] = "no-cache"
