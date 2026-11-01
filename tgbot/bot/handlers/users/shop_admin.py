@@ -467,16 +467,20 @@ async def shopadm_cancel_cb(call: types.CallbackQuery, state: FSMContext):
 # ──────────────────────────────────────────────────────────────────────────
 # List products with quick actions (toggle active / delete)
 # ──────────────────────────────────────────────────────────────────────────
+LIST_PAGE = 15
+
+
 @sync_to_async
-def _list_products_sync(limit=20):
-    return list(
-        ShopProduct.objects
-        .order_by("sort_order", "-created_at")
-        .values("id", "name", "price_kitobcha", "stock_qty", "is_active")[:limit]
-    )
+def _list_products_sync(page=0):
+    """One page of ALL products (the list used to stop at 20, so older ones
+    could not be opened or deleted); returns (rows, total)."""
+    qs = ShopProduct.objects.order_by("sort_order", "-created_at")
+    total = qs.count()
+    start = max(0, int(page)) * LIST_PAGE
+    return list(qs.values("id", "name", "price_kitobcha", "stock_qty", "is_active")[start:start + LIST_PAGE]), total
 
 
-def _list_kb(rows) -> InlineKeyboardMarkup:
+def _list_kb(rows, page=0, total=0) -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup(row_width=3)
     if not rows:
         kb.row(InlineKeyboardButton("➕ Mahsulot qo'shish", callback_data="shopadm:add"))
@@ -487,6 +491,15 @@ def _list_kb(rows) -> InlineKeyboardMarkup:
         stock = "∞" if r["stock_qty"] is None else r["stock_qty"]
         title = f"{status_icon} {r['name'][:24]} • {r['price_kitobcha']}🪙 • {stock}📦"
         kb.row(InlineKeyboardButton(title, callback_data=f"shopadm:view:{r['id']}"))
+    pages = max(1, (total + LIST_PAGE - 1) // LIST_PAGE)
+    if pages > 1:
+        nav = []
+        if page > 0:
+            nav.append(InlineKeyboardButton("◀️", callback_data=f"shopadm:list:{page - 1}"))
+        nav.append(InlineKeyboardButton(f"{page + 1}/{pages}", callback_data=f"shopadm:list:{page}"))
+        if page + 1 < pages:
+            nav.append(InlineKeyboardButton("▶️", callback_data=f"shopadm:list:{page + 1}"))
+        kb.row(*nav)
     kb.row(
         InlineKeyboardButton("➕ Qo'shish", callback_data="shopadm:add"),
         InlineKeyboardButton("🔙 Orqaga", callback_data="admin:shop"),
@@ -501,7 +514,11 @@ async def shopadm_list(call: types.CallbackQuery, state: FSMContext):
         await call.answer("Faqat adminlar uchun", show_alert=True)
         return
     await call.answer()
-    rows = await _list_products_sync()
+    try:
+        page = int(call.data.split(":")[-1])
+    except ValueError:
+        page = 0
+    rows, total = await _list_products_sync(page)
     if not rows:
         await call.message.answer(
             "📋 Mahsulotlar yo'q.\n\nBirinchi mahsulotni qo'shing:",
@@ -509,10 +526,10 @@ async def shopadm_list(call: types.CallbackQuery, state: FSMContext):
         )
         return
     await call.message.answer(
-        f"📋 <b>Mahsulotlar</b> ({len(rows)} ta)\n\n"
-        "Birini tanlang — boshqarish tugmalari ochiladi:",
+        f"📋 <b>Mahsulotlar</b> ({total} ta)\n\n"
+        "Birini tanlang — boshqarish tugmalari ochiladi (o'chirish ham shu yerda):",
         parse_mode="HTML",
-        reply_markup=_list_kb(rows),
+        reply_markup=_list_kb(rows, page, total),
     )
 
 
@@ -622,12 +639,20 @@ async def shopadm_delete_confirm(call: types.CallbackQuery, state: FSMContext):
 
 
 @sync_to_async
-def _delete_product_sync(pid: int) -> bool:
+def _delete_product_sync(pid: int) -> str:
+    """"deleted"; "hidden" when the database protects its history (charity
+    contributions) -- it leaves the shop but keeps the records; "missing"."""
+    from django.db.models import ProtectedError
     p = ShopProduct.objects.filter(id=pid).first()
     if not p:
-        return False
-    p.delete()
-    return True
+        return "missing"
+    try:
+        p.delete()
+        return "deleted"
+    except ProtectedError:
+        p.is_active = False
+        p.save(update_fields=["is_active"])
+        return "hidden"
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith("shopadm:delete_yes:"), state="*")
@@ -637,13 +662,17 @@ async def shopadm_delete_yes(call: types.CallbackQuery, state: FSMContext):
         await call.answer("Faqat adminlar uchun", show_alert=True)
         return
     pid = int(call.data.split(":")[-1])
-    ok = await _delete_product_sync(pid)
-    await call.answer("🗑 O'chirildi" if ok else "Topilmadi", show_alert=True)
-    rows = await _list_products_sync()
+    result = await _delete_product_sync(pid)
+    await call.answer({
+        "deleted": "🗑 O'chirildi",
+        "hidden": "Bu mahsulotning tarixi bor (xayriya hissalari) — o'chirilmadi, do'kondan yashirildi.",
+        "missing": "Topilmadi",
+    }[result], show_alert=True)
+    rows, total = await _list_products_sync(0)
     await call.message.answer(
-        f"📋 <b>Mahsulotlar</b> ({len(rows)} ta)" if rows else "📋 Mahsulotlar yo'q.",
+        f"📋 <b>Mahsulotlar</b> ({total} ta)" if rows else "📋 Mahsulotlar yo'q.",
         parse_mode="HTML",
-        reply_markup=_list_kb(rows),
+        reply_markup=_list_kb(rows, 0, total),
     )
 
 
