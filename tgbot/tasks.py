@@ -1065,6 +1065,50 @@ def send_streak_warning():
 
 
 @shared_task
+def ask_streak_gifts():
+    """20:30: readers whose streak burns tonight and who cannot pay today's
+    report are offered to a few random active readers -- "gift them a streak
+    freeze?" (services.kitobcha_uses; owner, 2026-11-01). The first gift
+    saves them; later taps are told it is already done. One ask per donor a
+    day, and nothing about anyone's money is said."""
+    import time as _t
+    from django.core.cache import cache
+    from tgbot.services import kitobcha_uses as ku
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    today = timezone.localdate().isoformat()
+    asked = set()
+    sent = people = 0
+    for streak, p in ku.streak_gift_candidates():
+        people += 1
+        name = escape(ku._first_name(p))
+        text = (
+            f"🔥 Loyihadagi kitobxon do'stingiz <b>{name}</b>ning <b>{streak} kunlik</b> streaki "
+            "bugun kuyib ketishi mumkin.\n\n"
+            "Unga streak muzlatish sovg'a qilasizmi? 🛡 Muzlatish bir kun hisobot yuborilmasa ham "
+            "streakni saqlab qoladi.\n\n"
+            f"<i>1 kun = {ku.STREAK_GIFT_DAY_PRICE} Kitobcha</i>"
+        )
+        kb = json.dumps({"inline_keyboard": [
+            [{"text": f"🛡 {d} kun · {d * ku.STREAK_GIFT_DAY_PRICE} 🪙", "callback_data": f"sgift:{p.id}:{d}"}
+             for d in ku.STREAK_GIFT_DAY_OPTIONS],
+            [{"text": "Bu safar emas", "callback_data": "sgift:no"}],
+        ]})
+        for d in ku.streak_gift_donors(p, exclude=asked):
+            if not cache.add(f"streak_gift_asked:{d.id}:{today}", 1, 60 * 60 * 26):
+                continue
+            asked.add(d.id)
+            try:
+                r = requests.post(url, data={"chat_id": d.telegram_id, "text": text, "parse_mode": "HTML",
+                                             "reply_markup": kb}, timeout=8)
+                sent += bool(r.ok)
+            except Exception as e:
+                print(f"ask_streak_gifts {d.telegram_id}: {e}")
+            _t.sleep(0.05)
+    print(f"ask_streak_gifts: people={people} asks={sent}")
+
+
+@shared_task
 def apply_streak_freezes():
     """Auto-spend one banked Market 'Streak muzlatish' token for any user who
     was active yesterday (report or an earlier freeze), holds a token, but

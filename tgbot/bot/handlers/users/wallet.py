@@ -119,6 +119,8 @@ def wallet_kb(user) -> InlineKeyboardMarkup:
         label = "🪙 Kitobcha bilan to'lash: " + ("✅ yoqilgan" if on else "⛔️ o'chirilgan")
     kb.row(InlineKeyboardButton(label, callback_data="wallet:kitobcha"))
     kb.row(InlineKeyboardButton("📜 История" if ru else "📜 Tarix", callback_data="wallet:history"))
+    kb.row(InlineKeyboardButton("🪙 Что делать с Kitobcha?" if ru else "🪙 Kitobcha bilan nima qilaman?",
+                                callback_data="kuse:menu"))
     return kb
 
 

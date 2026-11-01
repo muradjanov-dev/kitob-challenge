@@ -290,7 +290,7 @@ def charge_report(user, day=None) -> dict:
 
 # Money the project gave (bonus, Premium days turned into so'm -- the Premium
 # itself still runs to its end date): never refunded (owner, 2026-11-01).
-GIFT_KINDS = ("bonus", "premium_conversion", "referral", "cashback")
+GIFT_KINDS = ("bonus", "premium_conversion", "referral", "cashback", "mentor")
 
 
 def refundable(user) -> int:
@@ -561,8 +561,14 @@ CASHBACK_PAYOUT = 50000
 
 
 def _cashback_locked(p, topup_amount: int) -> dict:
+    return _pot_add_locked(p, int(topup_amount) * CASHBACK_PCT // 100)
+
+
+def _pot_add_locked(p, add: int) -> dict:
+    """Put `add` so'm into the Kitob hamyonchasi (cashback, or Kitobcha
+    converted 1:1); at CASHBACK_PAYOUT the whole pot moves to the wallet."""
     from tgbot.models import WalletTransaction
-    add = int(topup_amount) * CASHBACK_PCT // 100
+    add = int(add)
     p.cashback_balance = int(p.cashback_balance or 0) + add
     paid = 0
     if p.cashback_balance >= CASHBACK_PAYOUT:

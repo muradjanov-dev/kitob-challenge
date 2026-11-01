@@ -303,6 +303,14 @@ class TelegramProfile(BaseModel):
         help_text="Kitob hamyonchasi, so'm: har to'ldirishning 1% keshbegi. 50 000 ga "
                   "yetganda butunlay asosiy hamyonga o'tadi (services/wallet).",
     )
+    # Ways to use Kitobcha (services/kitobcha_uses).
+    report_frame = models.CharField(max_length=20, blank=True, default="",
+                                    help_text="Guruhdagi hisobot posti ramkasi (kitobcha_uses.FRAMES).")
+    report_frame_until = models.DateField(null=True, blank=True, help_text="Ramka shu kungacha faol.")
+    mentor_days_given = models.PositiveIntegerField(default=0,
+                                                    help_text="Ustoz sifatida yangilarga to'lagan hisobot kunlari.")
+    honor_wall_at = models.DateTimeField(null=True, blank=True,
+                                         help_text="«Hurmatli kitobxonlar devori»ga yozilgan vaqt.")
 
     def has_active_premium(self) -> bool:
         """True if the user has a paid Payment active today, OR is inside a
@@ -1576,12 +1584,13 @@ class WalletTransaction(BaseModel):
     KIND_REFUND = "refund"
     KIND_REFERRAL = "referral"
     KIND_CASHBACK = "cashback"
+    KIND_MENTOR = "mentor"
     KIND_ADMIN = "admin"
     KIND_CHOICES = [
         (KIND_TOPUP, "To'ldirish"), (KIND_BONUS, "Bonus"),
         (KIND_PREMIUM, "Premium → hamyon"), (KIND_REPORT_FEE, "Kunlik to'lov"),
         (KIND_REPORT_EXTRA, "Qo'shimcha hisobot"), (KIND_REFUND, "Qaytarildi"),
-        (KIND_REFERRAL, "Referal mukofoti"), (KIND_CASHBACK, "Kitob hamyonchasidan"),
+        (KIND_REFERRAL, "Referal mukofoti"), (KIND_CASHBACK, "Kitob hamyonchasidan"), (KIND_MENTOR, "Ustoz sovg'asi"),
         (KIND_ADMIN, "Admin tuzatishi"),
     ]
     user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="wallet_transactions")

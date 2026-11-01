@@ -290,6 +290,12 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.send_streak_warning',
         'schedule': crontab(hour=20, minute=0),
     },
+    # Readers whose streak burns tonight and who cannot pay are offered to a
+    # few random readers as a streak-freeze gift (services.kitobcha_uses).
+    'ask-streak-gifts': {
+        'task': 'tgbot.tasks.ask_streak_gifts',
+        'schedule': crontab(hour=20, minute=30),
+    },
 
     # Auto-spend a banked Market 'Streak muzlatish' token for anyone about to
     # lose their streak today — runs just before midnight so it's the last

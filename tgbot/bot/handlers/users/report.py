@@ -1549,6 +1549,8 @@ async def _do_confirm_report(message, user, state: FSMContext):
             prem_badge += "🏅 "
     except Exception as e:
         print(f"weekly badge lookup failed: {e}")
+    if getattr(user, "mentor_days_given", 0):
+        prem_badge += "🎓 "
 
     # Refresh today's report list (now includes the row we just created) to
     # compute cumulative totals for the aggregated group message.
@@ -1591,6 +1593,11 @@ async def _do_confirm_report(message, user, state: FSMContext):
         f"<b>{motivation}</b>"
         f"{aggregate_note}"
     )
+    # A frame bought with Kitobcha (services.kitobcha_uses) around the post.
+    from tgbot.services.kitobcha_uses import frame_lines
+    _frame = frame_lines(user)
+    if _frame:
+        report_message = f"{_frame[0]}\n{report_message}\n{_frame[1]}"
 
     if not user:
         await state.finish()

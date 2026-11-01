@@ -59,6 +59,12 @@ class WalletStates(StatesGroup):
     reject_reason = State()
 
 
+class KitobchaStates(StatesGroup):
+    give_who = State()
+    give_amount = State()
+    mentor_who = State()
+
+
 class SendMessageInBot(StatesGroup):
     content = State()
     message = State()

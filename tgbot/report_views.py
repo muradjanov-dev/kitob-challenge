@@ -302,6 +302,8 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
             prem_badge += "🏅 "
     except Exception as e:
         print(f"weekly badge lookup failed: {e}")
+    if getattr(profile, "mentor_days_given", 0):
+        prem_badge += "🎓 "
     motivation = random.choice(MOTIVATIONS)
     conclusion_block = _format_conclusions_block(todays) or (
         f"<b>💡 Olingan xulosa:</b>\n<blockquote expandable>{conclusion}</blockquote>"
@@ -321,6 +323,10 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
         f"{aggregate_note}"
         f"\n\n<i>🌌 Parallel olam orqali yuborildi</i>"
     )
+    from tgbot.services.kitobcha_uses import frame_lines
+    _frame = frame_lines(profile)
+    if _frame:
+        report_message = f"{_frame[0]}\n{report_message}\n{_frame[1]}"
 
     routing_pages = sum((r.pages_read or 0) for r in todays if not r.is_audio)
     if profile.gender == "male":

@@ -31,3 +31,4 @@ from . import library_admin
 from . import market
 from . import boom_admin
 from . import ads
+from . import kitobcha_uses
