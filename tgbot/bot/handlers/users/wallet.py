@@ -32,6 +32,7 @@ def _lang(user) -> str:
 def wallet_text(user) -> str:
     bal, ball = int(user.wallet_balance or 0), int(user.ball or 0)
     back = wallet.refundable(user)
+    pot = int(getattr(user, "cashback_balance", 0) or 0)
     if _lang(user) == "ru":
         refund_line = (f"💸 Можно вернуть: <b>{_som(back)} сум</b> — неизрасходованные оплаченные деньги "
                        "(бонусы проекта не возвращаются). Напишите через «📞 Связь с админом».\n\n" if back else "")
@@ -64,6 +65,8 @@ def wallet_text(user) -> str:
             f"ℹ️ Каждый отчёт стоит <b>{_som(wallet.DAY_FEE)} сум</b>, отправлять можно сколько угодно раз в день. "
             f"До {wallet.KITOBCHA_SHARE_PCT}% цены можно оплатить Kitobcha.\n"
             f"{perks}"
+            f"📚 Книжная копилка: <b>{_som(pot)} / {_som(wallet.CASHBACK_PAYOUT)} сум</b> — {wallet.CASHBACK_PCT}% "
+            f"кешбэк с каждого пополнения; на {_som(wallet.CASHBACK_PAYOUT)} всё переходит в кошелёк.\n\n"
             f"{refund_line}"
             "Выберите сумму пополнения 👇"
         )
@@ -90,6 +93,8 @@ def wallet_text(user) -> str:
         f"ℹ️ Har bir hisobot <b>{_som(wallet.DAY_FEE)} so'm</b>, bir kunda istalgancha yuborish mumkin. "
         f"Narxning {wallet.KITOBCHA_SHARE_PCT}% gachasini Kitobcha bilan to'lash mumkin.\n"
         f"{perks}"
+        f"📚 Kitob hamyonchasi: <b>{_som(pot)} / {_som(wallet.CASHBACK_PAYOUT)} so'm</b> — har to'ldirishdan "
+        f"{wallet.CASHBACK_PCT}% keshbek; {_som(wallet.CASHBACK_PAYOUT)} ga yetganda hammasi asosiy hamyonga o'tadi.\n\n"
         f"{refund_line}"
         "To'ldirish uchun summani tanlang 👇"
     )
@@ -490,6 +495,17 @@ async def wallet_topup_approve(call: types.CallbackQuery):
                  f"kunning keyingi hisobotlari {_som(wallet.EXTRA_FEE_MEMBER)} so'mdan.\n\n")
     else:
         perks = ""
+    cb = getattr(topup, "cashback", None) or {}
+    if cb.get("paid_out"):
+        perks += (f"🎉 Книжная копилка дошла до {_som(wallet.CASHBACK_PAYOUT)} сум — <b>{_som(cb['paid_out'])} сум</b> "
+                  "переведено в кошелёк!\n\n" if ru else
+                  f"🎉 Kitob hamyonchangiz {_som(wallet.CASHBACK_PAYOUT)} so'mga yetdi — <b>{_som(cb['paid_out'])} so'm</b> "
+                  "asosiy hamyonga o'tkazildi!\n\n")
+    elif cb.get("added"):
+        perks += (f"📚 В копилку: <b>+{_som(cb['added'])} сум</b> кешбэка — всего {_som(cb['pot'])} / "
+                  f"{_som(wallet.CASHBACK_PAYOUT)}.\n\n" if ru else
+                  f"📚 Kitob hamyonchangizga <b>+{_som(cb['added'])} so'm</b> keshbek — jami {_som(cb['pot'])} / "
+                  f"{_som(wallet.CASHBACK_PAYOUT)} so'm.\n\n")
     text = (
         f"✅ <b>Кошелёк пополнен!</b>\n\n➕ {_som(topup.amount)} сум\n"
         f"💰 Баланс: <b>{_som(user.wallet_balance)} сум</b> (≈ {days} дн. отчётов)\n\n{perks}Читайте дальше! 📚"

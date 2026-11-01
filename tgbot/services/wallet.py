@@ -290,7 +290,7 @@ def charge_report(user, day=None) -> dict:
 
 # Money the project gave (bonus, Premium days turned into so'm -- the Premium
 # itself still runs to its end date): never refunded (owner, 2026-11-01).
-GIFT_KINDS = ("bonus", "premium_conversion", "referral")
+GIFT_KINDS = ("bonus", "premium_conversion", "referral", "cashback")
 
 
 def refundable(user) -> int:
@@ -325,7 +325,9 @@ def refund(user, amount=None, note: str = "") -> dict:
         if take <= 0:
             return {"ok": False, "refundable": can}
         p.wallet_balance = int(p.wallet_balance or 0) - take
-        p.save(update_fields=["wallet_balance"])
+        # The 1% that refunded money earned leaves the pot too.
+        p.cashback_balance = max(0, int(p.cashback_balance or 0) - take * CASHBACK_PCT // 100)
+        p.save(update_fields=["wallet_balance", "cashback_balance"])
         WalletTransaction.objects.create(user=p, kind=WalletTransaction.KIND_REFUND, delta=-take,
                                          balance_after=p.wallet_balance, note=(note or "Qaytarildi")[:120])
     user.wallet_balance = p.wallet_balance
@@ -431,6 +433,7 @@ def day_summary_text(s: dict) -> str:
     e_n, e_som, e_kit = mv("report_extra")
     b_n, b_som, _ = mv("bonus")
     r_n, r_som, _ = mv("referral")
+    c_n, c_som, _ = mv("cashback")
     a_n, a_som, _ = mv("admin")
     lines = [
         "👛 <b>Hamyon (so'm):</b>",
@@ -438,7 +441,7 @@ def day_summary_text(s: dict) -> str:
         f"kutilmoqda {t_wait['n']} ta — {som(t_wait['som'])}; rad etilgan {t_no['n']} ta",
         f"  🧾 Hisobot to'lovlari: <b>{f_n + e_n}</b> ta — <b>{som(f_som + e_som)}</b> so'm + "
         f"{som(f_kit + e_kit)} Kitobcha (birinchi {f_n}, qo'shimcha {e_n})",
-        f"  🎁 Bonus: {b_n} ta — {som(b_som)} · 👥 Referal: {r_n} ta — {som(r_som)} · 🛠 Admin: {a_n} ta — {som(a_som)}",
+        f"  🎁 Bonus: {b_n} ta — {som(b_som)} · 👥 Referal: {r_n} ta — {som(r_som)} · 📚 Keshbek: {c_n} ta — {som(c_som)} · 🛠 Admin: {a_n} ta — {som(a_som)}",
         f"  📊 Hisobot yuborishlar: {s['submissions']} ta, {s['reporters']} kishi · to'lovlar: {s['charges']} ta",
     ]
     if s["unpaid"]:
@@ -550,6 +553,26 @@ def create_topup(user, amount: int, photo_file_id: str):
     return WalletTopup.objects.create(user=user, amount=int(amount), photo_file_id=photo_file_id or "")
 
 
+# Kitob hamyonchasi (owner, 2026-11-01): CASHBACK_PCT of every approved
+# top-up is saved apart; when it reaches CASHBACK_PAYOUT the whole pot moves
+# into the main wallet (a gift row, never refunded) and can be spent.
+CASHBACK_PCT = 1
+CASHBACK_PAYOUT = 50000
+
+
+def _cashback_locked(p, topup_amount: int) -> dict:
+    from tgbot.models import WalletTransaction
+    add = int(topup_amount) * CASHBACK_PCT // 100
+    p.cashback_balance = int(p.cashback_balance or 0) + add
+    paid = 0
+    if p.cashback_balance >= CASHBACK_PAYOUT:
+        paid, p.cashback_balance = p.cashback_balance, 0
+    p.save(update_fields=["cashback_balance"])
+    if paid:
+        _credit_locked(p, paid, WalletTransaction.KIND_CASHBACK, "Kitob hamyonchasidan")
+    return {"added": add, "paid_out": paid, "pot": p.cashback_balance}
+
+
 def approve_topup(topup_id: int, admin=None):
     """(topup, credited_now). Only the click that moves it out of pending
     credits the wallet, so a second admin (group + DM buttons) cannot."""
@@ -567,8 +590,10 @@ def approve_topup(topup_id: int, admin=None):
         days = member_days_for(t.amount)
         if days:
             _extend_membership_locked(p, days)
+        t.cashback = _cashback_locked(p, t.amount)
         t.user.wallet_balance = p.wallet_balance
         t.user.wallet_member_until = p.wallet_member_until
+        t.user.cashback_balance = p.cashback_balance
     return t, True
 
 

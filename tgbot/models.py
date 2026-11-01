@@ -298,6 +298,11 @@ class TelegramProfile(BaseModel):
         help_text="Imtiyozlar shu kungacha (shu kun ham) faol. Bir martada 15 000 so'm "
                   "va undan ko'p to'ldirish har 1 000 so'm uchun 1 kun qo'shadi.",
     )
+    cashback_balance = models.PositiveIntegerField(
+        default=0,
+        help_text="Kitob hamyonchasi, so'm: har to'ldirishning 1% keshbegi. 50 000 ga "
+                  "yetganda butunlay asosiy hamyonga o'tadi (services/wallet).",
+    )
 
     def has_active_premium(self) -> bool:
         """True if the user has a paid Payment active today, OR is inside a
@@ -1570,12 +1575,13 @@ class WalletTransaction(BaseModel):
     KIND_REPORT_EXTRA = "report_extra"
     KIND_REFUND = "refund"
     KIND_REFERRAL = "referral"
+    KIND_CASHBACK = "cashback"
     KIND_ADMIN = "admin"
     KIND_CHOICES = [
         (KIND_TOPUP, "To'ldirish"), (KIND_BONUS, "Bonus"),
         (KIND_PREMIUM, "Premium → hamyon"), (KIND_REPORT_FEE, "Kunlik to'lov"),
         (KIND_REPORT_EXTRA, "Qo'shimcha hisobot"), (KIND_REFUND, "Qaytarildi"),
-        (KIND_REFERRAL, "Referal mukofoti"),
+        (KIND_REFERRAL, "Referal mukofoti"), (KIND_CASHBACK, "Kitob hamyonchasidan"),
         (KIND_ADMIN, "Admin tuzatishi"),
     ]
     user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="wallet_transactions")
