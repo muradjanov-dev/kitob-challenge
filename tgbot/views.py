@@ -790,6 +790,99 @@ def internal_ops(request: HttpRequest, action: str):
                              "premium_users": len(days), "premium_days": sum(days),
                              "premium_total": sum(days) * wallet.DAY_FEE})
 
+    if action == "admin-grant":
+        # A gift to every admin (profiles with is_admin + settings.ADMINS):
+        # `amount` so'm into the wallet and `member_days` perk days, once per
+        # admin per `tag` (the WalletTransaction note is the marker); `text`
+        # ({name} {som} {until}) is DMed to each one credited.
+        import html
+        import os as _os
+
+        import requests
+        from django.conf import settings as _settings
+        from django.db import transaction as _txn
+        from tgbot.models import TelegramProfile, WalletTransaction
+        from tgbot.services import wallet
+        tag = (body.get("tag") or "Admin sovg'asi")[:120]
+        amount, days = int(body.get("amount") or 0), int(body.get("member_days") or 0)
+        env_ids = {int(a) for a in getattr(_settings, "ADMINS", []) if str(a).strip().lstrip("-").isdigit()}
+        admins = list(TelegramProfile.objects.filter(is_admin=True)) + list(
+            TelegramProfile.objects.filter(telegram_id__in=env_ids, is_admin=False))
+        template = body.get("text") or ""
+        rows = []
+        for p in admins:
+            done = WalletTransaction.objects.filter(user=p, kind=WalletTransaction.KIND_ADMIN, note=tag).exists()
+            row = {"telegram_id": p.telegram_id, "name": p.full_name, "done_before": done}
+            if apply and not done and amount > 0:
+                with _txn.atomic():
+                    q = TelegramProfile.objects.select_for_update().get(id=p.id)
+                    wallet._credit_locked(q, amount, WalletTransaction.KIND_ADMIN, tag)
+                    if days:
+                        wallet._extend_membership_locked(q, days)
+                row.update(credited=amount, balance=q.wallet_balance, until=str(q.wallet_member_until))
+                if template and not q.is_blocked:
+                    try:
+                        requests.post(
+                            f"https://api.telegram.org/bot{_os.environ.get('API_TOKEN', '')}/sendMessage",
+                            data={"chat_id": q.telegram_id, "parse_mode": "HTML", "text": template.format(
+                                name=html.escape(q.full_name or "Admin"), som=f"{amount:,}".replace(",", " "),
+                                until=wallet.uz_date(q.wallet_member_until) if q.wallet_member_until else "")},
+                            timeout=8)
+                    except Exception as e:
+                        row["dm_error"] = str(e)[:80]
+                time.sleep(0.05)
+            rows.append(row)
+        return JsonResponse({"ok": True, "admins": len(rows), "rows": rows})
+
+    if action == "shop-product-refund":
+        # Take a product off the shop and give every buyer their Kitobcha back,
+        # once per purchase (status -> refunded, ledger shop_refund:<id>);
+        # straight to the balance, so no member 2x. `text` ({name} {amount})
+        # is DMed to each refunded buyer.
+        import html
+        import os as _os
+
+        import requests
+        from django.db import transaction as _txn
+        from django.db.models import F
+        from tgbot.models import KitobchaLedger, ShopProduct, ShopPurchase, TelegramProfile
+        product = ShopProduct.objects.filter(id=int(body["product_id"])).first()
+        if not product:
+            return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+        purchases = list(ShopPurchase.objects.filter(product=product).select_related("user").order_by("id"))
+        owed = {}
+        if apply:
+            ShopProduct.objects.filter(id=product.id).update(is_active=False)
+            for pu in purchases:
+                with _txn.atomic():
+                    claimed = ShopPurchase.objects.filter(id=pu.id).exclude(
+                        status=ShopPurchase.STATUS_REFUNDED).update(status=ShopPurchase.STATUS_REFUNDED)
+                    if not claimed:
+                        continue
+                    TelegramProfile.objects.filter(id=pu.user_id).update(ball=F("ball") + pu.price_at_purchase)
+                    KitobchaLedger.objects.create(user_id=pu.user_id, delta=pu.price_at_purchase,
+                                                  reason=f"shop_refund:{pu.id}"[:40])
+                owed[pu.user_id] = owed.get(pu.user_id, 0) + pu.price_at_purchase
+            template = body.get("text") or ""
+            for pu in purchases:
+                amount = owed.pop(pu.user_id, 0)
+                if not (template and amount and not pu.user.is_blocked):
+                    continue
+                try:
+                    requests.post(f"https://api.telegram.org/bot{_os.environ.get('API_TOKEN', '')}/sendMessage",
+                                  data={"chat_id": pu.user.telegram_id, "parse_mode": "HTML",
+                                        "text": template.format(name=html.escape(pu.user.full_name or "Kitobxon"),
+                                                                amount=f"{amount:,}".replace(",", " "))},
+                                  timeout=8)
+                except Exception as e:
+                    print(f"shop-product-refund DM {pu.user_id}: {e}")
+                time.sleep(0.05)
+        rows = [{"purchase": pu.id, "telegram_id": pu.user.telegram_id, "name": pu.user.full_name,
+                 "price": pu.price_at_purchase, "status": pu.status, "date": pu.created_at.date().isoformat()}
+                for pu in ShopPurchase.objects.filter(product=product).select_related("user").order_by("id")]
+        return JsonResponse({"ok": True, "product": product.name, "is_active": ShopProduct.objects.get(id=product.id).is_active,
+                             "purchases": len(rows), "kitobcha_total": sum(r["price"] for r in rows), "rows": rows})
+
     if action == "wallet-refund":
         # Support tool: what a reader may take back (dry), or take it out of
         # the wallet once the money has gone back to their card (apply).

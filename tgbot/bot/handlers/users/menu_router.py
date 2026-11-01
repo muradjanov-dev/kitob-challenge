@@ -785,6 +785,88 @@ _HOW_IT_WORKS_UZ = (
     "Qani, bugungi birinchi hisobotni yuboramizmi? 👇"
 )
 
+# Uzbek: three pages told as an adventure -- three doors, each page ending on
+# a hook for the next -- with arrows between them and the report CTA last
+# (owner, 2026-11-01: read it with curiosity, not boredom; always "Siz").
+_HOW_PAGES_UZ = (
+    "🗺 <b>Bot qanday ishlaydi? — 1/3: Sarguzasht boshlanadi</b>\n\n"
+    "Salom, bo'lajak super-kitobxon! 🦸 Tasavvur qiling: qo'lingizda sehrli xarita. "
+    "Unda uchta eshik bor, har birining ortida bitta sir. Birinchisini ochamiz 🗝\n\n"
+    "🚪 <b>1-eshik: Hisobot — sehrli kalit</b>\n"
+    "Kitob o'qidingizmi? «📚 Kitob hisoboti» → kitobni tanlang → nechta bet o'qiganingizni "
+    "yozing → bitta xulosa qoldiring. Tamom! ✨\n"
+    "Hatto <b>1 bet</b> ham hisoblanadi 😉 (faqat botni aldamang — u hammasini eslab qoladi 👀)\n\n"
+    "Har bir hisobotingiz bilan:\n"
+    "📊 reytingda yuqorilaysiz,\n"
+    "🔥 streakingiz (ketma-ket kunlar) o'sadi,\n"
+    "🆙 darajangiz oshadi: 100 → 500 → 1000 bet... har bosqichda yangi unvon va sovg'a!\n"
+    "Bir kunda bir necha marta o'qidingizmi? Bemalol yuboring — guruhda hammasi bitta "
+    "chiroyli xabarga jamlanadi 🗂\n\n"
+    "Lekin bu kalit ishlashi uchun yana bitta narsa kerak... 🤫\n"
+    "U nima ekanini ikkinchi eshik ortida bilasiz 👇",
+
+    "👛 <b>Bot qanday ishlaydi? — 2/3: Xazina sandig'i</b>\n\n"
+    "🚪 <b>2-eshik: Hamyon — sizning xazina sandig'ingiz</b>\n"
+    "Har bir hisobot — <b>1 000 so'm</b>, bir piyola choydan ham arzon ☕️\n"
+    "Sovg'amiz allaqachon sandig'ingizda: <b>3 000 so'm</b> bonus 🎁\n\n"
+    "🔐 Sandiqning uchta siri:\n"
+    "1️⃣ Pul hech qachon so'roqsiz yechilmaydi — bot har safar «Ha»ingizni kutadi ✅\n"
+    "2️⃣ 🪙 Kitobcha ham pul o'rnida ishlaydi: har hisobot narxining 30% gachasini "
+    "Kitobchangiz to'laydi.\n"
+    "3️⃣ Hamyonni bir martada <b>15 000 so'm</b> va undan ko'p to'ldirsangiz — har 1 000 so'm "
+    "uchun 1 kunlik imtiyoz: 2× Kitobcha, VIP arena va kunning keyingi hisobotlari atigi "
+    "<b>100 so'm</b> 💎\n\n"
+    "To'ldirish oson: «👛 Hamyon» → summa → kartaga o'tkazma → chek rasmi → admin tasdiqlaydi ✅\n"
+    "To'lagan pulingizning ishlatilmagan qismini istalgan payt qaytarib olish mumkin "
+    "(loyiha bonuslari bundan mustasno).\n\n"
+    "Xo'sh, Kitobcha qayerdan keladi? Eng qiziq joyi — uchinchi eshik ortida 👇",
+
+    "🏆 <b>Bot qanday ishlaydi? — 3/3: Katta o'yin</b>\n\n"
+    "🚪 <b>3-eshik: O'yinlar, yutuqlar va katta mukofot</b>\n"
+    "🎮 Har kuni <b>10:00</b> va <b>21:30</b> da saytda 3 ta jonli o'yin: Kitob Zanjiri, "
+    "Bilim Qal'asi, Emoji Kitob, Kitob Detektivi, Omon qolish va boshqalar! "
+    "🧩 Viktorina esa guruhda — 08:30, 14:00, 21:00.\n"
+    "G'oliblarga 🪙 Kitobcha, qatnashganga ham sovg'a 🎁\n\n"
+    "🏅 100 dan ortiq yutuq: «Yigirma bet», «Kunlik marafon», «Birinchi kitob»... har biri "
+    "Kitobcha olib keladi.\n"
+    "🎪 Kitobchani Market'da sarflang: streak muzlatish, shaxsiy sertifikat va boshqalar.\n"
+    "👥 Do'stingizni olib keling: u birinchi hisobotini yuborganda sizga <b>500 Kitobcha</b> 🎁\n\n"
+    "🤫 Va eng katta sir: noyabrda <b>100 000 so'mlik</b> mukofot jamg'armasi! "
+    "4 hafta davomida haftadan-haftaga o'sib boradi: 10 000 → 20 000 → 30 000 → 40 000 so'm 💰\n\n"
+    "Xarita tugadi — endi sarguzasht sizniki 🗺✨\n"
+    "<b>O'qing → Yozing → O'ynang → Yuting!</b>\n\n"
+    "Birinchi qadamni hoziroq qo'yamizmi? 👇",
+)
+
+
+def _how_page_kb(page: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardMarkup(row_width=2)
+    nav = []
+    if page > 1:
+        nav.append(InlineKeyboardButton(f"⬅️ {page - 1}/3", callback_data=f"how:{page - 1}"))
+    if page < len(_HOW_PAGES_UZ):
+        nav.append(InlineKeyboardButton(f"Keyingi sir ➡️ {page + 1}/3", callback_data=f"how:{page + 1}"))
+    kb.row(*nav)
+    if page == len(_HOW_PAGES_UZ):
+        kb.row(InlineKeyboardButton("📚 Hisobot yuborish", callback_data="cta_send_report"))
+        kb.row(InlineKeyboardButton("👛 Hamyon", callback_data="wallet:open"),
+               InlineKeyboardButton("👥 Do'st taklif qilish", callback_data="referral:link"))
+    return kb
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith("how:"), state="*")
+async def how_it_works_page(call: types.CallbackQuery, state: FSMContext):
+    try:
+        page = max(1, min(len(_HOW_PAGES_UZ), int(call.data.split(":")[1])))
+    except ValueError:
+        page = 1
+    await call.answer()
+    try:
+        await call.message.edit_text(_HOW_PAGES_UZ[page - 1], parse_mode="HTML", reply_markup=_how_page_kb(page))
+    except Exception:
+        await call.message.answer(_HOW_PAGES_UZ[page - 1], parse_mode="HTML", reply_markup=_how_page_kb(page))
+
+
 _HOW_IT_WORKS_RU = (
     "❓ <b>Как работает бот? (Не бойтесь — всё очень просто!)</b>\n\n"
     "Привет, будущий супер-читатель! 🦸 Здесь чтение книг превращается в "
@@ -864,8 +946,10 @@ def _how_it_works_kb(lang: str) -> InlineKeyboardMarkup:
 
 async def _show_how_it_works(message, user):
     lang = _user_lang(user)
-    text = _HOW_IT_WORKS_RU if lang == "ru" else _HOW_IT_WORKS_UZ
-    await message.answer(text, parse_mode="HTML", reply_markup=_how_it_works_kb(lang))
+    if lang == "ru":
+        await message.answer(_HOW_IT_WORKS_RU, parse_mode="HTML", reply_markup=_how_it_works_kb(lang))
+        return
+    await message.answer(_HOW_PAGES_UZ[0], parse_mode="HTML", reply_markup=_how_page_kb(1))
 
 
 async def _menu_how_it_works(call, user, _state: FSMContext):

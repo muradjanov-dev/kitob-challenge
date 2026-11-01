@@ -352,12 +352,16 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
                     target_thread_id = latest.group_thread_id
             except Exception as e:
                 print(f"web report: edit group msg failed: {e}")
-        if not group_message_id:
-            for key in {(p.group_chat_id, p.group_message_id) for p in prior if p.group_chat_id and p.group_message_id}:
-                try:
-                    requests.post(f"{api}/deleteMessage", data={"chat_id": key[0], "message_id": key[1]}, timeout=5)
-                except Exception as e:
-                    print(f"web report: delete prior group msg failed {key}: {e}")
+        # Every other message of the day goes, the edited one stays -- also
+        # clears duplicates posted before the merge existed.
+        kept = (latest.group_chat_id, latest.group_message_id) if group_message_id else None
+        for key in {(p.group_chat_id, p.group_message_id) for p in prior if p.group_chat_id and p.group_message_id}:
+            if key == kept:
+                continue
+            try:
+                requests.post(f"{api}/deleteMessage", data={"chat_id": key[0], "message_id": key[1]}, timeout=5)
+            except Exception as e:
+                print(f"web report: delete prior group msg failed {key}: {e}")
         ConfirmationReport.objects.filter(id__in=[p.id for p in prior]).update(
             group_chat_id=None, group_message_id=None, group_thread_id=None)
     if target_chat_id and not group_message_id:

@@ -364,6 +364,12 @@ def day_summary(day=None) -> dict:
         "submissions": len(submissions),
         "charges": sum(per_user.values()),
         "unpaid": [{"telegram_id": tg.get(u), "name": names.get(u), "missing": m} for u, m in short.items()],
+        "submission_list": [
+            {"telegram_id": t, "name": n, "at": timezone.localtime(d).strftime("%H:%M")}
+            for t, n, d in sorted(ConfirmationReport.objects.filter(date__date=day)
+                                  .values_list("user__telegram_id", "user__full_name", "date").distinct(),
+                                  key=lambda r: r[2])[:300]
+        ],
         "kitobcha_in": {"n": kit_in["n"] or 0, "sum": int(kit_in["s"] or 0)},
         "kitobcha_out": {"n": kit_out["n"] or 0, "sum": -int(kit_out["s"] or 0)},
         "wallets_total": int(TelegramProfile.objects.aggregate(s=Sum("wallet_balance"))["s"] or 0),

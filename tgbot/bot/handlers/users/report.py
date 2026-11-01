@@ -1646,20 +1646,21 @@ async def _do_confirm_report(message, user, state: FSMContext):
             except Exception as e:
                 print(f"edit_group_msg failed, falling back to delete+send: {e}")
 
-        if not edited_in_place:
-            # Fallback: delete all prior group messages then send a fresh one.
-            seen = set()
-            for prev in prior_reports:
-                key = (prev.group_chat_id, prev.group_message_id)
-                if not prev.group_chat_id or not prev.group_message_id or key in seen:
-                    continue
-                seen.add(key)
-                try:
-                    await bot.delete_message(
-                        chat_id=prev.group_chat_id, message_id=prev.group_message_id,
-                    )
-                except Exception as e:
-                    print(f"delete prior aggregated msg failed (chat={prev.group_chat_id}, msg={prev.group_message_id}): {e}")
+        # Delete every other group message of the day -- all of them when the
+        # edit failed and a fresh one is sent. Also clears duplicates posted
+        # before the merge existed.
+        seen = {(final_group_chat_id, final_group_message_id)} if edited_in_place else set()
+        for prev in prior_reports:
+            key = (prev.group_chat_id, prev.group_message_id)
+            if not prev.group_chat_id or not prev.group_message_id or key in seen:
+                continue
+            seen.add(key)
+            try:
+                await bot.delete_message(
+                    chat_id=prev.group_chat_id, message_id=prev.group_message_id,
+                )
+            except Exception as e:
+                print(f"delete prior aggregated msg failed (chat={prev.group_chat_id}, msg={prev.group_message_id}): {e}")
 
         # Clear group-message references on all prior reports.
         await sync_to_async(
