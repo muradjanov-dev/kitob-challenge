@@ -1569,11 +1569,13 @@ class WalletTransaction(BaseModel):
     KIND_REPORT_FEE = "report_fee"
     KIND_REPORT_EXTRA = "report_extra"
     KIND_REFUND = "refund"
+    KIND_REFERRAL = "referral"
     KIND_ADMIN = "admin"
     KIND_CHOICES = [
         (KIND_TOPUP, "To'ldirish"), (KIND_BONUS, "Bonus"),
         (KIND_PREMIUM, "Premium → hamyon"), (KIND_REPORT_FEE, "Kunlik to'lov"),
         (KIND_REPORT_EXTRA, "Qo'shimcha hisobot"), (KIND_REFUND, "Qaytarildi"),
+        (KIND_REFERRAL, "Referal mukofoti"),
         (KIND_ADMIN, "Admin tuzatishi"),
     ]
     user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="wallet_transactions")

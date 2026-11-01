@@ -39,8 +39,8 @@ SHORT_TEXTS = [
     "💛 Bugun ham o'qishga vaqt topsangiz — o'zingizga bir «rahmat» deb qo'ying.",
     "🪙 Kitobchangiz shunchaki chiroyli raqam emas: u har kungi hisobot to'lovining 300 so'migacha qismini o'zi to'laydi. O'qing, yuting, tejang 😉",
     "👛 Hamyoningiz yana necha kunga yetishini bilmoqchimisiz? «👛 Hamyon» tugmasi hammasini ko'rsatadi.",
-    "🎁 Do'stingizni ham kitobga «yuqtiring» 😄 U birinchi hisobotini yuborganda sizga <b>500 Kitobcha</b>! Havola: «Kabinet → 🌟 Yaxshilik ulashuvchi».",
-    "👥 Birga o'qish — birga choy ichishdek gap 😊 Do'stingizni chaqiring: har bir faol do'st uchun <b>500 Kitobcha</b> 🎁",
+    "🎁 Do'stingizni ham kitobga «yuqtiring» 😄 U birinchi hisobotini yuborganda hamyoningizga <b>500 so'm</b>! Havola: «Kabinet → 🌟 Yaxshilik ulashuvchi».",
+    "👥 Birga o'qish — birga choy ichishdek gap 😊 Do'stingizni chaqiring: har bir faol do'st uchun <b>500 so'm</b>, 30 tadan keyin — <b>1 000 so'm</b> 🎁",
 ]
 
 RUBRIC_TEXTS = [

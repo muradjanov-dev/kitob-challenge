@@ -790,6 +790,41 @@ def internal_ops(request: HttpRequest, action: str):
                              "premium_users": len(days), "premium_days": sum(days),
                              "premium_total": sum(days) * wallet.DAY_FEE})
 
+    if action == "newcomer-topup":
+        # Readers who joined on/after the launch and got the 3 000 launch
+        # bonus: +2 000 so their welcome gift is 5 000 like every newcomer's,
+        # once each; `text` ({name}) DMed to each one topped up.
+        import html
+        import os as _os
+
+        import requests
+        from tgbot.models import TelegramProfile, WalletTransaction
+        from tgbot.services import wallet
+        got_3000 = WalletTransaction.objects.filter(kind=WalletTransaction.KIND_BONUS,
+                                                    delta__lt=wallet.NEWCOMER_BONUS).values_list("user_id", flat=True)
+        people = [p for p in TelegramProfile.objects.filter(id__in=list(got_3000)).order_by("id") if wallet.is_newcomer(p)]
+        template = body.get("text") or ""
+        rows = []
+        for p in people:
+            done = WalletTransaction.objects.filter(user=p, kind=WalletTransaction.KIND_ADMIN,
+                                                    note=wallet.NEWCOMER_TOPUP_NOTE).exists()
+            row = {"telegram_id": p.telegram_id, "name": p.full_name, "joined": str(p.created_at.date()),
+                   "done_before": done}
+            if apply and not done:
+                row["added"] = wallet.newcomer_topup(p)
+                if row["added"] and template and not p.is_blocked:
+                    try:
+                        requests.post(
+                            f"https://api.telegram.org/bot{_os.environ.get('API_TOKEN', '')}/sendMessage",
+                            data={"chat_id": p.telegram_id, "parse_mode": "HTML",
+                                  "text": template.format(name=html.escape((p.full_name or "Kitobxon").split()[0]))},
+                            timeout=8)
+                    except Exception as e:
+                        row["dm_error"] = str(e)[:80]
+                    time.sleep(0.05)
+            rows.append(row)
+        return JsonResponse({"ok": True, "count": len(rows), "rows": rows})
+
     if action == "admin-grant":
         # A gift to every admin (profiles with is_admin + settings.ADMINS):
         # `amount` so'm into the wallet and `member_days` perk days, once per

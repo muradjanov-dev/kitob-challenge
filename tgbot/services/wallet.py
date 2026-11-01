@@ -36,6 +36,10 @@ from django.utils import timezone
 LAUNCH_DATE = datetime.date(2026, 11, 1)
 DAY_FEE = 1000
 LAUNCH_BONUS = 3000
+# A reader who joins on or after the launch day gets this instead, with a
+# congratulation at registration (owner, 2026-11-01).
+NEWCOMER_BONUS = 5000
+NEWCOMER_TOPUP_NOTE = "Xush kelibsiz sovg'asi (+2 000)"
 KITOBCHA_SHARE_PCT = 30
 MEMBER_MIN = 15000
 # A member's 2nd, 3rd... report of the day (owner, 2026-11-01: free extras would
@@ -286,7 +290,7 @@ def charge_report(user, day=None) -> dict:
 
 # Money the project gave (bonus, Premium days turned into so'm -- the Premium
 # itself still runs to its end date): never refunded (owner, 2026-11-01).
-GIFT_KINDS = ("bonus", "premium_conversion")
+GIFT_KINDS = ("bonus", "premium_conversion", "referral")
 
 
 def refundable(user) -> int:
@@ -326,6 +330,41 @@ def refund(user, amount=None, note: str = "") -> dict:
                                          balance_after=p.wallet_balance, note=(note or "Qaytarildi")[:120])
     user.wallet_balance = p.wallet_balance
     return {"ok": True, "refunded": take, "balance": p.wallet_balance}
+
+
+# Referral reward in so'm (owner, 2026-11-01): REFERRAL_SOM for each confirmed
+# referral, REFERRAL_SOM_AFTER from the (REFERRAL_TIER + 1)-th on; at most
+# REFERRAL_WEEKLY_CAP paid per calendar week (Mon-Sun), against spam.
+REFERRAL_SOM = 500
+REFERRAL_SOM_AFTER = 1000
+REFERRAL_TIER = 30
+REFERRAL_WEEKLY_CAP = 1000
+
+
+def referral_reward(nth: int) -> int:
+    return REFERRAL_SOM_AFTER if int(nth) > REFERRAL_TIER else REFERRAL_SOM
+
+
+def week_start(now=None):
+    now = timezone.localtime(now) if now else timezone.localtime()
+    monday = now.date() - datetime.timedelta(days=now.weekday())
+    return timezone.make_aware(datetime.datetime.combine(monday, datetime.time.min))
+
+
+def referrals_this_week(referrer) -> int:
+    from tgbot.models import UserReferal
+    return UserReferal.objects.filter(referrer=referrer, created_at__gte=week_start()).count()
+
+
+def pay_referral(referrer, nth: int) -> int:
+    """Credit the referrer for their nth confirmed referral (the UserReferal
+    row already exists); 0 once this week's cap is passed."""
+    from tgbot.models import WalletTransaction
+    if referrals_this_week(referrer) > REFERRAL_WEEKLY_CAP:
+        return 0
+    amount = referral_reward(nth)
+    credit(referrer, amount, WalletTransaction.KIND_REFERRAL, f"Referal #{nth}")
+    return amount
 
 
 def day_summary(day=None) -> dict:
@@ -391,6 +430,7 @@ def day_summary_text(s: dict) -> str:
     f_n, f_som, f_kit = mv("report_fee")
     e_n, e_som, e_kit = mv("report_extra")
     b_n, b_som, _ = mv("bonus")
+    r_n, r_som, _ = mv("referral")
     a_n, a_som, _ = mv("admin")
     lines = [
         "👛 <b>Hamyon (so'm):</b>",
@@ -398,7 +438,7 @@ def day_summary_text(s: dict) -> str:
         f"kutilmoqda {t_wait['n']} ta — {som(t_wait['som'])}; rad etilgan {t_no['n']} ta",
         f"  🧾 Hisobot to'lovlari: <b>{f_n + e_n}</b> ta — <b>{som(f_som + e_som)}</b> so'm + "
         f"{som(f_kit + e_kit)} Kitobcha (birinchi {f_n}, qo'shimcha {e_n})",
-        f"  🎁 Bonus: {b_n} ta — {som(b_som)} · 🛠 Admin: {a_n} ta — {som(a_som)}",
+        f"  🎁 Bonus: {b_n} ta — {som(b_som)} · 👥 Referal: {r_n} ta — {som(r_som)} · 🛠 Admin: {a_n} ta — {som(a_som)}",
         f"  📊 Hisobot yuborishlar: {s['submissions']} ta, {s['reporters']} kishi · to'lovlar: {s['charges']} ta",
     ]
     if s["unpaid"]:
@@ -427,6 +467,32 @@ def premium_days_left(user, from_day=None) -> int:
     return (end - from_day).days + 1 if end else 0
 
 
+def is_newcomer(user) -> bool:
+    """Joined the bot on or after the launch day."""
+    created = getattr(user, "created_at", None)
+    return bool(created and timezone.localtime(created).date() >= LAUNCH_DATE)
+
+
+def newcomer_topup(user) -> int:
+    """The 2 000 that brings a newcomer who got the 3 000 launch bonus up to
+    NEWCOMER_BONUS, once (a gift row, so never refundable). 0 when not owed."""
+    from tgbot.models import TelegramProfile, WalletTransaction
+    if not is_newcomer(user):
+        return 0
+    with transaction.atomic():
+        p = TelegramProfile.objects.select_for_update().get(id=user.id)
+        bonus = WalletTransaction.objects.filter(user=p, kind=WalletTransaction.KIND_BONUS).first()
+        if not bonus or bonus.delta >= NEWCOMER_BONUS:
+            return 0
+        if WalletTransaction.objects.filter(user=p, kind=WalletTransaction.KIND_ADMIN,
+                                            note=NEWCOMER_TOPUP_NOTE).exists():
+            return 0
+        extra = NEWCOMER_BONUS - bonus.delta
+        _credit_locked(p, extra, WalletTransaction.KIND_ADMIN, NEWCOMER_TOPUP_NOTE)
+    user.wallet_balance = p.wallet_balance
+    return extra
+
+
 def ensure_launch_credit(user) -> dict:
     """The launch bonus and the Premium conversion, each at most once.
     Returns what was credited now: {"bonus": so'm, "premium_days": n, "premium": so'm}."""
@@ -440,8 +506,12 @@ def ensure_launch_credit(user) -> dict:
             user=p, kind__in=[WalletTransaction.KIND_BONUS, WalletTransaction.KIND_PREMIUM],
         ).values_list("kind", flat=True))
         if WalletTransaction.KIND_BONUS not in kinds:
-            _credit_locked(p, LAUNCH_BONUS, WalletTransaction.KIND_BONUS, "Hamyon ishga tushdi")
-            out["bonus"] = LAUNCH_BONUS
+            if is_newcomer(p):
+                _credit_locked(p, NEWCOMER_BONUS, WalletTransaction.KIND_BONUS, "Xush kelibsiz sovg'asi")
+                out["bonus"] = NEWCOMER_BONUS
+            else:
+                _credit_locked(p, LAUNCH_BONUS, WalletTransaction.KIND_BONUS, "Hamyon ishga tushdi")
+                out["bonus"] = LAUNCH_BONUS
         # Premium is converted only on the real launch -- a tester previewing
         # the wallet in October must keep the Premium they paid for.
         if is_live_launch() and WalletTransaction.KIND_PREMIUM not in kinds:

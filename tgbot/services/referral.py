@@ -149,11 +149,13 @@ class ReferralService:
         # Award rewards to referrer
         @sync_to_async
         def _award():
-            """Grant the referral's reward. Returns the Premium days granted,
-            or minus the Kitobcha credited after the wallet launch; 0 once this
-            month's cap is reached (the UserReferal created above already
-            counts toward it)."""
+            """Grant the referral's reward. From the wallet launch: minus the
+            so'm put into the referrer's wallet (0 past the weekly cap).
+            Before it: the Premium days granted, 0 past the monthly cap."""
             from tgbot.models import Payment
+            from tgbot.services import wallet
+            if wallet.is_live_launch():
+                return -wallet.pay_referral(referrer, ref_count)
 
             now = timezone.localtime()
             this_month = UserReferal.objects.filter(
@@ -162,10 +164,6 @@ class ReferralService:
             ).count()
             if this_month > REFERRAL_PREMIUM_MONTHLY_CAP:
                 return 0
-            from tgbot.services import wallet
-            if wallet.is_live_launch():
-                # update_ball: members get 2x, like every other reward.
-                return -referrer.update_ball(True, REFERRAL_KITOBCHA, reason="referral")
             # Straight onto the subscription, not services.premium.grant_premium:
             # this is earned, like a shop purchase, so the prize scarcity
             # limits (1/week, not while already Premium) must not swallow it.
@@ -281,8 +279,22 @@ class ReferralService:
     @staticmethod
     async def _notify_referrer(referrer: TelegramProfile, new_user: TelegramProfile, ref_count: int = 0, awarded_days: int = 0):
         try:
+            from tgbot.services import wallet
             if awarded_days < 0:
-                reward_lines = [f"🪙 <b>+{-awarded_days} Kitobcha</b> qo'shildi!"]
+                som = f"{-awarded_days:,}".replace(",", " ")
+                reward_lines = [f"👛 <b>+{som} so'm</b> hamyoningizga tushdi! 🎁"]
+                if ref_count < wallet.REFERRAL_TIER:
+                    reward_lines.append(
+                        f"💡 Yana <b>{wallet.REFERRAL_TIER - ref_count}</b> ta taklifdan keyin har biri uchun "
+                        f"<b>{wallet.REFERRAL_SOM_AFTER:,} so'm</b> bo'ladi!".replace(",", " "))
+                else:
+                    reward_lines.append(f"🔥 Endi har bir yangi taklif uchun <b>{wallet.REFERRAL_SOM_AFTER:,} so'm</b>!"
+                                        .replace(",", " "))
+            elif wallet.is_live_launch():
+                reward_lines = [
+                    f"⏸ Bu hafta referal mukofoti chegarasi (<b>{wallet.REFERRAL_WEEKLY_CAP} ta</b>) to'ldi — "
+                    "keyingi haftadan yana davom etadi. Taklifingiz reytingga baribir qo'shiladi!",
+                ]
             elif awarded_days:
                 from tgbot.services.premium import premium_left_text
                 left = await sync_to_async(premium_left_text)(referrer)

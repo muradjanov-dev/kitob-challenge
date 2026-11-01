@@ -599,6 +599,32 @@ async def age_pick(call: types.CallbackQuery, state: FSMContext):
     )
     await state.finish()
 
+    # Every new reader's welcome gift (wallet.NEWCOMER_BONUS), with a
+    # congratulation, right at registration.
+    from html import escape
+    from tgbot.services import wallet as _wallet
+    if _wallet.launched(user):
+        try:
+            got = await sync_to_async(_wallet.ensure_launch_credit)(user)
+            if got.get("bonus"):
+                first = (user.full_name or "").split()[0] if user.full_name else ("друг" if lang == "ru" else "do'st")
+                som = f"{got['bonus']:,}".replace(",", " ")
+                await call.message.answer(
+                    t(
+                        lang,
+                        f"🎉 <b>Tabriklaymiz, {escape(first)}!</b>\n\n"
+                        f"Kitob Challenge oilasiga xush kelibsiz! Sovg'amiz: 👛 hamyoningizga <b>{som} so'm</b> "
+                        f"tushdi 🎁\nBu — {got['bonus'] // _wallet.DAY_FEE} ta hisobot degani. "
+                        "Birinchisini bugunoq yuboramizmi? 📚",
+                        f"🎉 <b>Поздравляем, {escape(first)}!</b>\n\n"
+                        f"Добро пожаловать в Kitob Challenge! Наш подарок: в 👛 кошелёк зачислено <b>{som} сум</b> "
+                        f"🎁\nЭто {got['bonus'] // _wallet.DAY_FEE} отчётов. Отправим первый уже сегодня? 📚",
+                    ),
+                    parse_mode="HTML",
+                )
+        except Exception as e:
+            print(f"newcomer gift failed for {call.from_user.id}: {e}")
+
     # Send welcome / how-it-works message immediately after registration.
     _WELCOME_UZ = (
         "👋 <b>Xush kelibsiz, {name}!</b>\n\n"

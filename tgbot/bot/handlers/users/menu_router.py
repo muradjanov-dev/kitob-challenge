@@ -808,7 +808,7 @@ _HOW_PAGES_UZ = (
     "👛 <b>Bot qanday ishlaydi? — 2/3: Xazina sandig'i</b>\n\n"
     "🚪 <b>2-eshik: Hamyon — sizning xazina sandig'ingiz</b>\n"
     "Har bir hisobot — <b>1 000 so'm</b>, bir piyola choydan ham arzon ☕️\n"
-    "Sovg'amiz allaqachon sandig'ingizda: <b>3 000 so'm</b> bonus 🎁\n\n"
+    "Sovg'amiz allaqachon sandig'ingizda turibdi 🎁\n\n"
     "🔐 Sandiqning uchta siri:\n"
     "1️⃣ Pul hech qachon so'roqsiz yechilmaydi — bot har safar «Ha»ingizni kutadi ✅\n"
     "2️⃣ 🪙 Kitobcha ham pul o'rnida ishlaydi: har hisobot narxining 30% gachasini "
@@ -830,7 +830,8 @@ _HOW_PAGES_UZ = (
     "🏅 100 dan ortiq yutuq: «Yigirma bet», «Kunlik marafon», «Birinchi kitob»... har biri "
     "Kitobcha olib keladi.\n"
     "🎪 Kitobchani Market'da sarflang: streak muzlatish, shaxsiy sertifikat va boshqalar.\n"
-    "👥 Do'stingizni olib keling: u birinchi hisobotini yuborganda sizga <b>500 Kitobcha</b> 🎁\n\n"
+    "👥 Do'stingizni olib keling: u birinchi hisobotini yuborganda hamyoningizga <b>500 so'm</b>, "
+    "30-taklifdan keyin esa har biri uchun <b>1 000 so'm</b> 🎁\n\n"
     "🤫 Va eng katta sir: noyabrda <b>100 000 so'mlik</b> mukofot jamg'armasi! "
     "4 hafta davomida haftadan-haftaga o'sib boradi: 10 000 → 20 000 → 30 000 → 40 000 so'm 💰\n\n"
     "Xarita tugadi — endi sarguzasht sizniki 🗺✨\n"
@@ -1379,21 +1380,27 @@ async def show_referral_link_screen(message: types.Message, user):
     lang = _user_lang(user)
     ref_count = await ReferralService.get_referral_count(user)
     ref_link = await ReferralService.get_referral_link(user)
-    from tgbot.services.referral import (
-        REFERRAL_PREMIUM_DAYS, REFERRAL_PREMIUM_MONTHLY_CAP, referral_premium_days_this_month,
-    )
-    month_days = await sync_to_async(referral_premium_days_this_month)(user)
+    from tgbot.services import wallet as _wallet
+    week = await sync_to_async(_wallet.referrals_this_week)(user)
+    tier, low, high = _wallet.REFERRAL_TIER, _wallet.REFERRAL_SOM, _wallet.REFERRAL_SOM_AFTER
+    som = lambda v: f"{v:,}".replace(",", " ")  # noqa: E731
+    left = max(0, tier - ref_count)
     text = _t(
         lang,
         f"🔗 <b>Sizning taklif havolangiz:</b>\n<code>{ref_link}</code>\n\n"
-        f"📊 Jami taklif: <b>{ref_count}</b> ta\n"
-        f"🎁 Har bir taklif uchun: <b>+{REFERRAL_PREMIUM_DAYS} kun 💎 Premium</b>\n"
-        f"📅 Bu oy olingan: <b>{month_days} / {REFERRAL_PREMIUM_MONTHLY_CAP} kun</b>\n\n"
+        f"📊 Jami taklif: <b>{ref_count}</b> ta · bu hafta: <b>{week}</b> ta\n"
+        f"🎁 Har bir taklif uchun hamyoningizga: <b>{som(low)} so'm</b>, {tier}-taklifdan keyin — "
+        f"<b>{som(high)} so'm</b>\n"
+        + (f"💡 Yana <b>{left}</b> ta taklifdan keyin har biri {som(high)} so'm bo'ladi!\n" if left
+           else f"🔥 Siz {tier} tadan oshdingiz — har bir yangi taklif {som(high)} so'm!\n")
+        + f"🛡 Haftasiga ko'pi bilan {som(_wallet.REFERRAL_WEEKLY_CAP)} ta taklif uchun to'lanadi.\n\n"
         f"<i>(Eslatma: taklif faqat do'stingiz birinchi kitob hisobotini yuborgach hisoblanadi — shunchaki /start bosish yetarli emas.)</i>",
         f"🔗 <b>Ваша реферальная ссылка:</b>\n<code>{ref_link}</code>\n\n"
-        f"📊 Всего приглашений: <b>{ref_count}</b>\n"
-        f"🎁 За каждое приглашение: <b>+{REFERRAL_PREMIUM_DAYS} день 💎 Premium</b>\n"
-        f"📅 В этом месяце: <b>{month_days} / {REFERRAL_PREMIUM_MONTHLY_CAP} дней</b>\n\n"
+        f"📊 Всего приглашений: <b>{ref_count}</b> · на этой неделе: <b>{week}</b>\n"
+        f"🎁 За каждое приглашение в кошелёк: <b>{som(low)} сум</b>, после {tier}-го — <b>{som(high)} сум</b>\n"
+        + (f"💡 Ещё <b>{left}</b> приглашений — и каждое будет по {som(high)} сум!\n" if left
+           else f"🔥 Больше {tier} приглашений — каждое новое {som(high)} сум!\n")
+        + f"🛡 Оплачивается не более {som(_wallet.REFERRAL_WEEKLY_CAP)} приглашений в неделю.\n\n"
         f"<i>(Примечание: приглашение засчитывается только после того, как ваш друг отправит свой первый отчёт о книге — одного /start недостаточно.)</i>",
     )
 

@@ -52,8 +52,8 @@ ANNOUNCEMENTS = {
             "2️⃣ Premium muddatingiz hali tugamagan bo'lsa, qolgan har bir kuningiz uchun "
             "hamyoningizga <b>1 000 so'm</b> qo'shildi. Premium imtiyozlari esa "
             "muddati tugaguncha saqlanadi 🤝\n"
-            "3️⃣ Do'stingizni taklif qiling: u birinchi hisobotini yuborganda sizga "
-            "<b>500 Kitobcha</b> 🎁\n\n"
+            "3️⃣ Do'stingizni taklif qiling: u birinchi hisobotini yuborganda "
+            "hamyoningizga <b>500 so'm</b>, 30-taklifdan keyin esa har biri uchun <b>1 000 so'm</b> 🎁\n\n"
             "Har bir o'qilgan bet — o'zingizga qilgan sarmoya. Bugungi hisobotni "
             "yuborishni unutmang, azizlarim 💛"
         ), _HAMYON),
