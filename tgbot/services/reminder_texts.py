@@ -2,7 +2,9 @@
 
 Owner (2026-11-01): funny but sincere and simple, always with "Siz", never
 "sen"; one-liners plus rubrics -- short stories, reader life, talking books,
-proverbs, "did you know" about the bot. "Bilasizmi?" only states what the
+proverbs, "did you know" about the bot; then also gentle sarcasm, sayings of
+great Islamic scholars (only well-known, attested ones, with respect),
+reader jokes and unusual formats. "Bilasizmi?" only states what the
 bot really does, and "Kun hikmati" only uses well-known folk proverbs, so
 nothing here can be a made-up fact.
 """
@@ -37,6 +39,17 @@ SHORT_TEXTS = [
     "🍪 Kitob pechenyega o'xshaydi: bittasini boshlasangiz, to'xtash qiyin 😋",
     "🎧 Ovqat pishirayotganda, yo'lda, sayrda — audiokitob bilan vaqtingiz ikki barobar foydali!",
     "💛 Bugun ham o'qishga vaqt topsangiz — o'zingizga bir «rahmat» deb qo'ying.",
+    # ── Yengil kinoya (Siz bilan, haqoratsiz) ─────────────────────────────
+    "📱 Telefoningiz bugun yana bir necha soat ishladi. Kitobingiz esa javonda «dam olish kuni»ni davom ettiryapti 😏",
+    "🧐 «Ertaga boshlayman» — bu jumla kecha ham aytilgan edi. Bugun-chi? 😉",
+    "📺 Serialning butun mavsumini bir kechada ko'rish mumkin-u, 10 bet kitob og'ir keldimi? 😄 Keling, adolat qilaylik!",
+    "🤳 Lentani varaqlagan barmog'ingiz endi chempion. Kitob varag'iga ham bir imkon bering 😏",
+    "😴 Kitobingiz shunchalik uzoq yopiq turdiki, ichidagi qahramonlar sizni qidirib qolishdi 🔍",
+    "🍕 Ovqatga 15 daqiqa topiladi, ruh ozuqasiga-chi? 😉 Bir necha bet — ham to'yimli, ham foydali.",
+    "🧠 Miyangiz «bugun yangi ma'lumot berilmadi» deb shikoyat xati yozibdi. Javobni bir necha bet bilan qaytaramizmi? 😄",
+    "🐌 Toshbaqa ham marraga yetib bordi. Siz-chi, bugun startga chiqdingizmi? 😉",
+    "🛋 Divan sizni sog'inmagan, ishonavering. Kitobingiz esa — juda sog'indi 😌",
+    "⏳ «Vaqtim yo'q» — eng ko'p o'qilgan, lekin hech kim oxiriga yetkazmagan kitob. Uni yopib, haqiqiy kitobni ochamizmi? 😄",
     "🪙 Kitobchangiz shunchaki chiroyli raqam emas: u har kungi hisobot to'lovining 300 so'migacha qismini o'zi to'laydi. O'qing, yuting, tejang 😉",
     "👛 Hamyoningiz yana necha kunga yetishini bilmoqchimisiz? «👛 Hamyon» tugmasi hammasini ko'rsatadi.",
     "🎁 Do'stingizni ham kitobga «yuqtiring» 😄 U birinchi hisobotini yuborganda hamyoningizga <b>500 so'm</b>! Havola: «Kabinet → 🌟 Yaxshilik ulashuvchi».",
@@ -149,6 +162,108 @@ RUBRIC_TEXTS = [
     "«Tomchi-tomchi ko'l bo'lur.» (xalq maqoli)\n\n"
     "Kuniga 10 bet — oyiga 300 bet. Bu bitta qalin kitob degani! 📚",
 
+    # ── 🕌 Ulamolar so'zi (faqat mashhur, manbali so'zlar; hurmat bilan) ──────
+    "🕌 <b>Ulamolar so'zi</b>\n\n"
+    "Imom Shofeiy rahimahulloh aytganlar: «Ilm — yod olingan narsa emas, foyda bergan narsadir.»\n\n"
+    "Bugun o'qiganingizdan bitta foyda olsangiz — bu katta yutuq 💛",
+
+    "🕌 <b>Ulamolar so'zi</b>\n\n"
+    "Imom Ahmad ibn Hanbal rahimahulloh aytganlar: «Odamlarning ilmga ehtiyoji taom va ichimlikka "
+    "bo'lgan ehtiyojidan ham ko'proqdir.»\n\n"
+    "Tanangizni to'ydirdingizmi? Endi ruhingizni ham bir necha bet bilan to'ydiring 📖",
+
+    "🕌 <b>Ulamolar so'zi</b>\n\n"
+    "Imom Ahmad rahimahullohdan rivoyat qilinadi: «Siyohdon bilan — qabrgacha.»\n"
+    "Ya'ni ilm yo'li umr bo'yi davom etadi.\n\n"
+    "Bu yo'lda bugungi qadamingiz — bir necha bet 🕯",
+
+    "🕌 <b>Ulamolar so'zi</b>\n\n"
+    "Imom Buxoriy rahimahulloh «Sahih»larida bir bobni shunday nomlaganlar: «Ilm — so'z va amaldan oldin.»\n\n"
+    "Avval bilim, keyin amal. Bugun bir necha bet bilan boshlaymizmi? 🌱",
+
+    "🕌 <b>Ulamolar so'zi</b>\n\n"
+    "Imom Molik rahimahulloh aytganlar: «Ilm ko'p rivoyat qilish bilan emas, balki Alloh qalbga "
+    "soladigan nurdir.»\n\n"
+    "Ozdan bo'lsa ham, chin dildan o'qing 🤍",
+
+    "🕌 <b>Ulamolar so'zi</b>\n\n"
+    "Imom G'azzoliy rahimahulloh «Ey farzand» risolasida yozganlar: «Amalsiz ilm — telbalik, "
+    "ilmsiz amal esa amal bo'lmaydi.»\n\n"
+    "Bugun o'qiganingizdan bittasini hayotda qo'llab ko'ring 🌿",
+
+    "🕌 <b>Ulamolar so'zi</b>\n\n"
+    "Imom Shofeiy rahimahullohga nisbat beriladigan mashhur baytda shunday deyiladi: «Ustozim Vakiyga "
+    "yodlashim sustligidan shikoyat qildim, u menga gunohlarni tark etishni maslahat berdi va dedi: "
+    "ilm — nur, Allohning nuri esa gunohkorga berilmaydi.»\n\n"
+    "Toza qalb bilan o'qilgan bet ko'proq yodda qoladi 🤍",
+
+    "🕌 <b>Ulamolar so'zi</b>\n\n"
+    "Ibn al-Javziy rahimahulloh «Soyd al-xotir» kitobida hali talabalik chog'idayoq 20 000 jilddan "
+    "ortiq kitob mutolaa qilganini yozib qoldirgan.\n\n"
+    "Bizdan 20 000 talab qilinmaydi 😊 Bugun 20 bet ham — ajoyib natija!",
+
+    "🕌 <b>Ilk buyruq</b>\n\n"
+    "Qur'oni karimning ilk nozil bo'lgan oyati «O'qing!» degan amr bilan boshlangan (Alaq surasi, 1-oyat).\n\n"
+    "Bugun biz ham shu ulug' amrga ergashib, bir necha bet o'qiymizmi? 📖",
+
+    "📜 <b>Mumtoz she'riyatdan</b>\n\n"
+    "Shoir Mutanabbiy: «Zamonning eng yaxshi hamsuhbati — kitob.»\n\n"
+    "Bugun shu hamsuhbatingiz bilan bir necha daqiqa o'tkazasizmi? ☕️",
+
+    # ── 😂 Latifa ──────────────────────────────────────────────────────────
+    "😂 <b>Latifa</b>\n\n"
+    "Kitobxon do'kondan uchta paket bilan qaytdi.\n— Bitta kitob olaman degan edingiz-ku?\n"
+    "— Bittasini oldim. Qolgan ikkitasi «buni olganlar bularni ham olishdi» edi 😅\n\n"
+    "Siz-chi, bugun nechta bet o'qidingiz?",
+
+    "😂 <b>Latifa</b>\n\n"
+    "O'g'il: — Dada, kitob o'qish nimaga kerak?\nDada: — Telefon zaryadi tugaganda ham aqlli ko'rinish uchun 😄",
+
+    "😂 <b>Latifa</b>\n\n"
+    "Kutubxonachi: — Kitobni qachon qaytarasiz?\nKitobxon: — O'qib bo'lgach.\n"
+    "Kutubxonachi: — Unda formulyarga nevaralaringizning ismini ham yozib qo'yay 😅\n\n"
+    "Keling, bugundan tezlashtiramiz — bir necha bet!",
+
+    "😂 <b>Latifa</b>\n\n"
+    "Talaba imtihondan oldin kitobni yostiq ostiga qo'yib uxlabdi.\n— Xo'sh, bilim o'tdimi?\n"
+    "— Yo'q, faqat bo'ynim qotib qoldi 😅\n\n"
+    "Yostiq emas, ko'z bilan o'qiymiz 😉",
+
+    "😂 <b>Latifa</b>\n\n"
+    "— Uyingizda nechta kitob bor?\n— 300 ta.\n— Hammasini o'qiganmisiz?\n"
+    "— Yo'q, ba'zilari bilan hali «tanishib» yuribmiz 😄\n\n"
+    "Bugun bittasi bilan yaqinroq tanishamizmi?",
+
+    "😂 <b>Latifa</b>\n\n"
+    "— Bugun o'qishga umuman vaqtim bo'lmadi.\n— Telefoningiz ekran vaqti 5 soat deyapti-ku?\n"
+    "— Ha... 5 soat kitoblar haqida video ko'rdim 😅\n\n"
+    "Video yaxshi, lekin kitobning o'zi yanada yaxshi 📖",
+
+    # ── 📰 Noodatiy ────────────────────────────────────────────────────────
+    "📰 <b>Shoshilinch xabar</b>\n\n"
+    "Matematika tasdiqladi: kuniga 10 bet o'qigan odam bir yilda 3 650 bet o'qiydi — bu o'rtacha 12 ta kitob!\n\n"
+    "Hisob-kitobni tekshirish shart emas, boshlashning o'zi kifoya 😉",
+
+    "🔍 <b>Tergov boshlandi</b>\n\n"
+    "Javondagi kitob bir haftadan beri ochilmagan. Asosiy gumonlanuvchi — telefon. "
+    "Guvoh — muqovadagi chang.\n\nIshni yopishning yagona yo'li: kitobni ochish 😄",
+
+    "📡 <b>Ob-havo ma'lumoti</b>\n\n"
+    "Bugun kechqurun bir necha bet kitob «yog'ishi» kutilmoqda. Shamol — sahifalar tomon, "
+    "kayfiyat — +25 daraja ☀️\n\nSoyabon shart emas, faqat kitob 😊",
+
+    "🎙 <b>Kitob bilan intervyu</b>\n\n"
+    "Muxbir: — Bugun o'zingizni qanday his qilyapsiz?\nKitob: — Biroz yolg'iz... Egam bir ochib qo'ysa, "
+    "juda xursand bo'lardim 🥺\n\nKitobingizni xursand qilamizmi?",
+
+    "🧪 <b>Kichik tajriba</b>\n\n"
+    "5 daqiqa kitob o'qing, keyin kayfiyatingizni o'lchang. Ogohlantirish: tajriba qatnashchilarining "
+    "ko'pchiligi to'xtay olmay, davom ettirib yuborishadi 😄",
+
+    "🚦 <b>Yo'l harakati</b>\n\n"
+    "Hisobot tugmasida yashil chiroq yondi 🟢 To'xtab turish mumkin emas — bir necha bet o'qing va "
+    "hisobotni yuboring 😉",
+
     # ── 🤔 Bilasizmi? (faqat botning haqiqiy imkoniyatlari) ─────────────────
     "🤔 <b>Bilasizmi?</b>\n\n"
     "Kitobchangiz kunlik hisobot to'lovining 300 so'migacha qismini o'zi to'laydi 🪙 "
@@ -193,6 +308,10 @@ STREAK_WARNING_POOL = [
     "😌 Kun og'ir o'tgan bo'lsa, bir necha bet kitob ko'ngilni yengil qiladi. Ham dam, ham hisobot 💛",
     "🐣 Streakingiz hali kichkina bo'lsa ham, uni boqish kerak 😄 Bugungi «ovqati» — bir necha bet!",
     "🧊 Bugun umuman imkon bo'lmasa — Market'dagi «Streak muzlatish» streakingizni asrab qoladi.",
+    "😏 Streakingiz: «Meni tashlab ketmaysiz-a?» deb so'rayapti. Bir necha bet bilan «yo'q» deb javob bering 💛",
+    "🧯 Streakingiz kuyib ketish xavfida, qutqaruvchi esa — siz! Bir necha bet bilan uni asrab qoling 🔥",
+    "📉 Grafikdagi bugungi nuqta bo'sh qolib ketmasin. Bir necha bet — va chiziq yana yuqoriga 📈",
+    "🎬 Bugungi epizod: «Streak qutqaruvchisi». Bosh rolda — siz. Suratga olish 5 daqiqa davom etadi 😄",
 ]
 
 _RECENT_KEY = "inspiration_recent"
