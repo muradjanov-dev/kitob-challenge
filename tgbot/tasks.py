@@ -7203,6 +7203,17 @@ def set_slot_headliner(day, slot, game_type):
     cache.set(_headliner_key(day, slot), game_type or "", 3 * 86400)
 
 
+# Owner (2026-11-01): games that make readers think and grow -- mind,
+# discernment (farosat), conscience (vijdon) and the spirit -- come out more
+# often: every 10:00 / 21:30 slot draws one of them.
+MIND_FLAVORS = frozenset({
+    "mindtrap", "stoic", "antiherd", "dilemma", "causeeffect",
+    "masks", "socrates", "memento", "strategy", "paradox",
+    "simurgh", "ishq", "nafs", "qalb", "naqshband",
+    "yassaviy", "masnaviy", "gazzoliy", "fano", "marifat",
+})
+
+
 @shared_task
 def start_game_sequence(slot, count=3, pool=None):
     """Kick off today's `slot` ('morning' 10:00, 'evening' 21:30, or 'vip_2230') sequence."""
@@ -7223,7 +7234,13 @@ def start_game_sequence(slot, count=3, pool=None):
             pool = VIP_TOP_GAMES
         else:
             b_sample = random.sample(base_games, min(1, len(base_games)))
-            q_sample = random.sample(all_quiz, min(count - len(b_sample), len(all_quiz)))
+            need = max(0, count - len(b_sample))
+            # One quiz of every slot trains the mind, discernment and
+            # conscience (MIND_FLAVORS); the rest are drawn from everything.
+            mind = [f for f in all_quiz if f in MIND_FLAVORS]
+            q_sample = random.sample(mind, 1) if mind and need else []
+            others = [f for f in all_quiz if f not in q_sample]
+            q_sample += random.sample(others, min(need - len(q_sample), len(others)))
             pool = b_sample + q_sample
             random.shuffle(pool)
 
