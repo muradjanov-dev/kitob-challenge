@@ -6586,6 +6586,9 @@ def send_game_teaser(slot="evening"):
     """DM every reachable reader 10 minutes before the `slot` games start."""
     import time
 
+    if not _teaser_still_due(slot):
+        return
+
     text = _game_teaser_text(slot)
     keyboard = _teaser_group_buttons()
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -7564,10 +7567,56 @@ def _auto_recover_game_sequences():
         _advance_game_sequence(gt, gid, seq=seq)
 
 
+_SLOT_TIMES = {"morning": (10, 0), "evening": (21, 30)}
+
+
+def _slot_start(slot, now):
+    h, m = _SLOT_TIMES[slot]
+    return now.replace(hour=h, minute=m, second=0, microsecond=0)
+
+
+def _teaser_still_due(slot) -> bool:
+    """A teaser belongs to the 15 minutes before its games. One that arrives
+    later -- e.g. redelivered an hour late after a worker restart (2026-11-02:
+    the evening teaser and start were stuck behind 1 688 queued pinned-balance
+    edits, then lost with the restarted worker) -- or after its slot already
+    began would DM everyone about games that already ran."""
+    from tgbot.models import GameSequence
+    if slot not in _SLOT_TIMES:
+        return True
+    now = timezone.localtime()
+    start = _slot_start(slot, now)
+    if not (start - timezone.timedelta(minutes=15) <= now < start):
+        print(f"send_game_teaser({slot}): skipped, {now:%H:%M} is outside its window")
+        return False
+    if GameSequence.objects.filter(slot=slot, date=now.date()).exists():
+        print(f"send_game_teaser({slot}): skipped, the slot already started")
+        return False
+    return True
+
+
+def _ensure_slot_started():
+    """Beat's own start of a slot can be lost (see _teaser_still_due), so the
+    minute tick starts a slot that should be running but never began -- 2 to
+    20 minutes after its time. start_game_sequence is idempotent per slot and
+    day, so a slot that did start is never started twice."""
+    from tgbot.models import GameSequence
+    now = timezone.localtime()
+    for slot in _SLOT_TIMES:
+        start = _slot_start(slot, now)
+        if start + timezone.timedelta(minutes=2) <= now <= start + timezone.timedelta(minutes=20)                 and not GameSequence.objects.filter(slot=slot, date=now.date()).exists():
+            print(f"_ensure_slot_started: {slot} never started, starting it now")
+            start_game_sequence(slot)
+
+
 @shared_task
 def games_finalize_tick():
     """Finish + reward any live game whose time is up; announce results to
     groups and DM winners. Runs every minute (cheap no-op)."""
+    try:
+        _ensure_slot_started()
+    except Exception as e:
+        print(f"_ensure_slot_started: {e}")
     from tgbot.services import feud_game, castle_game, emoji_game
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     medals = ["🥇", "🥈", "🥉"]
