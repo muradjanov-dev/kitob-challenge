@@ -900,6 +900,13 @@ def internal_ops(request: HttpRequest, action: str):
             btn["web_app" if body.get("web_app") else "url"] = (
                 {"url": body["button_url"]} if body.get("web_app") else body["button_url"])
             markup = _json.dumps({"inline_keyboard": [[btn]]})
+        elif body.get("keyboard"):
+            # [[{"text", "url", "web_app"}, ...], ...] -- rows of buttons (max 100)
+            rows = [[({"text": b["text"], "web_app": {"url": b["url"]}} if b.get("web_app")
+                      else {"text": b["text"], "url": b["url"]}) for b in row] for row in body["keyboard"]]
+            if sum(len(r) for r in rows) > 100:
+                return JsonResponse({"ok": False, "error": "max_100_buttons"}, status=400)
+            markup = _json.dumps({"inline_keyboard": rows})
         out = {"ok": True, "people": len(people), "blocked": sum(1 for p in people if p.is_blocked), "preview": text}
         if not apply:
             return JsonResponse(out)
