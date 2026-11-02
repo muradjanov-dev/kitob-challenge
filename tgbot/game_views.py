@@ -435,9 +435,10 @@ def api_quiz_submit(request: HttpRequest, flavor: str) -> JsonResponse:
     g = quiz_game.get_or_activate_live_game(flavor)
     if not g:
         return JsonResponse({"ok": False, "error": "not_live"})
+    expect_qi = body.get("q_index")
     if typed:
-        return JsonResponse(quiz_game.submit_text_answer(g.id, request.tg_profile, text))
-    return JsonResponse(quiz_game.submit_answer(g.id, request.tg_profile, choice))
+        return JsonResponse(quiz_game.submit_text_answer(g.id, request.tg_profile, text, expect_qi=expect_qi))
+    return JsonResponse(quiz_game.submit_answer(g.id, request.tg_profile, choice, expect_qi=expect_qi))
 
 
 @csrf_exempt

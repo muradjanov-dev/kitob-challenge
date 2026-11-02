@@ -1237,6 +1237,14 @@ def internal_ops(request: HttpRequest, action: str):
         preview = template.format(name="Kitobxon", days=10, som="10 000", until="10-noyabr") if template else ""
         return JsonResponse({"ok": True, "count": len(out), "rows": out, "preview": preview})
 
+    if action == "quiz-self-paced":
+        # {"on": true|false, "apply": true}: new quiz games run self-paced
+        # (each player moves on at once; results at the end). Without apply: state.
+        from tgbot.services import quiz_game
+        if apply and "on" in body:
+            quiz_game.set_self_paced(bool(body.get("on")))
+        return JsonResponse({"ok": True, "on": quiz_game.self_paced_enabled()})
+
     if action == "app-shell":
         # The site's swipe shell (services/app_shell.py): {"on": true|false}
         # with apply switches it for everyone; without apply, the state.

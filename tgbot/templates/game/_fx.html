@@ -285,6 +285,11 @@
 
     // the server's verdict (dispatched by the page)
     document.addEventListener('kc:answer', function (e) {
+      if (e.detail && e.detail.accepted) {  // self-paced: taken, not judged -- a small sparkle
+        var tt = $('toast'), rr = tt ? tt.getBoundingClientRect() : {left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0};
+        burst(rr.left + rr.width / 2, rr.top + rr.height / 2, 14);
+        return;
+      }
       var ok = e.detail && e.detail.correct;
       setTimeout(function () {
         var el = document.querySelector('.opt.correct') || document.querySelector('.text-input-wrap') || $('toast');

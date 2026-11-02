@@ -668,49 +668,44 @@
     // /api/quiz/<flavor>/demo/ hands out questions to admins only.
     var DEMO = /[?&]demo=1(&|$)/.test(location.search);
     if (DEMO) (function () {
-      var realApi = api, qs = null, err = null, i = 0, pts = 0, right = 0;
-      var PER = 25, REVEAL = 3, phase = 'answer', phaseEnd = 0, choice = -1, wasRight = false;
+      var realApi = api, qs = null, err = null, i = 0, pts = 0, PER = 25, served = 0, picks = [];
       realApi('/api/quiz/' + FLAVOR + '/demo/').then(function (d) {
-        if (d && d.ok && d.questions && d.questions.length) { qs = d.questions; phaseEnd = Date.now() + PER * 1000; }
+        if (d && d.ok && d.questions && d.questions.length) { qs = d.questions; served = Date.now(); }
         else err = (d && d.error) || 'empty';
       }).catch(function () { err = 'network'; });
       function norm(t) { return String(t || '').toLowerCase().replace(/[ʻʼ‘’`']/g, "'").replace(/\s+/g, ' ').trim(); }
-      function advance() {
-        var now = Date.now();
-        if (phase === 'answer' && now >= phaseEnd) { phase = 'reveal'; phaseEnd = now + REVEAL * 1000; }
-        else if (phase === 'reveal' && now >= phaseEnd) {
-          i += 1; phase = 'answer'; choice = -1; wasRight = false; phaseEnd = now + PER * 1000;
-        }
+      function record(choice, secs) {
+        var q = qs[i], ok = choice === q.correct;
+        if (ok) pts += 10 + Math.max(0, PER - Math.round(secs));
+        picks.push({you: choice < 0 ? 'skip' : (ok ? 'ok' : 'no'), secs: choice < 0 ? null : Math.round(secs * 10) / 10});
+        i += 1; served = Date.now();
       }
       function state() {
         if (!qs) return err ? {ok: false, error: err} : {ok: true, status: 'scheduled', seconds: 0};
-        advance();
-        var q = qs[i % qs.length], n = qs.length;
-        var s = {ok: true, status: 'live', game_id: 'demo', q_index: i, q_number: (i % n) + 1, q_total: n,
-                 seconds: Math.max(0, Math.ceil((phaseEnd - Date.now()) / 1000)), phase: phase,
-                 input: q.input, q: q.q, options: q.options, items: q.items || [], mask: q.mask || '', image: q.image || '',
-                 your_points: pts, balance: 0, jokers: {used: [], hidden: [], shields: 0},
-                 leaderboard: [{name: 'Siz (demo)', points: pts, correct: right, q_total: n}]};
-        if (choice !== -1 || phase === 'reveal') {
-          s.answered = choice !== -1; s.your_choice = choice; s.your_correct = wasRight;
-          s.correct_text = q.options[q.correct];
+        var n = qs.length;
+        while (i < n && (Date.now() - served) / 1000 >= PER) record(-1, PER);
+        if (i >= n) {
+          return {ok: true, status: 'finished', your_points: pts, your_reward: 0, history: [], lifetime: {games: 0, points: 0},
+                  leaderboard: [{name: 'Siz (demo)', points: pts, reward: 0}],
+                  answer_key: qs.map(function (q, k) { return {n: k + 1, q: q.q, answer: q.options[q.correct],
+                                                             you: picks[k].you, secs: picks[k].secs}; })};
         }
-        if (phase === 'reveal') s.correct_index = q.correct;
-        return s;
+        var q = qs[i];
+        return {ok: true, status: 'live', self_paced: true, game_id: 'demo', q_index: i, q_number: i + 1, q_total: n,
+                seconds: Math.max(1, Math.ceil(PER - (Date.now() - served) / 1000)), phase: 'answer',
+                input: q.input, q: q.q, options: q.options, items: q.items || [], mask: q.mask || '', image: q.image || '',
+                your_points: null, answered_count: i, balance: 0, jokers: {used: [], hidden: [], shields: 0},
+                leaderboard: [{name: 'Siz (demo)', answered: i}]};
       }
       api = function (path, opts) {
         if (/state\/$/.test(path)) return Promise.resolve(state());
-        if (/submit\/$/.test(path) && qs && phase === 'answer' && choice === -1) {
+        if (/submit\/$/.test(path) && qs && i < qs.length) {
           var body = {}; try { body = JSON.parse((opts && opts.body) || '{}'); } catch (e) {}
-          var q = qs[i % qs.length];
-          if (typeof body.text === 'string') { choice = norm(body.text) === norm(q.options[q.correct]) ? q.correct : 99; }
-          else choice = body.choice;
-          wasRight = choice === q.correct;
-          if (wasRight) { right += 1; pts += 10 + Math.max(0, Math.ceil((phaseEnd - Date.now()) / 1000)); }
-          phase = 'reveal'; phaseEnd = Date.now() + REVEAL * 1000;
-          return Promise.resolve({ok: true, correct: wasRight, correct_index: q.correct, correct_text: q.options[q.correct]});
+          var q = qs[i], choice = body.choice;
+          if (typeof body.text === 'string') choice = norm(body.text) === norm(q.options[q.correct]) ? q.correct : 99;
+          record(choice, (Date.now() - served) / 1000);
+          return Promise.resolve({ok: true, self_paced: true, accepted: true});
         }
-        if (/submit\/$/.test(path)) return Promise.resolve({ok: false, error: 'already_answered'});
         return Promise.resolve({ok: false, error: 'demo'});
       };
     })();
@@ -722,13 +717,27 @@
       return p.join(' · ');
     }
 
+    // Self-paced games: who has answered how many (never who is right).
+    function progressBoardHtml(s, bare) {
+      var rows = s.leaderboard || [], n = s.q_total || 0, h = '';
+      rows.forEach(function (r, i) {
+        h += '<div class="lb"><div class="rank">' + (i + 1) + '</div><div class="lb-name">' + esc(r.name) + '</div>'
+           + '<div class="pts">📝 ' + (r.answered || 0) + (n ? '/' + n : '') + '</div></div>';
+      });
+      if (!h || bare) return h;
+      return '<div style="text-align:left;margin-top:14px"><div style="font-weight:800;margin-bottom:6px">📝 Kim qancha javob berdi</div>' + h + '</div>';
+    }
+
     function answerKeyHtml(s) {
       if (!s.answer_key || !s.answer_key.length) return '';
       var h = '<div style="text-align:left;margin-top:16px"><div style="font-weight:800;margin-bottom:8px">📋 To\'g\'ri javoblar</div>';
       s.answer_key.forEach(function(r) {
         var mark = r.you === 'ok' ? '✅' : (r.you === 'shield' ? '🛡' : (r.you === 'no' ? '❌' : '➖'));
         var t = r.secs != null ? ' <span class="muted">(' + r.secs + 's)</span>' : '';
-        h += '<div class="lb"><div class="rank">' + mark + '</div><div class="lb-name">' + esc(r.answer) + t + '</div></div>';
+        var qq = (r.q || '').replace(/^\s*\[[^\]]{2,40}\]\s*/, '');
+        h += '<div class="lb"><div class="rank">' + mark + '</div><div class="lb-name" style="white-space:normal">'
+           + (qq ? '<span class="muted" style="font-size:11.5px;white-space:normal">' + r.n + '. ' + esc(qq.slice(0, 110)) + '</span><br>' : '')
+           + esc(r.answer) + t + '</div></div>';
       });
       return h + '<div class="muted" style="font-size:11px;margin-top:6px">✅ to\'g\'ri · 🛡 qalqon saqlagan · ❌ xato · ➖ javob berilmagan</div></div>';
     }
@@ -1005,6 +1014,18 @@
         $('timer').textContent = '--:--';
         return;
       }
+      if (s.status === 'live' && s.self_paced && s.self_done) {
+        live.classList.add('hidden');
+        info.classList.remove('hidden');
+        renderJokers(null);
+        $('timerLbl').textContent = 'YAKUNGACHA';
+        $('subtitle').textContent = 'Siz tugatdingiz';
+        info.innerHTML = '<div class="em">🎉</div><h2>Barakalla, barcha savollarga javob berdingiz!</h2>'
+          + '<p>To\'g\'ri javoblar va natijalar o\'yin tugashi bilan shu yerda chiqadi. Kuting, hozir boshqalar ham yakunlashyapti 😊</p>'
+          + progressBoardHtml(s);
+        localSeconds = s.seconds;
+        return;
+      }
       if (s.status === 'live') {
         live.classList.remove('hidden');
         info.classList.add('hidden');
@@ -1021,8 +1042,20 @@
         else if (FLAVOR === 'hangman') badgeText = '🪢 DORBOZ · ' + s.q_number + '/' + s.q_total;
         else if (FLAVOR === 'speedtype') badgeText = '⚡️ TEZKOR TERISH · ' + s.q_number + '/' + s.q_total;
         else if (FLAVOR === 'labyrinth') badgeText = '🧭 ADABIY LABIRINT · ' + s.q_number + '/' + s.q_total;
+        // "[Mavzu] savol..." -> the topic goes up into the badge, the question
+        // starts with the question itself (owner: no time lost reading it).
+        var qRaw = s.q || '', topicM = /^\s*\[([^\]]{2,40})\]\s*/.exec(qRaw);
+        if (topicM) {
+          qRaw = qRaw.slice(topicM[0].length);
+          if (badgeText.indexOf('SAVOL ') === 0) badgeText = topicM[1].toUpperCase() + ' · ' + s.q_number + ' / ' + s.q_total;
+        }
         $('qn').textContent = badgeText;
         $('myPts').textContent = s.your_points || 0;
+        $('myPtsLbl').textContent = 'Sizning ochkoingiz';
+        if (s.self_paced) {
+          $('myPts').textContent = s.answered_count || 0;
+          $('myPtsLbl').textContent = 'Javob berildi · natija oxirida';
+        }
         $('qnum').textContent = s.q_number + '/' + s.q_total;
         if (s.input) isText = (s.input === 'text');
         if (s.game_id !== lastGameId) { lastGameId = s.game_id; lastQ = -1; }
@@ -1044,7 +1077,7 @@
           jokerShields = jk.shields || 0;
           jokerShieldsLeft = (jk.shields_left_to_buy !== undefined ? jk.shields_left_to_buy : 2);
         }
-        $('qtext').innerHTML = (s.q || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/&lt;b&gt;/gi,'<b>').replace(/&lt;\/b&gt;/gi,'</b>').replace(/\n/g,'<br>');
+        $('qtext').innerHTML = qRaw.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/&lt;b&gt;/gi,'<b>').replace(/&lt;\/b&gt;/gi,'</b>').replace(/\n/g,'<br>');
 
         var audioBox = $('audioBox');
         if (FLAVOR === 'audioquote' || s.audio_url) {
@@ -1113,13 +1146,14 @@
         }
 
         var b = '';
-        (s.leaderboard || []).forEach(function(r, i) {
+        if (s.self_paced) { $('board').innerHTML = progressBoardHtml(s, true) || '<div class="muted" style="padding:6px 0">Hozircha javob yo\'q.</div>'; }
+        else (s.leaderboard || []).forEach(function(r, i) {
           var cls = i === 0 ? 'g1' : (i === 1 ? 'g2' : (i === 2 ? 'g3' : ''));
           var teamCls = r.team === 'a' ? ' team-a' : (r.team === 'b' ? ' team-b' : '');
           var teamTag = r.team ? (r.team === 'a' ? ' 🔵' : ' 🔴') : '';
           b += '<div class="lb"><div class="rank ' + cls + '">' + (i + 1) + '</div><div class="lb-name' + teamCls + '">' + esc(r.name) + teamTag + '<br><span class="muted" style="font-size:11px">' + detail(r) + '</span></div><div class="pts">' + r.points + '</div></div>';
         });
-        $('board').innerHTML = b || '<div class="muted" style="padding:6px 0">Hozircha ball yo\'q.</div>';
+        if (!s.self_paced) $('board').innerHTML = b || '<div class="muted" style="padding:6px 0">Hozircha ball yo\'q.</div>';
         localSeconds = s.seconds;
       } else {
         live.classList.add('hidden');
@@ -1179,11 +1213,23 @@
     function sendAnswer(body, choice) {
       if (busy || curAnswered) return;
       busy = true;
+      body.q_index = lastQ;  // the server refuses an answer meant for another question
       api(M.api + 'submit/', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(body)
       }).then(function(r) {
+        if (r.self_paced) {
+          var tt = $('toast'); tt.className = 'toast ok'; tt.textContent = '✓ Qabul qilindi — keyingi savol!';
+          if (tg && tg.HapticFeedback) { try { tg.HapticFeedback.impactOccurred('light'); } catch(e) {} }
+          try { document.dispatchEvent(new CustomEvent('kc:answer', {detail: {accepted: true}})); } catch(e) {}
+          busy = false;
+          // Lock these options until the next question arrives (render resets on a new q_index).
+          curAnswered = true; curChoice = -1; curCorrectIdx = -1; renderOpts();
+          setTimeout(function () { tt.textContent = ''; }, 1400);
+          poll();
+          return;
+        }
         if (r.ok || r.error === 'already_answered') {
           $('toast').textContent = '';
           curAnswered = true;

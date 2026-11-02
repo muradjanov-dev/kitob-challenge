@@ -760,7 +760,7 @@ def create_scheduled_quiz(flavor: str, lead_seconds: int = LEAD_SECONDS, is_vip:
         status=QuizGame.STATUS_SCHEDULED,
         starts_at=starts, ends_at=starts + timedelta(seconds=total),
         questions=qs, answer_seconds=ANSWER_SECONDS, reveal_seconds=REVEAL_SECONDS,
-        is_vip=is_vip,
+        is_vip=is_vip, self_paced=self_paced_enabled() and flavor not in SELF_PACED_EXCLUDE,
     )
 
 
@@ -807,6 +807,85 @@ def _phase(game, now):
     return "live", qi, "reveal", int(span - within) + 1
 
 
+# ── Self-paced games (owner, 2026-11-03) ───────────────────────────────────
+# Nobody waits for a shared question: a player's question is the first one
+# they have not answered yet, with their own ANSWER_SECONDS clock (kept in the
+# cache from the moment it is first shown). Answers are taken without saying
+# whether they were right; points, right answers and the ranking come out
+# when the game ends. Switched on for new games via ops (quiz-self-paced).
+SELF_PACED_FLAG = "quiz_self_paced_on"
+SELF_PACED_EXCLUDE = {"teams"}
+
+
+def self_paced_enabled() -> bool:
+    from django.core.cache import cache
+    try:
+        return bool(cache.get(SELF_PACED_FLAG))
+    except Exception:
+        return False
+
+
+def set_self_paced(on: bool) -> None:
+    from django.core.cache import cache
+    cache.set(SELF_PACED_FLAG, bool(on), None)
+
+
+def _sp_key(game, profile, qi):
+    return f"qsp:{game.id}:{profile.id}:{qi}"
+
+
+def _sp_position(game, profile, now, serve=False):
+    """(question index, seconds left) for this player in a self-paced game;
+    the index equals the question count once they have answered them all.
+    A question left past its time counts as missed and the next one starts
+    -- but only after the player joined (answered at least once), so idling
+    on the first question never dodges the entry fee: its clock restarts."""
+    from django.core.cache import cache
+    nq = len(game.questions or [])
+    for _ in range(nq + 1):
+        answered = QuizAnswer.objects.filter(game_id=game.id, user=profile).count()
+        qi = answered
+        if qi >= nq:
+            return nq, 0
+        key = _sp_key(game, profile, qi)
+        served = cache.get(key)
+        if served is None:
+            if not serve:
+                return qi, game.answer_seconds
+            cache.add(key, now.timestamp(), 3 * 3600)
+            served = cache.get(key) or now.timestamp()
+        left = game.answer_seconds - (now.timestamp() - served)
+        if left > 0:
+            return qi, int(left) + 1
+        if answered == 0:
+            cache.set(key, now.timestamp(), 3 * 3600)
+            return qi, game.answer_seconds
+        q = game.questions[qi]
+        _, made = QuizAnswer.objects.get_or_create(
+            game_id=game.id, user=profile, q_index=qi,
+            defaults={"choice": len(q.get("options") or []), "is_correct": False,
+                      "time_taken": float(game.answer_seconds)})
+        if made:
+            QuizScore.objects.filter(game_id=game.id, user=profile).update(
+                total_time=F("total_time") + float(game.answer_seconds))
+    return nq, 0
+
+
+def _progress_board(game, limit=50):
+    """While a self-paced game runs: who has answered how many -- not who is
+    right, which stays hidden until the end."""
+    from django.core.cache import cache
+    key = f"quiz_progress:{game.id}"
+    rows = cache.get(key)
+    if rows is None:
+        data = (QuizAnswer.objects.filter(game_id=game.id).values("user_id", "user__full_name")
+                .annotate(n=Count("id")).order_by("-n", "user_id")[:limit])
+        rows = [{"name": ((r["user__full_name"] or "Kitobxon").split() or ["Kitobxon"])[0], "answered": r["n"]}
+                for r in data]
+        cache.set(key, rows, 3)
+    return rows
+
+
 def _assign_team(game) -> str:
     """Caller must hold the row lock on `game`. Alternates A/B so team sizes
     never differ by more than one, regardless of join order."""
@@ -814,7 +893,7 @@ def _assign_team(game) -> str:
     return "a" if len(a) <= len(b) else "b"
 
 
-def submit_answer(game_id: int, profile, choice: int) -> dict:
+def submit_answer(game_id: int, profile, choice: int, expect_qi=None) -> dict:
     g = QuizGame.objects.filter(id=game_id).first()
     if not g:
         return {"ok": False, "error": "not_live"}
@@ -826,6 +905,14 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
         }
     now = timezone.now()
     status, qi, phase, _ = _phase(g, now)
+    if g.self_paced:
+        if status != "live":
+            return {"ok": False, "error": "not_answering"}
+        qi, _left = _sp_position(g, profile, now, serve=True)
+        phase = "answer"
+        # A double tap must not answer the next, unseen question.
+        if expect_qi is not None and str(expect_qi).lstrip("-").isdigit() and int(expect_qi) != qi:
+            return {"ok": False, "error": "already_answered", "self_paced": True}
     if status != "live" or phase != "answer" or qi < 0 or qi >= len(g.questions or []):
         return {"ok": False, "error": "not_answering"}
 
@@ -865,6 +952,10 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
     span = g.answer_seconds + g.reveal_seconds
     elapsed = (now - g.starts_at).total_seconds()
     within = max(0.01, elapsed - qi * span)
+    if g.self_paced:
+        from django.core.cache import cache
+        served = cache.get(_sp_key(g, profile, qi)) or now.timestamp()
+        within = min(float(g.answer_seconds), max(0.01, now.timestamp() - served))
     time_taken = round(within, 3)
 
     hit, created = QuizAnswer.objects.get_or_create(
@@ -872,6 +963,8 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
         defaults={"choice": choice, "is_correct": correct, "time_taken": time_taken},
     )
     if not created:
+        if g.self_paced:
+            return {"ok": False, "error": "already_answered", "self_paced": True}
         return {"ok": False, "error": "already_answered",
                 "correct": hit.is_correct, "correct_index": q.get("correct"),
                 "correct_text": correct_text(q)}
@@ -900,12 +993,15 @@ def submit_answer(game_id: int, profile, choice: int) -> dict:
             QuizGame.objects.filter(id=g.id).update(**{field: F(field) + POINTS})
     score.save(update_fields=fields)
 
+    if g.self_paced:
+        # Taken, not judged: right answers and points come out at the end.
+        return {"ok": True, "self_paced": True, "accepted": True}
     return {"ok": True, "correct": correct, "shielded": shielded,
             "correct_index": q.get("correct"), "correct_text": correct_text(q),
             "team": score.team}
 
 
-def submit_text_answer(game_id: int, profile, text: str) -> dict:
+def submit_text_answer(game_id: int, profile, text: str, expect_qi=None) -> dict:
     """Typed answer for a TEXT_FLAVORS question: map it onto an option on the
     server (forgiving apostrophes, case, spacing and small typos -- see
     chain_text.match_text_answer), then score it like a tapped choice. Text
@@ -914,7 +1010,11 @@ def submit_text_answer(game_id: int, profile, text: str) -> dict:
     g = QuizGame.objects.filter(id=game_id).first()
     if not g:
         return {"ok": False, "error": "not_live"}
-    status, qi, phase, _ = _phase(g, timezone.now())
+    now = timezone.now()
+    status, qi, phase, _ = _phase(g, now)
+    if g.self_paced and status == "live":
+        qi, _left = _sp_position(g, profile, now, serve=True)
+        phase = "answer"
     if status != "live" or phase != "answer" or not (0 <= qi < len(g.questions or [])):
         return {"ok": False, "error": "not_answering"}
     q = g.questions[qi]
@@ -922,7 +1022,7 @@ def submit_text_answer(game_id: int, profile, text: str) -> dict:
         text, q.get("options") or [], q.get("correct", -1),
         allow_names=g.flavor in NAME_FLAVORS,
     )
-    return submit_answer(g.id, profile, choice)
+    return submit_answer(g.id, profile, choice, expect_qi=expect_qi)
 
 
 def _shields_available(game, profile, bought: int | None = None) -> int:
@@ -959,7 +1059,11 @@ def use_joker(game_id: int, profile, kind: str) -> dict:
     if g.is_vip and not (profile and profile.has_active_premium()):
         return {"ok": False, "error": "premium_required"}
 
-    status, qi, phase, _ = _phase(g, timezone.now())
+    now = timezone.now()
+    status, qi, phase, _ = _phase(g, now)
+    if g.self_paced and status == "live":
+        qi, _left = _sp_position(g, profile, now, serve=True)
+        phase = "answer"
     if status != "live" or phase != "answer" or qi < 0 or qi >= len(g.questions or []):
         return {"ok": False, "error": "not_answering"}
 
@@ -1021,6 +1125,7 @@ def use_joker(game_id: int, profile, kind: str) -> dict:
                 game_jokers.refund(profile, price, f"joker_{kind}_refund")
             return {"ok": False, "error": res.get("error") or "failed",
                     "balance": int(profile.ball or 0)}
+        out["self_paced"] = bool(g.self_paced)
         out["choice"] = q.get("correct")
         out["correct_index"] = q.get("correct")
         out["correct_text"] = correct_text(q)
@@ -1291,6 +1396,12 @@ def state_payload(profile, flavor) -> dict:
 
     status, qi, phase, secs = _phase(g, now)
     nq = len(g.questions or [])
+    self_done = False
+    if g.self_paced and status == "live":
+        qi, secs = _sp_position(g, profile, now, serve=True)
+        phase = "answer"
+        if qi >= nq:
+            self_done, secs = True, max(0, int((g.ends_at - now).total_seconds()))
     finished = status == "finished"
     if finished and not g.rewarded and g.ends_at and g.ends_at <= now:
         request_finalize(flavor, g.id, g.ends_at, finalize)
@@ -1306,6 +1417,7 @@ def state_payload(profile, flavor) -> dict:
         "q_index": qi, "q_number": qi + 1, "q_total": nq, "seconds": secs,
         "leaderboard": _cached_leaderboard(g),
         "your_points": (my.points if my else 0),
+        "self_paced": bool(g.self_paced),
         "your_team": (my.team if my else ""),
         "your_reward": (my.reward if my else 0),
         "your_premium_days": (my.premium_days if my else 0),
@@ -1340,6 +1452,13 @@ def state_payload(profile, flavor) -> dict:
             else:
                 row["you"] = "no"
             row["secs"] = round(a.time_taken, 1) if a else None
+    if g.self_paced and status == "live":
+        payload["your_points"] = None  # comes out at the end
+        payload["answered_count"] = min(qi, nq)
+        payload["self_done"] = self_done
+        payload["leaderboard"] = _progress_board(g)
+        if self_done:
+            return payload
     if flavor == "teams":
         payload["team_a_points"] = g.team_a_points
         payload["team_b_points"] = g.team_b_points

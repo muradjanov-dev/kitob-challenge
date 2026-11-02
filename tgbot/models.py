@@ -2505,6 +2505,9 @@ class QuizGame(BaseModel):
     team_a_points = models.PositiveIntegerField(default=0)
     team_b_points = models.PositiveIntegerField(default=0)
     rewarded = models.BooleanField(default=False)
+    # Owner 2026-11-03: each player moves on as soon as they answer; right
+    # answers and points only come out when the game ends (quiz_game.py).
+    self_paced = models.BooleanField(default=False)
     is_vip = models.BooleanField(default=False, help_text="True if this game is exclusive to VIP Premium users.")
 
     class Meta:
