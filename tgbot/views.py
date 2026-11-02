@@ -875,6 +875,57 @@ def internal_ops(request: HttpRequest, action: str):
             rows.append(row)
         return JsonResponse({"ok": True, "admins": len(rows), "rows": rows})
 
+    if action == "wallet-gift":
+        # A gift of `amount` so'm to every registered reader whose wallet
+        # holds less than `below`, once per reader per `tag` (the note is the
+        # marker), `limit` readers per call -- call again until "left" is 0.
+        # `text` ({name} {som} {balance}) is DMed to each one credited.
+        import html
+        import os as _os
+
+        import requests
+        from django.db import transaction as _txn
+        from tgbot.models import TelegramProfile, WalletTransaction
+        from tgbot.services import wallet
+        tag = (body.get("tag") or "")[:120]
+        amount, below = int(body.get("amount") or 0), int(body.get("below") or 0)
+        if not tag or amount <= 0 or below <= 0:
+            return JsonResponse({"ok": False, "error": "tag, amount and below are required"}, status=400)
+        limit = max(1, min(int(body.get("limit") or 200), 500))
+        done_ids = WalletTransaction.objects.filter(kind=WalletTransaction.KIND_ADMIN, note=tag).values("user_id")
+        todo = (TelegramProfile.objects.filter(is_registered=True, wallet_balance__lt=below)
+                .exclude(id__in=done_ids).order_by("id"))
+        left = todo.count()
+        out = {"ok": True, "eligible_left": left, "done_before": done_ids.count(),
+               "total_if_all": left * amount, "blocked_among_left": todo.filter(is_blocked=True).count()}
+        if not apply:
+            return JsonResponse(out)
+        template = body.get("text") or ""
+        credited = dms = 0
+        for p in todo[:limit]:
+            with _txn.atomic():
+                q = TelegramProfile.objects.select_for_update().get(id=p.id)
+                if q.wallet_balance >= below or WalletTransaction.objects.filter(
+                        user=q, kind=WalletTransaction.KIND_ADMIN, note=tag).exists():
+                    continue
+                wallet._credit_locked(q, amount, WalletTransaction.KIND_ADMIN, tag)
+            credited += 1
+            if template and not q.is_blocked:
+                try:
+                    requests.post(
+                        f"https://api.telegram.org/bot{_os.environ.get('API_TOKEN', '')}/sendMessage",
+                        data={"chat_id": q.telegram_id, "parse_mode": "HTML", "text": template.format(
+                            name=html.escape((q.full_name or "Kitobxon").split()[0]),
+                            som=f"{amount:,}".replace(",", " "),
+                            balance=f"{q.wallet_balance:,}".replace(",", " "))},
+                        timeout=8)
+                    dms += 1
+                except Exception:
+                    pass
+                time.sleep(0.05)
+        out.update(credited=credited, dms=dms, eligible_left=todo.count())
+        return JsonResponse(out)
+
     if action == "shop-product-refund":
         # Take a product off the shop and give every buyer their Kitobcha back,
         # once per purchase (status -> refunded, ledger shop_refund:<id>);
