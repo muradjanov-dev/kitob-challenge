@@ -875,6 +875,117 @@ def internal_ops(request: HttpRequest, action: str):
             rows.append(row)
         return JsonResponse({"ok": True, "admins": len(rows), "rows": rows})
 
+    if action == "dm-list":
+        # DM one approved text to a list of readers ("ids") or to every admin
+        # ("admins": true), optionally with one button -- a Mini App button
+        # when "web_app" is true (private chats only). Readers who blocked the
+        # bot are skipped. Without apply: the count and the text back.
+        import os as _os
+        import requests
+        from django.conf import settings as _settings
+        from tgbot.models import TelegramProfile
+        text = body.get("text") or ""
+        if not text:
+            return JsonResponse({"ok": False, "error": "text_required"}, status=400)
+        if body.get("admins"):
+            env = {int(a) for a in getattr(_settings, "ADMINS", []) if str(a).strip().lstrip("-").isdigit()}
+            people = list(TelegramProfile.objects.filter(is_admin=True)) + list(
+                TelegramProfile.objects.filter(telegram_id__in=env, is_admin=False))
+        else:
+            ids = [int(i) for i in body.get("ids") or []]
+            people = list(TelegramProfile.objects.filter(telegram_id__in=ids))
+        markup = None
+        if body.get("button_text") and body.get("button_url"):
+            btn = {"text": body["button_text"]}
+            btn["web_app" if body.get("web_app") else "url"] = (
+                {"url": body["button_url"]} if body.get("web_app") else body["button_url"])
+            markup = _json.dumps({"inline_keyboard": [[btn]]})
+        out = {"ok": True, "people": len(people), "blocked": sum(1 for p in people if p.is_blocked), "preview": text}
+        if not apply:
+            return JsonResponse(out)
+        sent = failed = 0
+        api = f"https://api.telegram.org/bot{_os.environ.get('API_TOKEN', '')}/sendMessage"
+        for p in people:
+            if p.is_blocked:
+                continue
+            data = {"chat_id": p.telegram_id, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"}
+            if markup:
+                data["reply_markup"] = markup
+            try:
+                r = requests.post(api, data=data, timeout=8)
+                if r.ok:
+                    sent += 1
+                else:
+                    failed += 1
+                    if r.status_code == 403:
+                        TelegramProfile.objects.filter(id=p.id).update(is_blocked=True)
+            except Exception:
+                failed += 1
+            time.sleep(0.05)
+        out.update(sent=sent, failed=failed)
+        return JsonResponse(out)
+
+    if action == "broadcast-edit":
+        # Edit every message an ops broadcast sent (ids kept since 2026-11-03).
+        import os as _os
+        import requests
+        msgs = ops_broadcast.sent_messages(body.get("campaign", ""))
+        text = body.get("text") or ""
+        if not apply or not text:
+            return JsonResponse({"ok": True, "messages": len(msgs)})
+        api = f"https://api.telegram.org/bot{_os.environ.get('API_TOKEN', '')}/editMessageText"
+        edited = 0
+        for chat_id, mid in msgs:
+            try:
+                r = requests.post(api, data={"chat_id": chat_id, "message_id": mid, "text": text,
+                                             "parse_mode": "HTML", "disable_web_page_preview": "true"}, timeout=8)
+                edited += r.ok
+            except Exception:
+                pass
+            time.sleep(0.05)
+        return JsonResponse({"ok": True, "messages": len(msgs), "edited": edited})
+
+    if action == "group-find-delete":
+        # Find the bot's own older post in a group by how its text starts and
+        # delete it. The Bot API cannot read a chat, so each message below
+        # `below` is forwarded silently to the admin group, its text checked,
+        # and the forwarded copy deleted at once; nothing in the group is
+        # touched except the one match (and only with apply).
+        import os as _os
+        import requests
+        api = f"https://api.telegram.org/bot{_os.environ.get('API_TOKEN', '')}"
+        probe_chat = _os.environ.get("ADMIN_GROUP_ID", "")
+        chat, below = str(body.get("chat") or ""), int(body.get("below") or 0)
+        start = (body.get("startswith") or "").strip()
+        depth = max(1, min(int(body.get("depth") or 150), 400))
+        if not (probe_chat and chat and below and start):
+            return JsonResponse({"ok": False, "error": "chat, below, startswith required"}, status=400)
+        found, probed = None, 0
+        for mid in range(below - 1, max(0, below - 1 - depth), -1):
+            try:
+                r = requests.post(f"{api}/forwardMessage", data={"chat_id": probe_chat, "from_chat_id": chat,
+                                                                 "message_id": mid, "disable_notification": "true"},
+                                  timeout=8).json()
+            except Exception:
+                continue
+            probed += 1
+            if not r.get("ok"):
+                continue
+            fwd = r["result"]
+            try:
+                requests.post(f"{api}/deleteMessage", data={"chat_id": probe_chat, "message_id": fwd["message_id"]}, timeout=8)
+            except Exception:
+                pass
+            if (fwd.get("text") or "").strip().startswith(start):
+                found = mid
+                break
+            time.sleep(0.03)
+        out = {"ok": True, "found": found, "probed": probed}
+        if apply and found:
+            r = requests.post(f"{api}/deleteMessage", data={"chat_id": chat, "message_id": found}, timeout=8).json()
+            out["deleted"] = bool(r.get("ok"))
+        return JsonResponse(out)
+
     if action == "games":
         # {"do": "inspect"}: what the Celery worker holds right now and
         # today's sequences. {"do": "start", "slot": "evening", "apply": true}:

@@ -31,7 +31,7 @@ from tgbot.game_views import (
     author_index, api_author_state, api_author_submit, api_author_vote,
     detective_index, api_detective_state, api_detective_submit,
     survival_index, api_survival_state, api_survival_submit, api_survival_joker,
-    quiz_index, api_quiz_state, api_quiz_submit, api_quiz_joker,
+    quiz_index, api_quiz_state, api_quiz_submit, api_quiz_joker, api_quiz_demo, games_demo_hub,
     api_games_status,
 )
 
@@ -415,6 +415,8 @@ urlpatterns = [
     # Bilim O'yinining har bir flavori uchun alohida yo'l ochilmaydi — joker
     # endpointi bitta, flavor manzilning o'zidan olinadi.
     path("api/quiz/<str:flavor>/joker/", api_quiz_joker, name="quiz-api-joker"),
+    path("api/quiz/<str:flavor>/demo/", api_quiz_demo, name="quiz-api-demo"),
+    path("demo/", games_demo_hub, name="games-demo-hub"),
 
     path("api/games/status/", api_games_status, name="games-api-status"),
 

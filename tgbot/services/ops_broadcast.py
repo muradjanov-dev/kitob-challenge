@@ -34,8 +34,9 @@ def run(campaign: str, text: str, groups: bool = True, users: bool = True,
         markup = json.dumps({"inline_keyboard": [[{"text": button_text, "url": button_url}]]})
 
     prog = {"state": "running", "groups_sent": 0, "users_sent": 0, "skipped": 0,
-            "blocked": 0, "failed": 0, "total_users": 0}
+            "blocked": 0, "failed": 0, "total_users": 0, "group_messages": []}
     cache.set(_progress_key(campaign), prog, KEEP)
+    sent_ids = []  # (chat_id, message_id) of everything sent, so it can be edited later
 
     def _send(chat_id, thread_id=None):
         data = {"chat_id": chat_id, "text": text, "parse_mode": "HTML",
@@ -49,6 +50,11 @@ def run(campaign: str, text: str, groups: bool = True, users: bool = True,
             if resp.status_code == 429:
                 time.sleep(int(resp.json().get("parameters", {}).get("retry_after", 5)) + 1)
                 continue
+            if resp.ok:
+                try:
+                    sent_ids.append((str(chat_id), resp.json()["result"]["message_id"]))
+                except Exception:
+                    pass
             return resp
         return resp
 
@@ -60,6 +66,7 @@ def run(campaign: str, text: str, groups: bool = True, users: bool = True,
             try:
                 if _send(chat_id, thread_id).ok:
                     prog["groups_sent"] += 1
+                    prog["group_messages"].append(list(sent_ids[-1]))
                 else:
                     prog["failed"] += 1
             except Exception as e:
@@ -93,5 +100,10 @@ def run(campaign: str, text: str, groups: bool = True, users: bool = True,
 
     prog["state"] = "done"
     cache.set(_progress_key(campaign), prog, KEEP)
+    cache.set(f"ops_bc:{campaign}:ids", sent_ids, KEEP)
     print(f"ops_broadcast {campaign}: {prog}")
     return prog
+
+
+def sent_messages(campaign) -> list:
+    return cache.get(f"ops_bc:{campaign}:ids") or []

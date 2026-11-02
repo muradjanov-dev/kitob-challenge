@@ -663,6 +663,58 @@
       return fetch(path, opts).then(function(r) { return r.json(); });
     }
 
+    // Admin demo (?demo=1): real questions played inside the page -- no live
+    // game, no points, no rewards -- so the screens can be tried any time.
+    // /api/quiz/<flavor>/demo/ hands out questions to admins only.
+    var DEMO = /[?&]demo=1(&|$)/.test(location.search);
+    if (DEMO) (function () {
+      var realApi = api, qs = null, err = null, i = 0, pts = 0, right = 0;
+      var PER = 25, REVEAL = 3, phase = 'answer', phaseEnd = 0, choice = -1, wasRight = false;
+      realApi('/api/quiz/' + FLAVOR + '/demo/').then(function (d) {
+        if (d && d.ok && d.questions && d.questions.length) { qs = d.questions; phaseEnd = Date.now() + PER * 1000; }
+        else err = (d && d.error) || 'empty';
+      }).catch(function () { err = 'network'; });
+      function norm(t) { return String(t || '').toLowerCase().replace(/[ʻʼ‘’`']/g, "'").replace(/\s+/g, ' ').trim(); }
+      function advance() {
+        var now = Date.now();
+        if (phase === 'answer' && now >= phaseEnd) { phase = 'reveal'; phaseEnd = now + REVEAL * 1000; }
+        else if (phase === 'reveal' && now >= phaseEnd) {
+          i += 1; phase = 'answer'; choice = -1; wasRight = false; phaseEnd = now + PER * 1000;
+        }
+      }
+      function state() {
+        if (!qs) return err ? {ok: false, error: err} : {ok: true, status: 'scheduled', seconds: 0};
+        advance();
+        var q = qs[i % qs.length], n = qs.length;
+        var s = {ok: true, status: 'live', game_id: 'demo', q_index: i, q_number: (i % n) + 1, q_total: n,
+                 seconds: Math.max(0, Math.ceil((phaseEnd - Date.now()) / 1000)), phase: phase,
+                 input: q.input, q: q.q, options: q.options, items: q.items || [], mask: q.mask || '', image: q.image || '',
+                 your_points: pts, balance: 0, jokers: {used: [], hidden: [], shields: 0},
+                 leaderboard: [{name: 'Siz (demo)', points: pts, correct: right, q_total: n}]};
+        if (choice !== -1 || phase === 'reveal') {
+          s.answered = choice !== -1; s.your_choice = choice; s.your_correct = wasRight;
+          s.correct_text = q.options[q.correct];
+        }
+        if (phase === 'reveal') s.correct_index = q.correct;
+        return s;
+      }
+      api = function (path, opts) {
+        if (/state\/$/.test(path)) return Promise.resolve(state());
+        if (/submit\/$/.test(path) && qs && phase === 'answer' && choice === -1) {
+          var body = {}; try { body = JSON.parse((opts && opts.body) || '{}'); } catch (e) {}
+          var q = qs[i % qs.length];
+          if (typeof body.text === 'string') { choice = norm(body.text) === norm(q.options[q.correct]) ? q.correct : 99; }
+          else choice = body.choice;
+          wasRight = choice === q.correct;
+          if (wasRight) { right += 1; pts += 10 + Math.max(0, Math.ceil((phaseEnd - Date.now()) / 1000)); }
+          phase = 'reveal'; phaseEnd = Date.now() + REVEAL * 1000;
+          return Promise.resolve({ok: true, correct: wasRight, correct_index: q.correct, correct_text: q.options[q.correct]});
+        }
+        if (/submit\/$/.test(path)) return Promise.resolve({ok: false, error: 'already_answered'});
+        return Promise.resolve({ok: false, error: 'demo'});
+      };
+    })();
+
     function detail(r) {
       var p = [];
       if (r.q_total) p.push('✅ ' + (r.correct || 0) + '/' + r.q_total);
@@ -956,7 +1008,7 @@
       if (s.status === 'live') {
         live.classList.remove('hidden');
         info.classList.add('hidden');
-        $('subtitle').textContent = 'Savol ' + s.q_number + ' / ' + s.q_total;
+        $('subtitle').textContent = (DEMO ? '🧪 DEMO · ' : '') + 'Savol ' + s.q_number + ' / ' + s.q_total;
         var badgeText = 'SAVOL ' + s.q_number + ' / ' + s.q_total;
         if (FLAVOR === 'riddlebox') badgeText = '🧩 ADABIY JUMBOQ · ' + s.q_number + '/' + s.q_total;
         else if (FLAVOR === 'quotechain') badgeText = '🔗 IQTIBOS HALQASI · ' + s.q_number + '/' + s.q_total;
@@ -1111,7 +1163,9 @@
         if (!s || s.ok === false) {
           $('info').classList.remove('hidden');
           $('live').classList.add('hidden');
-          $('info').innerHTML = '<div class="em">🔒</div><h2>Kirish xatosi</h2><p>Iltimos, bot orqali qayta kiring.</p>';
+          $('info').innerHTML = (DEMO && s && s.error === 'admins_only')
+            ? '<div class="em">🧪</div><h2>Demo faqat adminlar uchun</h2><p>Jonli o&#39;yin har kuni 10:00 va 21:30 da.</p>'
+            : '<div class="em">🔒</div><h2>Kirish xatosi</h2><p>Iltimos, bot orqali qayta kiring.</p>';
           return;
         }
         render(s);

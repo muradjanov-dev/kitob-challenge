@@ -348,6 +348,53 @@ _QUIZ_FLAVORS = (
 )
 
 
+def _is_game_admin(p) -> bool:
+    from django.conf import settings as _settings
+    env = {int(a) for a in getattr(_settings, "ADMINS", []) if str(a).strip().lstrip("-").isdigit()}
+    return bool(p and (p.is_admin or p.telegram_id in env))
+
+
+@csrf_exempt
+@require_GET
+@_require_authed
+def api_quiz_demo(request: HttpRequest, flavor: str) -> JsonResponse:
+    """Admin demo (`?demo=1` on a quiz page): a handful of real questions
+    with their answers, played in the page itself -- no game, no points, no
+    rewards. Admins only, since it shows the right answers."""
+    import random as _random
+    if flavor not in _QUIZ_FLAVORS or flavor == "cover":
+        return JsonResponse({"ok": False, "error": "bad_flavor"}, status=404)
+    if not _is_game_admin(request.tg_profile):
+        return JsonResponse({"ok": False, "error": "admins_only"}, status=403)
+    pool = list(quiz_game._raw_pool(flavor))
+    out = []
+    for item in _random.sample(pool, min(len(pool), 12)):
+        try:
+            q = quiz_game._prep_one(flavor, item)
+        except Exception:
+            continue
+        if not q.get("options"):
+            continue
+        out.append({"q": q.get("q", ""), "options": q["options"], "correct": q.get("correct", 0),
+                    "items": q.get("items"), "mask": q.get("mask", ""), "image": q.get("image"),
+                    "input": "text" if flavor in quiz_game.TEXT_FLAVORS else "choice"})
+        if len(out) >= 8:
+            break
+    return JsonResponse({"ok": True, "questions": out})
+
+
+def games_demo_hub(request: HttpRequest) -> HttpResponse:
+    """Every quiz game with a demo link, for admins to try the screens."""
+    games = []
+    for fl in _QUIZ_FLAVORS:
+        label, url = _GAME_LABELS_URLS.get(fl, (fl, None))
+        if url and fl != "cover":
+            games.append({"label": label, "url": url})
+    resp = render(request, "game/demo_hub.html", {"games": games})
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return resp
+
+
 def quiz_index(request: HttpRequest, flavor: str) -> HttpResponse:
     if flavor not in _QUIZ_FLAVORS:
         return HttpResponse("Not found", status=404)
