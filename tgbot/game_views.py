@@ -524,6 +524,24 @@ def _game_participant_count(game_type: str, game_id: int) -> int:
     return model.objects.filter(game_id=game_id).count() if model else 0
 
 
+def _live_participants(game_type, game_id) -> int:
+    """Players of the running game for the live counter on every game page
+    (game/_live_count.html polls it every few seconds); cached 4 s so a
+    full room of pollers costs one count query."""
+    if not game_type or not game_id:
+        return 0
+    from django.core.cache import cache
+    key = f"live_players:{game_type}:{game_id}"
+    n = cache.get(key)
+    if n is None:
+        try:
+            n = _game_participant_count(game_type, game_id)
+        except Exception:
+            n = 0
+        cache.set(key, n, 4)
+    return n
+
+
 def _next_slot_at():
     """Next occurrence of 10:00 or 21:30 Tashkent time, as an aware datetime."""
     import datetime as _dt
@@ -554,6 +572,7 @@ def api_games_status(request: HttpRequest) -> JsonResponse:
             "url": url,
             "index": seq.current_index + 1,
             "total": len(seq.game_types),
+            "participants": _live_participants(seq.current_game_type, seq.current_game_id),
         }
 
     last_result = None

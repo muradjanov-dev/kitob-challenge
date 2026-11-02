@@ -1,0 +1,63 @@
+{% comment %}
+  Live player counter for whichever game is running (owner, 2026-11-02):
+  a small pill "● JONLI · 👥 N kishi o'ynayapti" that appears while this
+  page's game is the active one, counts up smoothly and bumps when someone
+  joins. Polls /api/games/status/ (participants cached 4 s server-side) every
+  5 s, and rests while the page is hidden. Include once, before </body>.
+{% endcomment %}
+<style>
+  #kcLive { position: fixed; z-index: 9999; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 50%;
+    transform: translate(-50%, -140%); display: flex; align-items: center; gap: 8px; padding: 7px 14px 7px 10px;
+    border-radius: 999px; background: rgba(18, 16, 28, .78); color: #fff; font: 600 13px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .28), inset 0 0 0 1px rgba(255, 255, 255, .12);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    transition: transform .5s cubic-bezier(.2, 1.4, .4, 1), opacity .3s; opacity: 0; pointer-events: none; }
+  #kcLive.on { transform: translate(-50%, 0); opacity: 1; }
+  #kcLive .dot { width: 8px; height: 8px; border-radius: 50%; background: #ff3b5c; box-shadow: 0 0 0 0 rgba(255, 59, 92, .7);
+    animation: kcLivePulse 1.6s infinite; }
+  #kcLive .tag { letter-spacing: .08em; font-size: 11px; color: #ff8fa3; }
+  #kcLive .num { display: inline-block; min-width: 1.4em; text-align: right; font-variant-numeric: tabular-nums;
+    background: linear-gradient(90deg, #ffd56b, #ff9d5c); -webkit-background-clip: text; background-clip: text; color: transparent;
+    font-size: 15px; font-weight: 800; }
+  #kcLive.bump .num { animation: kcLiveBump .6s ease; }
+  #kcLive .plus { position: absolute; right: 12px; top: -4px; color: #7dffb3; font-weight: 800; font-size: 12px;
+    opacity: 0; pointer-events: none; }
+  #kcLive.bump .plus { animation: kcLivePlus .9s ease-out; }
+  @keyframes kcLivePulse { 0% { box-shadow: 0 0 0 0 rgba(255, 59, 92, .7); } 70% { box-shadow: 0 0 0 9px rgba(255, 59, 92, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 59, 92, 0); } }
+  @keyframes kcLiveBump { 0% { transform: scale(1); } 35% { transform: scale(1.45); } 100% { transform: scale(1); } }
+  @keyframes kcLivePlus { 0% { opacity: 0; transform: translateY(6px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
+  @media (prefers-reduced-motion: reduce) { #kcLive, #kcLive .dot, #kcLive.bump .num, #kcLive.bump .plus { animation: none; transition: none; } }
+</style>
+<div id="kcLive" aria-live="polite"><span class="dot"></span><span class="tag">JONLI</span>
+  <span>👥 <span class="num">0</span> kishi o'ynayapti</span><span class="plus">+1</span></div>
+<script>
+  (function () {
+    var el = document.getElementById('kcLive'), num = el.querySelector('.num'), plus = el.querySelector('.plus');
+    var shown = 0, timer = null;
+    function countTo(n) {
+      var from = shown, t0 = performance.now();
+      if (n > from) {
+        plus.textContent = '+' + (n - from);
+        el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+      }
+      shown = n;
+      (function step(t) {
+        var k = Math.min(1, (t - t0) / 700), e = 1 - Math.pow(1 - k, 3);
+        num.textContent = Math.round(from + (n - from) * e);
+        if (k < 1) requestAnimationFrame(step);
+      })(t0);
+    }
+    function poll() {
+      fetch('/api/games/status/', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+        var a = d && d.active;
+        var mine = a && a.url && location.pathname.indexOf(a.url) === 0;
+        el.classList.toggle('on', !!mine);
+        if (mine && typeof a.participants === 'number' && a.participants !== shown) countTo(a.participants);
+      }).catch(function () {});
+    }
+    function start() { if (!timer) { poll(); timer = setInterval(poll, 5000); } }
+    function stop() { clearInterval(timer); timer = null; }
+    document.addEventListener('visibilitychange', function () { document.hidden ? stop() : start(); });
+    start();
+  })();
+</script>

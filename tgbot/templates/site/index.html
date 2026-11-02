@@ -750,7 +750,8 @@
               document.getElementById("gamesCountdown").style.display = "none";
               document.getElementById("gamesActiveTitle").textContent = d.active.label;
               document.getElementById("gamesActiveMeta").textContent =
-                `${d.active.index}/${d.active.total} — ${d.active.slot === "morning" ? "ertalabki" : "kechqurungi"} seriya`;
+                `${d.active.index}/${d.active.total} — ${d.active.slot === "morning" ? "ertalabki" : "kechqurungi"} seriya`
+                  + (d.active.participants ? ` · 👥 ${d.active.participants} kishi o'ynayapti` : "");
               const link = document.getElementById("gamesActiveLink");
               if (d.active.url) {
                 link.onclick = function (e) {
