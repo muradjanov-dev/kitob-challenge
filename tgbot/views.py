@@ -875,6 +875,38 @@ def internal_ops(request: HttpRequest, action: str):
             rows.append(row)
         return JsonResponse({"ok": True, "admins": len(rows), "rows": rows})
 
+    if action == "games":
+        # {"do": "inspect"}: what the Celery worker holds right now and
+        # today's sequences. {"do": "start", "slot": "evening", "apply": true}:
+        # start a slot that beat missed (start_game_sequence is idempotent per
+        # slot and day, so a slot already running is left alone).
+        from django.utils import timezone as _tz
+        from tgbot.models import GameSequence
+        do = body.get("do") or "inspect"
+        seqs = list(GameSequence.objects.filter(date=_tz.localdate()).values(
+            "slot", "game_types", "current_index", "current_game_type", "current_game_id", "completed"))
+        if do == "start":
+            slot = body.get("slot") or "evening"
+            if apply:
+                from tgbot.tasks import start_game_sequence
+                start_game_sequence(slot)
+                seqs = list(GameSequence.objects.filter(date=_tz.localdate()).values(
+                    "slot", "game_types", "current_index", "current_game_type", "current_game_id", "completed"))
+            return JsonResponse({"ok": True, "sequences": seqs}, json_dumps_params={"default": str})
+        from collections import Counter
+        from src.celery_app import app as _celery
+        i = _celery.control.inspect(timeout=3)
+
+        def _names(d):
+            c = Counter()
+            for tasks in (d or {}).values():
+                for t in tasks:
+                    c[(t.get("request") or t).get("name") or t.get("name")] += 1
+            return dict(c)
+        return JsonResponse({"ok": True, "sequences": seqs, "active": _names(i.active()),
+                             "reserved": _names(i.reserved()), "scheduled": _names(i.scheduled())},
+                            json_dumps_params={"default": str})
+
     if action == "group-prune":
         # Readers with no report for more than `days` days (or none at all,
         # if they joined that long ago) leave the reading groups: a kick (ban
