@@ -26,6 +26,11 @@
   @keyframes kcLivePulse { 0% { box-shadow: 0 0 0 0 rgba(255, 59, 92, .7); } 70% { box-shadow: 0 0 0 9px rgba(255, 59, 92, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 59, 92, 0); } }
   @keyframes kcLiveBump { 0% { transform: scale(1); } 35% { transform: scale(1.45); } 100% { transform: scale(1); } }
   @keyframes kcLivePlus { 0% { opacity: 0; transform: translateY(6px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
+  /* Under the page header when there is one, so it never covers the title. */
+  #kcLive.inflow { position: relative; top: auto; left: auto; transform: none; width: max-content; max-width: 100%;
+    margin: -4px auto 12px; display: none; }
+  #kcLive.inflow.on { display: flex; opacity: 1; animation: kcLiveIn .45s cubic-bezier(.2, 1.4, .4, 1); }
+  @keyframes kcLiveIn { from { opacity: 0; transform: translateY(-8px) scale(.9); } }
   @media (prefers-reduced-motion: reduce) { #kcLive, #kcLive .dot, #kcLive.bump .num, #kcLive.bump .plus { animation: none; transition: none; } }
 </style>
 <div id="kcLive" aria-live="polite"><span class="dot"></span><span class="tag">JONLI</span>
@@ -34,6 +39,8 @@
   (function () {
     var el = document.getElementById('kcLive'), num = el.querySelector('.num'), plus = el.querySelector('.plus');
     var shown = 0, timer = null;
+    var head = document.querySelector('.top');
+    if (head) { head.insertAdjacentElement('afterend', el); el.classList.add('inflow'); }
     function countTo(n) {
       var from = shown, t0 = performance.now();
       if (n > from) {

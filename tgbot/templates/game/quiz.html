@@ -1145,6 +1145,7 @@
           if (tg && tg.HapticFeedback) {
             try { tg.HapticFeedback.notificationOccurred((r.correct || r.shielded) ? 'success' : 'error'); } catch(e) {}
           }
+          try { document.dispatchEvent(new CustomEvent('kc:answer', {detail: {correct: !!r.correct}})); } catch(e) {}
           poll();
         } else {
           var t = $('toast');
@@ -1177,6 +1178,7 @@
     setInterval(poll, 1500);
   </script>
 {% include "_tracking.html" with section="quiz-"|add:flavor %}
+{% include "game/_fx.html" %}
 {% include "game/_live_count.html" %}
 </body>
 </html>

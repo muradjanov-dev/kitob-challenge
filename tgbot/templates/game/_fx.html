@@ -1,0 +1,206 @@
+{% comment %}
+  Game FX layer (owner, 2026-11-02: "visually engaging, animated, playable").
+  Pure presentation on top of a game page -- it never touches game logic:
+  - an aurora background in the game's own --accent / --accent2 colours,
+    glassy cards, a sheen over the question card;
+  - a new question slides in, its options arrive one after another;
+  - taps ripple; a right answer glows and bursts confetti, a wrong one shakes
+    (the page dispatches `kc:answer` {correct} when the server answers);
+  - points count up with a floating "+N"; the timer pulses red in its last
+    10 seconds.
+  Respects prefers-reduced-motion; nothing runs while the page is hidden.
+  Include once, right before </body>.
+{% endcomment %}
+<style>
+  /* One static layer of soft radial gradients in the game's own colours:
+     no blur, no animated full-screen layers -- those stall low-end phones. */
+  #kcFxBg { position: fixed; inset: 0; z-index: -1; pointer-events: none; background:
+    radial-gradient(60vmax 60vmax at 0% 0%, color-mix(in srgb, var(--accent) 38%, transparent), transparent 70%),
+    radial-gradient(60vmax 60vmax at 100% 100%, color-mix(in srgb, var(--accent2) 34%, transparent), transparent 70%),
+    radial-gradient(40vmax 40vmax at 70% 30%, rgba(217, 164, 65, .12), transparent 70%),
+    var(--bg); }
+  @media (prefers-color-scheme: light) { #kcFxBg { background:
+    radial-gradient(60vmax 60vmax at 0% 0%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 70%),
+    radial-gradient(60vmax 60vmax at 100% 100%, color-mix(in srgb, var(--accent2) 18%, transparent), transparent 70%),
+    var(--bg); } }
+  body { background: transparent !important; }
+
+  .card, .timer, .stat .box, .jk {
+    background: color-mix(in srgb, var(--card) 84%, transparent) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .18), inset 0 1px 0 rgba(255, 255, 255, .06) !important;
+  }
+  .qcard { overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)) !important;
+    box-shadow: 0 14px 40px color-mix(in srgb, var(--accent) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, .08) !important; }
+  .qcard::after { content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%; pointer-events: none;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .16), transparent); transform: skewX(-18deg); opacity: 0; }
+  .qcard.kc-new { animation: kcQIn .55s cubic-bezier(.2, .9, .3, 1.2) both; }
+  .qcard.kc-new::after { animation: kcSheen 1.1s .25s ease-out; }
+  @keyframes kcQIn { from { opacity: 0; transform: translateY(18px) scale(.97); } to { opacity: 1; transform: none; } }
+  @keyframes kcSheen { 0% { left: -60%; opacity: 1; } 100% { left: 130%; opacity: 0; } }
+  .qcard .qn { background: color-mix(in srgb, var(--accent) 30%, var(--badge)) !important; color: var(--text) !important; }
+  /* A gradient frame in the game's colours (static: padding-box/border-box, no animation). */
+  .qcard { border: 1.5px solid transparent !important;
+    background: linear-gradient(145deg, var(--card2), var(--card)) padding-box,
+                linear-gradient(135deg, var(--accent), var(--accent2) 55%, #d9a441) border-box !important; }
+  .top .title { background: linear-gradient(90deg, var(--text), color-mix(in srgb, var(--accent) 60%, var(--text)));
+    -webkit-background-clip: text; background-clip: text; }
+  .top .title > span, .top .title { -webkit-text-fill-color: currentColor; }
+  .timer { border: 1.5px solid color-mix(in srgb, var(--accent) 55%, var(--line)) !important; }
+  .opt-badge { background: color-mix(in srgb, var(--accent) 22%, var(--card2)) !important; color: var(--text) !important;
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--line)) !important; }
+  .stat .box b, .pts { background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text;
+    background-clip: text; color: transparent !important; }
+
+  .opt { position: relative; overflow: hidden; transition: transform .14s, border-color .2s, box-shadow .2s, background .2s !important; }
+  .opt.kc-in { animation: kcOptIn .45s cubic-bezier(.2, .9, .3, 1.25) both; animation-delay: calc(var(--i, 0) * 70ms + 120ms); }
+  @keyframes kcOptIn { from { opacity: 0; transform: translateX(-16px) scale(.98); } to { opacity: 1; transform: none; } }
+  .opt:not(:disabled):hover { border-color: var(--accent) !important; box-shadow: 0 6px 22px color-mix(in srgb, var(--accent) 30%, transparent) !important; }
+  .opt:not(:disabled):active { transform: scale(.975) !important; }
+  .opt .opt-badge { transition: transform .25s; }
+  .opt:not(:disabled):hover .opt-badge { transform: rotate(-8deg) scale(1.08); background: var(--accent); color: #fff; border-color: var(--accent); }
+  .opt.correct { animation: kcGlow 1.4s ease-out 1; box-shadow: 0 0 0 2px var(--ok), 0 10px 30px color-mix(in srgb, var(--ok) 45%, transparent) !important; }
+  .opt.wrong { animation: kcShake .5s cubic-bezier(.36, .07, .19, .97) 1; }
+  @keyframes kcGlow { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 80%, transparent); } 60% { box-shadow: 0 0 0 12px transparent; } }
+  @keyframes kcShake { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); } 30%, 50%, 70% { transform: translateX(-7px); } 40%, 60% { transform: translateX(7px); } }
+  .kc-ripple { position: absolute; border-radius: 50%; transform: scale(0); background: color-mix(in srgb, var(--accent) 45%, transparent);
+    pointer-events: none; animation: kcRipple .6s ease-out forwards; }
+  @keyframes kcRipple { to { transform: scale(2.6); opacity: 0; } }
+
+  .timer.kc-hurry { color: #fff !important; background: color-mix(in srgb, var(--bad) 75%, transparent) !important; animation: kcHurry 1s ease-in-out infinite; }
+  .timer.kc-hurry .lbl { color: rgba(255, 255, 255, .85) !important; }
+  @keyframes kcHurry { 50% { transform: scale(1.07); box-shadow: 0 0 0 6px color-mix(in srgb, var(--bad) 25%, transparent); } }
+  .kc-bump { animation: kcBump .55s ease; display: inline-block; }
+  @keyframes kcBump { 35% { transform: scale(1.35); } }
+  .kc-float { position: fixed; z-index: 9998; pointer-events: none; font-weight: 900; font-size: 20px; color: var(--ok);
+    text-shadow: 0 2px 12px color-mix(in srgb, var(--ok) 60%, transparent); animation: kcFloat 1.2s ease-out forwards; }
+  @keyframes kcFloat { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.8); } 20% { opacity: 1; transform: translate(-50%, -6px) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -54px) scale(1); } }
+  .lb { animation: kcRow .4s ease both; }
+  @keyframes kcRow { from { opacity: 0; transform: translateY(6px); } }
+  .kc-conf { position: fixed; z-index: 9997; width: 9px; height: 5px; border-radius: 1.5px; pointer-events: none;
+    animation: kcConf 1.25s cubic-bezier(.2, .7, .4, 1) forwards; will-change: transform, opacity; }
+  @keyframes kcConf { 0% { transform: translate(-50%, -50%) rotate(0); opacity: 1; }
+    45% { transform: translate(calc(-50% + var(--dx) * .7), calc(-50% + var(--up))) rotate(calc(var(--rot) * .6)); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--down))) rotate(var(--rot)); opacity: 0; } }
+  .big .em { display: inline-block; animation: kcFloatEm 3s ease-in-out infinite; }
+  @keyframes kcFloatEm { 50% { transform: translateY(-6px) rotate(-4deg); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .qcard.kc-new, .qcard.kc-new::after, .opt.kc-in, .opt.correct, .opt.wrong, .timer.kc-hurry, .kc-bump, .lb, .big .em { animation: none !important; }
+  }
+</style>
+<div id="kcFxBg" aria-hidden="true"></div>
+<script>
+  (function () {
+    var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var $ = function (id) { return document.getElementById(id); };
+
+    // ── confetti: a few dozen CSS-animated pieces (no full-screen canvas) ──
+    function colors() {
+      var cs = getComputedStyle(document.documentElement);
+      return [cs.getPropertyValue('--accent'), cs.getPropertyValue('--accent2'), '#ffd56b', '#7dffb3', '#ff8fa3'].map(function (c) { return c.trim() || '#ffd56b'; });
+    }
+    function burst(x, y, n) {
+      if (reduce) return;
+      var c = colors(), frag = document.createDocumentFragment(), pieces = [];
+      for (var k = 0; k < (n || 46); k++) {
+        var a = Math.random() * Math.PI * 2, v = 60 + Math.random() * 120, d = document.createElement('i');
+        d.className = 'kc-conf'; d.style.left = x + 'px'; d.style.top = y + 'px'; d.style.background = c[k % c.length];
+        d.style.setProperty('--dx', Math.round(Math.cos(a) * v) + 'px');
+        d.style.setProperty('--up', Math.round(Math.sin(a) * v * .6 - 70) + 'px');
+        d.style.setProperty('--down', Math.round(120 + Math.random() * 160) + 'px');
+        d.style.setProperty('--rot', Math.round((Math.random() - .5) * 900) + 'deg');
+        d.style.animationDelay = Math.round(Math.random() * 80) + 'ms';
+        frag.appendChild(d); pieces.push(d);
+      }
+      document.body.appendChild(frag);
+      setTimeout(function () { pieces.forEach(function (d) { d.remove(); }); }, 1500);
+    }
+    window.kcBurst = burst;
+
+    function floatText(txt, x, y, color) {
+      var f = document.createElement('div');
+      f.className = 'kc-float'; f.textContent = txt; f.style.left = x + 'px'; f.style.top = y + 'px';
+      if (color) f.style.color = color;
+      document.body.appendChild(f); setTimeout(function () { f.remove(); }, 1300);
+    }
+    window.kcFloat = floatText;
+
+    // ── a new question slides in; options arrive one by one ──────────────
+    var qtext = $('qtext'), lastQ = null;
+    function animateQuestion() {
+      var card = qtext && qtext.closest('.qcard');
+      if (!card) return;
+      card.classList.remove('kc-new'); void card.offsetWidth; card.classList.add('kc-new');
+    }
+    if (qtext) new MutationObserver(function () {
+      if (qtext.textContent !== lastQ) { lastQ = qtext.textContent; animateQuestion(); }
+    }).observe(qtext, { childList: true, characterData: true, subtree: true });
+
+    var opts = $('opts'), seenList = null;
+    if (opts) new MutationObserver(function () {
+      var list = opts.querySelector('.opt-list');
+      if (!list || list === seenList) return;
+      var fresh = !seenList || !list.querySelector('.correct,.wrong');
+      seenList = list;
+      if (fresh) list.querySelectorAll('.opt').forEach(function (b, i) { b.style.setProperty('--i', i); b.classList.add('kc-in'); });
+    }).observe(opts, { childList: true, subtree: true });
+
+    // tap ripple
+    document.addEventListener('pointerdown', function (e) {
+      var b = e.target.closest && e.target.closest('.opt:not(:disabled), .btn-submit, .jk:not([disabled])');
+      if (!b || reduce) return;
+      var r = b.getBoundingClientRect(), s = Math.max(r.width, r.height), d = document.createElement('span');
+      d.className = 'kc-ripple'; d.style.width = d.style.height = s + 'px';
+      d.style.left = (e.clientX - r.left - s / 2) + 'px'; d.style.top = (e.clientY - r.top - s / 2) + 'px';
+      if (getComputedStyle(b).position === 'static') b.style.position = 'relative';
+      b.style.overflow = 'hidden'; b.appendChild(d); setTimeout(function () { d.remove(); }, 650);
+    }, { passive: true });
+
+    // the server's verdict (dispatched by the page)
+    document.addEventListener('kc:answer', function (e) {
+      var ok = e.detail && e.detail.correct;
+      setTimeout(function () {
+        var el = document.querySelector('.opt.correct') || document.querySelector('.text-input-wrap') || $('toast');
+        var r = el ? el.getBoundingClientRect() : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
+        if (ok) burst(r.left + r.width / 2, r.top + r.height / 2, 46);
+        else if (!reduce) { var t = $('opts'); if (t) { t.classList.remove('kc-shake'); void t.offsetWidth; } }
+      }, 60);
+    });
+
+    // ── points count up with a floating +N ───────────────────────────────
+    // MutationObserver callbacks run after our own writes, so a value we wrote
+    // ourselves is recognised by its text, never mistaken for a new score
+    // (that would restart the count forever).
+    var pts = $('myPts'), shownPts = null, written = null;
+    if (pts) new MutationObserver(function () {
+      var txt = pts.textContent;
+      if (txt === written) return;
+      var n = parseInt(txt, 10);
+      if (isNaN(n)) return;
+      if (shownPts === null || reduce) { shownPts = n; return; }
+      if (n === shownPts) return;
+      var from = shownPts, t0 = performance.now(); shownPts = n;
+      if (n > from) {
+        var r = pts.getBoundingClientRect();
+        floatText('+' + (n - from), r.left + r.width / 2, r.top);
+        pts.classList.remove('kc-bump'); void pts.offsetWidth; pts.classList.add('kc-bump');
+      }
+      (function step(t) {
+        if (shownPts !== n) return;  // a newer score took over
+        var k = Math.min(1, (t - t0) / 650), v = Math.round(from + (n - from) * (1 - Math.pow(1 - k, 3)));
+        written = String(v);
+        if (pts.textContent !== written) pts.textContent = written;
+        if (k < 1) requestAnimationFrame(step);
+      })(t0);
+    }).observe(pts, { childList: true, characterData: true, subtree: true });
+
+    // ── the timer's last 10 seconds ──────────────────────────────────────
+    var timer = $('timer'), box = timer && timer.closest('.timer');
+    if (timer && box) new MutationObserver(function () {
+      var m = /^(\d+):(\d{2})$/.exec(timer.textContent.trim());
+      var left = m ? (+m[1]) * 60 + (+m[2]) : NaN;
+      box.classList.toggle('kc-hurry', left > 0 && left <= 10);
+    }).observe(timer, { childList: true, characterData: true, subtree: true });
+
+  })();
+</script>
