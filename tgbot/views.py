@@ -875,6 +875,67 @@ def internal_ops(request: HttpRequest, action: str):
             rows.append(row)
         return JsonResponse({"ok": True, "admins": len(rows), "rows": rows})
 
+    if action == "group-prune":
+        # Readers with no report for more than `days` days (or none at all,
+        # if they joined that long ago) leave the reading groups: a kick (ban
+        # + unban), not a ban -- the bot's join buttons let them back in any
+        # time. Bot admins and chat admins stay. Walks readers by id: `limit`
+        # per call from `after_id`; answers "next_after_id" and "left".
+        import datetime as _dt
+        import os as _os
+
+        import requests
+        from django.conf import settings as _settings
+        from django.utils import timezone as _tz
+        from tgbot.models import BroadcastGroup, ConfirmationReport, TelegramProfile
+        days = max(30, int(body.get("days") or 100))
+        cutoff = _tz.now() - _dt.timedelta(days=days)
+        chats = [str(c).strip() for c in (body.get("chats") or [
+            _os.environ.get("BOYS_GROUP_ID", ""), _os.environ.get("GIRLS_GROUP_ID", "")]) if str(c).strip()]
+        env_admins = [int(a) for a in getattr(_settings, "ADMINS", []) if str(a).strip().lstrip("-").isdigit()]
+        recent = ConfirmationReport.objects.filter(date__gte=cutoff).values("user_id")
+        qs = (TelegramProfile.objects.filter(created_at__lt=cutoff, is_admin=False)
+              .exclude(telegram_id__in=env_admins).exclude(id__in=recent).order_by("id"))
+        after_id = int(body.get("after_id") or 0)
+        if not apply:
+            ever = ConfirmationReport.objects.values("user_id")
+            sample = []
+            for p in qs[:15]:
+                last = ConfirmationReport.objects.filter(user=p).order_by("-date").values_list("date", flat=True).first()
+                sample.append({"name": p.full_name, "last_report": str(last.date()) if last else None})
+            return JsonResponse({"ok": True, "days": days, "cutoff": str(cutoff.date()), "chats": chats,
+                                 "candidates": qs.count(), "never_reported": qs.exclude(id__in=ever).count(),
+                                 "other_bot_groups": list(BroadcastGroup.objects.filter(is_active=True)
+                                                          .exclude(chat_id__in=chats).values_list("chat_id", "title")),
+                                 "sample": sample})
+        api = f"https://api.telegram.org/bot{_os.environ.get('API_TOKEN', '')}"
+        limit = max(1, min(int(body.get("limit") or 20), 50))
+        batch = list(qs.filter(id__gt=after_id)[:limit])
+        kicked, errors = [], 0
+        for p in batch:
+            for chat in chats:
+                try:
+                    m = requests.post(f"{api}/getChatMember", data={"chat_id": chat, "user_id": p.telegram_id},
+                                      timeout=8).json()
+                    time.sleep(0.04)
+                    if not m.get("ok") or (m.get("result") or {}).get("status") not in ("member", "restricted"):
+                        continue
+                    b = requests.post(f"{api}/banChatMember", data={
+                        "chat_id": chat, "user_id": p.telegram_id,
+                        "until_date": int(_tz.now().timestamp()) + 60}, timeout=8).json()
+                    requests.post(f"{api}/unbanChatMember", data={
+                        "chat_id": chat, "user_id": p.telegram_id, "only_if_banned": "true"}, timeout=8)
+                    time.sleep(0.08)
+                    if b.get("ok"):
+                        kicked.append({"telegram_id": p.telegram_id, "name": p.full_name, "chat": chat})
+                    else:
+                        errors += 1
+                except Exception:
+                    errors += 1
+        nxt = batch[-1].id if batch else after_id
+        return JsonResponse({"ok": True, "checked": len(batch), "kicked": kicked, "errors": errors,
+                             "next_after_id": nxt, "left": qs.filter(id__gt=nxt).count()})
+
     if action == "wallet-gift":
         # A gift of `amount` so'm to every registered reader whose wallet
         # holds less than `below`, once per reader per `tag` (the note is the
