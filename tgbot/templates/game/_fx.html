@@ -76,11 +76,11 @@
   .qcard::after { content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%; pointer-events: none;
     background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .16), transparent); transform: skewX(-18deg); opacity: 0; }
   /* The question card drifts gently, like a page in a light breeze. */
-  .qcard { animation: kcDrift 7s ease-in-out infinite; }
-  @keyframes kcDrift { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-3px) rotate(-.25deg); } }
-  .qcard.kc-new { animation: kcQIn .55s cubic-bezier(.2, .9, .3, 1.2) both, kcDrift 7s .55s ease-in-out infinite; }
+  .qcard { animation: kcDrift 8s ease-in-out infinite; }
+  @keyframes kcDrift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  .qcard.kc-new { animation: kcQIn .6s ease-out both, kcDrift 8s .6s ease-in-out infinite; }
   .qcard.kc-new::after { animation: kcSheen 1.1s .25s ease-out; }
-  @keyframes kcQIn { from { opacity: 0; transform: translateY(18px) scale(.97); } to { opacity: 1; transform: none; } }
+  @keyframes kcQIn { from { transform: translateY(10px); } to { transform: none; } }
   @keyframes kcSheen { 0% { left: -60%; opacity: 1; } 100% { left: 130%; opacity: 0; } }
   .qcard .qn { background: color-mix(in srgb, var(--accent) 30%, var(--badge)) !important; color: var(--text) !important; }
   /* A gradient frame in the game's colours (static: padding-box/border-box, no animation). */
@@ -98,11 +98,18 @@
 
   .opt { position: relative; overflow: hidden; transition: transform .14s, border-color .2s, box-shadow .2s, background .2s !important; }
   .opt.kc-in { animation: kcOptIn .45s cubic-bezier(.2, .9, .3, 1.25) both; animation-delay: calc(var(--i, 0) * 70ms + 120ms); }
-  @keyframes kcOptIn { from { opacity: 0; transform: translateX(-16px) scale(.98); } to { opacity: 1; transform: none; } }
+  @keyframes kcOptIn { from { opacity: .6; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
   .opt:not(:disabled):hover { border-color: var(--accent) !important; box-shadow: 0 6px 22px color-mix(in srgb, var(--accent) 30%, transparent) !important; }
   .opt:not(:disabled):active { transform: scale(.975) !important; }
   .opt .opt-badge { transition: transform .25s; }
   .opt:not(:disabled):hover .opt-badge { transform: rotate(-8deg) scale(1.08); background: var(--accent); color: #fff; border-color: var(--accent); }
+  /* Options stay solid over the picture, before and after an answer. */
+  .opt { background: var(--card) !important; }
+  .opt:disabled { opacity: 1 !important; }
+  .opt.correct { background: color-mix(in srgb, var(--ok) 28%, var(--card)) !important; }
+  .opt.wrong { background: color-mix(in srgb, var(--bad) 26%, var(--card)) !important; }
+  .jk[disabled] { opacity: .7 !important; }
+  .text-input, .mask { background: var(--card) !important; }
   .opt.correct { animation: kcGlow 1.4s ease-out 1; box-shadow: 0 0 0 2px var(--ok), 0 10px 30px color-mix(in srgb, var(--ok) 45%, transparent) !important; }
   .opt.wrong { animation: kcShake .5s cubic-bezier(.36, .07, .19, .97) 1; }
   @keyframes kcGlow { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 80%, transparent); } 60% { box-shadow: 0 0 0 12px transparent; } }
