@@ -40,7 +40,7 @@ def _note_failure(name, err) -> None:
             pass
 
 
-def providers(lite_first=False) -> list:
+def providers(lite_first=False, lite_only=False) -> list:
     """[(name, api_key, base_url, model)] in the order to try. Gemini comes
     twice: Flash, then Flash-Lite (or the other way round with lite_first,
     for bulk jobs that should leave the small Flash quota to the AI quiz)."""
@@ -51,6 +51,8 @@ def providers(lite_first=False) -> list:
         models = [GEMINI_MODEL, GEMINI_LITE_MODEL]
         if lite_first:
             models.reverse()
+        if lite_only:
+            models = [GEMINI_LITE_MODEL]
         for m in dict.fromkeys(models):
             out.append(("gemini", os.environ["GEMINI_API_KEY"], GEMINI_BASE_URL, m))
     if os.environ.get("LLM_PROVIDER") == "gemini":
@@ -72,11 +74,13 @@ def _kwargs(name, model, max_tokens, json_mode):
     return kw
 
 
-def complete(messages, max_tokens=2000, json_mode=False, timeout=120, lite_first=False) -> tuple:
-    """(text, provider_name). Raises the last error when every provider fails."""
+def complete(messages, max_tokens=2000, json_mode=False, timeout=120, lite_first=False, lite_only=False) -> tuple:
+    """(text, provider_name). Raises the last error when every provider fails.
+    lite_only: Gemini Flash-Lite only -- for bulk jobs, so they can never eat
+    the small free Flash quota the AI quiz lives on."""
     from openai import OpenAI
     last = RuntimeError("no LLM key configured (OPENAI_API_KEY / GEMINI_API_KEY)")
-    for name, key, base, model in providers(lite_first):
+    for name, key, base, model in providers(lite_first, lite_only):
         try:
             # No silent SDK retries: a spent quota should move on to the next model.
             client = (OpenAI(api_key=key, base_url=base, max_retries=0) if base

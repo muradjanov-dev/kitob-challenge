@@ -144,10 +144,10 @@ def letter_for(p) -> tuple:
     from tgbot.services import llm
     f = reader_facts(p)
     try:
-        # Flash-Lite first: the free Flash quota (20 a day) is kept for the AI quiz.
+        # Flash-Lite only: the free Flash quota (20 a day) is the AI quiz's.
         body, src = llm.complete([{"role": "system", "content": SYSTEM},
                                   {"role": "user", "content": _facts_text(f)}], max_tokens=1500, timeout=90,
-                                 lite_first=True)
+                                 lite_only=True)
         body = _clean_html(body)
         if len(body) < 120:
             raise ValueError("too short")
