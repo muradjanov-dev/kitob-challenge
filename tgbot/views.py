@@ -1375,6 +1375,53 @@ def internal_ops(request: HttpRequest, action: str):
         return JsonResponse({"ok": True, "sequences": seqs, "quiz_games": games},
                             json_dumps_params={"default": str})
 
+    if action == "ai-health":
+        # Which AI keys are set and whether each answers (services.llm).
+        from tgbot.services import llm
+        return JsonResponse({"ok": True, **llm.health()})
+
+    if action == "gratitude":
+        # Personal letters (services.gratitude).
+        # {"sample": [telegram_id, ...]} or {"sample": 3}: write letters, send nothing.
+        # {"to_admins": true, "sample": 3, "apply": true}: DM those samples to the admins.
+        # {"start": true, "apply": true}: send to every reachable reader in the background.
+        # {} : progress.
+        from django.core.cache import cache as _c
+        from tgbot.models import TelegramProfile
+        from tgbot.services import gratitude
+        out = {"ok": True, "pending": len(gratitude.pending_ids()),
+               "stats": _c.get(f"gratitude_stats:{gratitude.CAMPAIGN}")}
+        sample = body.get("sample")
+        if sample:
+            if isinstance(sample, list):
+                people = list(TelegramProfile.objects.filter(telegram_id__in=sample))
+            else:
+                from django.db.models import Count as _Cnt
+                active = list(TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+                              .annotate(n=_Cnt("confirmationreport")).filter(n__gte=5).order_by("?")[:max(1, int(sample) - 1)])
+                quiet = list(TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+                             .annotate(n=_Cnt("confirmationreport")).filter(n=0).order_by("?")[:1])
+                people = active + quiet
+            letters = []
+            for p in people:
+                text, src = gratitude.letter_for(p)
+                letters.append({"telegram_id": p.telegram_id, "source": src, "text": text})
+            out["letters"] = letters
+            if apply and body.get("to_admins"):
+                import os as _os
+                import requests
+                admins = list(TelegramProfile.objects.filter(is_admin=True).values_list("telegram_id", flat=True))
+                for a in admins:
+                    for l in letters:
+                        requests.post(f"https://api.telegram.org/bot{_os.environ.get('API_TOKEN', '')}/sendMessage",
+                                      data={"chat_id": a, "parse_mode": "HTML",
+                                            "text": f"🔎 Namuna ({l['source']}):\n\n" + l["text"]}, timeout=10)
+        if apply and body.get("start"):
+            from tgbot.tasks import send_gratitude_letters
+            send_gratitude_letters.delay()
+            out["started"] = True
+        return JsonResponse(out)
+
     if action == "challenges":
         # Reading challenges: {} = state; {"on": true|false, "apply": true}.
         # While off, the running challenge still ends normally, no new one starts.

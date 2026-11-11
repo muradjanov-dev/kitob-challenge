@@ -253,8 +253,8 @@ async def process_time_limit(call: types.CallbackQuery, state: FSMContext):
 
 @dp.message_handler(content_types=['text', 'photo', 'document'], state=AIQuizCreateState.input_content)
 async def process_ai_input(message: types.Message, state: FSMContext):
-    if not os.environ.get("OPENAI_API_KEY"):
-        await message.answer("⚠️ Bot adminstratori OPENAI_API_KEY kalitini kiritmagan. Bot ishlay olmaydi.")
+    if not (os.environ.get("OPENAI_API_KEY") or os.environ.get("GEMINI_API_KEY")):
+        await message.answer("⚠️ Bot adminstratori AI kalitini (OPENAI_API_KEY yoki GEMINI_API_KEY) kiritmagan. Bot ishlay olmaydi.")
         await state.finish()
         return
 
@@ -407,30 +407,12 @@ Return ONLY valid JSON in the following format:
         # per-quiz cost.
         model = "gpt-5-mini"
 
-        # Call OpenAI
-        api_key = os.environ.get("OPENAI_API_KEY")
-        openai_client = AsyncOpenAI(api_key=api_key)
-        # gpt-5-mini is a reasoning model: it rejects `temperature` (fixed
-        # internally) and `max_tokens` — must use `max_completion_tokens`.
-        # Its hidden reasoning tokens count against that same budget, so at
-        # the default effort a 20-25 question quiz from a long PDF could
-        # spend most of 8000 thinking and come back empty or cut off (shown
-        # as "AI javobi to'liq kelmadi"). Low effort plus a larger budget
-        # leaves room for the JSON itself. reasoning_effort goes through
-        # extra_body because the pinned openai==1.55.3 predates the kwarg.
-        response = await openai_client.chat.completions.create(
-            model=model,
-            messages=messages,
-            max_completion_tokens=16000,
-            response_format={"type": "json_object"},
-            extra_body={"reasoning_effort": "low"},
-            timeout=180,
-        )
-
-        choice = response.choices[0]
-        result_text = (choice.message.content or "").strip()
-        if not result_text:
-            raise json.JSONDecodeError(f"empty content, finish_reason={choice.finish_reason}", "", 0)
+        # OpenAI first, Google Gemini when OpenAI has no key / credit / quota
+        # (services.llm). gpt-5-mini is a reasoning model whose hidden
+        # reasoning counts against the token budget, so low effort and a large
+        # budget leave room for the JSON of a 20-25 question quiz.
+        from tgbot.services import llm
+        result_text, _provider = await llm.acomplete(messages, max_tokens=16000, json_mode=True, timeout=180)
         # Clean markdown code block if present
         if result_text.startswith("```json"):
             result_text = result_text.split("```json", 1)[1]

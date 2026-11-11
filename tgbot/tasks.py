@@ -128,6 +128,57 @@ def broadcast_any_message(from_chat_id, message_ids, mode, admin_chat_id):
     return {"sent": sent, "blocked": blocked, "failed": failed}
 
 
+GRATITUDE_BATCH = 8
+
+
+@shared_task
+def send_gratitude_letters(stop_after=None):
+    """Personal thank-you letters (services.gratitude), GRATITUDE_BATCH
+    readers per run, then this task queues itself again -- one long run would
+    hold a worker for an hour and push the live games back. Each reader once
+    per campaign (cache marker), so a restart or a second start resumes.
+    Not during the evening games: from 20:45 to 22:15 it waits."""
+    import time as _t
+    from django.core.cache import cache
+    from tgbot.services import gratitude
+    now = timezone.localtime()
+    if (now.hour, now.minute) >= (20, 45) and (now.hour, now.minute) < (22, 15):
+        send_gratitude_letters.apply_async(kwargs={"stop_after": stop_after}, countdown=15 * 60)
+        return {"paused": "evening games"}
+    ids = gratitude.pending_ids()
+    if stop_after is not None:
+        ids = ids[:max(0, int(stop_after))]
+    batch = ids[:GRATITUDE_BATCH]
+    stats = cache.get(f"gratitude_stats:{gratitude.CAMPAIGN}") or {"sent": 0, "failed": 0, "template": 0}
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    for uid in batch:
+        p = TelegramProfile.objects.filter(id=uid).first()
+        if not p or not cache.add(gratitude.sent_key(uid), 1, 60 * 60 * 24 * 60):
+            continue
+        try:
+            text, src = gratitude.letter_for(p)
+            r = requests.post(url, data={"chat_id": p.telegram_id, "text": text, "parse_mode": "HTML"}, timeout=10)
+            if r.ok:
+                stats["sent"] += 1
+                stats["template"] += src == "template"
+            else:
+                stats["failed"] += 1
+                if r.status_code == 403:
+                    TelegramProfile.objects.filter(id=uid).update(is_blocked=True)
+        except Exception as e:
+            stats["failed"] += 1
+            print(f"send_gratitude_letters {uid}: {e}")
+        _t.sleep(0.3)
+    cache.set(f"gratitude_stats:{gratitude.CAMPAIGN}", stats, 60 * 60 * 24 * 60)
+    left = len(ids) - len(batch)
+    if left > 0:
+        send_gratitude_letters.apply_async(
+            kwargs={"stop_after": None if stop_after is None else left}, countdown=3)
+    else:
+        print(f"send_gratitude_letters: done {stats}")
+    return {"batch": len(batch), "left": left, **stats}
+
+
 @shared_task
 def delete_message_after_delay(chat_id, message_id):
     """Delete a Telegram message. Scheduled via apply_async(countdown=N)."""
