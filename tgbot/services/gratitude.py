@@ -78,7 +78,8 @@ def _facts_text(f) -> str:
              f"Loyihada: {f['days_with_us']} kundan beri" if f["days_with_us"] is not None else "",
              f"Hisobotlar: {f['reports']} ta ({f['report_days']} kun)",
              f"O'qigan betlari: {f['pages']}",
-             f"Hozirgi ketma-ketlik: {f['streak_now']} kun",
+             # A zero is left out: told to the model, it gets said to the reader.
+             f"Hozirgi ketma-ketlik: {f['streak_now']} kun" if f["streak_now"] else "",
              "Kitoblari: " + ("; ".join(f["books"]) if f["books"] else "—")]
     if f["conclusions"]:
         lines.append("Xulosalaridan:")
