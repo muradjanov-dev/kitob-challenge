@@ -6202,16 +6202,8 @@ def announce_top_game_players():
     if not text:
         return
 
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    for group_id, thread_id in _game_targets():
-        try:
-            data = {"chat_id": group_id, "text": text, "parse_mode": "HTML",
-                    "disable_web_page_preview": "true"}
-            if thread_id:
-                data["message_thread_id"] = thread_id
-            requests.post(url, data=data, timeout=10)
-        except Exception as e:
-            print(f"announce_top_game_players group {group_id}: {e}")
+    # Into the evening results message, not a message of its own.
+    _post_game_results(text)
     print(f"announce_top_game_players: top5={counts.most_common(5)}")
     try:
         cache.set(cache_key, True, 60 * 60 * 6)
@@ -6575,7 +6567,9 @@ def start_chain_game():
         if thread_id:
             data["message_thread_id"] = thread_id
         try:
-            requests.post(url, data=data, timeout=10)
+            r = requests.post(url, data=data, timeout=10)
+            if r.ok:
+                _schedule_group_delete(group_id, r.json().get("result", {}).get("message_id"))
         except Exception as e:
             print(f"start_chain_game group {group_id}: {e}")
     print(f"start_chain_game: game #{game.id} live until {game.ends_at}")
@@ -6614,17 +6608,7 @@ def chain_game_tick():
         else:
             lines.append("Bu safar hech kim ochko olmadi 😔")
         text = "\n".join(lines)
-        for group_id, thread_id in _game_targets():
-            try:
-                data = {
-                    "chat_id": group_id, "text": text, "parse_mode": "HTML",
-                    "disable_web_page_preview": "true",
-                }
-                if thread_id:
-                    data["message_thread_id"] = thread_id
-                requests.post(url, data=data, timeout=10)
-            except Exception as e:
-                print(f"chain_game_tick group {group_id}: {e}")
+        _post_game_results(text)
 
         # Start the next game now, not after every winner has been DMed.
         _advance_game_sequence("chain", game.id)
@@ -6777,6 +6761,62 @@ def send_game_teaser(slot="evening"):
 PREMIUM_2X_NOTE = "\n\n💎 <i>Premium a'zolar bu o'yinda <b>2 barobar</b> Kitobcha oladi.</i>"
 # After the wallet launch the 2x belongs to readers with a funded wallet.
 WALLET_2X_NOTE = "\n\n💎 <i>Hamyonini bir martada 15 000 so'm va undan ko'p to'ldirganlar bu o'yinda <b>2 barobar</b> Kitobcha oladi.</i>"
+
+
+def _results_slot(now=None) -> str:
+    lt = timezone.localtime(now) if now else timezone.localtime()
+    return f"{lt.date().isoformat()}:{'am' if lt.hour < 15 else 'pm'}"
+
+
+RESULTS_SEPARATOR = "\n\n➖➖➖➖➖\n\n"
+
+
+def _post_game_results(text) -> int:
+    """A finished game's results, into ONE message per group per slot (owner,
+    2026-11-11: "g'oliblar xabarini birlashtirib edit qil, xabarlar ko'payib
+    ketmasin"). The slot's first game sends it; every later game edits that
+    message, adding its block under the earlier ones. Everything else the
+    games post (announcements, start notices) is deleted after 12 hours, so
+    these result messages are what stays in the chat."""
+    from django.core.cache import cache
+    slot = _results_slot()
+    base = f"https://api.telegram.org/bot{BOT_TOKEN}"
+    posted = 0
+    for gid, tid in _game_targets():
+        key = f"slot_results:{slot}:{gid}:{tid or 0}"
+        prev = cache.get(key)
+        try:
+            if prev:
+                merged = prev["text"] + RESULTS_SEPARATOR + text
+                if len(merged) <= 3900:
+                    r = requests.post(f"{base}/editMessageText", data={
+                        "chat_id": gid, "message_id": prev["mid"], "text": merged, "parse_mode": "HTML",
+                        "disable_web_page_preview": "true"}, timeout=10)
+                    if r.ok or "not modified" in r.text:
+                        cache.set(key, {"mid": prev["mid"], "text": merged}, 60 * 60 * 30)
+                        posted += 1
+                        continue
+            data = {"chat_id": gid, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"}
+            if tid:
+                data["message_thread_id"] = tid
+            r = requests.post(f"{base}/sendMessage", data=data, timeout=10)
+            mid = r.json().get("result", {}).get("message_id") if r.ok else None
+            if mid:
+                cache.set(key, {"mid": mid, "text": text}, 60 * 60 * 30)
+                posted += 1
+        except Exception as e:
+            print(f"_post_game_results {gid}: {e}")
+    return posted
+
+
+def _schedule_group_delete(group_id, message_id, hours=12):
+    """Game chatter (announcements, start notices) leaves the group after
+    `hours`; only the results message stays (process_scheduled_deletions)."""
+    from datetime import timedelta as _td
+    from tgbot.models import ScheduledMessageDeletion
+    if group_id and message_id:
+        ScheduledMessageDeletion.objects.create(chat_id=group_id, message_id=message_id,
+                                                delete_at=timezone.now() + _td(hours=hours))
 
 
 def _announce_game(text, start_param, premium_note=True):
@@ -7863,14 +7903,7 @@ def games_finalize_tick():
                 lines.append("Bu safar hech kim qatnashmadi 😔")
             text = "\n".join(lines)
             if not _is_admin_only(winners):
-                for gid, tid in _game_targets():
-                    try:
-                        data = {"chat_id": gid, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"}
-                        if tid:
-                            data["message_thread_id"] = tid
-                        requests.post(url, data=data, timeout=10)
-                    except Exception:
-                        pass
+                _post_game_results(text)
             # Start the next game now, not after every winner has been DMed.
             _advance_game_sequence("feud", game.id)
             for w in winners:
@@ -7894,14 +7927,7 @@ def games_finalize_tick():
             winners = summary.get("winners", [])
             text = ask_results_text(summary)
             if winners and not _is_admin_only(winners):
-                for gid, tid in _game_targets():
-                    try:
-                        data = {"chat_id": gid, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"}
-                        if tid:
-                            data["message_thread_id"] = tid
-                        requests.post(url, data=data, timeout=10)
-                    except Exception:
-                        pass
+                _post_game_results(text)
             _advance_game_sequence("savol", game.id)
             for w in winners:
                 if not w.get("reward"):
@@ -7929,14 +7955,7 @@ def games_finalize_tick():
                 lines.append(f"{i + 1}. {escape(w['name'])}{badge} — {w['correct']} ✓ (+{w['reward']} 🪙)")
             text = "\n".join(lines)
             if not _is_admin_only(winners):
-                for gid, tid in _game_targets():
-                    try:
-                        data = {"chat_id": gid, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"}
-                        if tid:
-                            data["message_thread_id"] = tid
-                        requests.post(url, data=data, timeout=10)
-                    except Exception:
-                        pass
+                _post_game_results(text)
             # Start the next game now, not after every winner has been DMed.
             _advance_game_sequence("castle", game.id)
             for w in winners:
@@ -7968,14 +7987,7 @@ def games_finalize_tick():
                 lines.append("Bu safar hech kim ochko olmadi 😔")
             text = "\n".join(lines)
             if not _is_admin_only(winners):
-                for gid, tid in _game_targets():
-                    try:
-                        data = {"chat_id": gid, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"}
-                        if tid:
-                            data["message_thread_id"] = tid
-                        requests.post(url, data=data, timeout=10)
-                    except Exception:
-                        pass
+                _post_game_results(text)
             # Start the next game now, not after every winner has been DMed.
             _advance_game_sequence("emoji", game.id)
             for w in winners:
@@ -8070,15 +8082,7 @@ def _broadcast_and_dm(header_lines, winners, dm_text_fn, dm_markup_fn=None, afte
     text = _trim_telegram("\n".join(header_lines))
     try:
         if not _is_admin_only(winners):
-            for gid, tid in _game_targets():
-                try:
-                    data = {"chat_id": gid, "text": text, "parse_mode": "HTML",
-                            "disable_web_page_preview": "true"}
-                    if tid:
-                        data["message_thread_id"] = tid
-                    requests.post(url, data=data, timeout=10)
-                except Exception:
-                    pass
+            _post_game_results(text)
     finally:
         if after_broadcast:
             try:
