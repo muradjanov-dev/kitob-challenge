@@ -1375,6 +1375,15 @@ def internal_ops(request: HttpRequest, action: str):
         return JsonResponse({"ok": True, "sequences": seqs, "quiz_games": games},
                             json_dumps_params={"default": str})
 
+    if action == "challenges":
+        # Reading challenges: {} = state; {"on": true|false, "apply": true}.
+        # While off, the running challenge still ends normally, no new one starts.
+        from django.core.cache import cache as _c
+        from tgbot.tasks import challenges_paused
+        if apply and "on" in body:
+            _c.set("challenges_on", bool(body.get("on")), None)
+        return JsonResponse({"ok": True, "on": not challenges_paused()})
+
     if action == "slot-plan":
         # {"date": "2026-11-11", "slot": "evening", "games": ["savol", "feud", "savol"], "apply": true}
         # runs exactly these games in that slot ([] clears); without apply: the plan.

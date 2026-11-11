@@ -172,24 +172,75 @@ def build_quiz_round():
 
 
 # ── Copy + keyboards ─────────────────────────────────────────────────────────
+# Owner, 2026-11-11: "viktorinalarga noodatiy dizayn va estetik stil ...
+# odamlarni diqqatini ushlab turadigan va ertasi kuni ham shu uchun kiradigan".
+# So the post reads like a daily issue: its number and date, the reader's
+# words in a quote block with the reader named (tomorrow it could be yours --
+# a reason to write a real conclusion), a daily streak of right answers that
+# readers come back to keep, this week's leaders, and tomorrow's time.
+NEXT_ROUND_TIME = "14:00"
+
+
+def _uz_day(d) -> str:
+    days = ("dushanba", "seshanba", "chorshanba", "payshanba", "juma", "shanba", "yakshanba")
+    from tgbot.services.wallet import uz_date
+    return f"{uz_date(d)}, {days[d.weekday()]}"
+
+
 def build_quiz_text(quiz_round) -> str:
+    from django.utils import timezone
     consolation = getattr(quiz_round, "consolation", 5)
+    day = timezone.localtime(quiz_round.created_at).date() if quiz_round.created_at else timezone.localdate()
+    author = getattr(quiz_round, "source_user", None)
+    who = _escape(((author.full_name or "").split() or ["Kitobxon"])[0]) if author else "Kitobxon"
     return (
-        "🧩 <b>KITOB VIKTORINASI</b>\n"
-        "━━━━━━━━━━━━━━━\n"
-        "📖 <b>Bu iqtibos qaysi kitobdan?</b>\n\n"
-        f"💬 <i>«{_escape(quiz_round.conclusion)}»</i>\n\n"
-        f"🎟 Ovoz berish → <b>{VOTE_FEE_KITOBCHA}</b> 🪙\n"
-        f"🎯 To'g'ri javob → <b>+{quiz_round.reward}</b> 🪙\n"
-        f"🎁 Noto'g'ri ham → <b>+{consolation}</b> 🪙 <i>(urinish uchun)</i>\n"
-        "💎 Premium → <b>×2</b>\n\n"
+        f"🧩 <b>KUNNING VIKTORINASI</b> · №{quiz_round.id}\n"
+        f"<i>{_uz_day(day)}</i>\n\n"
+        f"✍️ Kitobxonimiz <b>{who}</b> hisobotida shunday yozgan:\n"
+        f"<blockquote><i>«{_escape(quiz_round.conclusion)}»</i></blockquote>\n\n"
+        "❓ <b>Bu qaysi kitob haqida?</b>\n\n"
+        f"🎯 To'g'ri javob — <b>+{quiz_round.reward}</b> 🪙 · noto'g'ri ham <b>+{consolation}</b> 🪙\n"
+        f"🎟 Ovoz berish — {VOTE_FEE_KITOBCHA} 🪙 · 💎 imtiyozlilarga ×2\n"
+        "🔥 Har kuni to'g'ri topsangiz — <b>seriyangiz</b> o'sadi\n\n"
         "👇 <b>Variantni tanlang:</b>"
     )
 
 
+def quiz_streak(user_id, upto_round=None) -> int:
+    """Days in a row (by round date, up to `upto_round`'s day) on which the
+    reader answered the Viktorina right."""
+    from tgbot.models import BookQuizAnswer
+    from django.db.models.functions import TruncDate
+    qs = BookQuizAnswer.objects.filter(user_id=user_id, is_correct=True)
+    if upto_round is not None:
+        qs = qs.filter(quiz_round__created_at__lte=upto_round.created_at)
+    days = sorted(set(qs.annotate(d=TruncDate("quiz_round__created_at")).values_list("d", flat=True)), reverse=True)
+    if not days:
+        return 0
+    streak, expect = 0, days[0]
+    import datetime as _dt
+    for d in days:
+        if d != expect:
+            break
+        streak += 1
+        expect = d - _dt.timedelta(days=1)
+    return streak
+
+
+def _week_leaders(limit=3):
+    from django.db.models import Count
+    from django.utils import timezone
+    import datetime as _dt
+    from tgbot.models import BookQuizAnswer
+    today = timezone.localdate()
+    monday = today - _dt.timedelta(days=today.weekday())
+    return list(BookQuizAnswer.objects.filter(is_correct=True, quiz_round__created_at__date__gte=monday)
+                .values("user__full_name").annotate(n=Count("id")).order_by("-n", "user__full_name")[:limit])
+
+
 def build_results_block(quiz_round) -> str:
     """The live 'who answered right / wrong' board, rebuilt from the DB. Empty
-    string until the first answer lands. Names are clickable mentions."""
+    string until the first answer lands. Names are plain bold text."""
     from tgbot.models import BookQuizAnswer
 
     answers = list(
@@ -224,6 +275,20 @@ def build_results_block(quiz_round) -> str:
         parts.append(f"✅ <b>To'g'ri ({len(correct)}):</b> {_names(correct)}")
     if wrong:
         parts.append(f"❌ <b>Noto'g'ri ({len(wrong)}):</b> {_names(wrong)}")
+    streaks = sorted(((quiz_streak(a.user_id, quiz_round), a) for a in correct[:40]),
+                     key=lambda x: -x[0])
+    hot = [f"<b>{_escape(((a.user.full_name or '').split() or ['Kitobxon'])[0])}</b> {n} kun"
+           for n, a in streaks if n >= 2][:5]
+    if hot:
+        parts.append("🔥 <b>Seriyalar:</b> " + " · ".join(hot))
+    leaders = _week_leaders()
+    if leaders:
+        medals = ["🥇", "🥈", "🥉"]
+        parts.append("🏆 <b>Hafta yetakchilari:</b> " + " · ".join(
+            f"{medals[i]} {_escape(((r['user__full_name'] or '').split() or ['Kitobxon'])[0])} ({r['n']})"
+            for i, r in enumerate(leaders)))
+    parts.append(f"\n📅 Ertangi viktorina — <b>{NEXT_ROUND_TIME}</b> da. "
+                 "Ertaga savol Sizning xulosangizdan bo'lishi mumkin — hisobotingizga mazmunli xulosa yozing ✍️")
     return "\n".join(parts)
 
 

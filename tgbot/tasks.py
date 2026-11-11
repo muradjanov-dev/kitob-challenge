@@ -3558,6 +3558,14 @@ def _finalize_challenge_results(challenge_id: int):
         print(f"challenge finalize admin notif failed: {e}")
 
 
+def challenges_paused() -> bool:
+    from django.core.cache import cache
+    try:
+        return cache.get("challenges_on") is not True
+    except Exception:
+        return True
+
+
 @shared_task
 def announce_challenge():
     """Runs daily at 00:15; only actually does anything once the active
@@ -3601,6 +3609,13 @@ def announce_challenge():
     # boom's own finalize (above, or boom_reminder_tick) clears is_active.
     if ReferralBoom.objects.filter(is_active=True).exists():
         print("announce_challenge: a Referral BOOM is still active — skipping regular challenge rotation")
+        return
+
+    # On hold (owner, 2026-11-11: "kitobxonlik challenglarini to'xtatib
+    # turamiz"): the running one still ends and is settled above, no new one
+    # starts. ops `challenges` {"on": true, "apply": true} resumes.
+    if challenges_paused():
+        print("announce_challenge: challenges are on hold, no new challenge")
         return
 
     # If a boom is queued for this rotation slot, launch it INSTEAD of a normal

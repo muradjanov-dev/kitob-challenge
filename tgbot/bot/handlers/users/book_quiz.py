@@ -88,7 +88,11 @@ def _process_answer(user_id: int, round_id: int, chosen_idx: int) -> str:
         except Exception:
             ach_note = ""
 
+        from tgbot.services.book_quiz import quiz_streak
+        streak = quiz_streak(user_id, quiz_round)
+        streak_note = f"🔥 Seriya: {streak} kun!\n" if streak >= 2 else ""
         return (f"✅ To'g'ri! «{quiz_round.correct_title}»\n\n"
+                f"{streak_note}"
                 f"🪙 +{awarded} Kitobcha{prem_note}\n"
                 f"{fee_note}"
                 f"💰 Balans: {int(profile.ball)}{ach_note}{promo}")
