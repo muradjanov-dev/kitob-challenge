@@ -105,9 +105,14 @@ def _strip_frame(text: str) -> str:
     return "\n".join(lines).strip()
 
 
+_SIZ = re.compile(r"(?<![\w'’ʻʼ])siz(?=[a-zʻʼ'’]*\b)")
+
+
 def _clean_html(text: str) -> str:
-    """Escape everything, then let <b>/<i> back in; drop markdown stars."""
+    """Escape everything, then let <b>/<i> back in; drop markdown stars;
+    the reader is always "Siz" with a capital (owner's rule)."""
     text = _strip_frame(text)
+    text = _SIZ.sub("Siz", text)
     text = re.sub(r"\*\*(.+?)\*\*", r"\1", text or "").replace("*", "")
     text = escape(text.strip(), quote=False)
     text = _ALLOWED.sub(r"<\1\2>", text)

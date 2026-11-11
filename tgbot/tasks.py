@@ -178,7 +178,8 @@ def send_gratitude_letters(stop_after=None):
         except Exception as e:
             stats["failed"] += 1
             print(f"send_gratitude_letters {uid}: {e}")
-        _t.sleep(0.3)
+        # Under the free Gemini per-minute quota (about 8 a minute).
+        _t.sleep(7)
     cache.set(f"gratitude_stats:{gratitude.CAMPAIGN}", stats, 60 * 60 * 24 * 60)
     left = len(ids) - len(batch)
     if left > 0:
