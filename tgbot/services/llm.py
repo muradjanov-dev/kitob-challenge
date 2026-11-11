@@ -12,6 +12,10 @@ import os
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5-mini")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+# The free tier allows only 20 Flash requests a day (seen 2026-11-11:
+# "generate_content_free_tier_requests, limit: 20"); Flash-Lite has its own,
+# larger quota, so it answers when Flash is spent.
+GEMINI_LITE_MODEL = os.environ.get("GEMINI_LITE_MODEL", "gemini-2.5-flash-lite")
 
 
 _BAD_KEY_FLAG = "llm_bad_key:{}"
@@ -36,13 +40,19 @@ def _note_failure(name, err) -> None:
             pass
 
 
-def providers() -> list:
-    """[(name, api_key, base_url, model)] in the order to try."""
+def providers(lite_first=False) -> list:
+    """[(name, api_key, base_url, model)] in the order to try. Gemini comes
+    twice: Flash, then Flash-Lite (or the other way round with lite_first,
+    for bulk jobs that should leave the small Flash quota to the AI quiz)."""
     out = []
     if os.environ.get("OPENAI_API_KEY") and not _bad_key("openai"):
         out.append(("openai", os.environ["OPENAI_API_KEY"], None, OPENAI_MODEL))
     if os.environ.get("GEMINI_API_KEY"):
-        out.append(("gemini", os.environ["GEMINI_API_KEY"], GEMINI_BASE_URL, GEMINI_MODEL))
+        models = [GEMINI_MODEL, GEMINI_LITE_MODEL]
+        if lite_first:
+            models.reverse()
+        for m in dict.fromkeys(models):
+            out.append(("gemini", os.environ["GEMINI_API_KEY"], GEMINI_BASE_URL, m))
     if os.environ.get("LLM_PROVIDER") == "gemini":
         out.sort(key=lambda p: p[0] != "gemini")
     return out
@@ -62,13 +72,15 @@ def _kwargs(name, model, max_tokens, json_mode):
     return kw
 
 
-def complete(messages, max_tokens=2000, json_mode=False, timeout=120) -> tuple:
+def complete(messages, max_tokens=2000, json_mode=False, timeout=120, lite_first=False) -> tuple:
     """(text, provider_name). Raises the last error when every provider fails."""
     from openai import OpenAI
     last = RuntimeError("no LLM key configured (OPENAI_API_KEY / GEMINI_API_KEY)")
-    for name, key, base, model in providers():
+    for name, key, base, model in providers(lite_first):
         try:
-            client = OpenAI(api_key=key, base_url=base) if base else OpenAI(api_key=key)
+            # No silent SDK retries: a spent quota should move on to the next model.
+            client = (OpenAI(api_key=key, base_url=base, max_retries=0) if base
+                      else OpenAI(api_key=key, max_retries=0))
             r = client.chat.completions.create(messages=messages, timeout=timeout,
                                                **_kwargs(name, model, max_tokens, json_mode))
             text = (r.choices[0].message.content or "").strip()
@@ -87,7 +99,8 @@ async def acomplete(messages, max_tokens=2000, json_mode=False, timeout=180) -> 
     last = RuntimeError("no LLM key configured (OPENAI_API_KEY / GEMINI_API_KEY)")
     for name, key, base, model in providers():
         try:
-            client = AsyncOpenAI(api_key=key, base_url=base) if base else AsyncOpenAI(api_key=key)
+            client = (AsyncOpenAI(api_key=key, base_url=base, max_retries=0) if base
+                      else AsyncOpenAI(api_key=key, max_retries=0))
             r = await client.chat.completions.create(messages=messages, timeout=timeout,
                                                      **_kwargs(name, model, max_tokens, json_mode))
             text = (r.choices[0].message.content or "").strip()
@@ -106,7 +119,9 @@ def health() -> dict:
     from openai import OpenAI
     out = {}
     every = [p for p in (("openai", os.environ.get("OPENAI_API_KEY"), None, OPENAI_MODEL),
-                         ("gemini", os.environ.get("GEMINI_API_KEY"), GEMINI_BASE_URL, GEMINI_MODEL)) if p[1]]
+                         ("gemini", os.environ.get("GEMINI_API_KEY"), GEMINI_BASE_URL, GEMINI_MODEL),
+                         ("gemini-lite", os.environ.get("GEMINI_API_KEY"), GEMINI_BASE_URL, GEMINI_LITE_MODEL))
+             if p[1]]
     for name, key, base, model in every:
         try:
             client = OpenAI(api_key=key, base_url=base) if base else OpenAI(api_key=key)
