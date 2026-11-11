@@ -33,5 +33,5 @@ class Command(BaseCommand):
             return
 
         from tgbot.tasks import post_book_quiz
-        post_book_quiz()
+        post_book_quiz(force=True)
         self.stdout.write(self.style.SUCCESS("post_book_quiz bajarildi."))

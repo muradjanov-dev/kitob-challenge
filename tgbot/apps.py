@@ -17,6 +17,9 @@ class TgbotConfig(AppConfig):
         from tgbot.services import auction_guard  # noqa: F401
         # Keep the balance in each reader's pinned progress message current.
         from tgbot.services import pinned_balance  # noqa: F401
+        # Pay the 10-day streak reward when a report completes the step.
+        from tgbot.services import report_rewards
+        report_rewards.connect()
         try:
             from django.db import connection
             with connection.cursor() as cursor:

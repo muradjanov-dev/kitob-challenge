@@ -149,9 +149,13 @@ def charged_text(user, res) -> str:
     if _lang(user) == "ru":
         parts = [f"{_som(res['cash'])} сум"] + ([f"{res['kitobcha']} Kitobcha"] if res.get("kitobcha") else [])
         what = "За этот отчёт" if res.get("extra") else "За сегодняшний день"
-        return f"👛 {what} списано: {' + '.join(parts)}. Остаток: <b>{_som(res['balance'])} сум</b>."
+        bonus = (f"\n🎁 Бонус за отчёт: <b>+{_som(res['bonus'])} сум</b> ({wallet.REPORT_BONUS_PCT}% вернулось в кошелёк)."
+                 if res.get("bonus") else "")
+        return f"👛 {what} списано: {' + '.join(parts)}.{bonus}\nОстаток: <b>{_som(res['balance'])} сум</b>."
     what = "Bu hisobot uchun" if res.get("extra") else "Bugungi kun uchun"
-    return f"👛 {what} yechildi: {' + '.join(parts)}. Qoldiq: <b>{_som(res['balance'])} so'm</b>."
+    bonus = (f"\n🎁 Hisobot bonusi: <b>+{_som(res['bonus'])} so'm</b> — to'lovning {wallet.REPORT_BONUS_PCT}% hamyoningizga qaytdi."
+             if res.get("bonus") else "")
+    return f"👛 {what} yechildi: {' + '.join(parts)}.{bonus}\nQoldiq: <b>{_som(res['balance'])} so'm</b>."
 
 
 async def show_wallet(message: types.Message, user) -> None:
@@ -171,9 +175,11 @@ def fee_confirm_text(user) -> str:
         hint = ("" if n == 0 or member else
                 f"\n💡 Пополнение за один раз от {_som(wallet.MEMBER_MIN)} сум — и следующие отчёты дня "
                 f"будут по {_som(wallet.EXTRA_FEE_MEMBER)} сум.\n")
+        back = wallet.report_bonus(wallet.report_price(user))
         return (
             "💳 <b>Оплата отчёта</b>\n\n"
             f"Когда отчёт будет принят, {which} спишется {part}.\n"
+            + (f"🎁 И сразу {wallet.REPORT_BONUS_PCT}% — <b>{_som(back)} сум</b> — вернётся бонусом.\n" if back else "") +
             f"👛 В кошельке: <b>{_som(bal)} сум</b> · 🪙 <b>{_som(ball)}</b> Kitobcha\n{hint}\n"
             "Продолжаем? 😊"
         )
@@ -182,9 +188,11 @@ def fee_confirm_text(user) -> str:
     hint = ("" if n == 0 or member else
             f"\n💡 Bir martada {_som(wallet.MEMBER_MIN)} so'm va undan ko'p to'ldirsangiz, kunning keyingi "
             f"hisobotlari atigi {_som(wallet.EXTRA_FEE_MEMBER)} so'm bo'ladi.\n")
+    back = wallet.report_bonus(wallet.report_price(user))
     return (
         "💳 <b>Hisobot uchun to'lov</b>\n\n"
         f"Hisobotingiz qabul qilinganda {which} {part} yechiladi.\n"
+        + (f"🎁 Shu zahoti {wallet.REPORT_BONUS_PCT}% — <b>{_som(back)} so'm</b> — bonus bo'lib qaytadi.\n" if back else "") +
         f"👛 Hamyoningizda: <b>{_som(bal)} so'm</b> · 🪙 <b>{_som(ball)}</b> Kitobcha\n{hint}\n"
         "Davom etamizmi? 😊"
     )

@@ -1078,12 +1078,29 @@ class ChallengeParticipant(models.Model):
 # Currently gated to is_admin users for testing; flip the gate in the bot
 # keyboard + view to roll out.
 # ─────────────────────────────────────────────────────────────────────────────
+CURRENCY_KITOBCHA = "kitobcha"
+CURRENCY_SOM = "som"
+CURRENCY_CHOICES = [(CURRENCY_KITOBCHA, "Kitobcha"), (CURRENCY_SOM, "So'm (hamyon)")]
+
+
+def currency_label(currency) -> str:
+    return "so'm" if currency == CURRENCY_SOM else "Kitobcha"
+
+
 class ShopProduct(BaseModel):
     name = models.CharField(max_length=120)
     description = models.TextField(blank=True, default="")
     image = models.ImageField(upload_to="shop/products/", blank=True, null=True)
     price_kitobcha = models.PositiveIntegerField(
-        help_text="Cost in Kitobcha. Deducted atomically from the buyer's ball.",
+        help_text="Narx — mahsulot valyutasida (Kitobcha yoki so'm). Xaridorning "
+                  "Kitobchasidan yoki hamyonidan atomik yechiladi.",
+    )
+    # Owner, 2026-11-11: products and auctions can be priced in real money
+    # too. Every amount of the product (price, opening bid, the bids) is in
+    # this currency; so'm moves through services.wallet like any other spend.
+    currency = models.CharField(
+        max_length=10, choices=CURRENCY_CHOICES, default=CURRENCY_KITOBCHA,
+        help_text="Kitobcha — balansdan; so'm — hamyondan (narx, boshlang'ich taklif va takliflar shu valyutada).",
     )
     stock_qty = models.PositiveIntegerField(
         null=True, blank=True,
@@ -1110,7 +1127,7 @@ class ShopProduct(BaseModel):
     )
     min_start_bid = models.PositiveIntegerField(
         default=100,
-        help_text="Minimum starting bid amount in Kitobcha (default: 100).",
+        help_text="Minimal boshlang'ich taklif — mahsulot valyutasida.",
     )
     auction_end_at = models.DateTimeField(
         null=True, blank=True,
@@ -1153,7 +1170,15 @@ class ShopProduct(BaseModel):
         ordering = ("sort_order", "-created_at")
 
     def __str__(self):
-        return f"{self.name} — {self.price_kitobcha} Kitobcha"
+        return f"{self.name} — {self.price_kitobcha} {self.currency_label}"
+
+    @property
+    def is_som(self) -> bool:
+        return self.currency == CURRENCY_SOM
+
+    @property
+    def currency_label(self) -> str:
+        return currency_label(self.currency)
 
     @property
     def is_available(self) -> bool:
@@ -1175,7 +1200,7 @@ class ShopAuctionBid(BaseModel):
         TelegramProfile, on_delete=models.CASCADE, related_name="shop_auction_bids",
     )
     amount = models.PositiveIntegerField(
-        help_text="Total active Kitobcha bid placed by this user for this auction.",
+        help_text="Total active bid placed by this user, in the product's currency.",
     )
     is_refunded = models.BooleanField(
         default=False,
@@ -1215,6 +1240,7 @@ class ShopPurchase(BaseModel):
         help_text="Name at time of purchase, kept even if product is deleted.",
     )
     price_at_purchase = models.PositiveIntegerField()
+    currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES, default=CURRENCY_KITOBCHA)
     code = models.CharField(
         max_length=12, unique=True,
         help_text="Short pickup code the user shows the admin.",
@@ -1586,12 +1612,19 @@ class WalletTransaction(BaseModel):
     KIND_CASHBACK = "cashback"
     KIND_MENTOR = "mentor"
     KIND_ADMIN = "admin"
+    KIND_REPORT_BONUS = "report_bonus"
+    KIND_STREAK = "streak_bonus"
+    KIND_DAILY_GIFT = "daily_gift"
+    KIND_SHOP = "shop"
+    KIND_SHOP_REFUND = "shop_refund"
     KIND_CHOICES = [
         (KIND_TOPUP, "To'ldirish"), (KIND_BONUS, "Bonus"),
         (KIND_PREMIUM, "Premium → hamyon"), (KIND_REPORT_FEE, "Kunlik to'lov"),
         (KIND_REPORT_EXTRA, "Qo'shimcha hisobot"), (KIND_REFUND, "Qaytarildi"),
         (KIND_REFERRAL, "Referal mukofoti"), (KIND_CASHBACK, "Kitob hamyonchasidan"), (KIND_MENTOR, "Ustoz sovg'asi"),
         (KIND_ADMIN, "Admin tuzatishi"),
+        (KIND_REPORT_BONUS, "Hisobot bonusi"), (KIND_STREAK, "Ketma-ketlik mukofoti"),
+        (KIND_DAILY_GIFT, "Kunning sovg'asi"), (KIND_SHOP, "Do'kon"), (KIND_SHOP_REFUND, "Do'kon qaytimi"),
     ]
     user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="wallet_transactions")
     kind = models.CharField(max_length=24, choices=KIND_CHOICES)

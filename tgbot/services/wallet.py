@@ -45,6 +45,9 @@ MEMBER_MIN = 15000
 # A member's 2nd, 3rd... report of the day (owner, 2026-11-01: free extras would
 # leave members' money untouched, the full price would make the perk pointless).
 EXTRA_FEE_MEMBER = 100
+# Hisobot bonusi (owner, 2026-11-11): every report charge hands this share of
+# its price straight back to the wallet, as a gift (never refunded).
+REPORT_BONUS_PCT = 50
 TOPUP_PRESETS = (1000, 2000, 5000, 10000, 15000, 30000)
 MIN_TOPUP = 1000
 MAX_TOPUP = 2_000_000
@@ -160,13 +163,16 @@ def fee_confirm_plain(user) -> str:
     cash, kit = fee_split(user)
     n = fees_today(user)
     som = lambda v: f"{int(v or 0):,}".replace(",", " ")  # noqa: E731
+    back = report_bonus(report_price(user))
     if (getattr(user, "language", None) or "uz") == "ru":
         part = f"{som(cash)} сум" + (f" + {kit} Kitobcha" if kit else "")
         which = "За сегодняшний отчёт" if n == 0 else f"За {n + 1}-й отчёт сегодня"
-        return f"{which} спишется {part}. В кошельке: {som(user.wallet_balance)} сум. Подтверждаете?"
+        ret = f" {som(back)} сум сразу вернётся бонусом." if back else ""
+        return f"{which} спишется {part}.{ret} В кошельке: {som(user.wallet_balance)} сум. Подтверждаете?"
     part = f"{som(cash)} so'm" + (f" + {kit} Kitobcha" if kit else "")
     which = "Bugungi hisobotingiz" if n == 0 else f"Bugungi {n + 1}-hisobotingiz"
-    return f"{which} uchun {part} yechiladi. Hamyoningizda: {som(user.wallet_balance)} so'm. Tasdiqlaysizmi?"
+    ret = f" {som(back)} so'm darhol bonus bo'lib qaytadi." if back else ""
+    return f"{which} uchun {part} yechiladi.{ret} Hamyoningizda: {som(user.wallet_balance)} so'm. Tasdiqlaysizmi?"
 
 
 def legacy_premium(user) -> bool:
@@ -282,15 +288,24 @@ def charge_report(user, day=None) -> dict:
         WalletTransaction.objects.create(
             user=p, kind=WalletTransaction.KIND_REPORT_FEE if n == 0 else WalletTransaction.KIND_REPORT_EXTRA,
             delta=-cash, kitobcha=kit, day=day, balance_after=p.wallet_balance)
+        bonus = report_bonus(price)
+        if bonus:
+            _credit_locked(p, bonus, WalletTransaction.KIND_REPORT_BONUS, f"Hisobot bonusi ({REPORT_BONUS_PCT}%)")
     user.wallet_balance = p.wallet_balance
     user.ball = p.ball
     return {"ok": True, "extra": n > 0, "price": price, "cash": cash, "kitobcha": kit,
-            "balance": p.wallet_balance}
+            "bonus": bonus, "balance": p.wallet_balance}
+
+
+def report_bonus(price) -> int:
+    """So'm handed back right after a report charge of `price`."""
+    return int(price) * REPORT_BONUS_PCT // 100
 
 
 # Money the project gave (bonus, Premium days turned into so'm -- the Premium
 # itself still runs to its end date): never refunded (owner, 2026-11-01).
-GIFT_KINDS = ("bonus", "premium_conversion", "referral", "cashback", "mentor")
+GIFT_KINDS = ("bonus", "premium_conversion", "referral", "cashback", "mentor",
+              "report_bonus", "streak_bonus", "daily_gift")
 
 
 def refundable(user) -> int:
@@ -307,7 +322,9 @@ def refundable(user) -> int:
                      .aggregate(s=Sum("delta"))["s"] or 0)
     paid_in = int(sums.get("topup") or 0)
     gifts_in = sum(int(sums.get(k) or 0) for k in GIFT_KINDS) + admin_in
-    spent = -int(sums.get("report_fee") or 0) - int(sums.get("report_extra") or 0) + admin_out
+    # Shop: purchases and auction bids out, refunded bids back in.
+    shop_net = -int(sums.get("shop") or 0) - int(sums.get("shop_refund") or 0)
+    spent = -int(sums.get("report_fee") or 0) - int(sums.get("report_extra") or 0) + admin_out + max(0, shop_net)
     refunded = -int(sums.get("refund") or 0)
     paid_spent = max(0, spent - gifts_in)
     return max(0, min(int(user.wallet_balance or 0), paid_in - paid_spent - refunded))
@@ -332,6 +349,25 @@ def refund(user, amount=None, note: str = "") -> dict:
                                          balance_after=p.wallet_balance, note=(note or "Qaytarildi")[:120])
     user.wallet_balance = p.wallet_balance
     return {"ok": True, "refunded": take, "balance": p.wallet_balance}
+
+
+def spend_locked(p, amount: int, kind: str, note: str = ""):
+    """Take `amount` so'm from a profile row the caller holds under
+    select_for_update (shop purchases and auction bids). Returns the
+    WalletTransaction, or None when the wallet does not hold enough."""
+    from tgbot.models import WalletTransaction
+    amount = int(amount)
+    if amount <= 0 or int(p.wallet_balance or 0) < amount:
+        return None
+    p.wallet_balance = int(p.wallet_balance or 0) - amount
+    p.save(update_fields=["wallet_balance"])
+    return WalletTransaction.objects.create(user=p, kind=kind, delta=-amount,
+                                            balance_after=p.wallet_balance, note=note[:120])
+
+
+def credit_locked(p, amount: int, kind: str, note: str = ""):
+    """_credit_locked for callers outside this module (the row is locked)."""
+    return _credit_locked(p, amount, kind, note)
 
 
 # Referral reward in so'm (owner, 2026-11-01): REFERRAL_SOM for each confirmed
@@ -435,6 +471,10 @@ def day_summary_text(s: dict) -> str:
     r_n, r_som, _ = mv("referral")
     c_n, c_som, _ = mv("cashback")
     a_n, a_som, _ = mv("admin")
+    rb_n, rb_som, _ = mv("report_bonus")
+    st_n, st_som, _ = mv("streak_bonus")
+    lo_n, lo_som, _ = mv("daily_gift")
+    sh_n, sh_som, _ = mv("shop")
     lines = [
         "👛 <b>Hamyon (so'm):</b>",
         f"  ➕ To'ldirish: tasdiqlangan <b>{t_ok['n']}</b> ta — <b>{som(t_ok['som'])}</b>; "
@@ -442,6 +482,7 @@ def day_summary_text(s: dict) -> str:
         f"  🧾 Hisobot to'lovlari: <b>{f_n + e_n}</b> ta — <b>{som(f_som + e_som)}</b> so'm + "
         f"{som(f_kit + e_kit)} Kitobcha (birinchi {f_n}, qo'shimcha {e_n})",
         f"  🎁 Bonus: {b_n} ta — {som(b_som)} · 👥 Referal: {r_n} ta — {som(r_som)} · 📚 Keshbek: {c_n} ta — {som(c_som)} · 🛠 Admin: {a_n} ta — {som(a_som)}",
+        f"  🎁 Hisobot bonusi: {rb_n} ta — {som(rb_som)} · 🔥 Ketma-ketlik: {st_n} ta — {som(st_som)} · 🎁 Kunning sovg'asi: {lo_n} ta — {som(lo_som)} · 🛒 Do'kon: {sh_n} ta — {som(sh_som)}",
         f"  📊 Hisobot yuborishlar: {s['submissions']} ta, {s['reporters']} kishi · to'lovlar: {s['charges']} ta",
     ]
     if s["unpaid"]:

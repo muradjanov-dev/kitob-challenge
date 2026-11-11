@@ -212,7 +212,7 @@ app.conf.beat_schedule = {
 
     # ── User DMs — hard cap of 3 per day ─────────────────────────────────────
     #
-    # Slot 1 — 08:30  Kitob Viktorina (GROUP post only — never a DM)
+    # Slot 1 — 08:30  Kunning kitob savoli (GROUP post only — never a DM)
     # Slot 2 — 10:00  Single inspiration (personalized hour OR fixed 10:00 fallback)
     # Slot 3 — 20:00  Streak warning (non-reporters only)
     # Slot 4 — 23:57  Personal daily report (everyone)
@@ -233,19 +233,25 @@ app.conf.beat_schedule = {
     #                                     percentile is now shown inside personal report
     #   challenge_reminder      (18:00) — folded into streak warning at 20:00
 
-    # Kitob Viktorina — 3x daily (GROUP posts only, never personal DMs, so they
-    # don't count against the 3-DM/day budget above).
-    'book-quiz-morning': {
-        'task': 'tgbot.tasks.post_book_quiz',
-        'schedule': crontab(hour=8, minute=30),
-    },
+    # Kitob Viktorina — once a day (owner, 2026-11-11: three a day was too
+    # many). GROUP post only, never a DM. The task itself also refuses a second
+    # round on the same day, so a doubled or retried beat run cannot repeat it.
     'book-quiz-midday': {
         'task': 'tgbot.tasks.post_book_quiz',
         'schedule': crontab(hour=14, minute=0),
     },
-    'book-quiz-evening': {
-        'task': 'tgbot.tasks.post_book_quiz',
-        'schedule': crontab(hour=21, minute=0),
+    # Kunning kitob savoli — one question about books a day, as a native
+    # Telegram quiz poll in the games topic (services.daily_book_question).
+    'post-daily-book-question': {
+        'task': 'tgbot.tasks.post_daily_book_question',
+        'schedule': crontab(hour=8, minute=30),
+    },
+    # Kunning sovg'asi — the project's 10 000 so'm gift to one steady reporter (at least
+    # GIFT_MIN_DAYS report days in the last 7), announced in the groups.
+    # 19:30: well before the 20:45-22:15 evening-games window.
+    'draw-daily-reporter-gift': {
+        'task': 'tgbot.tasks.draw_daily_reporter_gift',
+        'schedule': crontab(hour=19, minute=30),
     },
     # Kunning latifasi — one reader joke a day in the groups' announcement
     # topic; 17:00 is the quiet afternoon gap between the 14:00 Viktorina and

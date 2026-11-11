@@ -1335,6 +1335,46 @@ def internal_ops(request: HttpRequest, action: str):
     if action == "broadcast-status":
         return JsonResponse({"ok": True, "status": ops_broadcast.status(body.get("campaign", ""))})
 
+    if action == "progress-now":
+        # The daily progress message (normally 00:01), sent now in the
+        # background; once per day (the task's own cache claim).
+        if apply:
+            from tgbot.tasks import daily_progress_broadcast
+            daily_progress_broadcast.delay()
+        return JsonResponse({"ok": True, "queued": apply})
+
+    if action == "daily-gift":
+        # Kunning sovg'asi: {} = today's pool size; {"apply": true} draws and
+        # announces now (normally 19:30 by beat; once per day either way).
+        from tgbot.services import report_rewards
+        if apply:
+            from tgbot.tasks import draw_daily_reporter_gift
+            draw_daily_reporter_gift.delay()
+            return JsonResponse({"ok": True, "queued": True})
+        return JsonResponse({"ok": True, "pool": len(report_rewards.gift_pool())})
+
+    if action == "game-audit":
+        # Recent live games and whether players were served questions:
+        # {"days": 3}. Read-only.
+        import datetime as _dt
+        from django.db.models import Count as _Count
+        from django.utils import timezone as _tz
+        from tgbot.models import GameSequence, QuizAnswer, QuizGame, QuizScore
+        since = _tz.localdate() - _dt.timedelta(days=int(body.get("days") or 3))
+        seqs = list(GameSequence.objects.filter(date__gte=since).order_by("date", "slot").values(
+            "date", "slot", "game_types", "current_index", "current_game_type", "current_game_id", "completed"))
+        games = []
+        for g in QuizGame.objects.filter(starts_at__date__gte=since).order_by("starts_at"):
+            per_q = dict(QuizAnswer.objects.filter(game=g).values("q_index").annotate(n=_Count("id"))
+                         .values_list("q_index", "n"))
+            games.append({"id": g.id, "flavor": g.flavor, "status": g.status, "self_paced": g.self_paced,
+                          "starts": _tz.localtime(g.starts_at).strftime("%m-%d %H:%M"),
+                          "ends": _tz.localtime(g.ends_at).strftime("%H:%M") if g.ends_at else None,
+                          "questions": len(g.questions or []), "players": QuizScore.objects.filter(game=g).count(),
+                          "answers_per_q": per_q, "rewarded": g.rewarded})
+        return JsonResponse({"ok": True, "sequences": seqs, "quiz_games": games},
+                            json_dumps_params={"default": str})
+
     if action == "headliner":
         from tgbot.tasks import _GAME_STARTERS, set_slot_headliner, slot_headliner
         day, slot, game = body.get("date", ""), body.get("slot", "evening"), body.get("game")

@@ -706,7 +706,7 @@ class BookQuizRoundAdmin(admin.ModelAdmin):
     @admin.action(description="Hozir yangi viktorina yuborish")
     def post_quiz_now(self, request, queryset):
         from tgbot.tasks import post_book_quiz
-        post_book_quiz.delay()
+        post_book_quiz.delay(force=True)
         self.message_user(request, "Yangi viktorina yuborilmoqda…")
 
 

@@ -1,6 +1,9 @@
 <!-- Shared classical background-music player: quiet random Beethoven / Bach /
-     Mozart on loop across all site pages, with a mute toggle the user's
-     choice is remembered (localStorage) so it carries between pages. -->
+     Mozart on loop across all site pages and the live games, with a mute
+     toggle the user's choice is remembered (localStorage) so it carries
+     between pages. Switching it back on always starts a different piece.
+     music_corner="top": the button sits top-right (the games keep their
+     answer buttons at the bottom). -->
 <audio id="kcBgAudio" preload="none"></audio>
 <button id="kcMusicToggle" type="button" aria-label="Musiqani yoqish/o'chirish" title="Fon musiqasi">
   <span id="kcMusicIcon">🔊</span>
@@ -16,7 +19,9 @@
     transition: transform .15s ease, opacity .2s ease;
   }
   #kcMusicToggle:active { transform: scale(.90); }
-  #kcMusicToggle.kc-muted { opacity: .55; color: rgba(243,234,217,.55); }
+  #kcMusicToggle.kc-muted { opacity: .55; color: rgba(243,234,217,.55); }{% if music_corner == "top" %}
+  #kcMusicToggle { top: calc(env(safe-area-inset-top, 0px) + 10px); bottom: auto; right: 12px;
+    width: 38px; height: 38px; font-size: 16px; z-index: 10000; }{% endif %}
 </style>
 <script>
 (function () {
@@ -163,6 +168,13 @@
       tryPlay();
     }
   });
+
+  // A page that plays its own sound (the Ovozli Iqtibos clip) hushes the
+  // music for it: kcMusic.hush() before, kcMusic.resume() after.
+  window.kcMusic = {
+    hush: function () { audio.pause(); },
+    resume: function () { if (!muted) audio.play().catch(function () {}); }
+  };
 
   updateIcon();
   if (!muted) {

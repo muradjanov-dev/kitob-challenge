@@ -1943,6 +1943,53 @@ def _referral_share_texts(user) -> list:
     ]
 
 
+_ACH_UNITS = {
+    "reports": "ta hisobot", "pages": "bet", "books_finished": "ta kitob",
+    "max_streak": "kun ketma-ket hisobot", "long_conclusions": "ta uzun xulosa",
+    "referrals": "ta do'st taklifi", "audio_minutes": "daqiqa audio",
+    "max_day_pages": "bet (bir kunda)", "quizzes_played": "ta o'yin",
+    "quiz_correct": "ta to'g'ri javob",
+}
+
+
+def nearest_achievement_line(user) -> str:
+    """'🎯 Eng yaqin yutuq: ...' -- the not-yet-won achievement the reader is
+    closest to, with what is left (owner, 2026-11-11). Computed once a day per
+    reader (the pinned message is edited on every balance move)."""
+    from django.core.cache import cache
+    key = f"ach_nudge:{user.id}:{timezone.localdate().isoformat()}"
+    line = cache.get(key)
+    if line is not None:
+        return line
+    line = ""
+    try:
+        from html import escape as _html_esc
+        from tgbot.models import UserAchievement as _UA
+        from tgbot.services.achievements import ACHIEVEMENTS_RAW, compute_user_stats
+        stats = compute_user_stats(user)
+        won = set(_UA.objects.filter(user=user).values_list("code", flat=True))
+        best = None
+        for ach in ACHIEVEMENTS_RAW:
+            cells = getattr(ach.get("cond"), "__closure__", None) or ()
+            if ach["code"] in won or len(cells) < 2:
+                continue
+            field, target = cells[0].cell_contents, cells[1].cell_contents
+            if not isinstance(field, str) or not isinstance(target, (int, float)):
+                continue
+            left = target - (stats.get(field, 0) if hasattr(stats, "get") else getattr(stats, field, 0))
+            # Share of the way still to go: 3 of 5 reports is closer than 300 of 2000 pages.
+            if left > 0 and (best is None or left / target < best[0]):
+                best = (left / target, ach, field, int(left))
+        if best:
+            _, ach, field, left = best
+            line = (f"🎯 <b>Eng yaqin yutuq:</b> {ach['emoji']} <b>{_html_esc(ach['title_uz'], quote=False)}</b> — "
+                    f"yana <b>{left}</b> {_ACH_UNITS.get(field, field)} qoldi. Shu bugun bir qadam tashlaymizmi? 💪")
+    except Exception as e:
+        print(f"nearest_achievement_line {user.id}: {e}")
+    cache.set(key, line, 60 * 60 * 26)
+    return line
+
+
 def _pinned_balance_text(user) -> str:
     """The wallet lines heading the pinned progress message, from the launch
     on (empty before). refresh_pinned_balance keeps them current."""
@@ -1981,6 +2028,9 @@ def _progress_payload(user, pages=None) -> tuple:
 
     site_url = f"{_settings.WEB_DOMAIN}/"
     text = f'🌌 <a href="{site_url}">Parallel olam</a>\n\n' + _progress_bar_text(pages)
+    nudge = nearest_achievement_line(user)
+    if nudge:
+        text += "\n\n" + nudge
 
     buttons = [[{
         "text": "🌌 Parallel olam",
@@ -2143,34 +2193,33 @@ def refresh_pinned_balance(user_id):
 
 @shared_task
 def daily_progress_broadcast():
-    """At 00:01 Tashkent: refresh each user's pinned progress bar -- edited in
-    place, which makes no new message and no sound (one DM a day fewer); a
-    fresh one is sent and pinned only when there is nothing to edit."""
+    """At 00:01 Tashkent: a fresh progress message to every reader, pinned in
+    place of yesterday's, which is deleted (owner, 2026-11-11: the message
+    must arrive every day again -- editing it in place went unnoticed).
+    The cache claim keeps a doubled beat run from sending it twice."""
     import time as _t
+    from django.core.cache import cache
+    if not cache.add(f"daily_progress_sent:{timezone.localdate().isoformat()}", 1, 60 * 60 * 20):
+        print("daily_progress_broadcast: already sent today")
+        return
     users = TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
-    edit_url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText"
-    edited = sent = 0
+    delete_url = f"https://api.telegram.org/bot{BOT_TOKEN}/deleteMessage"
+    sent = 0
     for user in users.iterator():
         try:
-            if user.last_progress_msg_id:
-                pages = (ConfirmationReport.objects.filter(user=user)
-                         .aggregate(s=Sum("pages_read"))["s"] or 0)
-                _award_level_rewards(user, pages)
-                text, markup = _progress_payload(user, pages)
-                resp = requests.post(edit_url, data={
-                    "chat_id": user.telegram_id, "message_id": user.last_progress_msg_id,
-                    "text": text, "parse_mode": "HTML", "reply_markup": markup}, timeout=5)
-                if resp.ok or "not modified" in resp.text:
-                    _remember_pinned_balance(user, user.last_progress_msg_id)
-                    edited += 1
-                    _t.sleep(0.04)
-                    continue
-            if _send_and_pin_progress(user):
+            old_id = user.last_progress_msg_id
+            new_id = _send_and_pin_progress(user)
+            if new_id:
                 sent += 1
+                if old_id and old_id != new_id:
+                    try:
+                        requests.post(delete_url, data={"chat_id": user.telegram_id, "message_id": old_id}, timeout=3)
+                    except Exception:
+                        pass
         except Exception as e:
             print(f"daily_progress_broadcast failed for {user.id}: {e}")
         _t.sleep(0.04)
-    print(f"daily_progress_broadcast: edited={edited} sent={sent}")
+    print(f"daily_progress_broadcast: sent={sent}")
 
 
 @shared_task
@@ -5281,16 +5330,95 @@ def refresh_quiz_boards(quiz_round):
 
 
 @shared_task
-def post_book_quiz():
+def post_book_quiz(force=False):
     """Build one fresh Viktorina round and broadcast it. Skips silently when
-    there isn't enough material to build a quote."""
+    there isn't enough material to build a quote.
+
+    At most one scheduled round a day (owner, 2026-11-11: "viktorinalarni
+    juda ko'p yuboryapsan"): the cache claim makes a doubled beat, a retried
+    task or a worker that got the same message twice a no-op. `force` is for
+    an admin who posts an extra round on purpose."""
+    from django.core.cache import cache
     from tgbot.services.book_quiz import build_quiz_round
 
+    if not force and not cache.add(f"book_quiz_posted:{timezone.localdate().isoformat()}", 1, 60 * 60 * 26):
+        print("post_book_quiz: already posted today, skipping")
+        return
     quiz_round = build_quiz_round()
     if not quiz_round:
         print("post_book_quiz: no quiz could be built (not enough conclusions yet)")
         return
     _broadcast_quiz_round(quiz_round)
+
+
+@shared_task
+def post_daily_book_question(force=False):
+    """Kunning kitob savoli: one quiz poll about books a day in every game
+    group (services.daily_book_question). Once a day -- the cache claim makes
+    a doubled or retried beat run a no-op."""
+    from django.core.cache import cache
+    from tgbot.services.daily_book_question import poll_question, question_for
+
+    today = timezone.localdate()
+    if not force and not cache.add(f"daily_book_question_posted:{today.isoformat()}", 1, 60 * 60 * 26):
+        return
+    q = question_for(today)
+    if not q:
+        print("post_daily_book_question: empty pool")
+        return
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPoll"
+    posted = 0
+    for group_id, thread_id in _game_targets():
+        data = {"chat_id": group_id, "question": poll_question(q),
+                "options": json.dumps(q["options"], ensure_ascii=False),
+                "type": "quiz", "correct_option_id": q["correct"], "is_anonymous": "true"}
+        if q.get("explanation"):
+            data["explanation"] = q["explanation"][:200]
+        if thread_id:
+            data["message_thread_id"] = thread_id
+        try:
+            resp = requests.post(url, data=data, timeout=10)
+            posted += resp.ok
+            if not resp.ok:
+                print(f"post_daily_book_question group {group_id}: {resp.status_code} {resp.text[:200]}")
+        except Exception as e:
+            print(f"post_daily_book_question group {group_id}: {e}")
+    print(f"post_daily_book_question: {today} posted to {posted} group(s)")
+
+
+@shared_task
+def reward_report_streak(user_id):
+    """A report just came in: pay the ketma-ketlik mukofoti if it completed
+    a 10-day step (services.report_rewards)."""
+    from tgbot.services.report_rewards import reward_streak
+    paid = reward_streak(user_id)
+    if paid:
+        print(f"reward_report_streak: user {user_id} +{paid}")
+
+
+@shared_task
+def draw_daily_reporter_gift():
+    """Kunning sovg'asi: pay today's gift to a steady reporter and announce the
+    winner in the groups (services.report_rewards). Paying is idempotent per
+    day, and the cache claim keeps a second run from posting again."""
+    from django.core.cache import cache
+    from tgbot.services.report_rewards import draw_daily_gift
+
+    today = timezone.localdate()
+    res = draw_daily_gift(today)
+    print(f"draw_daily_reporter_gift: {res}")
+    if not res.get("group_text") or not cache.add(f"daily_gift_announced:{today.isoformat()}", 1, 60 * 60 * 26):
+        return
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    for group_id, thread_id in _announce_targets():
+        try:
+            data = {"chat_id": group_id, "text": res["group_text"], "parse_mode": "HTML",
+                    "disable_web_page_preview": "true"}
+            if thread_id:
+                data["message_thread_id"] = thread_id
+            requests.post(url, data=data, timeout=10)
+        except Exception as e:
+            print(f"draw_daily_reporter_gift group {group_id}: {e}")
 
 
 @shared_task
@@ -5996,6 +6124,32 @@ def expire_ai_quiz_trial(user_id):
     TelegramProfile.objects.filter(id=user_id).update(trial_ai_quiz_until=None)
 
 
+def top_game_players_text(top, day):
+    """The evening 'kun yakuni' post: the readers who played the most live
+    games today ([(user_id, games)]), in the house style (announce_style)."""
+    from tgbot.models import TelegramProfile
+    from tgbot.services.announce_style import name, quote_block
+
+    users = {u.id: u for u in TelegramProfile.objects.filter(id__in=[uid for uid, _ in top])}
+    medals = ["🥇", "🥈", "🥉", "🏅", "🎖"]
+    rows = [f"{medals[i]} <b>{name(users[uid].full_name)}</b> · {cnt} ta o'yin"
+            for i, (uid, cnt) in enumerate(top) if uid in users]
+    if not rows:
+        return None
+    return "\n".join([
+        "🏆 <b>Kun yakuni: o'yin maydonining eng faollari</b>",
+        "",
+        quote_block("reading", day),
+        "",
+        "Bugun jonli o'yinlarga eng ko'p chiqqanlar:",
+        "",
+        *rows,
+        "",
+        "Siz bilan maydon jonli bo'ldi — rahmat! 👏",
+        "Ertaga <b>10:00</b> va <b>21:30</b> da — bu ro'yxatda o'z ismingizni ko'rish uchun yana bir imkoniyat. 📚",
+    ])
+
+
 @shared_task
 def announce_top_game_players():
     """Celebratory announcement of the 5 users who joined the most live games
@@ -6042,24 +6196,9 @@ def announce_top_game_players():
         print("announce_top_game_players: no game activity today")
         return
 
-    top = counts.most_common(5)
-    users = {u.id: u for u in TelegramProfile.objects.filter(id__in=[uid for uid, _ in top])}
-    medals = ["🥇", "🥈", "🥉", "🏅", "🎖"]
-    lines = [
-        "🎉🏆 <b>TANTANALI E'LON — BUGUNGI O'YINLAR YAKUNI!</b> 🏆🎉\n",
-        "Bugungi barcha jonli o'yinlarda eng faol bo'lgan <b>5 ta Kitobxon</b>:\n",
-    ]
-    shown = 0
-    for i, (uid, cnt) in enumerate(top):
-        u = users.get(uid)
-        if not u:
-            continue
-        lines.append(f"{medals[i]} <b>{escape(u.full_name or 'Kitobxon')}</b> — {cnt} ta o'yinda qatnashdi!")
-        shown += 1
-    if not shown:
+    text = top_game_players_text(counts.most_common(5), today)
+    if not text:
         return
-    lines.append("\n👏 Barchangizni tabriklaymiz! Ertaga ham 10:00 va 21:30 dagi o'yinlarda faol bo'ling — navbatdagi tantanali e'londa sizning ismingiz bo'lsin! 🔥📚")
-    text = "\n".join(lines)
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     for group_id, thread_id in _game_targets():
@@ -6071,7 +6210,7 @@ def announce_top_game_players():
             requests.post(url, data=data, timeout=10)
         except Exception as e:
             print(f"announce_top_game_players group {group_id}: {e}")
-    print(f"announce_top_game_players: top5={top}")
+    print(f"announce_top_game_players: top5={counts.most_common(5)}")
     try:
         cache.set(cache_key, True, 60 * 60 * 6)
     except Exception:
