@@ -24,18 +24,20 @@ SYSTEM = (
     "Sen «Kitob Challenge» kitobxonlar loyihasi nomidan bitta kitobxonga shaxsiy tashakkur maktubi yozasan. "
     "Qoidalar:\n"
     "- Faqat o'zbek tilida, lotin yozuvida yoz. Kitobxonga doim «Siz» deb murojaat qil (Siz, Sizning — bosh harf bilan).\n"
-    "- 90–140 so'z. Ohang: iliq, samimiy, ruhlantiruvchi; ichida yengil, mehribon kinoya yoki hazil bo'lsin — "
-    "himmatini qo'zg'atadigan, lekin hech qachon kamsitmaydigan, uyaltirmaydigan.\n"
+    "- 80–120 so'z, 2 ta xatboshi. Ohang: iliq, samimiy, ruhlantiruvchi; bitta joyda yengil, mehribon kinoya "
+    "yoki hazil bo'lsin — himmatini qo'zg'atadigan, lekin hech qachon kamsitmaydigan, uyaltirmaydigan.\n"
     "- Maktub aynan shu insonga xos bo'lsin: berilgan ma'lumotdan aniq tafsilotlarni ishlat — kitob nomlari, "
     "betlar, ketma-ketlik kunlari; agar xulosalari berilgan bo'lsa, ulardan bitta qisqa iborani «...» ichida "
     "keltirib, unga munosabat bildir.\n"
-    "- Uning «uyg'oq kitobxonlar» safida ekani va «O'zligini anglash yo'lida» ekani uchun Kitob Challenge "
-    "nomidan tashakkur ayt.\n"
+    "- Uyg'oq kitobxonlar safida ekani va O'zligini anglash yo'lida ekani uchun Kitob Challenge nomidan "
+    "tashakkur ayt — bu iboralarni qo'shtirnoqsiz, jumla ichida tabiiy ishlat.\n"
+    "- Ketma-ketlik 0 bo'lsa, raqamni aytma — yo'lni qayta davom ettirishga iliq chaqir.\n"
     "- Hisoboti bo'lmasa: kitob javonda uni sabr bilan kutayotgani haqida yengil hazil qil va bugun birinchi "
     "sahifadan boshlashga iliq taklif qil.\n"
     "- Ma'lumotda yo'q narsani to'qima. Raqamlarni o'zgartirma.\n"
-    "- Formatlash: oddiy matn, 2–3 xatboshi. Faqat <b> va <i> teglari mumkin, boshqa teg, markdown, "
-    "sarlavha, imzo yozma — imzoni tizim o'zi qo'shadi."
+    "- Formatlash: oddiy matn. Faqat <b> va <i> teglari mumkin; boshqa teg, markdown, sarlavha yozma.\n"
+    "- Salomlashish («Assalomu alaykum», «Hurmatli ...») va imzo («Hurmat bilan», «... jamoasi») yozma — "
+    "murojaat va imzoni tizim o'zi qo'shadi. Birinchi gapdanoq mazmunga o't."
 )
 
 
@@ -87,8 +89,24 @@ def _facts_text(f) -> str:
 _ALLOWED = re.compile(r"&lt;(/?)(b|i)&gt;")
 
 
+_SIGN_OFF = re.compile(r"^\s*(hurmat bilan|chuqur hurmat bilan|samimiy hurmat bilan|«?kitob challenge»? jamoasi)",
+                       re.IGNORECASE)
+_GREETING = re.compile(r"^\s*(assalomu alaykum|hurmatli|aziz|qadrli)\b[^\n]{0,60}[!,.]?\s*$", re.IGNORECASE)
+
+
+def _strip_frame(text: str) -> str:
+    """The letter has its own address line and signature: drop the model's."""
+    lines = [l for l in (text or "").strip().split("\n")]
+    while lines and (not lines[0].strip() or _GREETING.match(lines[0])):
+        lines.pop(0)
+    while lines and (not lines[-1].strip() or _SIGN_OFF.match(lines[-1])):
+        lines.pop()
+    return "\n".join(lines).strip()
+
+
 def _clean_html(text: str) -> str:
     """Escape everything, then let <b>/<i> back in; drop markdown stars."""
+    text = _strip_frame(text)
     text = re.sub(r"\*\*(.+?)\*\*", r"\1", text or "").replace("*", "")
     text = escape(text.strip(), quote=False)
     text = _ALLOWED.sub(r"<\1\2>", text)
@@ -110,8 +128,13 @@ def _fallback(f) -> str:
             "boshlang — O'zligingizni anglash yo'li aynan shunday boshlanadi.")
 
 
+class RateLimited(Exception):
+    """Every model refused for quota / rate: wait and retry, no template."""
+
+
 def letter_for(p) -> tuple:
-    """(message HTML, source) -- source is the model's name or "template"."""
+    """(message HTML, source) -- source is the model's name or "template".
+    Raises RateLimited when the models are out of quota for now."""
     from tgbot.services import llm
     f = reader_facts(p)
     try:
@@ -121,7 +144,10 @@ def letter_for(p) -> tuple:
         if len(body) < 120:
             raise ValueError("too short")
     except Exception as e:
-        print(f"gratitude letter {p.id}: {str(e)[:200]}")
+        msg = str(e)
+        print(f"gratitude letter {p.id}: {msg[:200]}")
+        if "429" in msg or "quota" in msg.lower() or "rate" in msg.lower():
+            raise RateLimited(msg[:200])
         body, src = _fallback(f), "template"
     text = (f"💌 <b>{escape(f['name'], quote=False)}, Kitob Challenge'dan Sizga maktub</b>\n\n"
             f"{body}\n\n— <i>Kitob Challenge jamoasi</i> 📚")

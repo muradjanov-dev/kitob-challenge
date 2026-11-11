@@ -156,7 +156,17 @@ def send_gratitude_letters(stop_after=None):
         if not p or not cache.add(gratitude.sent_key(uid), 1, 60 * 60 * 24 * 60):
             continue
         try:
-            text, src = gratitude.letter_for(p)
+            try:
+                text, src = gratitude.letter_for(p)
+            except gratitude.RateLimited:
+                # The model's quota is spent for now: give the reader back to
+                # the queue and try again in 20 minutes -- a real letter later
+                # beats a template now.
+                cache.delete(gratitude.sent_key(uid))
+                cache.set(f"gratitude_stats:{gratitude.CAMPAIGN}", stats, 60 * 60 * 24 * 60)
+                send_gratitude_letters.apply_async(kwargs={"stop_after": stop_after}, countdown=20 * 60)
+                print("send_gratitude_letters: rate limited, retrying in 20 min")
+                return {"paused": "rate limit", **stats}
             r = requests.post(url, data={"chat_id": p.telegram_id, "text": text, "parse_mode": "HTML"}, timeout=10)
             if r.ok:
                 stats["sent"] += 1
