@@ -152,7 +152,14 @@ class TelegramProfile(BaseModel):
         default=0.00
     )
     is_registered = models.BooleanField(default=False)
-    is_blocked = models.BooleanField(default=False)
+    # Two different things, kept apart since 2026-11-11: `is_blocked` means
+    # the bot cannot reach the reader (Telegram answered 403 -- they blocked
+    # or deleted the bot); broadcasts skip them, and it clears itself the
+    # moment they write to the bot again. `is_banned` is an admin's
+    # restriction. One flag used to mean both, so every reader a broadcast
+    # once failed to reach was told "hisobingiz cheklangan" on return.
+    is_blocked = models.BooleanField(default=False, help_text="Bot yetib bora olmaydi (403). Avtomatik.")
+    is_banned = models.BooleanField(default=False, help_text="Admin tomonidan cheklangan.")
     is_admin = models.BooleanField(default=False)
     age_range = models.CharField(
         max_length=16,

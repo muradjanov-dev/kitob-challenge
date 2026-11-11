@@ -2009,7 +2009,7 @@ def nearest_achievement_line(user) -> str:
     closest to, with what is left (owner, 2026-11-11). Computed once a day per
     reader (the pinned message is edited on every balance move)."""
     from django.core.cache import cache
-    key = f"ach_nudge:{user.id}:{timezone.localdate().isoformat()}"
+    key = f"ach_nudge2:{user.id}:{timezone.localdate().isoformat()}"
     line = cache.get(key)
     if line is not None:
         return line
@@ -2021,6 +2021,7 @@ def nearest_achievement_line(user) -> str:
         stats = compute_user_stats(user)
         won = set(_UA.objects.filter(user=user).values_list("code", flat=True))
         best = None
+        current_streak = None
         for ach in ACHIEVEMENTS_RAW:
             cells = getattr(ach.get("cond"), "__closure__", None) or ()
             if ach["code"] in won or len(cells) < 2:
@@ -2028,14 +2029,32 @@ def nearest_achievement_line(user) -> str:
             field, target = cells[0].cell_contents, cells[1].cell_contents
             if not isinstance(field, str) or not isinstance(target, (int, float)):
                 continue
-            left = target - (stats.get(field, 0) if hasattr(stats, "get") else getattr(stats, field, 0))
+            have = stats.get(field, 0) if hasattr(stats, "get") else getattr(stats, field, 0)
+            if field == "max_streak":
+                # The achievement wants N days IN A ROW: what counts is the
+                # streak running now, not the best one (a past 13-day best
+                # read as "1 day left" to a reader on day 2 -- 2026-11-11).
+                if current_streak is None:
+                    from tgbot.services import ops_fixes
+                    current_streak = ops_fixes.current_streak(user.id)
+                have = current_streak
+            elif field == "max_day_pages":
+                # N pages in ONE day: nothing carries over from the best day.
+                have = 0
+            left = target - (have or 0)
             # Share of the way still to go: 3 of 5 reports is closer than 300 of 2000 pages.
             if left > 0 and (best is None or left / target < best[0]):
-                best = (left / target, ach, field, int(left))
+                best = (left / target, ach, field, int(left), int(target))
         if best:
-            _, ach, field, left = best
-            line = (f"🎯 <b>Eng yaqin yutuq:</b> {ach['emoji']} <b>{_html_esc(ach['title_uz'], quote=False)}</b> — "
-                    f"yana <b>{left}</b> {_ACH_UNITS.get(field, field)} qoldi. Shu bugun bir qadam tashlaymizmi? 💪")
+            _, ach, field, left, target = best
+            title = f"{ach['emoji']} <b>{_html_esc(ach['title_uz'], quote=False)}</b>"
+            if field == "max_streak":
+                todo = f"ketma-ket yana <b>{left}</b> kun hisobot yuboring (hozir {target - left} kun)"
+            elif field == "max_day_pages":
+                todo = f"bir kunda <b>{target}</b> bet o'qing"
+            else:
+                todo = f"yana <b>{left}</b> {_ACH_UNITS.get(field, field)} qoldi"
+            line = f"🎯 <b>Eng yaqin yutuq:</b> {title} — {todo}. Shu bugun bir qadam tashlaymizmi? 💪"
     except Exception as e:
         print(f"nearest_achievement_line {user.id}: {e}")
     cache.set(key, line, 60 * 60 * 26)

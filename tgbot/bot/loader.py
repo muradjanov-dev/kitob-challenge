@@ -124,6 +124,30 @@ from utils.subscription import get_result
 from tgbot.bot.keyboards.inline import get_check_button
 
 
+class ReachableAgain(BaseMiddleware):
+    """Anyone who writes to the bot privately can be reached again: clear the
+    automatic `is_blocked` flag (set when a send got 403). One cheap UPDATE,
+    and only for a reader who still has the flag."""
+    async def on_pre_process_update(self, update: types.Update, data: dict):
+        msg = update.message or (update.callback_query and update.callback_query.message)
+        who = (update.message and update.message.from_user) or (update.callback_query and update.callback_query.from_user)
+        if not who or not msg or msg.chat.type != "private":
+            return
+        try:
+            from asgiref.sync import sync_to_async
+            from tgbot.models import TelegramProfile
+            await sync_to_async(lambda: TelegramProfile.objects.filter(
+                telegram_id=who.id, is_blocked=True).update(is_blocked=False))()
+        except Exception as e:
+            print(f"ReachableAgain {who.id}: {e}")
+
+
+try:
+    dp.middleware.setup(ReachableAgain())
+except Exception:
+    pass
+
+
 class BigBrother(BaseMiddleware):
     async def on_pre_process_update(self, update: types.Update, data: dict):
         if update.message:

@@ -1170,7 +1170,7 @@ def _build_user_detail(user_id: int) -> str:
     else:
         action_line = f"{_profile_a}\n"
     reg_status = "✅ Ro'yxatdan to'liq o'tgan" if user.is_registered else "🚫 Tugatmagan"
-    blocked = "🚫 Bloklangan" if user.is_blocked else ""
+    blocked = "🚫 Bloklangan" if user.is_banned else ""
     admin_flag = "👑 Admin" if user.is_admin else ""
     days_since_join = (timezone.now() - user.created_at).days if user.created_at else 0
 
@@ -1453,7 +1453,7 @@ async def _do_user_search(message: types.Message, query: str):
     lines = [f"🔍 «{_escape(query)}» — <b>{len(results)}</b> ta natija:\n"]
     for u in results:
         name = u.full_name or (("@" + u.username) if u.username else "Ism yo'q")
-        flag = "🚫" if u.is_blocked else ("✅" if u.is_registered else "·")
+        flag = "🚫" if u.is_banned else ("✅" if u.is_registered else "·")
         lines.append(f"{flag} {_escape(name)} — <code>{u.telegram_id}</code>")
         label = f"{name}"[:40]
         kb.add(InlineKeyboardButton(f"👤 {label}", callback_data=f"adm_userd:{u.id}"))
@@ -1709,7 +1709,7 @@ def _user_detail_markup(target_user, is_premium: bool) -> InlineKeyboardMarkup:
             callback_data=f"adm_kitobcha_start:{target_user.id}",
         ))
         # Block / Unblock toggle — admin-only control over user access.
-        if target_user.is_blocked:
+        if target_user.is_banned:
             kb.add(InlineKeyboardButton(
                 "✅ Blokdan chiqarish",
                 callback_data=f"adm_block_toggle:{target_user.id}:0",
@@ -1785,7 +1785,7 @@ async def adm_user_detail(call: types.CallbackQuery):
     state="*",
 )
 async def adm_block_toggle(call: types.CallbackQuery):
-    """Toggle a user's is_blocked flag. Notifies the target so they aren't
+    """Toggle a user's is_banned flag (the admin restriction). Notifies the target so they aren't
     silently locked out, and re-renders the detail card."""
     actor = await aget_user(call.from_user.id)
     if not (actor and actor.is_admin):
@@ -1812,7 +1812,7 @@ async def adm_block_toggle(call: types.CallbackQuery):
 
     await sync_to_async(
         TelegramProfile.objects.filter(id=target_id).update
-    )(is_blocked=block)
+    )(is_banned=block)
 
     # Inform the affected user so they understand why the bot stopped responding.
     try:

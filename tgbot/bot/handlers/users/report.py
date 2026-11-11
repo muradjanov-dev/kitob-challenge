@@ -494,7 +494,7 @@ async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
     if not user:
         await call.answer("Avval /start bosing", show_alert=True)
         return
-    if user.is_blocked:
+    if user.is_banned:
         await call.answer(
             _("Hisobingiz cheklangan. Admin bilan bog'lanish tugmasi orqali murojaat qiling."),
             show_alert=True,
@@ -537,7 +537,7 @@ async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
 @dp.message_handler(ChatTypeFilter(ChatType.PRIVATE), text="📚 Отчет о книге", state="*")
 async def send_daily_report_handler(message: types.Message, state: FSMContext):
     user = await aget_user(message.from_user.id)
-    if user.is_blocked:
+    if user.is_banned:
         await message.answer(
             "🚫 <b>Sizning hisobingiz cheklangan.</b>\n\n"
             "Hisobot yubora olmaysiz. <b>📞 Admin bilan bog'lanish</b> "

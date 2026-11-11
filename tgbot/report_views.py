@@ -198,7 +198,7 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
     if err:
         return JsonResponse({"ok": False, "error": err}, status=403)
 
-    if profile.is_blocked:
+    if profile.is_banned:
         return JsonResponse({"ok": False, "error": "blocked"}, status=403)
 
     entries = body.get("entries")

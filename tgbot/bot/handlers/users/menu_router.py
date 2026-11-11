@@ -117,7 +117,7 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
 
     # Blocked users can ONLY reach the "contact admin" path so they can
     # appeal. Everything else short-circuits with a clear message.
-    if user and user.is_blocked and action != "contact":
+    if user and user.is_banned and action != "contact":
         await call.answer()
         await call.message.answer(
             _t(
@@ -212,7 +212,7 @@ async def _menu_report(call, user, state: FSMContext):
     if not user:
         await call.message.answer(_t(lang, "Avval /start bosing", "Сначала /start"))
         return
-    if user.is_blocked:
+    if user.is_banned:
         await call.message.answer(
             _t(
                 lang,

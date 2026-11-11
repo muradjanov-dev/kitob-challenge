@@ -70,7 +70,7 @@ class TelegramProfileAdmin(admin.ModelAdmin):
             "fields": ("language", "gender", "region", "group")
         }),
         ("System Status", {
-            "fields": ("referral_code", "ball", "is_registered", "is_blocked", "is_admin",
+            "fields": ("referral_code", "ball", "is_registered", "is_blocked", "is_banned", "is_admin",
                        "trial_premium_until")
         }),
         ("Timestamps", {
