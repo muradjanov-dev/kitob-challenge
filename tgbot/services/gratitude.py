@@ -152,7 +152,13 @@ def letter_for(p) -> tuple:
     except Exception as e:
         msg = str(e)
         print(f"gratitude letter {p.id}: {msg[:200]}")
-        if "429" in msg or "quota" in msg.lower() or "rate" in msg.lower():
+        low = msg.lower()
+        if "429" in msg or "quota" in low or "rate limit" in low or "resource_exhausted" in low:
+            try:
+                from django.core.cache import cache
+                cache.set(f"gratitude_last_error:{CAMPAIGN}", msg[:300], 60 * 60 * 24)
+            except Exception:
+                pass
             raise RateLimited(msg[:200])
         body, src = _fallback(f), "template"
     text = (f"💌 <b>{escape(f['name'], quote=False)}, Kitob Challenge'dan Sizga maktub</b>\n\n"

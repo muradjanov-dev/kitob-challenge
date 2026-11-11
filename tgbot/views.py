@@ -1390,7 +1390,8 @@ def internal_ops(request: HttpRequest, action: str):
         from tgbot.models import TelegramProfile
         from tgbot.services import gratitude
         out = {"ok": True, "pending": len(gratitude.pending_ids()),
-               "stats": _c.get(f"gratitude_stats:{gratitude.CAMPAIGN}")}
+               "stats": _c.get(f"gratitude_stats:{gratitude.CAMPAIGN}"),
+               "last_quota_error": _c.get(f"gratitude_last_error:{gratitude.CAMPAIGN}")}
         sample = body.get("sample")
         if sample:
             if isinstance(sample, list):
