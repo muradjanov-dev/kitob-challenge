@@ -641,6 +641,7 @@
       <div>
         <div class="label">Sizning balansingiz</div>
         <div class="value"><span id="balanceVal">0</span><span class="unit">Kitobcha</span></div>
+        <div class="label" id="walletLine" style="display:none;margin-top:3px;text-transform:none;letter-spacing:0">👛 Hamyon: <b id="walletVal">0</b> so'm</div>
       </div>
     </div>
   </div>
@@ -763,6 +764,21 @@
     // Smallest amount of Kitobcha anyone puts in anywhere: an opening bid, a
     // raise, a charity contribution. Mirrors MIN_BID_STEP on the server.
     const MIN_STEP = 100;
+    // Products may be priced in so'm (paid from the wallet) as well as in
+    // Kitobcha (owner, 2026-11-11). Every amount of a product is in its own
+    // currency; these helpers pick the balance, unit, icon and bid step.
+    let wallet = 0;
+    const SOM_STEP = 1000;
+    const isSom = (p) => p && p.currency === "som";
+    const balFor = (p) => isSom(p) ? wallet : balance;
+    const unitFor = (p) => isSom(p) ? "so'm" : "Kitobcha";
+    const iconFor = (p) => isSom(p) ? "💵" : "🪙";
+    const stepFor = (p) => isSom(p) ? SOM_STEP : MIN_STEP;
+    const coinFor = (p) => isSom(p) ? '<span style="font-size:15px">💵</span>' : '<span class="mini-coin"></span>';
+    function takeBalances(d) {
+      if (d && typeof d.balance === "number") balance = d.balance;
+      if (d && typeof d.wallet_balance === "number") wallet = d.wallet_balance;
+    }
 
     // ─── Sound engine (Web Audio API, synthesized) ───────────
     const SOUND_KEY_ENABLED = "kc_shop_sound_on";
@@ -860,7 +876,7 @@
         }
         return;
       }
-      balance = r.data.balance;
+      takeBalances(r.data);
       balanceLoaded = true;
       renderBalance(false);
       renderGrid(); // refresh shortfall notes now that balance is known
@@ -874,6 +890,8 @@
       document.getElementById("balanceWrap").style.display = "block";
       const el = document.getElementById("balanceVal");
       el.textContent = balance;
+      document.getElementById("walletLine").style.display = "block";
+      document.getElementById("walletVal").textContent = fmtNum(wallet);
       if (pulse) {
         el.parentNode.classList.remove("pulse");
         void el.parentNode.offsetWidth;
@@ -919,18 +937,18 @@
           ? '<div class="price-row" style="font-size:12.5px"><span class="mini-coin"></span>' + fmtNum(charityProgress) + '<span style="font-size:11px;color:var(--text-dim);margin-left:2px">/ ' + fmtNum(p.charity_step) + '</span></div>' +
             '<div class="charity-bar"><span style="width:' + Math.min(100, charityProgress * 100 / (p.charity_step || 100000)).toFixed(1) + '%"></span></div>'
           : p.is_auction
-          ? '<div class="price-row"><span class="mini-coin"></span>' + (p.highest_bid || p.min_start_bid) + '<span style="font-size:11px;color:var(--text-dim);margin-left:4px">eng yuqori</span></div>'
-          : '<div class="price-row"><span class="mini-coin"></span>' + p.price + '</div>';
+          ? '<div class="price-row">' + coinFor(p) + fmtNum(p.highest_bid || p.min_start_bid) + (isSom(p) ? " so'm" : '') + '<span style="font-size:11px;color:var(--text-dim);margin-left:4px">eng yuqori</span></div>'
+          : '<div class="price-row">' + coinFor(p) + fmtNum(p.price) + (isSom(p) ? " so'm" : '') + '</div>';
 
         const auctionNote = p.is_charity
           ? '<div class="stock" style="color:#4ade80;font-weight:700">🤲 Istagancha hissa qo\'shing</div>'
           : p.is_auction
-          ? '<div class="stock urgent">⏳ 10 kunlik auksion (' + (p.bids_count || 0) + ' ta taklif)</div>'
+          ? '<div class="stock urgent">⏳ Auksion (' + (p.bids_count || 0) + ' ta taklif)</div>'
           : stockNote;
 
-        const shortfall = p.price - balance;
+        const shortfall = p.price - balFor(p);
         const shortfallNote = (!p.is_auction && !p.is_charity && balanceLoaded && p.is_available && shortfall > 0)
-          ? '<div class="shortfall">Yana ' + shortfall + ' 🪙 kerak</div>' : '';
+          ? '<div class="shortfall">Yana ' + fmtNum(shortfall) + ' ' + iconFor(p) + ' kerak</div>' : '';
 
         card.innerHTML =
           badgeHtml +
@@ -1018,6 +1036,8 @@
 
       const d = r.data;
       const prod = d.product;
+      if (d.signed_in) takeBalances(d);
+      const IC = iconFor(prod), UN = unitFor(prod), STEP = stepFor(prod);
       const topBids = d.top_bids || [];
       const myBid = d.my_bid || 0;
       const myRank = d.my_rank;
@@ -1035,41 +1055,43 @@
           lbHtml += '<div class="lb-row' + isMeClass + '">' +
                       '<div class="lb-rank ' + rankClass + '">' + medal + '</div>' +
                       '<div class="lb-name">' + nameLabel + '</div>' +
-                      '<div class="lb-amount">' + b.amount + ' 🪙</div>' +
+                      '<div class="lb-amount">' + fmtNum(b.amount) + ' ' + IC + '</div>' +
                     '</div>';
         });
       }
 
       const myBidHtml = myBid > 0
         ? '<div class="my-bid-box">' +
-            '<div><div class="lbl">Sizning taklifingiz</div><div class="val">' + myBid + ' 🪙</div></div>' +
+            '<div><div class="lbl">Sizning taklifingiz</div><div class="val">' + fmtNum(myBid) + ' ' + IC + '</div></div>' +
             '<div><div class="lbl">Joriy o\'rningiz</div><div class="val" style="color:#fff">#' + (myRank || '-') + '</div></div>' +
           '</div>'
         : '<div class="my-bid-box">' +
             '<div><div class="lbl">Sizning taklifingiz</div><div class="val" style="font-size:14px;color:var(--text-dim)">Hali taklif bermadingiz</div></div>' +
-            '<div style="font-size:12px;color:var(--accent);font-weight:700">Min. ' + Math.max(prod.min_start_bid || 0, MIN_STEP) + ' 🪙</div>' +
+            '<div style="font-size:12px;color:var(--accent);font-weight:700">Min. ' + fmtNum(Math.max(prod.min_start_bid || 0, STEP)) + ' ' + IC + '</div>' +
           '</div>';
 
-      const minAllowed = myBid > 0 ? myBid + MIN_STEP : Math.max(prod.min_start_bid || 0, MIN_STEP);
+      const minAllowed = myBid > 0 ? myBid + STEP : Math.max(prod.min_start_bid || 0, STEP);
       const suggested1 = minAllowed;
-      const suggested2 = suggested1 + 400;
-      const suggested3 = suggested1 + 900;
+      const suggested2 = suggested1 + STEP * 4;
+      const suggested3 = suggested1 + STEP * 9;
 
       const biddingForm = isEnded
         ? '<div class="err-line" style="color:var(--error);text-align:center;font-weight:700;font-size:15px;margin:16px 0">Ushbu auksion yakunlangan!</div>'
-        : '<div class="leaderboard-title">' + (myBid > 0 ? 'Taklifni oshiring (kamida +' + MIN_STEP + ' 🪙):' : 'O\'z taklifingizni bering (kamida ' + minAllowed + ' 🪙):') + '</div>' +
+        : '<div class="leaderboard-title">' + (myBid > 0 ? 'Taklifni oshiring (kamida +' + fmtNum(STEP) + ' ' + IC + '):' : 'O\'z taklifingizni bering (kamida ' + fmtNum(minAllowed) + ' ' + IC + '):') + '</div>' +
           '<div class="quick-bids">' +
-            '<button type="button" class="quick-bid-chip" data-val="' + suggested1 + '">' + suggested1 + ' 🪙</button>' +
-            '<button type="button" class="quick-bid-chip" data-val="' + suggested2 + '">' + suggested2 + ' 🪙</button>' +
-            '<button type="button" class="quick-bid-chip" data-val="' + suggested3 + '">' + suggested3 + ' 🪙</button>' +
+            '<button type="button" class="quick-bid-chip" data-val="' + suggested1 + '">' + fmtNum(suggested1) + ' ' + IC + '</button>' +
+            '<button type="button" class="quick-bid-chip" data-val="' + suggested2 + '">' + fmtNum(suggested2) + ' ' + IC + '</button>' +
+            '<button type="button" class="quick-bid-chip" data-val="' + suggested3 + '">' + fmtNum(suggested3) + ' ' + IC + '</button>' +
           '</div>' +
           '<div class="bid-input-wrap">' +
-            '<input type="number" id="bidInput" class="bid-input" value="' + suggested1 + '" min="' + minAllowed + '" step="' + MIN_STEP + '" placeholder="Miqdor (🪙)" />' +
+            '<input type="number" id="bidInput" class="bid-input" value="' + suggested1 + '" min="' + minAllowed + '" step="' + STEP + '" placeholder="Miqdor (' + IC + ')" />' +
           '</div>' +
-          '<button class="buy-btn" id="placeBidBtn" style="margin-top:12px">🪙 Taklifni yuborish</button>' +
+          '<button class="buy-btn" id="placeBidBtn" style="margin-top:12px">' + IC + ' Taklifni yuborish</button>' +
           '<div class="err-line" id="bidErrLine"></div>' +
           '<div style="font-size:11.5px;color:var(--text-dim);text-align:center;margin-top:6px;line-height:1.4">' +
-            '💡 Agar yutmasangiz, 10 kundan keyin barcha Kitobchalaringiz to\'liq balansingizga qaytariladi!' +
+            (isSom(prod)
+              ? '💡 Taklif hamyoningizdan band qilinadi. Yutmasangiz, auksion tugashi bilan to\'liq hamyoningizga qaytadi.'
+              : '💡 Agar yutmasangiz, auksion tugashi bilan barcha Kitobchalaringiz to\'liq balansingizga qaytariladi!') +
           '</div>';
 
       document.getElementById("aucSpinner").style.display = "none";
@@ -1109,8 +1131,8 @@
           const val = parseInt(input.value, 10);
           if (isNaN(val) || val < minAllowed) {
             err.textContent = myBid > 0
-              ? "Taklifni kamida " + MIN_STEP + " Kitobchaga oshiring (" + minAllowed + " 🪙 dan)."
-              : "Minimal taklif miqdori — " + minAllowed + " Kitobcha!";
+              ? "Taklifni kamida " + fmtNum(STEP) + " " + UN + "ga oshiring (" + fmtNum(minAllowed) + " " + IC + " dan)."
+              : "Minimal taklif miqdori — " + fmtNum(minAllowed) + " " + UN + "!";
             sound.play("error");
             return;
           }
@@ -1119,18 +1141,18 @@
           const res = await api('/shop/api/bid/', { method: 'POST', body: { product_id: p.id, bid_amount: val } });
           if (!res.ok || !res.data.ok) {
             placeBtn.disabled = false;
-            placeBtn.textContent = "🪙 Taklifni yuborish";
+            placeBtn.textContent = IC + " Taklifni yuborish";
             sound.play("error");
             const msg = ({
-              insufficient_balance: "Balansingizda yetarli Kitobcha yo\'q.",
-              bid_too_low: "Minimal taklif — " + minAllowed + " Kitobcha.",
-              must_increase_bid: "Taklifni kamida " + MIN_STEP + " Kitobchaga oshiring.",
+              insufficient_balance: isSom(prod) ? "Hamyoningizda mablag' yetarli emas — botda 👛 Hamyon bo'limidan to'ldiring." : "Balansingizda yetarli Kitobcha yo\'q.",
+              bid_too_low: "Minimal taklif — " + fmtNum(minAllowed) + " " + UN + ".",
+              must_increase_bid: "Taklifni kamida " + fmtNum(STEP) + " " + UN + "ga oshiring.",
               auction_ended: "Auksion yakunlangan.",
             })[res.data.error] || (res.data.error || "Xatolik yuz berdi");
             err.textContent = msg;
             return;
           }
-          balance = res.data.balance;
+          takeBalances(res.data);
           renderBalance(true);
           sound.play("success");
           fireConfetti();
@@ -1284,12 +1306,12 @@
       // a false "Yetarli emas" while it's still unknown. The buy button
       // stays tappable either way; api_buy re-validates server-side and
       // buyOpen() already handles a real insufficient_balance response.
-      const canAfford = !balanceLoaded || balance >= p.price;
+      const canAfford = !balanceLoaded || balFor(p) >= p.price;
       const buyLabel = !balanceLoaded
-        ? p.price + ' Kitobcha bilan sotib olish'
+        ? fmtNum(p.price) + ' ' + unitFor(p) + ' bilan sotib olish'
         : (canAfford
-            ? p.price + ' Kitobcha bilan sotib olish'
-            : 'Yetarli emas — yana ' + (p.price - balance) + ' 🪙 kerak');
+            ? fmtNum(p.price) + ' ' + unitFor(p) + ' bilan sotib olish'
+            : 'Yetarli emas — yana ' + fmtNum(p.price - balFor(p)) + ' ' + iconFor(p) + ' kerak');
       const premiumNote = p.grants_premium_days
         ? '<div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:8px 12px;margin:8px 0;color:#fbbf24;font-size:13px;font-weight:700;text-align:center;">⭐ ' + p.grants_premium_days + ' kunlik Premium (Avtomatik faollashadi!)</div>'
         : '';
@@ -1298,7 +1320,8 @@
         '<h2>' + escapeHTML(p.name) + '</h2>' +
         premiumNote +
         (p.description ? '<div class="desc">' + escapeHTML(p.description) + '</div>' : '') +
-        '<div class="price-big"><span class="mini-coin"></span>' + p.price + '<span style="font-size:13px;color:var(--text-dim);font-weight:600;margin-left:6px;">Kitobcha</span></div>' +
+        '<div class="price-big">' + coinFor(p) + fmtNum(p.price) + '<span style="font-size:13px;color:var(--text-dim);font-weight:600;margin-left:6px;">' + unitFor(p) + '</span></div>' +
+        (isSom(p) ? '<div style="font-size:12px;color:var(--text-dim);text-align:center;margin:-4px 0 8px">👛 Hamyoningizdan yechiladi</div>' : '') +
         '<button class="buy-btn" id="buyBtn"' + (canAfford ? '' : ' disabled') + '>' + buyLabel + '</button>' +
         '<div class="err-line" id="errLine"></div>' +
         '<button class="close-btn" id="cancelBtn">Bekor qilish</button>'
@@ -1324,17 +1347,17 @@
         }
         sound.play("error");
         const msg = ({
-          insufficient_balance: "Yetarli Kitobcha yo'q.",
+          insufficient_balance: isSom(openProduct) ? "Hamyoningizda mablag' yetarli emas — botda 👛 Hamyon bo'limidan to'ldiring." : "Yetarli Kitobcha yo'q.",
           out_of_stock: "Mahsulot tugadi.",
           product_unavailable: "Mahsulot mavjud emas.",
           invalid_init_data: "Ulanishda muammo — sahifani qayta yuklab, qayta urinib ko'ring.",
         })[r.data.error] || ("Xatolik: " + (r.data.error || r.status));
         err.textContent = msg;
         btn.disabled = false;
-        btn.textContent = openProduct.price + ' Kitobcha bilan sotib olish';
+        btn.textContent = fmtNum(openProduct.price) + ' ' + unitFor(openProduct) + ' bilan sotib olish';
         return;
       }
-      balance = r.data.balance;
+      takeBalances(r.data);
       renderBalance(true);
       sound.play("success");
       fireConfetti();

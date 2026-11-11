@@ -31,9 +31,11 @@ def _is_admin(user) -> bool:
 
 def _shop_admin_menu_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(InlineKeyboardButton("🛍 Oddiy mahsulot qo'shish", callback_data="shopadm:add:normal"))
+    kb.add(InlineKeyboardButton("🛍 Oddiy mahsulot (Kitobcha)", callback_data="shopadm:add:normal"))
+    kb.add(InlineKeyboardButton("💵 Oddiy mahsulot (so'm, hamyondan)", callback_data="shopadm:add:normal_som"))
+    kb.add(InlineKeyboardButton("🏛 Auksion (Kitobcha)", callback_data="shopadm:add:auction"))
+    kb.add(InlineKeyboardButton("💵 Auksion (so'm, hamyondan)", callback_data="shopadm:add:auction_som"))
     kb.add(InlineKeyboardButton("⭐ Premium obuna qo'shish (Avto)", callback_data="shopadm:add:premium"))
-    kb.add(InlineKeyboardButton("🏛 Auksion sovg'a qo'shish", callback_data="shopadm:add:auction"))
     kb.add(InlineKeyboardButton("📋 Mahsulotlar ro'yxati", callback_data="shopadm:list:0"))
     kb.add(InlineKeyboardButton("🔙 Admin panelga qaytish", callback_data="menu:admin"))
     return kb
@@ -52,7 +54,8 @@ async def shop_admin_menu(message: types.Message, user):
     is_admin is already enforced by the router."""
     await message.answer(
         "🛒 <b>Do'kon boshqaruvi</b>\n\n"
-        "Bot orqali oddiy mahsulot, <b>⭐ Premium obuna (avtomatik beriluvchi)</b> yoki <b>🏛 Auksion sovg'a</b> qo'shish, ko'rish va boshqarish mumkin.\n"
+        "Bot orqali oddiy mahsulot, <b>🏛 auksion</b> (Kitobchada yoki <b>💵 so'mda</b> — so'm kitobxon hamyonidan yechiladi) "
+        "yoki <b>⭐ Premium obuna</b> qo'shish, ko'rish va boshqarish mumkin.\n"
         "Kengaytirilgan boshqaruv uchun Django admin panelidan ham foydalanishingiz mumkin.",
         parse_mode="HTML",
         reply_markup=_shop_admin_menu_kb(),
@@ -77,25 +80,30 @@ _WIZARD_STATES = [
 ]
 
 
-@dp.callback_query_handler(lambda c: c.data in ("shopadm:add", "shopadm:add:normal", "shopadm:add:premium", "shopadm:add:auction"), state="*")
+@dp.callback_query_handler(lambda c: c.data in ("shopadm:add", "shopadm:add:normal", "shopadm:add:premium", "shopadm:add:auction",
+                                                 "shopadm:add:normal_som", "shopadm:add:auction_som"), state="*")
 async def shopadm_add_start(call: types.CallbackQuery, state: FSMContext):
     user = await aget_user(call.from_user.id)
     if not _is_admin(user):
         await call.answer("Faqat adminlar uchun", show_alert=True)
         return
     await call.answer()
-    is_auction = (call.data == "shopadm:add:auction")
+    is_auction = call.data in ("shopadm:add:auction", "shopadm:add:auction_som")
     is_premium = (call.data == "shopadm:add:premium")
+    currency = "som" if call.data.endswith("_som") else "kitobcha"
     await state.finish()
     await ShopProductCreateState.name.set()
-    await state.update_data(is_auction=is_auction, is_premium=is_premium)
+    await state.update_data(is_auction=is_auction, is_premium=is_premium, currency=currency)
 
     if is_auction:
-        mode_label = "🏛 <b>Auksion sovg'a qo'shish</b>"
+        mode_label = ("💵 <b>So'mdagi auksion qo'shish</b> (takliflar hamyondan)" if currency == "som"
+                      else "🏛 <b>Auksion sovg'a qo'shish</b>")
         example_name = "Nodir «O'tkan kunlar» qo'lyozmasi"
     elif is_premium:
         mode_label = "⭐ <b>Premium obuna qo'shish (Avtomatik faollashuvchi)</b>"
         example_name = "Kitob Challenge Premium (1 oylik)"
+    elif currency == "som":
+        mode_label = "💵 <b>So'mdagi mahsulot qo'shish</b> (narx hamyondan yechiladi)"
     else:
         mode_label = "🛍 <b>Oddiy mahsulot qo'shish</b>"
         example_name = "Mutolaa vaucheri 50 000 so'm"
@@ -178,18 +186,20 @@ async def shopadm_image_invalid(message: types.Message, state: FSMContext):
 async def _ask_price_or_bid(message: types.Message, state: FSMContext):
     data = await state.get_data()
     is_auction = data.get("is_auction", False)
+    som = data.get("currency") == "som"
     await ShopProductCreateState.price.set()
     if is_auction:
         await message.answer(
             "4️⃣ <b>Boshlang'ich qiymatni (minimal stavka) yuboring:</b>\n\n"
             "Ishtirokchilar auksionda kamida shu miqdordan boshlab taklif berishadi.\n"
-            "Masalan: <code>100</code> yoki <code>500</code> Kitobcha",
+            + ("Masalan: <code>20000</code> so'm (har taklif kamida 1 000 so'mga oshadi)" if som
+               else "Masalan: <code>100</code> yoki <code>500</code> Kitobcha"),
             parse_mode="HTML",
         )
     else:
         await message.answer(
-            "4️⃣ <b>Narxni Kitobchada yuboring:</b>\n\n"
-            "Faqat raqam, masalan: <code>250</code>",
+            ("4️⃣ <b>Narxni so'mda yuboring:</b>\n\nFaqat raqam, masalan: <code>45000</code>" if som else
+             "4️⃣ <b>Narxni Kitobchada yuboring:</b>\n\nFaqat raqam, masalan: <code>250</code>"),
             parse_mode="HTML",
         )
 
@@ -277,10 +287,11 @@ async def _show_preview(message: types.Message, state: FSMContext):
     is_premium = data.get("is_premium", False)
     duration_days = data.get("duration_days", 30)
     has_img = "Ha" if data.get("image_file_id") else "Yo'q"
+    unit = "so'm (hamyondan)" if data.get("currency") == "som" else "Kitobcha"
 
     if is_auction:
         type_label = "🏛 Auksion (Kimoshdi savdosi)"
-        cost_label = f"<b>Boshlang'ich stavka:</b> {price} Kitobcha"
+        cost_label = f"<b>Boshlang'ich stavka:</b> {price} {unit}"
         limit_label = f"<b>Auksion davomiyligi:</b> {duration_days} kun"
     elif is_premium:
         type_label = "⭐ Premium obuna (Avtomatik ochiladi)"
@@ -288,7 +299,7 @@ async def _show_preview(message: types.Message, state: FSMContext):
         limit_label = f"<b>Premium muddati:</b> {duration_days} kun (Cheksiz zaxira)"
     else:
         type_label = "🛍 Oddiy mahsulot"
-        cost_label = f"<b>Narx:</b> {price} Kitobcha"
+        cost_label = f"<b>Narx:</b> {price} {unit}"
         limit_label = f"<b>Zaxira:</b> {'Cheksiz' if stock is None else str(stock)}"
 
     text = (
@@ -309,7 +320,8 @@ async def _show_preview(message: types.Message, state: FSMContext):
 
 
 @sync_to_async
-def _create_product_sync(name, description, price, stock, is_auction=False, is_premium=False, duration_days=10):
+def _create_product_sync(name, description, price, stock, is_auction=False, is_premium=False, duration_days=10,
+                         currency="kitobcha"):
     import datetime
     from django.utils import timezone
     auction_end = timezone.now() + datetime.timedelta(days=duration_days) if is_auction else None
@@ -323,6 +335,7 @@ def _create_product_sync(name, description, price, stock, is_auction=False, is_p
         min_start_bid=price if is_auction else 100,
         auction_end_at=auction_end,
         grants_premium_days=premium_days,
+        currency="kitobcha" if is_premium else currency,
         is_active=True,
     )
 
@@ -351,7 +364,8 @@ async def shopadm_save(call: types.CallbackQuery, state: FSMContext):
     await call.answer("Saqlanmoqda…")
     product = await _create_product_sync(
         name, description, price, stock,
-        is_auction=is_auction, is_premium=is_premium, duration_days=duration_days
+        is_auction=is_auction, is_premium=is_premium, duration_days=duration_days,
+        currency=data.get("currency") or "kitobcha",
     )
 
     if file_id:
@@ -369,7 +383,7 @@ async def shopadm_save(call: types.CallbackQuery, state: FSMContext):
         await call.message.answer(
             "🏛 <b>Auksion muvaffaqiyatli boshlandi!</b>\n\n"
             f"<b>{_escape(product.name)}</b>\n"
-            f"💰 Boshlang'ich taklif: <b>{product.min_start_bid} Kitobcha</b>\n"
+            f"💰 Boshlang'ich taklif: <b>{product.min_start_bid} {product.currency_label}</b>\n"
             f"⏳ Davomiyligi: <b>{duration_days} kun</b>",
             parse_mode="HTML",
             reply_markup=_shop_admin_menu_kb(),
@@ -388,7 +402,7 @@ async def shopadm_save(call: types.CallbackQuery, state: FSMContext):
         await call.message.answer(
             "✅ <b>Mahsulot qo'shildi!</b>\n\n"
             f"<b>{_escape(product.name)}</b>\n"
-            f"💰 {product.price_kitobcha} Kitobcha • 📦 {stock_label}",
+            f"💰 {product.price_kitobcha} {product.currency_label} • 📦 {stock_label}",
             parse_mode="HTML",
             reply_markup=_shop_admin_menu_kb(),
         )
@@ -411,8 +425,10 @@ async def _announce_new_product_to_groups(product: ShopProduct):
             "🏛 <b>KITOB CHALLENGE'DA YANGI AUKSION BOSHLANDI!</b> 🔥📚\n\n"
             f"🌟 <b>{_escape(product.name)}</b>\n"
             f"{desc_line}\n"
-            f"💰 <b>Boshlang'ich minimal taklif:</b> {product.min_start_bid or 100} Kitobcha\n"
-            "🎯 <b>100% Xavfsiz:</b> Agar g'olib bo'la olmasangiz, barcha tikkan Kitobchalaringiz to'liq balansingizga qaytariladi!\n\n"
+            f"💰 <b>Boshlang'ich minimal taklif:</b> {product.min_start_bid or 100} {product.currency_label}\n"
+            + ("🎯 <b>100% Xavfsiz:</b> Taklifingiz hamyoningizda band turadi; g'olib bo'lmasangiz, to'liq qaytariladi!\n\n"
+               if product.is_som else
+               "🎯 <b>100% Xavfsiz:</b> Agar g'olib bo'la olmasangiz, barcha tikkan Kitobchalaringiz to'liq balansingizga qaytariladi!\n\n") +
             "👇 <i>Do'konga kiring va o'z taklifingizni bering!</i>"
         )
     elif product.grants_premium_days:
@@ -431,7 +447,7 @@ async def _announce_new_product_to_groups(product: ShopProduct):
             "🛍 <b>Do'konga yangi mahsulot qo'shildi!</b>\n\n"
             f"<b>{_escape(product.name)}</b>\n"
             f"{desc_line}\n"
-            f"💰 <b>{product.price_kitobcha} Kitobcha</b> • 📦 {stock_label}\n\n"
+            f"💰 <b>{product.price_kitobcha} {product.currency_label}</b> • 📦 {stock_label}\n\n"
             "Sotib olish uchun: «🛒 Do'kon» bo'limiga o'ting!"
         )
 
@@ -477,7 +493,7 @@ def _list_products_sync(page=0):
     qs = ShopProduct.objects.order_by("sort_order", "-created_at")
     total = qs.count()
     start = max(0, int(page)) * LIST_PAGE
-    return list(qs.values("id", "name", "price_kitobcha", "stock_qty", "is_active")[start:start + LIST_PAGE]), total
+    return list(qs.values("id", "name", "price_kitobcha", "stock_qty", "is_active", "currency")[start:start + LIST_PAGE]), total
 
 
 def _list_kb(rows, page=0, total=0) -> InlineKeyboardMarkup:
@@ -489,7 +505,8 @@ def _list_kb(rows, page=0, total=0) -> InlineKeyboardMarkup:
     for r in rows:
         status_icon = "✅" if r["is_active"] else "⏸"
         stock = "∞" if r["stock_qty"] is None else r["stock_qty"]
-        title = f"{status_icon} {r['name'][:24]} • {r['price_kitobcha']}🪙 • {stock}📦"
+        icon = "💵" if r.get("currency") == "som" else "🪙"
+        title = f"{status_icon} {r['name'][:24]} • {r['price_kitobcha']}{icon} • {stock}📦"
         kb.row(InlineKeyboardButton(title, callback_data=f"shopadm:view:{r['id']}"))
     pages = max(1, (total + LIST_PAGE - 1) // LIST_PAGE)
     if pages > 1:
@@ -569,7 +586,7 @@ async def shopadm_view(call: types.CallbackQuery, state: FSMContext):
     text = (
         f"🛒 <b>{_escape(p.name)}</b>\n\n"
         f"{_escape(p.description) if p.description else '—'}\n\n"
-        f"💰 Narx: <b>{p.price_kitobcha} Kitobcha</b>\n"
+        f"💰 Narx: <b>{p.price_kitobcha} {p.currency_label}</b>\n"
         f"📦 Zaxira: <b>{stock_label}</b>\n"
         f"⚙️ Holat: {status}"
     )
@@ -607,7 +624,7 @@ async def shopadm_toggle(call: types.CallbackQuery, state: FSMContext):
             await call.message.edit_text(
                 f"🛒 <b>{_escape(p.name)}</b>\n\n"
                 f"{_escape(p.description) if p.description else '—'}\n\n"
-                f"💰 Narx: <b>{p.price_kitobcha} Kitobcha</b>\n"
+                f"💰 Narx: <b>{p.price_kitobcha} {p.currency_label}</b>\n"
                 f"📦 Zaxira: <b>{stock_label}</b>\n"
                 f"⚙️ Holat: {status}",
                 parse_mode="HTML",

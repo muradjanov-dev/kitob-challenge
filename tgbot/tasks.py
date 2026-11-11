@@ -8460,6 +8460,7 @@ def settle_finished_auctions():
                     product=product,
                     product_name_snapshot=product.name,
                     price_at_purchase=winner_bid.amount,
+                    currency=product.currency,
                     code=code,
                     status=ShopPurchase.STATUS_PENDING,
                 )
@@ -8468,7 +8469,7 @@ def settle_finished_auctions():
                 text_winner = (
                     "🎉 <b>Tabriklaymiz, siz auksion g'olibi bo'ldingiz!</b> 🏆\n\n"
                     f"📚 <b>{product.name}</b> kitobi sizniki bo'ldi!\n"
-                    f"💰 Yakuniy taklifingiz: <b>{winner_bid.amount} Kitobcha</b>\n"
+                    f"💰 Yakuniy taklifingiz: <b>{winner_bid.amount} {product.currency_label}</b>\n"
                     f"🎫 Buyurtma kodingiz: <code>{purchase.code}</code>\n\n"
                     "📞 Admin tez orada siz bilan bog'lanib kitobni yetkazib beradi."
                 )
@@ -8486,29 +8487,9 @@ def settle_finished_auctions():
                 except Exception:
                     pass
 
-                # Refund all other bidders
+                # Refund all other bidders (in the auction's currency)
                 for other_bid in bids[1:]:
-                    try:
-                        other_user = other_bid.user
-                        other_user.ball = (other_user.ball or Decimal("0")) + Decimal(other_bid.amount)
-                        other_user.save(update_fields=["ball"])
-                        KitobchaLedger.objects.create(
-                            user=other_user, delta=other_bid.amount, reason=f"auction_refund:{product.id}"
-                        )
-                        other_bid.is_refunded = True
-                        other_bid.save(update_fields=["is_refunded"])
-
-                        text_refund = (
-                            f"ℹ️ <b>'{product.name}'</b> kitobi auksioni yakunlandi.\n\n"
-                            f"Siz eng yuqori stavkani qo'ya olmadingiz, lekin tikkan <b>{other_bid.amount} Kitobchangiz</b> to'liq balansingizga qaytarildi! 🪙"
-                        )
-                        requests.post(
-                            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-                            data={"chat_id": other_user.telegram_id, "text": text_refund, "parse_mode": "HTML"},
-                            timeout=5,
-                        )
-                    except Exception as e:
-                        print(f"Auction refund for {other_bid.user_id} failed: {e}")
+                    _refund_losing_bid(other_bid)
 
             # Close auction
             product.is_active = False
@@ -8519,26 +8500,23 @@ def settle_finished_auctions():
 
 
 def _refund_losing_bid(bid):
-    """Hand a losing bidder their Kitobcha back and tell them so."""
+    """Hand a losing bidder their bid back (Kitobcha or so'm) and tell them so."""
     from decimal import Decimal
     from tgbot.models import KitobchaLedger
 
+    from tgbot.services.auction_guard import give_back, refunded_words
     try:
         user = bid.user
         product = bid.product
-        user.ball = (user.ball or Decimal("0")) + Decimal(bid.amount)
-        user.save(update_fields=["ball"])
-        KitobchaLedger.objects.create(
-            user=user, delta=bid.amount, reason=f"auction_refund:{product.id}",
-        )
-        bid.is_refunded = True
-        bid.save(update_fields=["is_refunded"])
+        if not give_back(bid, product):
+            return
         requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
             data={"chat_id": user.telegram_id, "parse_mode": "HTML", "text": (
                 f"ℹ️ <b>{escape(product.name)}</b> auksioni yakunlandi.\n\n"
                 f"Bu safar eng yuqori taklif siznikiga to'g'ri kelmadi, lekin "
-                f"tikkan <b>{bid.amount} Kitobchangiz</b> to'liq qaytarildi 🪙"
+                f"tikkan {refunded_words(product, bid.amount)} to'liq qaytarildi "
+                f"{'💵' if product.is_som else '🪙'}"
             )}, timeout=5,
         )
     except Exception as e:

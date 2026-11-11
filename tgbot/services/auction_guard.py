@@ -18,6 +18,35 @@ def is_settled(product) -> bool:
             or AdCampaign.objects.filter(product=product).exists())
 
 
+def give_back(bid, product) -> bool:
+    """Return one bid to its bidder in the product's currency, once: the bid
+    is claimed first (is_refunded False -> True), so a second caller finds
+    nothing to give back. True when this call refunded it."""
+    if not ShopAuctionBid.objects.filter(id=bid.id, is_refunded=False).update(is_refunded=True):
+        return False
+    bid.is_refunded = True
+    if product.is_som:
+        from django.db import transaction
+        from tgbot.models import WalletTransaction
+        from tgbot.services import wallet
+        with transaction.atomic():
+            p = TelegramProfile.objects.select_for_update().get(id=bid.user_id)
+            wallet.credit_locked(p, bid.amount, WalletTransaction.KIND_SHOP_REFUND,
+                                 f"Auksion qaytimi #{product.id}")
+    else:
+        TelegramProfile.objects.filter(id=bid.user_id).update(ball=F("ball") + bid.amount)
+        KitobchaLedger.objects.create(user_id=bid.user_id, delta=bid.amount,
+                                      reason=f"auction_refund:{product.id}")
+    return True
+
+
+def refunded_words(product, amount) -> str:
+    """'<b>500 Kitobchangiz</b>' / '<b>50 000 so'm</b> hamyoningizga'."""
+    if product.is_som:
+        return f"<b>{amount:,} so'm</b> hamyoningizga".replace(",", " ")
+    return f"<b>{amount} Kitobchangiz</b>"
+
+
 def refund_open_bids(product) -> int:
     """Give back every bid not yet refunded on an unsettled auction."""
     if not product.is_auction or is_settled(product):
@@ -28,19 +57,16 @@ def refund_open_bids(product) -> int:
     import requests
     done = 0
     for bid in list(product.auction_bids.filter(is_refunded=False).select_related("user")):
-        # Claim the bid first: a second caller finds nothing to update.
-        if not ShopAuctionBid.objects.filter(id=bid.id, is_refunded=False).update(is_refunded=True):
+        if not give_back(bid, product):
             continue
-        TelegramProfile.objects.filter(id=bid.user_id).update(ball=F("ball") + bid.amount)
-        KitobchaLedger.objects.create(user_id=bid.user_id, delta=bid.amount,
-                                      reason=f"auction_refund:{product.id}")
         done += 1
         try:
             requests.post(
                 f"https://api.telegram.org/bot{os.environ.get('API_TOKEN', '')}/sendMessage",
                 data={"chat_id": bid.user.telegram_id, "parse_mode": "HTML", "text": (
                     f"ℹ️ <b>{html.escape(product.name, quote=False)}</b> auksioni bekor qilindi.\n\n"
-                    f"Tikkan <b>{bid.amount} Kitobchangiz</b> to'liq qaytarildi 🪙"
+                    f"Tikkan {refunded_words(product, bid.amount)} to'liq qaytarildi "
+                    f"{'💵' if product.is_som else '🪙'}"
                 )}, timeout=5,
             )
         except Exception as e:

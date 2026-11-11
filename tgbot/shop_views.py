@@ -37,6 +37,16 @@ from tgbot.models import (
 
 # Smallest opening bid and smallest raise in an auction.
 MIN_BID_STEP = CHARITY_MIN_CONTRIBUTION
+# The same for an auction in so'm (paid from the wallet).
+MIN_BID_STEP_SOM = 1000
+
+
+def _bid_step(product) -> int:
+    return MIN_BID_STEP_SOM if product.is_som else MIN_BID_STEP
+
+
+def _wallet_of(profile) -> int:
+    return int(getattr(profile, "wallet_balance", 0) or 0)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -169,6 +179,7 @@ def _product_payload(p: ShopProduct, request: HttpRequest) -> dict:
     return {
         "id": p.id,
         "name": p.name,
+        "currency": p.currency,
         "description": p.description or "",
         "image_url": img,
         "price": p.price_kitobcha,
@@ -245,6 +256,7 @@ def api_auction_details(request: HttpRequest) -> JsonResponse:
         "my_rank": my_rank,
         "is_ended": is_ended,
         "balance": int(viewer.ball or 0) if viewer else None,
+        "wallet_balance": _wallet_of(viewer) if viewer else None,
         "signed_in": bool(viewer),
     })
 
@@ -290,7 +302,8 @@ def api_bid(request: HttpRequest) -> JsonResponse:
                                 "⭐️ Bu auksionda faqat Premium a'zolar qatnasha oladi."),
                 }, status=403)
 
-            min_start = max(product.min_start_bid or 0, MIN_BID_STEP)
+            step = _bid_step(product)
+            min_start = max(product.min_start_bid or 0, step)
             if bid_amount < min_start:
                 return JsonResponse({
                     "ok": False,
@@ -316,16 +329,16 @@ def api_bid(request: HttpRequest) -> JsonResponse:
 
             # Every Kitobcha a user puts in anywhere is at least 100 -- an
             # opening bid and each raise alike.
-            if old_bid_amount and bid_amount - old_bid_amount < MIN_BID_STEP:
+            if old_bid_amount and bid_amount - old_bid_amount < step:
                 return JsonResponse({
                     "ok": False,
                     "error": "must_increase_bid",
                     "my_current_bid": old_bid_amount,
-                    "min_step": MIN_BID_STEP,
+                    "min_step": step,
                 }, status=400)
 
             diff = bid_amount - old_bid_amount
-            user_balance = int(user.ball or 0)
+            user_balance = _wallet_of(user) if product.is_som else int(user.ball or 0)
             if user_balance < diff:
                 return JsonResponse({
                     "ok": False,
@@ -334,12 +347,19 @@ def api_bid(request: HttpRequest) -> JsonResponse:
                     "needed": diff,
                 }, status=400)
 
-            # Deduct the difference from user ball
-            user.ball = (user.ball or Decimal("0")) - Decimal(diff)
-            user.save(update_fields=["ball"])
-            KitobchaLedger.objects.create(
-                user=user, delta=-diff, reason=f"shop_auction_bid:{product.id}"
-            )
+            if product.is_som:
+                # So'm bids are held in the wallet like Kitobcha ones are held
+                # in the balance: refunded when the auction is lost or called off.
+                from tgbot.models import WalletTransaction
+                from tgbot.services import wallet as _wallet
+                _wallet.spend_locked(user, diff, WalletTransaction.KIND_SHOP, f"Auksion taklifi #{product.id}")
+            else:
+                # Deduct the difference from user ball
+                user.ball = (user.ball or Decimal("0")) - Decimal(diff)
+                user.save(update_fields=["ball"])
+                KitobchaLedger.objects.create(
+                    user=user, delta=-diff, reason=f"shop_auction_bid:{product.id}"
+                )
 
             # Save / update the user's bid
             if existing_bid:
@@ -372,6 +392,7 @@ def api_bid(request: HttpRequest) -> JsonResponse:
     return JsonResponse({
         "ok": True,
         "balance": new_balance,
+        "wallet_balance": _wallet_of(user),
         "my_bid": bid_amount,
         "message": "Stavkangiz muvaffaqiyatli qabul qilindi!",
     })
@@ -392,13 +413,15 @@ def _notify_outbid(product, loser, loser_amount: int, new_amount: int) -> None:
     except Exception:
         WEB_DOMAIN = ""
 
+    unit = product.currency_label
+    back = "mablag'ingiz hamyoningizga" if product.is_som else "Kitobchalaringiz"
     text = (
         "\u26A0\uFE0F <b>Kitob qo'lingizdan chiqyapti!</b>\n\n"
         f"\U0001F4DA <b>{_html.escape(product.name)}</b> auksionida sizdan "
         "ko'proq taklif qilishdi.\n\n"
-        f"\U0001FA99 Sizning taklifingiz: <b>{loser_amount}</b> Kitobcha\n"
-        f"\U0001F525 Hozirgi eng yuqori: <b>{new_amount}</b> Kitobcha\n\n"
-        "<i>Agar yutmasangiz, Kitobchalaringiz to'liq qaytariladi. "
+        f"\U0001FA99 Sizning taklifingiz: <b>{loser_amount}</b> {unit}\n"
+        f"\U0001F525 Hozirgi eng yuqori: <b>{new_amount}</b> {unit}\n\n"
+        f"<i>Agar yutmasangiz, {back} to'liq qaytariladi. "
         "Ammo kitob boshqaga ketadi \u2014 taklifingizni oshirasizmi?</i>"
     )
     keyboard = {"inline_keyboard": [[{
@@ -497,6 +520,7 @@ def api_products(request: HttpRequest) -> JsonResponse:
             "telegram_id": request.tg_profile.telegram_id,
             "full_name": request.tg_profile.full_name or "",
             "balance": int(request.tg_profile.ball or 0),
+            "wallet_balance": _wallet_of(request.tg_profile),
             "active_theme": request.tg_profile.active_theme,
             "unlocked_themes": request.tg_profile.unlocked_themes or [],
         },
@@ -512,6 +536,7 @@ def api_me(request: HttpRequest) -> JsonResponse:
         "telegram_id": request.tg_profile.telegram_id,
         "full_name": request.tg_profile.full_name or "",
         "balance": int(request.tg_profile.ball or 0),
+        "wallet_balance": _wallet_of(request.tg_profile),
         "active_theme": request.tg_profile.active_theme,
         "unlocked_themes": request.tg_profile.unlocked_themes or [],
     })
@@ -550,15 +575,21 @@ def api_buy(request: HttpRequest) -> JsonResponse:
             if product.stock_qty is not None and product.stock_qty <= 0:
                 return JsonResponse({"ok": False, "error": "out_of_stock"}, status=400)
             price = product.price_kitobcha
-            if int(user.ball or 0) < price:
+            have = _wallet_of(user) if product.is_som else int(user.ball or 0)
+            if have < price:
                 return JsonResponse({
                     "ok": False, "error": "insufficient_balance",
-                    "balance": int(user.ball or 0), "price": price,
+                    "balance": have, "price": price, "currency": product.currency,
                 }, status=400)
 
-            user.ball = (user.ball or Decimal("0")) - Decimal(price)
-            user.save(update_fields=["ball"])
-            KitobchaLedger.objects.create(user=user, delta=-price, reason="shop_purchase")
+            if product.is_som:
+                from tgbot.models import WalletTransaction
+                from tgbot.services import wallet as _wallet
+                _wallet.spend_locked(user, price, WalletTransaction.KIND_SHOP, f"Do'kon: {product.name}")
+            else:
+                user.ball = (user.ball or Decimal("0")) - Decimal(price)
+                user.save(update_fields=["ball"])
+                KitobchaLedger.objects.create(user=user, delta=-price, reason="shop_purchase")
             if product.stock_qty is not None:
                 product.stock_qty = product.stock_qty - 1
                 product.save(update_fields=["stock_qty"])
@@ -577,6 +608,7 @@ def api_buy(request: HttpRequest) -> JsonResponse:
                 product=product,
                 product_name_snapshot=product.name,
                 price_at_purchase=price,
+                currency=product.currency,
                 code=code,
                 status=ShopPurchase.STATUS_PENDING,
             )
@@ -612,8 +644,10 @@ def api_buy(request: HttpRequest) -> JsonResponse:
             "code": purchase.code,
             "product_name": purchase.product_name_snapshot,
             "price": purchase.price_at_purchase,
+            "currency": purchase.currency,
         },
         "balance": int(user.ball or 0),
+        "wallet_balance": _wallet_of(user),
     })
 
 
@@ -655,7 +689,7 @@ def _notify_admins_of_purchase(purchase: ShopPurchase, buyer: TelegramProfile) -
     text = (
         "🛒 <b>Yangi xarid!</b>\n\n"
         f"🎁 <b>Mahsulot:</b> {product}\n"
-        f"💰 <b>Narx:</b> {purchase.price_at_purchase} Kitobcha\n"
+        f"💰 <b>Narx:</b> {purchase.price_at_purchase} {'so' + chr(39) + 'm (hamyondan)' if purchase.currency == 'som' else 'Kitobcha'}\n"
         f"🎫 <b>Kod:</b> <code>{purchase.code}</code>\n\n"
         f"👤 <b>Xaridor ma'lumotlari</b>\n"
         f"• Ism: <b>{name}</b>\n"

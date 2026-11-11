@@ -406,14 +406,14 @@ class QuizSessionAdmin(admin.ModelAdmin):
 @admin.register(models.ShopProduct)
 class ShopProductAdmin(admin.ModelAdmin):
     list_display = (
-        'name', 'price_kitobcha', 'is_auction', 'min_start_bid', 'auction_end_at',
+        'name', 'price_kitobcha', 'currency', 'is_auction', 'min_start_bid', 'auction_end_at',
         'stock_qty', 'is_active', 'grants_premium_days', 'is_charity', 'sort_order', 'created_at',
     )
-    list_filter = ('is_active', 'is_auction', 'is_charity')
+    list_filter = ('is_active', 'currency', 'is_auction', 'is_charity')
     list_editable = ('price_kitobcha', 'is_auction', 'min_start_bid', 'stock_qty', 'is_active', 'sort_order')
     search_fields = ('name', 'description')
     fields = (
-        'name', 'description', 'image', 'price_kitobcha',
+        'name', 'description', 'image', 'price_kitobcha', 'currency',
         'is_auction', 'min_start_bid', 'auction_end_at',
         'ad_slot_hours', 'premium_only',
         'stock_qty', 'sort_order', 'is_active', 'grants_premium_days',
@@ -559,17 +559,33 @@ def _announce_new_shop_product(product):
         if gid and gid not in group_ids:
             group_ids.append(gid)
 
-    from django.utils.html import escape as _esc
+    # html.escape(quote=False): django's escape turns "'" into &#x27;, which
+    # Telegram prints as is ("O&#x27;tkan kunlar").
+    from html import escape as _he
+
+    def _esc(v):
+        return _he(str(v or ""), quote=False)
     desc = (product.description or "").strip()
     desc_line = f"\n{_esc(desc)}\n" if desc else ""
     stock_label = "cheksiz" if product.stock_qty is None else str(product.stock_qty)
-    text = (
-        "🛍 <b>Do'konga yangi mahsulot qo'shildi!</b>\n\n"
-        f"<b>{_esc(product.name)}</b>\n"
-        f"{desc_line}\n"
-        f"💰 <b>{product.price_kitobcha} Kitobcha</b> • 📦 {stock_label}\n\n"
-        "Sotib olish uchun: «🛒 Do'kon» bo'limiga o'ting!"
-    )
+    unit = product.currency_label + (" (hamyondan)" if product.is_som else "")
+    if product.is_auction:
+        text = (
+            "🏛 <b>Do'konda yangi auksion!</b>\n\n"
+            f"<b>{_esc(product.name)}</b>\n"
+            f"{desc_line}\n"
+            f"💰 Boshlang'ich taklif: <b>{product.min_start_bid} {unit}</b>\n"
+            "🎯 Yutmasangiz, taklifingiz to'liq qaytariladi.\n\n"
+            "Taklif berish uchun: «🛒 Do'kon» bo'limiga o'ting!"
+        )
+    else:
+        text = (
+            "🛍 <b>Do'konga yangi mahsulot qo'shildi!</b>\n\n"
+            f"<b>{_esc(product.name)}</b>\n"
+            f"{desc_line}\n"
+            f"💰 <b>{product.price_kitobcha} {unit}</b> • 📦 {stock_label}\n\n"
+            "Sotib olish uchun: «🛒 Do'kon» bo'limiga o'ting!"
+        )
 
     # Straight to this product's page (services/shop_links.py).
     import json as _json
