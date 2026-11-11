@@ -40,7 +40,7 @@ async def _can_manage_quizzes(user) -> bool:
 
 async def _has_ai_quiz_access(user) -> bool:
     """Admin, or anyone whose next AI quiz is free (Premium / trial window /
-    unused lifetime try) or who can pay AI_QUIZ_PRICE Kitobcha for it — see
+    unused lifetime try) or who can pay for it per question (so'm or Kitobcha) — see
     services/ai_quiz_billing.py. Distinct from _can_manage_quizzes: this
     only gates the AI-quiz feature, not manual quiz creation/management.
 
@@ -104,12 +104,12 @@ async def offer_ai_quiz_start(target_message, user, state: FSMContext):
     from tgbot.services import ai_quiz_billing as billing
 
     how = await sync_to_async(billing.plan)(user)
-    if how == billing.PAID and int(user.ball or 0) < billing.AI_QUIZ_PRICE:
+    if how == billing.PAID and not billing.can_start(user):
         await target_message.answer(
-            "⭐ <b>Hisobingizda Kitobcha yetarli emas!</b>\n\n"
-            f"AI yordamida bitta quiz tuzish narxi: <b>{billing.AI_QUIZ_PRICE} Kitobcha</b>. "
-            f"Hisobingizda: <b>{int(user.ball or 0)}</b>.\n"
-            "💎 Premium a'zolar har kuni bepul tuzadi.",
+            "⭐ <b>Mablag' yetarli emas</b>\n\n"
+            f"AI quiz narxi — {billing.price_text()}; eng kichik quiz ({billing.MIN_QUESTIONS} savol) — "
+            f"<b>{billing.price_text(billing.price_for(billing.MIN_QUESTIONS))}</b>.\n"
+            "💎 Hamyonini bir martada 15 000 so'm va undan ko'p to'ldirganlar har kuni bepul tuzadi.",
             parse_mode="HTML",
         )
         return
@@ -127,12 +127,12 @@ async def offer_ai_quiz_start(target_message, user, state: FSMContext):
     intro = "🤖 <b>AI yordamida Quiz yaratish</b>\n\n"
     if how == billing.FREE_TRY:
         intro += (
-            "🎁 Bu — sizning <b>bepul sinovingiz</b>! Keyingisi "
-            f"<b>{billing.AI_QUIZ_PRICE} Kitobcha</b> yoki 💎 Premium bilan.\n\n"
+            "🎁 Bu — Sizning <b>bepul sinovingiz</b>! Keyingilari — "
+            f"<b>{billing.price_text()}</b>.\n\n"
         )
     elif how == billing.PAID:
         intro += (
-            f"🪙 Bu quiz narxi: <b>{billing.AI_QUIZ_PRICE} Kitobcha</b> — AI ishga tushishidan "
+            f"💳 Narx: <b>{billing.price_text()}</b> — o'zingiz tanlaysiz. AI ishga tushishidan "
             "oldin yechiladi, xatolik bo'lsa qaytariladi.\n\n"
         )
     intro += "Nechta savol bo'lishini xohlaysiz? Quyidagi tugmalardan birini tanlang:"
@@ -317,10 +317,10 @@ async def quiz_admin_router(call: types.CallbackQuery, state: FSMContext):
     # manual-quiz-management Premium wall below.
     if action == "ai":
         if not await _has_ai_quiz_access(user):
-            from tgbot.services.ai_quiz_billing import AI_QUIZ_PRICE
+            from tgbot.services.ai_quiz_billing import price_text
             await call.answer(
-                f"🤖 AI quiz narxi — {AI_QUIZ_PRICE} Kitobcha (💎 Premium a'zolarga "
-                "har kuni bepul). Hisobingizda Kitobcha yetarli emas.",
+                f"🤖 AI quiz narxi — {price_text()}. Hamyoningizda ham, Kitobchada ham "
+                "yetarli mablag' yo'q.",
                 show_alert=True,
             )
             return

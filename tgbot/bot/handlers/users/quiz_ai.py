@@ -238,11 +238,74 @@ async def process_time_limit(call: types.CallbackQuery, state: FSMContext):
     
     state_data = await state.get_data()
     q_count = state_data.get("question_count", 5)
-    
-    await call.message.edit_text(
+
+    from tgbot.services import ai_quiz_billing as billing
+    user = await aget_user(call.from_user.id)
+    how = await sync_to_async(billing.plan)(user)
+    if how == billing.PAID:
+        await _ask_payment(call.message, user, q_count, t_limit)
+        return
+    await _ask_content(call.message, q_count, t_limit)
+
+
+def _som(v) -> str:
+    return f"{int(v or 0):,}".replace(",", " ")
+
+
+async def _ask_payment(message, user, q_count, t_limit):
+    """Paid quiz: the reader chooses -- so'm from the wallet or Kitobcha."""
+    from tgbot.services import ai_quiz_billing as billing
+    price = billing.price_for(q_count)
+    bal = billing.balances(user)
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton(
+        f"💵 {_som(price)} so'm — hamyondan" + ("" if bal[billing.SOM] >= price else " (yetarli emas)"),
+        callback_data="aiqz_pay:som"))
+    kb.add(InlineKeyboardButton(
+        f"🪙 {_som(price)} Kitobcha" + ("" if bal[billing.KITOBCHA] >= price else " (yetarli emas)"),
+        callback_data="aiqz_pay:kitobcha"))
+    await message.edit_text(
+        "🤖 <b>AI yordamida Quiz yaratish</b>\n\n"
+        f"Savollar soni: <b>{q_count} ta</b> · savol vaqti: <b>{t_limit} soniya</b>\n\n"
+        f"💳 Narx: <b>{q_count} × {billing.PRICE_PER_QUESTION} = {_som(price)}</b> — so'mda yoki Kitobchada, "
+        "o'zingiz tanlang:\n"
+        f"👛 Hamyonda: <b>{_som(bal[billing.SOM])} so'm</b> · 🪙 <b>{_som(bal[billing.KITOBCHA])}</b> Kitobcha\n\n"
+        "<i>To'lov AI ishga tushishidan oldin olinadi; quiz yaratilmasa — to'liq, kamroq savol chiqsa — "
+        "farqi qaytariladi.</i>",
+        parse_mode="HTML", reply_markup=kb,
+    )
+    await AIQuizCreateState.payment.set()
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith("aiqz_pay:"), state=AIQuizCreateState.payment)
+async def process_payment_choice(call: types.CallbackQuery, state: FSMContext):
+    from tgbot.services import ai_quiz_billing as billing
+    currency = call.data.split(":", 1)[1]
+    if currency not in (billing.SOM, billing.KITOBCHA):
+        await call.answer()
+        return
+    user = await aget_user(call.from_user.id)
+    data = await state.get_data()
+    q_count, t_limit = data.get("question_count", 5), data.get("time_limit", 30)
+    price = billing.price_for(q_count)
+    if not billing.can_afford(user, price, currency):
+        await call.answer(
+            ("👛 Hamyoningizda mablag' yetarli emas — botda 👛 Hamyon bo'limidan to'ldiring."
+             if currency == billing.SOM else "🪙 Kitobcha yetarli emas."),
+            show_alert=True)
+        return
+    await call.answer()
+    await state.update_data(pay_with=currency)
+    await _ask_content(call.message, q_count, t_limit,
+                       note=f"💳 To'lov: <b>{_som(price)} {billing.unit(currency)}</b>\n")
+
+
+async def _ask_content(message, q_count, t_limit, note=""):
+    await message.edit_text(
         "🤖 <b>AI yordamida Quiz yaratish</b>\n\n"
         f"Savollar soni: <b>{q_count} ta</b>\n"
-        f"Savol vaqti: <b>{t_limit} soniya</b>\n\n"
+        f"Savol vaqti: <b>{t_limit} soniya</b>\n"
+        f"{note}\n"
         "Sozlamalar saqlandi. Endi, quiz yaratish uchun matn yuboring, rasm yuklang yoki PDF fayl jo'nating.\n\n"
         "📎 <i>Eslatma: PDF fayl hajmi eng ko'pi bilan <b>20 MB</b> bo'lishi mumkin "
         "(Telegram bot cheklovi). Kattaroq kitobning bir bo'limini alohida yuboring.</i>",
@@ -267,16 +330,17 @@ async def process_ai_input(message: types.Message, state: FSMContext):
     
     # Who pays (services/ai_quiz_billing.py): Premium / trial readers inside
     # their daily allowance and a first-timer's free try are free; everyone
-    # else pays AI_QUIZ_PRICE Kitobcha, Premium readers past the allowance
+    # else pays per question (so'm or Kitobcha), Premium readers past the allowance
     # included. Text, photo and PDF are all allowed on every plan.
     from tgbot.services import ai_quiz_billing as billing
 
     how = await sync_to_async(billing.plan)(user)
-    if how == billing.PAID and int(user.ball or 0) < billing.AI_QUIZ_PRICE:
+    pay_with = state_data.get("pay_with") or billing.KITOBCHA
+    price = billing.price_for(q_count)
+    if how == billing.PAID and not billing.can_afford(user, price, pay_with):
         await message.answer(
-            "⚠️ <b>Bepul limit tugagan, Kitobcha esa yetarli emas.</b>\n\n"
-            f"Navbatdagi AI quiz narxi: <b>{billing.AI_QUIZ_PRICE} Kitobcha</b>, "
-            f"hisobingizda: <b>{int(user.ball or 0)}</b>.",
+            "⚠️ <b>Mablag' yetarli emas.</b>\n\n"
+            f"Bu quiz narxi: <b>{_som(price)} {billing.unit(pay_with)}</b>.",
             parse_mode="HTML"
         )
         await state.finish()
@@ -313,15 +377,13 @@ async def process_ai_input(message: types.Message, state: FSMContext):
             )
             return
 
-    charged = False
+    charged = 0  # amount taken, in `pay_with`, still refundable
     if how == billing.PAID:
-        if not await sync_to_async(billing.charge)(user):
-            await message.answer(
-                f"⚠️ Hisobingizda {billing.AI_QUIZ_PRICE} Kitobcha yetarli emas.",
-            )
+        if not await sync_to_async(billing.charge)(user, price, pay_with):
+            await message.answer(f"⚠️ Hisobingizda {_som(price)} {billing.unit(pay_with)} yetarli emas.")
             await state.finish()
             return
-        charged = True
+        charged = price
 
     msg = await message.answer("⏳ AI ma'lumotni tahlil qilib, quiz generatsiya qilmoqda... Iltimos kuting.")
     anim_task = asyncio.create_task(_animate_loading(msg))
@@ -452,7 +514,14 @@ Return ONLY valid JSON in the following format:
             return q
 
         quiz = await create_quiz_from_ai(data)
-        charged = False  # delivered — from here on the charge stands
+        short = max(0, q_count - len(data.get("questions") or []))
+        paid_now = charged
+        if charged and short:
+            # Fewer questions than ordered: those are given back.
+            back = short * billing.PRICE_PER_QUESTION
+            await sync_to_async(billing.refund)(user, back, pay_with)
+            paid_now = charged - back
+        charged = 0  # delivered — from here on the charge stands
         await sync_to_async(billing.note_used)(user, how)
 
         await msg.delete()
@@ -471,14 +540,15 @@ Return ONLY valid JSON in the following format:
         if how == billing.FREE_TRY:
             await message.answer(
                 "🎉 Bepul sinovingizdan foydalandingiz!\n\n"
-                "💎 <b>Premium</b>'ga o'ting — har kuni bepul AI quiz tuzing — "
-                f"yoki navbatdagisi uchun {billing.AI_QUIZ_PRICE} Kitobcha to'lang.",
+                f"Keyingi quizlar — {billing.price_text()} (o'zingiz tanlaysiz). "
+                "💎 Hamyonini bir martada 15 000 so'm va undan ko'p to'ldirganlar har kuni bepul tuzadi.",
                 parse_mode="HTML",
             )
         elif how == billing.PAID:
             await message.answer(
-                f"🤖 <b>AI Quiz yaratildi ({billing.AI_QUIZ_PRICE} Kitobcha yechildi).</b>\n\n"
-                "💎 <b>Premium</b> a'zolar har kuni bepul tuzadi.",
+                f"🤖 <b>AI Quiz yaratildi — {_som(paid_now)} {billing.unit(pay_with)} yechildi.</b>"
+                + (f"\n↩️ {short} ta savol kam chiqdi — {_som(short * billing.PRICE_PER_QUESTION)} "
+                   f"{billing.unit(pay_with)} qaytarildi." if short else ""),
                 parse_mode="HTML",
             )
 
@@ -494,17 +564,17 @@ Return ONLY valid JSON in the following format:
             "Iltimos qaytadan urinib ko'ring yoki:\n"
             "• Kamroq savol soni tanlang (masalan 10)\n"
             "• Kichikroq matn / PDF yuboring"
-            + (f"\n\n🪙 {billing.AI_QUIZ_PRICE} Kitobcha hisobingizga qaytarildi." if charged else "")
+            + (f"\n\n↩️ {_som(charged)} {billing.unit(pay_with)} qaytarildi." if charged else "")
         )
     except Exception as e:
         print(f"quiz_ai unexpected error: {e!r}")
         await msg.edit_text(
             "❌ Xatolik yuz berdi. Iltimos qaytadan urinib ko'ring "
             "yoki admin bilan bog'laning."
-            + (f"\n\n🪙 {billing.AI_QUIZ_PRICE} Kitobcha hisobingizga qaytarildi." if charged else "")
+            + (f"\n\n↩️ {_som(charged)} {billing.unit(pay_with)} qaytarildi." if charged else "")
         )
         await state.finish()
     finally:
         anim_task.cancel()
         if charged:
-            await sync_to_async(billing.refund)(user)
+            await sync_to_async(billing.refund)(user, charged, pay_with)

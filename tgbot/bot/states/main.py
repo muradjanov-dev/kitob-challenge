@@ -142,6 +142,7 @@ class QuizBattleState(StatesGroup):
 class AIQuizCreateState(StatesGroup):
     question_count = State()
     time_limit = State()
+    payment = State()  # a paid quiz: so'm from the wallet or Kitobcha
     input_content = State()
     parsing = State()
 

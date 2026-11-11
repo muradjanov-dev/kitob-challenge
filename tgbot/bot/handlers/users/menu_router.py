@@ -2053,7 +2053,7 @@ async def _menu_quiz(call, user, _state: FSMContext):
         if how == billing.FREE_TRY:
             ai_label += " (bepul sinov)"
         elif how == billing.PAID:
-            ai_label += f" ({billing.AI_QUIZ_PRICE} Kitobcha)"
+            ai_label += f" (savoliga {billing.PRICE_PER_QUESTION})"
         kb.add(InlineKeyboardButton(text=ai_label, callback_data="qz:ai"))
     if can_create:
         kb.add(InlineKeyboardButton(
