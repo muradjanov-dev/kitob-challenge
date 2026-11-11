@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Eng zo'r savol</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root{--bg:#16161c;--card:#1f1f27;--card2:#282832;--text:#ece9e2;--muted:#97949e;
+      --accent:#c2884a;--accent2:#5b6fb0;--ok:#4a9a70;--bad:#b85d68;--line:#30303b;}
+    @media (prefers-color-scheme: light){:root{--bg:#faf7f2;--card:#f3eee6;--card2:#eae4d8;--text:#2a2723;--muted:#736f68;--line:#dfd7ca;}}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:14px 14px 36px;max-width:620px;margin:0 auto}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:34px 0 14px}
+    .title{font-weight:800;font-size:19px;letter-spacing:-0.02em}.title small{display:block;font-weight:600;font-size:12px;color:var(--muted);margin-top:2px}
+    .timer{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 14px;font-weight:800;font-variant-numeric:tabular-nums;min-width:76px;text-align:center}
+    .timer .lbl{display:block;font-size:10px;color:var(--muted);font-weight:700;letter-spacing:0.5px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:12px}
+    .qcard{background:linear-gradient(145deg,var(--card2),var(--card));padding:22px 18px;text-align:center}
+    .qnum{display:inline-block;font-size:11px;font-weight:800;color:var(--muted);background:var(--card2);padding:3px 10px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase}
+    .qtext{font-size:20px;font-weight:700;line-height:1.4;margin-top:10px;white-space:pre-wrap;word-break:break-word}
+    .who{margin-top:8px;font-size:13px;color:var(--muted);font-weight:600}
+    .inrow{display:flex;gap:10px;margin-top:10px}
+    textarea,input[type=text]{-webkit-user-select:text;user-select:text;flex:1;background:var(--card2);border:1.5px solid var(--line);color:var(--text);border-radius:14px;padding:13px;font-size:16px;font-weight:600;outline:none;font-family:inherit;width:100%}
+    textarea{min-height:84px;resize:none}
+    textarea:focus,input:focus{border-color:var(--accent)}
+    button.send,button.big{background:var(--accent);color:#fff;border:0;border-radius:14px;padding:0 20px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;min-height:48px}
+    button.big{width:100%;margin-top:10px}
+    button:disabled{opacity:.4}
+    .toast{min-height:22px;margin-top:10px;font-size:14px;font-weight:700;text-align:center}
+    .toast.ok{color:var(--ok)}.toast.bad{color:var(--bad)}
+    .hint{font-size:13px;color:var(--muted);line-height:1.5;text-align:center;margin-top:8px}
+    .sect{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:2px 0 10px}
+    .ans{display:block;width:100%;text-align:left;background:var(--card2);border:1.5px solid var(--line);color:var(--text);border-radius:14px;padding:12px 14px;margin-bottom:8px;font-size:15px;font-weight:600;font-family:inherit;word-break:break-word}
+    button.ans{cursor:pointer}button.ans:active{border-color:var(--accent)}
+    .ans .nm{display:block;font-size:12px;color:var(--muted);margin-top:4px}
+    .ans.best{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 16%,var(--card2))}
+    .lb{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+    .lb:last-child{border-bottom:0}.rank{width:26px;text-align:center;font-weight:900}
+    .rank.g1{color:#d4af37}.rank.g2{color:#a8b0ba}.rank.g3{color:#c48c66}
+    .lb-name{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+    .pts{font-weight:800;color:var(--accent);font-size:15px}
+    .me{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .me b{font-size:20px;color:var(--accent)}
+    .big-info{text-align:center;padding:28px 18px}.big-info .em{font-size:48px;margin-bottom:8px}.big-info h2{margin:10px 0 8px;font-size:21px;font-weight:800}.big-info p{color:var(--muted);margin:0;font-size:14.5px;line-height:1.55}
+    .rules{text-align:left;font-size:14px;line-height:1.6;margin-top:12px}
+    .muted{color:var(--muted)}.hidden{display:none !important}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="title">❓ Eng zo'r savol <small id="subtitle">Jonli o'yin</small></div>
+    <div class="timer"><span class="lbl" id="timerLbl">QOLDI</span><span id="timer">--:--</span></div>
+  </div>
+
+  <div id="joinBox" class="card hidden" style="text-align:center">
+    <div style="font-size:14.5px;line-height:1.55">Har raundda tizim bitta ishtirokchini tanlaydi — u hammaga savol yozadi. Qolganlar <b>20 soniyada</b> javob yozadi, savol egasi <b>eng to'g'ri yoki eng yaqin</b> javobni tanlaydi.</div>
+    <button class="big" id="joinBtn">✋ Qatnashaman</button>
+  </div>
+
+  <div id="live" class="hidden">
+    <div class="card qcard">
+      <div class="qnum" id="qnum">Raund</div>
+      <div class="qtext" id="qtext">—</div>
+      <div class="who" id="who"></div>
+    </div>
+
+    <div id="askBox" class="card hidden">
+      <div class="sect">✍️ Sizning navbatingiz — hammaga savol yozing</div>
+      <textarea id="qInput" maxlength="200" placeholder="Masalan: «O'tkan kunlar» kim tomonidan yozilgan va nega u hali ham o'qiladi?"></textarea>
+      <button class="big" id="qBtn">Savolni yuborish</button>
+      <div class="hint">Kitob, hayot, bilim — qiziq va o'ylantiradigan savol bering. Javobni o'zingiz baholaysiz.</div>
+    </div>
+
+    <div id="answerBox" class="card hidden">
+      <div class="inrow">
+        <input id="aInput" type="text" maxlength="120" autocomplete="off" placeholder="Javobingiz…" enterkeyhint="send">
+        <button class="send" id="aBtn">Yuborish</button>
+      </div>
+      <div class="hint" id="aHint"></div>
+    </div>
+
+    <div id="listBox" class="card hidden">
+      <div class="sect" id="listTitle">Javoblar</div>
+      <div id="list"></div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <div class="me"><span>Sizning ballaringiz</span><b id="myPts">0</b></div>
+    <div class="card"><div class="sect">🏆 Reyting</div><div id="board"></div></div>
+  </div>
+
+  <div id="info" class="card big-info hidden"></div>
+
+  <script>
+    var tg=(window.Telegram&&window.Telegram.WebApp)?window.Telegram.WebApp:null;
+    if(tg){try{tg.ready();tg.expand();}catch(e){}}
+    function readInit(){if(tg&&tg.initData)return tg.initData;try{var q=new URLSearchParams(location.search).get('tgWebAppData');if(q)return q;}catch(e){}var h=(location.hash||'').replace(/^#/,'');if(h){try{var d=new URLSearchParams(h).get('tgWebAppData');if(d)return d;}catch(e){}}return'';}
+    var INIT=readInit();
+    var $=function(id){return document.getElementById(id);};
+    var localSeconds=0,busy=false,lastKey='';
+    function fmt(s){s=Math.max(0,s|0);var m=Math.floor(s/60),r=s%60;return(m<10?'0':'')+m+':'+(r<10?'0':'')+r;}
+    function esc(t){return String(t||'').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    function api(path,opts){opts=opts||{};opts.headers=Object.assign({'X-Telegram-Init-Data':INIT,'Content-Type':'application/json'},opts.headers||{});return fetch(path,opts).then(function(r){return r.json();});}
+    function post(action,body){return api('/eng-zor-savol/api/'+action+'/',{method:'POST',body:JSON.stringify(body||{})});}
+    function haptic(kind){if(tg&&tg.HapticFeedback){try{tg.HapticFeedback.notificationOccurred(kind)}catch(e){}}}
+    function toast(text,ok){var t=$('toast');t.className='toast '+(ok?'ok':'bad');t.textContent=text||'';}
+    var ERR={not_live:"O'yin faol emas.",not_answering:"Hozir javob vaqti emas.",not_your_turn:"Hozir sizning navbatingiz emas.",empty:"Avval yozing.",you_asked:"Savol sizniki — javoblarni siz baholaysiz.",bad_answer:"Bu javob topilmadi."};
+
+    function board(s){var b='';(s.leaderboard||[]).forEach(function(r,i){var cls=i===0?'g1':i===1?'g2':i===2?'g3':'';b+='<div class="lb"><div class="rank '+cls+'">'+(i+1)+'</div><div class="lb-name">'+esc(r.name)+'</div><div class="pts">'+r.points+'</div></div>';});$('board').innerHTML=b||'<div class="muted" style="padding:6px 0">Hali ishtirokchi yo\'q.</div>';}
+    function rulesHtml(){return '<div class="rules">❓ Tizim navbatma-navbat bitta ishtirokchini tanlaydi — u hammaga savol yozadi.<br>⏱ Qolganlar <b>20 soniyada</b> javob yozadi.<br>🏅 Savol egasi eng to\'g\'ri yoki eng yaqin javobni tanlaydi: muallifiga <b>+100</b>, savol egasiga <b>+30</b> ochko.<br>🎁 G\'oliblar Kitobcha oladi.</div>';}
+
+    function render(s){
+      var live=$('live'),info=$('info'),join=$('joinBox');
+      var open=(s.status==='live'||s.status==='scheduled');
+      join.classList.toggle('hidden',!(open&&!s.joined));
+      if(s.status==='live'&&s.round>0&&s.phase!=='waiting'&&s.phase!=='done'){
+        live.classList.remove('hidden');info.classList.add('hidden');
+        var key=s.round+':'+s.phase;
+        $('subtitle').textContent='Raund '+s.round+' / '+s.rounds_max+' · '+s.players+' ishtirokchi';
+        $('qnum').textContent='RAUND '+s.round;
+        $('myPts').textContent=s.your_points||0;
+        ['askBox','answerBox','listBox'].forEach(function(id){$(id).classList.add('hidden');});
+        if(key!==lastKey){$('toast').textContent='';if(s.phase==='answer')$('aInput').value='';if(s.phase==='ask')$('qInput').value='';}
+        if(s.phase==='ask'){
+          $('timerLbl').textContent='SAVOL';
+          if(s.is_asker){$('qtext').textContent='Navbat Sizda!';$('who').textContent='Hammaga bitta savol yozing';$('askBox').classList.remove('hidden');if(key!==lastKey)haptic('warning');}
+          else{$('qtext').textContent='✍️ '+s.asker+' savol yozmoqda…';$('who').textContent='Tayyor turing — javob uchun 20 soniya bo\'ladi';}
+        }else if(s.phase==='answer'){
+          $('timerLbl').textContent='JAVOB';
+          $('qtext').textContent=s.question||'';$('who').textContent='Savol: '+s.asker;
+          if(s.is_asker){$('listBox').classList.remove('hidden');$('listTitle').textContent='Javoblar kelmoqda';$('list').innerHTML='<div class="muted">'+(s.answers_count||0)+' ta javob keldi…</div>';}
+          else{$('answerBox').classList.remove('hidden');$('aHint').innerHTML=s.your_answer?('Javobingiz: <b>'+esc(s.your_answer)+'</b> (vaqt tugaguncha o\'zgartirsa bo\'ladi)'):'Qisqa va aniq yozing — savol egasi eng zo\'rini tanlaydi.';}
+        }else if(s.phase==='pick'){
+          $('timerLbl').textContent='TANLOV';
+          $('qtext').textContent=s.question||'';
+          $('listBox').classList.remove('hidden');
+          var h='';
+          if(s.is_asker){
+            $('who').textContent='Eng to\'g\'ri yoki eng yaqin javobni tanlang';$('listTitle').textContent='👆 Bittasini bosing';
+            (s.answers||[]).forEach(function(a){h+='<button class="ans" data-id="'+a.id+'">'+esc(a.text)+'</button>';});
+          }else{
+            $('who').textContent=s.asker+' eng zo\'r javobni tanlamoqda…';$('listTitle').textContent='Javoblar';
+            (s.answers||[]).forEach(function(a){h+='<div class="ans">'+esc(a.text)+'</div>';});
+          }
+          $('list').innerHTML=h||'<div class="muted">Javob yo\'q.</div>';
+          Array.prototype.forEach.call(document.querySelectorAll('button.ans'),function(b){b.onclick=function(){pick(parseInt(b.getAttribute('data-id'),10));};});
+        }else if(s.phase==='reveal'){
+          $('timerLbl').textContent='NATIJA';
+          $('qtext').textContent=s.question||'(savol yozilmadi)';
+          $('who').innerHTML=s.best?('🏅 Eng zo\'r javob — <b>'+esc(s.best.name)+'</b> (+100)'):'Bu raundda eng zo\'r javob tanlanmadi';
+          $('listBox').classList.remove('hidden');$('listTitle').textContent='Barcha javoblar';
+          var r='';(s.answers||[]).forEach(function(a){r+='<div class="ans'+(a.best?' best':'')+'">'+(a.best?'🏅 ':'')+esc(a.text)+'<span class="nm">'+esc(a.name)+'</span></div>';});
+          $('list').innerHTML=r||'<div class="muted">Bu raundda javob bo\'lmadi.</div>';
+          if(key!==lastKey&&s.best)haptic('success');
+        }
+        board(s);lastKey=key;localSeconds=s.seconds;
+      }else{
+        live.classList.add('hidden');info.classList.remove('hidden');
+        if(s.status==='scheduled'||(s.status==='live'&&(s.phase==='waiting'||s.round===0))){
+          $('timerLbl').textContent=s.status==='scheduled'?'BOSHLANISH':'KUTISH';$('subtitle').textContent=(s.players||0)+' ishtirokchi';
+          var wait=s.status==='live'?'<p style="margin-top:10px"><b>Kamida '+(s.min_players||2)+' ishtirokchi kerak</b> — do\'stlaringizni chaqiring!</p>':'';
+          info.innerHTML='<div class="em">❓</div><h2>Eng zo\'r savol</h2><p>'+(s.joined?'✅ Siz ro\'yxatdasiz. Navbat Sizga ham keladi!':'«Qatnashaman» tugmasini bosing.')+'</p>'+wait+rulesHtml();
+          localSeconds=s.seconds;
+        }else if(s.status==='finished'){
+          $('timerLbl').textContent='TUGADI';$('subtitle').textContent='Tugadi';
+          var w='';(s.leaderboard||[]).forEach(function(r,i){var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';var rew=r.reward?'<span style="color:var(--accent2);font-weight:800">🪙 +'+r.reward+'</span>':'';w+='<div class="lb"><div class="rank">'+medal+'</div><div class="lb-name">'+esc(r.name)+' <span class="muted">'+r.points+'</span></div><div class="pts">'+rew+'</div></div>';});
+          var mine=s.your_reward?('<div class="me" style="margin-top:12px"><span>Sizning mukofotingiz</span><b>🪙 +'+s.your_reward+'</b></div>'):'';
+          info.innerHTML='<div class="em">🏁</div><h2>O\'yin tugadi!</h2>'+mine+(w?'<div style="text-align:left;margin-top:14px">'+w+'</div>':'<p>Bu safar ishtirokchilar yetmadi.</p>');
+          localSeconds=0;
+        }else{
+          $('timerLbl').textContent='—';$('subtitle').textContent='Kutilmoqda';
+          info.innerHTML='<div class="em">❓</div><h2>Hozircha o\'yin yo\'q</h2><p>Eng zo\'r savol jonli o\'yinlarda boshlanadi — guruhni kuzating!</p>'+rulesHtml();
+          localSeconds=0;
+        }
+      }
+      $('timer').textContent=fmt(localSeconds);
+    }
+
+    function poll(){api('/eng-zor-savol/api/state/').then(function(s){if(!s||s.ok===false){$('info').classList.remove('hidden');$('live').classList.add('hidden');$('info').innerHTML='<div class="em">🔒</div><h2>Kirish xatosi</h2><p>O\'yinni bot orqali qayta oching.</p>';return;}render(s);}).catch(function(){});}
+    function act(action,body,okText){
+      if(busy)return;busy=true;
+      post(action,body).then(function(r){if(r.ok){toast(okText,true);haptic('success');poll();}else{toast(ERR[r.error]||'Qabul qilinmadi.',false);}})
+        .catch(function(){toast('Tarmoq xatosi.',false);}).then(function(){busy=false;});
+    }
+    function pick(id){act('pick',{answer_id:id},'🏅 Tanlandi!');}
+    $('joinBtn').onclick=function(){act('join',{},'✅ Siz ro\'yxatdasiz!');};
+    $('qBtn').onclick=function(){var t=($('qInput').value||'').trim();if(t.length<3){toast(ERR.empty,false);return;}act('question',{text:t},'✅ Savol hammaga yuborildi!');};
+    function sendAnswer(){var t=($('aInput').value||'').trim();if(!t){toast(ERR.empty,false);return;}act('answer',{text:t},'✅ Javobingiz qabul qilindi!');}
+    $('aBtn').onclick=sendAnswer;
+    $('aInput').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();sendAnswer();}});
+    setInterval(function(){if(localSeconds>0){localSeconds--;$('timer').textContent=fmt(localSeconds);}},1000);
+    poll();setInterval(poll,1500);
+  </script>
+{% include "_tracking.html" with section="savol" %}
+{% include "game/_fx.html" %}
+{% include "game/_live_count.html" %}
+</body>
+</html>

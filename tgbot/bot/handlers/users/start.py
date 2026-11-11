@@ -316,6 +316,8 @@ async def do_start(message: types.Message, state: FSMContext):
         "zanjir": ("/zanjir/", "🔗 O'yinni ochish", "Kitob Zanjiri"),
         "chain": ("/zanjir/", "🔗 O'yinni ochish", "Kitob Zanjiri"),
         "kopchilik": ("/kopchilik/", "🗣 O'yinni ochish", "Ko'pchilik nima dedi?"),
+        "eng-zor-savol": ("/eng-zor-savol/", "❓ O'yinni ochish", "Eng zo'r savol"),
+        "savol": ("/eng-zor-savol/", "❓ O'yinni ochish", "Eng zo'r savol"),
         "feud": ("/kopchilik/", "🗣 O'yinni ochish", "Ko'pchilik nima dedi?"),
         "qala": ("/qala/", "🏰 O'yinni ochish", "Bilim Qal'asi"),
         "castle": ("/qala/", "🏰 O'yinni ochish", "Bilim Qal'asi"),

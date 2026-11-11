@@ -2756,3 +2756,74 @@ class AdminInboxThread(BaseModel):
 
     def __str__(self):
         return f"#{self.id} from {self.from_user} ({'answered' if self.answered else 'open'})"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Eng zo'r savol (owner, 2026-11-11): each round the system picks one player,
+# who writes a question for everyone; the others type answers (20 s); the
+# asker picks the right / closest one. Then the next player asks.
+# Logic: services/ask_game.py.
+# ─────────────────────────────────────────────────────────────────────────────
+class AskGame(BaseModel):
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_LIVE = "live"
+    STATUS_FINISHED = "finished"
+    STATUS_CHOICES = [
+        (STATUS_SCHEDULED, "Rejalashtirilgan"), (STATUS_LIVE, "Jonli"), (STATUS_FINISHED, "Tugagan"),
+    ]
+    PHASE_CHOICES = [(p, p) for p in ("lobby", "waiting", "ask", "answer", "pick", "reveal", "done")]
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField(help_text="Hard stop: no round starts after this.")
+    phase = models.CharField(max_length=10, choices=PHASE_CHOICES, default="lobby")
+    phase_ends_at = models.DateTimeField(null=True, blank=True)
+    round_index = models.IntegerField(default=-1)
+    rewarded = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "ask_games"
+        verbose_name = "Eng zo'r savol — O'yin"
+        verbose_name_plural = "Eng zo'r savol — O'yinlar"
+        ordering = ("-starts_at",)
+
+    def __str__(self):
+        return f"Eng zo'r savol #{self.id} — {self.status}/{self.phase}"
+
+
+class AskPlayer(BaseModel):
+    game = models.ForeignKey(AskGame, on_delete=models.CASCADE, related_name="players")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="ask_players")
+    points = models.IntegerField(default=0)
+    has_asked = models.BooleanField(default=False)
+    rewarded = models.BooleanField(default=False)
+    reward = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = "ask_players"
+        unique_together = ("game", "user")
+        ordering = ("-points", "created_at")
+
+
+class AskRound(BaseModel):
+    game = models.ForeignKey(AskGame, on_delete=models.CASCADE, related_name="rounds")
+    index = models.IntegerField()
+    asker = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="ask_rounds")
+    question = models.CharField(max_length=300, blank=True, default="")
+    best_answer_id = models.IntegerField(null=True, blank=True)
+    skipped = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "ask_rounds"
+        unique_together = ("game", "index")
+        ordering = ("game", "index")
+
+
+class AskAnswer(BaseModel):
+    round = models.ForeignKey(AskRound, on_delete=models.CASCADE, related_name="answers")
+    user = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="ask_answers")
+    text = models.CharField(max_length=160)
+
+    class Meta:
+        db_table = "ask_answers"
+        unique_together = ("round", "user")
+        ordering = ("created_at",)

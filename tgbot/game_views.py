@@ -84,6 +84,46 @@ def api_feud_submit(request: HttpRequest) -> JsonResponse:
     return JsonResponse(feud_game.submit_answer(g.id, request.tg_profile, text))
 
 
+# ── Eng zo'r savol (players ask the questions) ─────────────────────────────
+def ask_index(request: HttpRequest) -> HttpResponse:
+    resp = render(request, "game/ask.html", {})
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp["Pragma"] = "no-cache"
+    return resp
+
+
+@csrf_exempt
+@require_GET
+@_require_authed
+def api_ask_state(request: HttpRequest) -> JsonResponse:
+    from tgbot.services import ask_game
+    return JsonResponse(ask_game.state_payload(request.tg_profile))
+
+
+@csrf_exempt
+@require_POST
+@_require_authed
+def api_ask_action(request: HttpRequest, action: str) -> JsonResponse:
+    from tgbot.services import ask_game
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
+    me = request.tg_profile
+    if action == "join":
+        return JsonResponse(ask_game.join(me))
+    if action == "question":
+        return JsonResponse(ask_game.submit_question(me, str(body.get("text") or "")))
+    if action == "answer":
+        return JsonResponse(ask_game.submit_answer(me, str(body.get("text") or "")))
+    if action == "pick":
+        aid = body.get("answer_id")
+        if not isinstance(aid, int):
+            return JsonResponse({"ok": False, "error": "bad_answer"}, status=400)
+        return JsonResponse(ask_game.pick(me, aid))
+    return JsonResponse({"ok": False, "error": "unknown"}, status=404)
+
+
 # ── Bilim Qal'asi (Castle) ───────────────────────────────────────────────────
 def castle_index(request: HttpRequest) -> HttpResponse:
     resp = render(request, "game/castle.html", {})
@@ -466,6 +506,7 @@ def api_quiz_joker(request: HttpRequest, flavor: str) -> JsonResponse:
 _GAME_LABELS_URLS = {
     "chain": ("Kitob Zanjiri", "/zanjir/"),
     "feud": ("Ko'pchilik nima dedi?", "/kopchilik/"),
+    "savol": ("Eng zo'r savol", "/eng-zor-savol/"),
     "castle": ("Bilim Qal'asi", "/qala/"),
     "emoji": ("Emoji Kitob", "/emoji/"),
     "wisdom": ("Hikmatlar", "/hikmat/"),
@@ -559,8 +600,9 @@ def _game_participant_count(game_type: str, game_id: int) -> int:
         ChainScore, FeudScore, CastleHit, EmojiScore,
         WisdomScore, DetectiveScore, SurvivalPlayer, QuizScore, AuthorEntry,
     )
+    from tgbot.models import AskPlayer
     model_by_type = {
-        "chain": ChainScore, "feud": FeudScore, "emoji": EmojiScore,
+        "chain": ChainScore, "feud": FeudScore, "emoji": EmojiScore, "savol": AskPlayer,
         "wisdom": WisdomScore, "detective": DetectiveScore, "survival": SurvivalPlayer,
         "muallif": AuthorEntry,
     }

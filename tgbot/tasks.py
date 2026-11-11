@@ -6186,6 +6186,8 @@ def announce_top_game_players():
     _tally(DetectiveScore.objects.all())
     _tally(SurvivalPlayer.objects.all())
     _tally(QuizScore.objects.all())
+    from tgbot.models import AskPlayer as _AP
+    _tally(_AP.objects.all())
     # CastleHit has no per-user-per-game "joined" row, so dedupe (user, game) pairs.
     for uid, _gid in set(
         CastleHit.objects.filter(game__starts_at__date=today).values_list("user_id", "game_id")
@@ -6836,6 +6838,24 @@ def start_feud_game():
 
 
 @shared_task
+def start_ask_game():
+    """Eng zo'r savol (services.ask_game): the players write the questions."""
+    from tgbot.services.ask_game import LEAD_SECONDS, create_scheduled_game
+    game = create_scheduled_game()
+    text = (
+        "❓ <b>ENG ZO'R SAVOL</b> — savollarni endi Siz berasiz!\n\n"
+        f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — kiring va «Qatnashaman»ni bosing.\n\n"
+        "<blockquote>Har raundda tizim bitta ishtirokchini tanlaydi — u hammaga savol yozadi. "
+        "Qolganlar <b>20 soniyada</b> javob yozadi, savol egasi eng to'g'ri yoki eng yaqin javobni tanlaydi.</blockquote>\n\n"
+        "🏅 Eng zo'r javob — <b>+100</b> ochko, savol egasiga <b>+30</b>.\n"
+        "🎁 G'oliblar Kitobcha oladi. 👇"
+    )
+    _announce_game(text, "eng-zor-savol")
+    print(f"start_ask_game: game #{game.id}")
+    return game
+
+
+@shared_task
 def start_castle_game():
     from tgbot.services.castle_game import create_scheduled_castle, LEAD_SECONDS
     # NOTE: the previous game of this type is settled by games_finalize_tick /
@@ -7244,6 +7264,7 @@ _BASE_GAME_STARTERS = {
     "detective": start_detective_game,
     "survival": start_survival_game,
     "muallif": start_author_game,
+    "savol": start_ask_game,
 }
 
 
@@ -7339,6 +7360,21 @@ def slot_headliner(day, slot):
     return value or None
 
 
+def slot_plan(day, slot):
+    from django.core.cache import cache
+    try:
+        plan = cache.get(f"slot_plan:{day}:{slot}")
+    except Exception:
+        plan = None
+    return [g for g in (plan or []) if g in _GAME_STARTERS] or None
+
+
+def set_slot_plan(day, slot, game_types):
+    """Run exactly `game_types` (in order) in `slot` on `day`; [] clears."""
+    from django.core.cache import cache
+    cache.set(f"slot_plan:{day}:{slot}", list(game_types or []), 3 * 86400)
+
+
 def set_slot_headliner(day, slot, game_type):
     """Make `game_type` the first game of `slot` on `day` (None clears it)."""
     from django.core.cache import cache
@@ -7371,7 +7407,7 @@ def start_game_sequence(slot, count=3, pool=None):
         from tgbot.services.quiz_game import flavor_is_playable
         # Never draw a flavor this process cannot build (see flavor_is_playable).
         all_quiz = [f for f in _QUIZ_FLAVORS if flavor_is_playable(f)]
-        base_games = ["chain", "feud", "castle", "emoji", "wisdom", "detective", "survival"]
+        base_games = ["chain", "feud", "castle", "emoji", "wisdom", "detective", "survival", "savol"]
         if is_vip:
             pool = VIP_TOP_GAMES
         else:
@@ -7386,9 +7422,15 @@ def start_game_sequence(slot, count=3, pool=None):
             pool = b_sample + q_sample
             random.shuffle(pool)
 
+    # A whole plan set for this date + slot (internal/ops/slot-plan/) wins
+    # over the draw, repeats allowed (2026-11-11: "Eng zo'r savol" twice).
+    plan = slot_plan(today, slot)
+    if plan:
+        pool = list(plan)
+
     # A headliner set for this date + slot (internal/ops/headliner/) opens
     # the slot; the random draw fills the rest.
-    headliner = slot_headliner(today, slot)
+    headliner = None if plan else slot_headliner(today, slot)
     if headliner and headliner in _GAME_STARTERS:
         pool = [headliner] + [g for g in pool if g != headliner]
 
@@ -7526,6 +7568,18 @@ def _advance_game_sequence(game_type, game_id=None, seq=None):
             seq = qs.filter(current_game_type=game_type).first()
 
     if not seq or seq.completed:
+        return
+
+    # One advance per step. The minute tick, the watchdog and a finalize
+    # triggered from a page can all see the same finished game at once; with
+    # no claim each of them started the next game (2026-11-11 10:05: two
+    # "fano" games, #538 and #539, and two announcements in the groups).
+    from django.core.cache import cache
+    if not cache.add(f"seq_advance:{seq.id}:{seq.current_index}", 1, 15 * 60):
+        print(f"_advance_game_sequence: {seq.slot}/{seq.date} step {seq.current_index} already advancing")
+        return
+    seq.refresh_from_db()
+    if seq.completed or (game_id and seq.current_game_id != game_id):
         return
 
     is_vip = (seq.slot == GameSequence.SLOT_VIP)
@@ -7684,6 +7738,14 @@ def _auto_recover_game_sequences():
                 if not g or g.status == AuthorGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
                     is_finished = True
                     ended_at = g.ends_at if g else None
+            elif gt == "savol":
+                # Its own table (ids overlap QuizGame's). Finished = settled, or
+                # stuck two minutes past its hard stop.
+                from tgbot.models import AskGame
+                g = AskGame.objects.filter(id=gid).first()
+                if not g or g.rewarded or (g.ends_at and (now - g.ends_at).total_seconds() > 120):
+                    is_finished = True
+                    ended_at = g.ends_at if g else None
             else:
                 g = QuizGame.objects.filter(id=gid).first()
                 if not g or g.status == QuizGame.STATUS_FINISHED or (g.ends_at and g.ends_at < now):
@@ -7748,6 +7810,28 @@ def _ensure_slot_started():
             start_game_sequence(slot)
 
 
+def ask_results_text(summary) -> str:
+    """Group post at the end of an Eng zo'r savol game, house style."""
+    from tgbot.services.announce_style import name as _nm
+    winners = summary.get("winners", [])
+    medals = ["🥇", "🥈", "🥉"]
+    lines = ["❓ <b>Eng zo'r savol — yakun</b>", ""]
+    best = summary.get("best") or []
+    if best:
+        b = max(best, key=lambda x: len(x["answer"]))
+        lines += [f"<blockquote><b>{_nm(b['asker'])}</b> so'radi: <i>{escape(b['question'][:200])}</i>\n"
+                  f"🏅 Eng zo'r javob — {_nm(b['by'])}: <i>{escape(b['answer'][:160])}</i></blockquote>", ""]
+    if winners:
+        for i, w in enumerate(winners[:5]):
+            m = medals[i] if i < 3 else f"{i + 1}."
+            rew = f" · +{w['reward']} 🪙" if w.get("reward") else ""
+            lines.append(f"{m} <b>{_nm(w['name'])}</b> · {w['points']} ochko{rew}")
+        lines += ["", "Savol bergan va javob yozgan hammaga rahmat — fikr shu yerda o'sadi. 📚"]
+    else:
+        lines.append("Bu safar ishtirokchilar yetmadi — keyingisida kutamiz!")
+    return "\n".join(lines)
+
+
 @shared_task
 def games_finalize_tick():
     """Finish + reward any live game whose time is up; announce results to
@@ -7802,6 +7886,36 @@ def games_finalize_tick():
                     pass
     except Exception as e:
         print(f"games_finalize_tick feud error: {e}")
+
+    # 1b. Eng zo'r savol
+    try:
+        from tgbot.services import ask_game
+        for game, summary in ask_game.finalize_due_games():
+            winners = summary.get("winners", [])
+            text = ask_results_text(summary)
+            if winners and not _is_admin_only(winners):
+                for gid, tid in _game_targets():
+                    try:
+                        data = {"chat_id": gid, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"}
+                        if tid:
+                            data["message_thread_id"] = tid
+                        requests.post(url, data=data, timeout=10)
+                    except Exception:
+                        pass
+            _advance_game_sequence("savol", game.id)
+            for w in winners:
+                if not w.get("reward"):
+                    continue
+                try:
+                    requests.post(url, data={"chat_id": w["telegram_id"],
+                        "text": (f"❓ Eng zo'r savol — <b>{w['rank']}-o'rin</b>!\n"
+                                 f"🪙 <b>+{w['reward']} Kitobcha</b> · Ochko: {w['points']}"
+                                 + _premium_missed_line(w, prem_ids)),
+                        "parse_mode": "HTML"}, timeout=8)
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"games_finalize_tick ask error: {e}")
 
     # 2. Castle
     try:

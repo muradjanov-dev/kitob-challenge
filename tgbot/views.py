@@ -1375,6 +1375,20 @@ def internal_ops(request: HttpRequest, action: str):
         return JsonResponse({"ok": True, "sequences": seqs, "quiz_games": games},
                             json_dumps_params={"default": str})
 
+    if action == "slot-plan":
+        # {"date": "2026-11-11", "slot": "evening", "games": ["savol", "feud", "savol"], "apply": true}
+        # runs exactly these games in that slot ([] clears); without apply: the plan.
+        from tgbot.tasks import _GAME_STARTERS, set_slot_plan, slot_plan
+        day, slot = body.get("date", ""), body.get("slot", "evening")
+        games = body.get("games")
+        if not day:
+            return JsonResponse({"ok": False, "error": "date_required"}, status=400)
+        if games is not None and any(g not in _GAME_STARTERS for g in games):
+            return JsonResponse({"ok": False, "error": "unknown_game"}, status=400)
+        if apply and games is not None:
+            set_slot_plan(day, slot, games)
+        return JsonResponse({"ok": True, "date": day, "slot": slot, "plan": slot_plan(day, slot)})
+
     if action == "headliner":
         from tgbot.tasks import _GAME_STARTERS, set_slot_headliner, slot_headliner
         day, slot, game = body.get("date", ""), body.get("slot", "evening"), body.get("game")
