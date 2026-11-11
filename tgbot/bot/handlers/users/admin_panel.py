@@ -708,9 +708,12 @@ async def test_weekly_report_handler(message: types.Message, state: FSMContext =
 
 
 @dp.message_handler(IsPrivate(), text="✉️ Habar yuborish")
-async def send_notification_text_handler(message: types.Message):
-    await message.answer("Habarni tektini yuboring.", reply_markup=types.ReplyKeyboardRemove())
-    await NotificationState.get_text.set()
+async def send_notification_text_handler(message: types.Message, state: FSMContext):
+    user = await aget_user(message.from_user.id)
+    if not user or not user.is_admin:
+        return
+    from tgbot.bot.handlers.users.broadcast_any import start as _bc_start
+    await _bc_start(message, state)
 
 
 @dp.message_handler(IsPrivate(), state=NotificationState.get_text, content_types=types.ContentType.TEXT)
@@ -2116,7 +2119,9 @@ async def admin_inline_router(call: types.CallbackQuery, state: FSMContext):
     elif action == "stats":
         await show_global_statistics(msg)
     elif action == "notify":
-        await send_notification_text_handler(msg)
+        # Any message, file, video or album, copied or forwarded (broadcast_any).
+        from tgbot.bot.handlers.users.broadcast_any import start as _bc_start
+        await _bc_start(msg, state)
     elif action == "welcome_video":
         await welcome_video_start_handler(msg, state)
     elif action == "reminders":

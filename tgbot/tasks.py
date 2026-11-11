@@ -77,6 +77,58 @@ def send_notification_with_celery(user_id, notification_message, photo=None, rep
 
 
 @shared_task
+def broadcast_any_message(from_chat_id, message_ids, mode, admin_chat_id):
+    """Send one admin message (any type; several ids = an album) to every
+    reachable reader -- mode "copy" (copyMessage, no source header) or
+    "forward" (forwardMessage). Readers who blocked the bot are marked; a
+    429 waits as Telegram asks. The admin gets the counts at the end."""
+    import time as _t
+    ids = [int(i) for i in message_ids]
+    album = len(ids) > 1
+    method = ("forwardMessages" if album else "forwardMessage") if mode == "forward" else \
+        ("copyMessages" if album else "copyMessage")
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
+    base = {"from_chat_id": from_chat_id}
+    if album:
+        base["message_ids"] = json.dumps(ids)
+    else:
+        base["message_id"] = ids[0]
+    people = list(TelegramProfile.objects.filter(is_registered=True, is_blocked=False)
+                  .values_list("telegram_id", flat=True).distinct())
+    sent = blocked = failed = 0
+    started = _t.monotonic()
+    for chat_id in people:
+        data = dict(base, chat_id=chat_id)
+        try:
+            r = requests.post(url, data=data, timeout=15)
+            if r.status_code == 429:
+                _t.sleep(int(r.json().get("parameters", {}).get("retry_after", 3)) + 1)
+                r = requests.post(url, data=data, timeout=15)
+            if r.ok:
+                sent += 1
+            elif r.status_code == 403:
+                blocked += 1
+                TelegramProfile.objects.filter(telegram_id=chat_id).update(is_blocked=True)
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+        _t.sleep(0.05)
+    mins = int((_t.monotonic() - started) // 60)
+    report = (f"✅ <b>Xabar yuborildi</b> ({'forward' if mode == 'forward' else 'nusxa'}"
+              f"{', albom' if album else ''})\n\n"
+              f"📨 Yetkazildi: <b>{sent}</b>\n🚫 Botni bloklagan: {blocked}\n⚠️ Xato: {failed}\n"
+              f"⏱ {mins} daqiqa")
+    try:
+        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                      data={"chat_id": admin_chat_id, "text": report, "parse_mode": "HTML"}, timeout=10)
+    except Exception:
+        pass
+    print(f"broadcast_any_message: {mode} sent={sent} blocked={blocked} failed={failed}")
+    return {"sent": sent, "blocked": blocked, "failed": failed}
+
+
+@shared_task
 def delete_message_after_delay(chat_id, message_id):
     """Delete a Telegram message. Scheduled via apply_async(countdown=N)."""
     try:

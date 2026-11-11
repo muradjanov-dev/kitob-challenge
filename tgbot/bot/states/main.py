@@ -9,6 +9,11 @@ class AdmissionState(StatesGroup):
     age = State()
 
 
+class BroadcastAnyState(StatesGroup):
+    message = State()  # waiting for any message (or album) to send to everyone
+    confirm = State()  # preview shown; copy / forward / cancel
+
+
 class NotificationState(StatesGroup):
     get_text = State()
     is_picture = State()
