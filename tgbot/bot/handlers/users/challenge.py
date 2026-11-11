@@ -126,7 +126,7 @@ def compute_bajardim_label(user, lang: str = "uz") -> str:
     base = "✅ Выполнено!" if lang == "ru" else "✅ Bajardim!"
     ch = Challenge.objects.filter(is_active=True).first()
     if not ch:
-        return base
+        return ""  # no challenge running: the button is left out
 
     days_completed = 0
     if user:

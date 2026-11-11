@@ -54,71 +54,56 @@ def _active_boom_for_menu():
 
 
 def main_markup(language="uz", is_admin=False):
-    """Inline main menu. callback_data uses `menu:<action>` namespace.
-    The 📚 Kitob hisoboti button is rendered as a tall full-width hero
-    (visually ≈ 4 ordinary buttons) by stacking decorative lines + a
-    blank padding row above and below the title."""
-    if language == "ru":
-        labels = {
-            "report_big": "📚\n\n📚 Отчет о книге 📚\n\n📚",
-            "cabinet": "👤 Кабинет",
-            "premium": "💎 Подписка",
-            "reyting": "📊 Рейтинг",
-            "contact": "📞 Написать администратору",
-            "settings": "⚙️ Настройки",
-            "quiz": "📝 Книжный Квиз",
-            "admin": "👑 Админ панель",
-            "how": "❓ Как это работает?",
-        }
-    else:
-        labels = {
-            "report_big": "📚\n\n📚 Kitob hisoboti 📚\n\n📚",
-            "cabinet": "👤 Kabinet",
-            "premium": "💎 Premium obuna",
-            "reyting": "📊 Reyting",
-            "contact": "📞 Admin bilan bog'lanish",
-            "settings": "⚙️ Sozlamalar",
-            "quiz": "📝 Kitob Quiz",
-            "market": "🎪 Market",
-            "admin": "👑 Admin panel",
-            "how": "❓ Qanday ishlaydi?",
-        }
-
-    # Premium is retired at the wallet launch; the same slot opens the wallet.
+    """Inline main menu, callback_data `menu:<action>` (owner, 2026-11-11:
+    minimal, and clearly thought through). One main action on top -- the
+    day's report, a tall full-width button -- then everything else in pairs
+    by what the reader wants: money and self (Hamyon, Kabinet), standing
+    and the currency they earn (Reyting, Kitobcha), play (Kitob Quiz,
+    Market), and the quiet corner (Sozlamalar, Yordam -- "how it works" and
+    "write to the admin" live inside it)."""
     from tgbot.services import wallet as _wallet
-    if _wallet.is_live_launch():
-        labels["premium"] = "👛 Кошелёк" if language == "ru" else "👛 Hamyon"
+    ru = language == "ru"
+    labels = {
+        "report_big": "\n📖  Отчёт за сегодня\n" if ru else "\n📖  Bugungi hisobot\n",
+        "wallet": ("👛 Кошелёк" if ru else "👛 Hamyon") if _wallet.is_live_launch()
+        else ("💎 Подписка" if ru else "💎 Premium obuna"),
+        "cabinet": "👤 Кабинет" if ru else "👤 Kabinet",
+        "reyting": "🏆 Рейтинг" if ru else "🏆 Reyting",
+        "kitobcha": "🪙 Kitobcha",
+        "quiz": "📝 Книжный квиз" if ru else "📝 Kitob Quiz",
+        "market": "🎪 Market",
+        "settings": "⚙️ Настройки" if ru else "⚙️ Sozlamalar",
+        "help": "💬 Помощь" if ru else "💬 Yordam",
+        "admin": "👑 Админ панель" if ru else "👑 Admin panel",
+    }
 
     kb = InlineKeyboardMarkup(row_width=2)
     kb.row(InlineKeyboardButton(text=labels["report_big"], callback_data="menu:report"))
-    # Dedicated, prominent entry while a Referral BOOM is live -- separate
-    # from the always-there Kabinet -> Referal entry so a running competition
-    # doesn't get buried a menu deep.
+    # Dedicated, prominent entry while a Referral BOOM is live.
     active_boom = _active_boom_for_menu()
     if active_boom:
-        kb.row(InlineKeyboardButton(
-            text=f"🌟 {active_boom.title}",
-            callback_data=f"join_boom:{active_boom.id}",
-        ))
-    kb.row(InlineKeyboardButton(text=labels["how"], callback_data="menu:how"))
-    # Shop entry lives on the native chat menu button now (see
-    # set_shop_menu_button management command), so it's removed from the
-    # inline menu entirely.
-    kb.row(
-        InlineKeyboardButton(text=labels["cabinet"], callback_data="menu:cabinet"),
-        InlineKeyboardButton(text=labels["reyting"], callback_data="menu:reyting"),
-    )
-    kb.row(
-        InlineKeyboardButton(text=labels["premium"], callback_data="menu:premium"),
-        InlineKeyboardButton(text=labels["quiz"], callback_data="menu:quiz"),
-    )
-    kb.row(InlineKeyboardButton(text=labels.get("market", "🎪 Market"), callback_data="menu:market"))
-    kb.row(
-        InlineKeyboardButton(text=labels["settings"], callback_data="menu:settings"),
-        InlineKeyboardButton(text=labels["contact"], callback_data="menu:contact"),
-    )
+        kb.row(InlineKeyboardButton(text=f"🌟 {active_boom.title}", callback_data=f"join_boom:{active_boom.id}"))
+    # The shop lives on the native chat menu button and inside the site.
+    kb.row(InlineKeyboardButton(text=labels["wallet"], callback_data="menu:premium"),
+           InlineKeyboardButton(text=labels["cabinet"], callback_data="menu:cabinet"))
+    kb.row(InlineKeyboardButton(text=labels["reyting"], callback_data="menu:reyting"),
+           InlineKeyboardButton(text=labels["kitobcha"], callback_data="kuse:menu"))
+    kb.row(InlineKeyboardButton(text=labels["quiz"], callback_data="menu:quiz"),
+           InlineKeyboardButton(text=labels["market"], callback_data="menu:market"))
+    kb.row(InlineKeyboardButton(text=labels["settings"], callback_data="menu:settings"),
+           InlineKeyboardButton(text=labels["help"], callback_data="menu:help"))
     if is_admin:
         kb.row(InlineKeyboardButton(text=labels["admin"], callback_data="menu:admin"))
+    return kb
+
+
+def help_markup(language="uz"):
+    """💬 Yordam: the two things a reader looks for when stuck."""
+    ru = language == "ru"
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton("❓ Как это работает?" if ru else "❓ Qanday ishlaydi?", callback_data="menu:how"))
+    kb.add(InlineKeyboardButton("📞 Написать администратору" if ru else "📞 Admin bilan bog'lanish",
+                                callback_data="menu:contact"))
     return kb
 
 
@@ -145,8 +130,13 @@ def report_reply_keyboard(language="uz", bajardim_label=None, is_admin=False):
     if not base_domain.startswith('http'):
         base_domain = f"https://{base_domain}"
 
+    # "✅ Bajardim!" only while a reading challenge runs (they are on hold
+    # since 2026-11-11): compute_bajardim_label gives "" when none does.
+    first = [KeyboardButton(text=report_text)]
+    if bajardim_label != "":
+        first.append(KeyboardButton(text=done_text))
     rows = [
-        [KeyboardButton(text=report_text), KeyboardButton(text=done_text)],
+        first,
         [KeyboardButton(text=site_text, web_app=WebAppInfo(url=f"{base_domain}/"))],
     ]
     # Persistent entry to this user's own boom stats + share link, while a

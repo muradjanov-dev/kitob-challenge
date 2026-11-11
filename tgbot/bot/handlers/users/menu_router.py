@@ -57,7 +57,7 @@ async def _notify_admins(text: str):
 async def send_main_menu(message: types.Message, user, header_text=None):
     lang = _user_lang(user)
     header = header_text or _t(lang, "🏠 Asosiy menyu", "🏠 Главное меню")
-    sub = _t(lang, "Quyidagilardan birini tanlang:", "Выберите одно из ниже:")
+    sub = _t(lang, "📚 Bugun nima qilamiz?", "📚 Чем займёмся сегодня?")
     # Compute the dynamic '✅ Bajardim!' label embedding today's challenge
     # progress + condition. Wrapped in try/except so any DB hiccup falls back
     # to the static label rather than blanking the whole menu render.
@@ -117,7 +117,7 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
 
     # Blocked users can ONLY reach the "contact admin" path so they can
     # appeal. Everything else short-circuits with a clear message.
-    if user and user.is_banned and action != "contact":
+    if user and user.is_banned and action not in ("contact", "help"):
         await call.answer()
         await call.message.answer(
             _t(
@@ -153,6 +153,11 @@ async def main_menu_router(call: types.CallbackQuery, state: FSMContext):
         await _menu_settings(call, user, state)
     elif action == "how":
         await _menu_how_it_works(call, user, state)
+    elif action == "help":
+        from tgbot.bot.keyboards.reply import help_markup
+        await call.answer()
+        await call.message.answer(_t(lang, "💬 <b>Yordam</b>\n\nNima kerak bo'ldi?", "💬 <b>Помощь</b>\n\nЧем помочь?"),
+                                  parse_mode="HTML", reply_markup=help_markup(lang))
     elif action == "admin":
         await _menu_admin(call, user, state)
     elif action == "quiz":
