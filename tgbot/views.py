@@ -1372,7 +1372,11 @@ def internal_ops(request: HttpRequest, action: str):
                           "ends": _tz.localtime(g.ends_at).strftime("%H:%M") if g.ends_at else None,
                           "questions": len(g.questions or []), "players": QuizScore.objects.filter(game=g).count(),
                           "answers_per_q": per_q, "rewarded": g.rewarded})
-        return JsonResponse({"ok": True, "sequences": seqs, "quiz_games": games},
+        from tgbot.services import ask_game as _ask
+        ask_games = []
+        for i in range(int(body.get("days") or 3) + 1):
+            ask_games += _ask.day_stats(since + _dt.timedelta(days=i))
+        return JsonResponse({"ok": True, "sequences": seqs, "quiz_games": games, "ask_games": ask_games},
                             json_dumps_params={"default": str})
 
     if action == "ai-health":
@@ -1422,6 +1426,18 @@ def internal_ops(request: HttpRequest, action: str):
             send_gratitude_letters.delay()
             out["started"] = True
         return JsonResponse(out)
+
+    if action == "ask-gift":
+        # A promised gift for one random Eng zo'r savol player of a day:
+        # {"date": "2026-11-11", "amount": 3000} = pool size; with "apply": draw
+        # + credit (once per date). The announcement is sent separately.
+        import datetime as _dt2
+        from tgbot.services import ask_game as _ask
+        day = _dt2.date.fromisoformat(body.get("date") or "")
+        amount = int(body.get("amount") or 0)
+        if amount <= 0 or amount > 100000:
+            return JsonResponse({"ok": False, "error": "amount_1_to_100000"}, status=400)
+        return JsonResponse(_ask.draw_day_gift(day, amount, apply))
 
     if action == "challenges":
         # Reading challenges: {} = state; {"on": true|false, "apply": true}.

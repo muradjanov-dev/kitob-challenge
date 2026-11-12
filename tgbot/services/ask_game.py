@@ -283,6 +283,67 @@ def finalize_due_games() -> list:
     return out
 
 
+# ── A gift drawn among one day's players (owner, 2026-11-11) ─────────────────
+
+def players_of_day(day) -> list:
+    """Profile ids that asked a question or wrote an answer in any Eng zo'r
+    savol game started on `day` (Tashkent date); admins left out."""
+    from tgbot.models import TelegramProfile
+    games = AskGame.objects.filter(starts_at__date=day)
+    ids = set(AskAnswer.objects.filter(round__game__in=games).values_list("user_id", flat=True))
+    ids |= set(AskRound.objects.filter(game__in=games).exclude(question="").values_list("asker_id", flat=True))
+    admins = set(TelegramProfile.objects.filter(id__in=ids, is_admin=True).values_list("id", flat=True))
+    return sorted(ids - admins)
+
+
+def gift_tag(day) -> str:
+    return f"ask_gift:{day.isoformat()}"
+
+
+def draw_day_gift(day, amount: int, apply: bool) -> dict:
+    """Give `amount` Kitobcha to one random player of `day`, once per day:
+    the ledger row's reason is the marker, checked under the winner's lock.
+    A gift, not a stake -- the games are free to enter. Flat Kitobcha (no
+    Premium 2x: this is a fixed promised prize)."""
+    from django.db.models import F
+    from tgbot.models import KitobchaLedger, TelegramProfile
+    tag = gift_tag(day)
+    done = KitobchaLedger.objects.filter(reason=tag).first()
+    if done:
+        return {"ok": True, "already": True, "winner_id": done.user_id}
+    pool = players_of_day(day)
+    out = {"ok": True, "pool": len(pool)}
+    if not pool or not apply:
+        return out
+    winner_id = secrets.SystemRandom().choice(pool)
+    with transaction.atomic():
+        TelegramProfile.objects.select_for_update().get(id=winner_id)
+        if KitobchaLedger.objects.filter(reason=tag).exists():
+            return {"ok": True, "already": True}
+        TelegramProfile.objects.filter(id=winner_id).update(ball=F("ball") + int(amount))
+        KitobchaLedger.objects.create(user_id=winner_id, delta=int(amount), reason=tag)
+    p = TelegramProfile.objects.get(id=winner_id)
+    out.update(winner_id=p.id, telegram_id=p.telegram_id, name=p.full_name or "Kitobxon",
+               balance=int(p.ball or 0), amount=int(amount))
+    return out
+
+
+def day_stats(day) -> list:
+    rows = []
+    for g in AskGame.objects.filter(starts_at__date=day).order_by("starts_at"):
+        rounds = list(AskRound.objects.filter(game=g))
+        rows.append({
+            "id": g.id, "status": g.status, "phase": g.phase,
+            "starts": timezone.localtime(g.starts_at).strftime("%H:%M"),
+            "joined": AskPlayer.objects.filter(game=g).count(),
+            "rounds": len(rounds), "asked": sum(1 for r in rounds if r.question),
+            "skipped": sum(1 for r in rounds if r.skipped),
+            "answers": AskAnswer.objects.filter(round__game=g).count(),
+            "best_picked": sum(1 for r in rounds if r.best_answer_id), "rewarded": g.rewarded,
+        })
+    return rows
+
+
 # ── What a player sees ───────────────────────────────────────────────────────
 
 def _first(name) -> str:
