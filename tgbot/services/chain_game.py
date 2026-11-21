@@ -33,7 +33,7 @@ from tgbot.services.chain_text import answer_key, is_guessable_letter, to_latin,
 ENTRY_FEE = 0  # Barcha jonli o'yinlar bepul (2026-08-19)
 POINTS_PER_ROUND = 10
 DEFAULT_DURATION_MIN = 10
-LEAD_SECONDS = 30  # lobby countdown after the announcement, so everyone can join
+LEAD_SECONDS = 20  # lobby countdown after the announcement, so everyone can join
 MIN_TITLE_LETTERS = 4  # skip titles too short to blank meaningfully
 
 REWARD_TIERS = {0: 150, 1: 90, 2: 45}

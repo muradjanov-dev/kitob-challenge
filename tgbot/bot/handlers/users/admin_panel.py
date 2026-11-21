@@ -124,7 +124,7 @@ async def _launch_chain_game(target_message):
         "🔗 O'yinni ochish", web_app=WebAppInfo(url=f"{WEB_DOMAIN}/zanjir/"),
     ))
     await target_message.answer(
-        "✅ <b>Kitob Zanjiri e'lon qilindi!</b> 30 soniyadan keyin boshlanadi. "
+        "✅ <b>Kitob Zanjiri e'lon qilindi!</b> 20 soniyadan keyin boshlanadi. "
         "Guruhlarga e'lon yuborildi.",
         parse_mode="HTML", reply_markup=kb,
     )
@@ -172,7 +172,7 @@ async def _launch_game(target_message, start_task, web_path, title):
         "🎮 O'yinni ochish", web_app=WebAppInfo(url=f"{WEB_DOMAIN}{web_path}"),
     ))
     await target_message.answer(
-        f"✅ <b>{title}</b> e'lon qilindi! 30 soniyadan keyin boshlanadi. "
+        f"✅ <b>{title}</b> e'lon qilindi! 20 soniyadan keyin boshlanadi. "
         "Guruhlarga e'lon yuborildi.",
         parse_mode="HTML", reply_markup=kb,
     )
@@ -493,7 +493,7 @@ async def _launch_game_silent(target_message, key, web_path, title):
     ))
     await target_message.answer(
         f"✅ <b>{title}</b> sinov o'yini tayyor — bu faqat sizga ko'rinadi, guruhga hech narsa "
-        "yuborilmadi. 30 soniyadan keyin boshlanadi.",
+        "yuborilmadi. 20 soniyadan keyin boshlanadi.",
         parse_mode="HTML", reply_markup=kb,
     )
 
@@ -567,7 +567,7 @@ async def admin_games_menu_cb(call: types.CallbackQuery, state: FSMContext = Non
     await call.answer()
     await call.message.answer(
         "🎮 <b>Qaysi toifadagi o'yinni boshlaymiz?</b>\n\n"
-        "O'yin tanlangach, darhol guruhlarga e'lon qilinadi va 30 soniyadan keyin jonli boshlanadi.\n"
+        "O'yin tanlangach, darhol guruhlarga e'lon qilinadi va 20 soniyadan keyin jonli boshlanadi.\n"
         "Bo'limni tanlang 👇",
         parse_mode="HTML", reply_markup=_games_admin_menu_kb(),
     )

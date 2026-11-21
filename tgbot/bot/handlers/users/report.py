@@ -398,7 +398,9 @@ def create_confirmation_report(
         minutes_listened=minutes_listened,
     )
     if book_ids:
-        report.books.set(book_ids)
+        # Only books that still exist: one removed while the report was open
+        # made the whole confirmation fail on the foreign key.
+        report.books.set(list(BooksToRead.objects.filter(id__in=book_ids, user=user).values_list("id", flat=True)))
     return report
 
 
@@ -409,7 +411,12 @@ async def send_book_selection_menu(message_or_call, state: FSMContext, page=1):
     selected_book_ids = data.get("selected_book_ids", [])
     user = await aget_user(message_or_call.from_user.id)
 
-    books_page = await get_user_books(user, page)
+    try:
+        books_page = await get_user_books(user, page)
+    except Exception:
+        # A page number from an old menu that no longer exists (books removed).
+        page = 1
+        books_page = await get_user_books(user, page)
 
     markup = InlineKeyboardMarkup(row_width=1)
 
@@ -449,7 +456,13 @@ async def send_book_selection_menu(message_or_call, state: FSMContext, page=1):
         "/ Yoki yangi kitob qo'shing (📖 Qog'oz / 🎧 Audio):")
 
     if isinstance(message_or_call, types.CallbackQuery):
-        await message_or_call.message.edit_text(text, reply_markup=markup)
+        try:
+            await message_or_call.message.edit_text(text, reply_markup=markup)
+        except Exception as e:
+            # "message is not modified" (a double tap) is harmless; anything
+            # else (the message is too old to edit) gets a fresh menu.
+            if "not modified" not in str(e).lower():
+                await message_or_call.message.answer(text, reply_markup=markup)
     else:
         await message_or_call.answer(text, reply_markup=markup)
 
@@ -578,8 +591,26 @@ async def start_report_flow(call: CallbackQuery, state: FSMContext, user):
 
 # ── Book selection callbacks ──────────────────────────────────────────────────
 
-@dp.callback_query_handler(state=ReportState.select_book)
+_SELECT_EXACT = ("add_new_book", "add_book_back", "confirm_selection", "noop")
+_SELECT_PREFIX = ("add_book_type:", "books_page:", "select_book:")
+
+
+def _is_select_button(data) -> bool:
+    data = data or ""
+    return data in _SELECT_EXACT or data.startswith(_SELECT_PREFIX)
+
+
+# Only this menu's own buttons: with no filter, every other button pressed
+# while a report was open (main menu, games, an old post) was swallowed here
+# and did nothing -- the "tushunarsiz holat" readers reported (2026-11-21).
+@dp.callback_query_handler(lambda c: _is_select_button(c.data), state=ReportState.select_book)
 async def book_selection_handler(call: CallbackQuery, state: FSMContext):
+    if call.data == "confirm_selection":
+        data = await state.get_data()
+        if not data.get("selected_book_ids"):
+            await call.answer(_("Kamida bitta kitob tanlang!"), show_alert=True)
+            return
+    await call.answer()
     if call.data == "add_new_book":
         type_kb = InlineKeyboardMarkup(row_width=2)
         type_kb.add(
@@ -590,28 +621,34 @@ async def book_selection_handler(call: CallbackQuery, state: FSMContext):
             InlineKeyboardButton("🔙 Orqaga", callback_data="add_book_back")
         )
         await call.message.edit_text("Qo'shmoqchi bo'lgan kitob turini tanlang:", reply_markup=type_kb)
-        await call.answer()
 
     elif call.data.startswith("add_book_type:"):
         is_audio_new = call.data.split(":")[1] == "audio"
         await state.update_data(new_book_is_audio=is_audio_new)
-        await call.message.delete()
+        try:
+            await call.message.delete()
+        except Exception:
+            pass
         await call.message.answer(_("Kitob nomini kiriting?"), reply_markup=back_keyboard)
         await ReportState.enter_book_name.set()
-        await call.answer()
 
     elif call.data == "add_book_back":
         await send_book_selection_menu(call, state)
-        await call.answer()
 
     elif call.data.startswith("books_page:"):
-        page = int(call.data.split(":")[1])
+        try:
+            page = int(call.data.split(":")[1])
+        except (ValueError, IndexError):
+            page = 1
         await send_book_selection_menu(call, state, page)
 
     elif call.data.startswith("select_book:"):
         parts = call.data.split(":")
-        book_id = int(parts[1])
-        page = int(parts[2]) if len(parts) > 2 else 1
+        try:
+            book_id = int(parts[1])
+            page = int(parts[2]) if len(parts) > 2 else 1
+        except (ValueError, IndexError):
+            return
 
         data = await state.get_data()
         selected_book_ids = data.get("selected_book_ids", [])
@@ -628,10 +665,18 @@ async def book_selection_handler(call: CallbackQuery, state: FSMContext):
     elif call.data == "confirm_selection":
         data = await state.get_data()
         selected_book_ids = data.get("selected_book_ids", [])
-
-        if not selected_book_ids:
-            await call.answer(_("Kamida bitta kitob tanlang!"), show_alert=True)
-            return
+        # The menu's buttons go once the choice is made: tapped later, they
+        # used to do nothing at all.
+        try:
+            titles = []
+            for bid in selected_book_ids:
+                b = await get_book_by_id(int(bid))
+                if b:
+                    titles.append(f"{'🎧' if b.is_audio else '📖'} {b.title}")
+            await call.message.edit_text(
+                "✅ Tanlangan kitoblar:\n" + "\n".join(titles or ["—"]), reply_markup=None)
+        except Exception:
+            pass
 
         # `call.message` belongs to the bot, so `from_user` on it is the bot --
         # stash the real reader's id for the steps that need to look them up.
@@ -1132,6 +1177,10 @@ async def ask_next_book_pages(message, state: FSMContext):
 
     next_book_id = pending_books[0]
     book = await get_book_by_id(next_book_id)
+    if not book:
+        # Removed since it was chosen: skip it instead of crashing the report.
+        await state.update_data(pending_books=pending_books[1:])
+        return await ask_next_book_pages(message, state)
 
     # Self-heal misclassified audiobooks: if a book has 0 progress and its title
     # clearly says it's an audiobook, flip is_audio=True silently. This rescues
@@ -1192,9 +1241,9 @@ async def process_loop_pages(message: types.Message, state: FSMContext):
         await send_book_selection_menu(message, state)
         return
 
-    value_str = message.text
+    value_str = (message.text or "").strip().replace(" ", "")
     if not value_str.isdigit() or int(value_str) <= 0:
-        await message.answer(_("Iltimos, to'g'ri raqam kiriting."))
+        await message.answer(_("Iltimos, faqat raqam yuboring — masalan: 25"))
         return
 
     value = int(value_str)
@@ -1202,6 +1251,11 @@ async def process_loop_pages(message: types.Message, state: FSMContext):
     data = await state.get_data()
     pending_books = data.get("pending_books", [])
     reports = data.get("book_reports", {})
+    if not pending_books:
+        await state.finish()
+        await message.answer(
+            "⌛️ Hisobot sessiyasi tugab qolgan ekan. Iltimos, «📚 Kitob hisoboti» orqali qaytadan boshlang.")
+        return
 
     current_book_id = pending_books[0]
     current_book = await get_book_by_id(current_book_id)
@@ -1787,3 +1841,47 @@ async def _do_confirm_report(message, user, state: FSMContext):
             print(f"deferred referral processing failed: {e}")
 
     await state.finish()
+
+
+
+# ── Stale report buttons ─────────────────────────────────────────────────────
+# A button from an earlier report message, pressed when that step is over
+# (another step is open, or no report at all). Without this the tap spun and
+# nothing happened. Registered after every state-bound handler above.
+_REPORT_STALE_PREFIX = ("select_book:", "books_page:", "add_book_type:", "high_pages:", "select_global_book:")
+_REPORT_STALE_EXACT = ("confirm_selection", "add_new_book", "add_book_back", "create_global_book",
+                       "report:confirm", "report:cancel")
+
+
+@dp.callback_query_handler(
+    lambda c: (c.data or "") in _REPORT_STALE_EXACT or (c.data or "").startswith(_REPORT_STALE_PREFIX),
+    state="*",
+)
+async def stale_report_button(call: CallbackQuery, state: FSMContext):
+    await call.answer("⌛️ Bu tugma eskirgan — hisobotning bu bosqichi tugagan.", show_alert=True)
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await call.message.answer(
+        "Hisobotni yangidan boshlash uchun pastdagi tugmani bosing 👇",
+        reply_markup=InlineKeyboardMarkup().add(
+            InlineKeyboardButton("📚 Hisobot yuborish", callback_data="cta_send_report")),
+    )
+
+
+# A sticker, photo or voice where the report needs typed text: the text-only
+# handlers above never saw it and the reader got no answer at all.
+_TEXT_HINTS = {
+    ReportState.enter_book_name.state: "✍️ Iltimos, kitob nomini matn bilan yozing.",
+    ReportState.enter_book_pages.state: "🔢 Iltimos, kitob hajmini raqam bilan yozing — masalan: 250",
+    ReportState.enter_pages_loop.state: "🔢 Iltimos, bugun o'qigan betlaringizni raqam bilan yuboring — masalan: 25",
+    ReportState.conclusion.state: "✍️ Iltimos, xulosangizni matn bilan yozing (rasm yoki ovozli xabar emas).",
+}
+
+
+@dp.message_handler(state=[ReportState.enter_book_name, ReportState.enter_book_pages,
+                           ReportState.enter_pages_loop, ReportState.conclusion],
+                    content_types=types.ContentTypes.ANY)
+async def report_needs_text(message: types.Message, state: FSMContext):
+    await message.answer(_TEXT_HINTS.get(await state.get_state(), "✍️ Iltimos, matn yuboring."))

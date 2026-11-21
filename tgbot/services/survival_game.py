@@ -26,7 +26,7 @@ from tgbot.services.game_questions import SURVIVAL_QUESTIONS
 
 GAME_TYPE = "survival"  # GameJoker.game_type
 ENTRY_FEE = 0  # bepul (2026-08-19)
-LEAD_SECONDS = 30
+LEAD_SECONDS = 20
 NUM_QUESTIONS = 12
 QUESTION_SECONDS = 15
 MAX_LIVES = 3

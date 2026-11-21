@@ -23,7 +23,7 @@ from tgbot.services.chain_game import (
     PARTICIPATION as _GAME_PARTICIPATION, REWARD_TIERS as _GAME_TIERS, _add_ball_reward, request_finalize,
 )
 
-LEAD_SECONDS = 60
+LEAD_SECONDS = 20
 WRITE_SECONDS = 8 * 60
 VOTE_SECONDS = 4 * 60
 MIN_CHARS = 120

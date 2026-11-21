@@ -20,7 +20,7 @@ from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, REWARD
 from tgbot.services.game_questions import DETECTIVE_BOOKS
 
 ENTRY_FEE = 0  # bepul (2026-08-19)
-LEAD_SECONDS = 30
+LEAD_SECONDS = 20
 NUM_ROUNDS = 8
 ROUND_SECONDS = 45
 CLUE_INTERVAL_SECONDS = 15

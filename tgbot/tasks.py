@@ -7164,7 +7164,7 @@ def start_author_game():
     game = create_scheduled_author()
     text = (
         "🎭 <b>MUALLIF BO'LIB KO'R</b> — yangi o'yin!\n\n"
-        f"⏳ <b>{LEAD_SECONDS // 60} daqiqadan keyin</b> boshlanadi — hozir kiring!\n"
+        f"⏳ <b>{LEAD_SECONDS} soniyadan keyin</b> boshlanadi — hozir kiring!\n"
         "Kitobdan bir lavha ko'rsatiladi — uning davomini o'z tasavvuringiz bilan "
         f"yozasiz ({WRITE_SECONDS // 60} daqiqa). Keyin hamma yozuvlarni muallif "
         f"ismisiz o'qib, eng yoqqaniga ovoz beradi ({VOTE_SECONDS // 60} daqiqa).\n\n"
@@ -7356,7 +7356,7 @@ def _start_quiz_flavor(flavor, is_vip=False):
     if is_vip:
         announcement_text = (
             f"⭐️ <b>VIP PREMIUM ARENA: {game_title}</b> ⭐️\n\n"
-            f"⏳ <b>{lead // 60} daqiqadan keyin</b> boshlanadi — ulgurib kiring!\n"
+            f"⏳ <b>{lead} soniyadan keyin</b> boshlanadi — ulgurib kiring!\n"
             f"👑 <b>Faqat VIP Premium a'zolar uchun!</b>\n\n"
             f"💰 <b>VIP Mukofot: 500 / 300 / 150 Kitobcha</b>\n"
             f"💎 Premium 2× bilan g'olibga <b>1000 Kitobcha</b> — botdagi eng katta "
@@ -7413,7 +7413,7 @@ def _dm_vip_arena_invite(game_title, deep_link, lead_seconds):
     text = (
         f"⭐️ <b>VIP PREMIUM ARENA — siz uchun ochildi!</b>\n\n"
         f"🎮 Bugungi o'yin: <b>{game_title}</b>\n"
-        f"⏳ <b>{max(1, lead_seconds // 60)} daqiqadan keyin</b> boshlanadi\n\n"
+        f"⏳ <b>{lead_seconds} soniyadan keyin</b> boshlanadi\n\n"
         f"💰 Mukofot: <b>500 / 300 / 150 Kitobcha</b>\n"
         f"💎 Premium 2× bilan g'olibga <b>1000 Kitobcha</b>\n\n"
         f"👑 Bu arenaga faqat Premium a'zolar kira oladi — raqobat kam, "

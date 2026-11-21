@@ -18,7 +18,7 @@ from tgbot.models import CastleGame, CastleHit
 from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, ENTRY_FEE, request_finalize
 from tgbot.services.game_questions import CASTLE_QUESTIONS
 
-LEAD_SECONDS = 30
+LEAD_SECONDS = 20
 NUM_QUESTIONS = 15
 QUESTION_SECONDS = 20
 BOSS_HP = 600

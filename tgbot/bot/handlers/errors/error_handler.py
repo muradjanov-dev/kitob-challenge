@@ -67,6 +67,53 @@ async def errors_handler(update, exception):
         return True
     
     logging.exception(f'Update: {update} \n{exception}')
+    await _tell_reader_and_admins(update, exception)
+    return True
+
+
+async def _tell_reader_and_admins(update, exception):
+    """A crash used to leave the reader with a spinning button or silence.
+    Now they get a plain apology and a way back, and the admins get the error
+    (each kind at most once in 10 minutes)."""
+    from tgbot.bot.loader import bot
+    text = ("⚠️ Kechirasiz, kutilmagan xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring "
+            "yoki /menu orqali bosh menyuga qayting.")
+    try:
+        call = getattr(update, "callback_query", None)
+        msg = getattr(update, "message", None)
+        if call:
+            try:
+                await call.answer(text, show_alert=True)
+            except Exception:
+                await bot.send_message(call.from_user.id, text)
+        elif msg and msg.chat.type == "private":
+            await msg.answer(text)
+    except Exception:
+        pass
+    try:
+        from django.core.cache import cache
+        kind = f"{type(exception).__name__}:{str(exception)[:60]}"
+        if not cache.add(f"err_notified:{hash(kind)}", 1, 600):
+            return
+        from asgiref.sync import sync_to_async
+        from tgbot.models import TelegramProfile
+        admins = await sync_to_async(lambda: list(
+            TelegramProfile.objects.filter(is_admin=True).values_list("telegram_id", flat=True)))()
+        where = ""
+        if getattr(update, "callback_query", None):
+            where = f"tugma: {update.callback_query.data}"
+        elif getattr(update, "message", None):
+            where = f"xabar: {(update.message.text or update.message.content_type or '')[:60]}"
+        import html
+        note = (f"🐞 <b>Botda xatolik</b>\n{html.escape(where)}\n"
+                f"<code>{html.escape(type(exception).__name__ + ': ' + str(exception)[:300])}</code>")
+        for a in admins:
+            try:
+                await bot.send_message(a, note, parse_mode="HTML")
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 
 if hasattr(dp, "errors_handler"):

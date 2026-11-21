@@ -22,7 +22,7 @@ from django.utils import timezone
 
 from tgbot.models import AskAnswer, AskGame, AskPlayer, AskRound
 
-LEAD_SECONDS = 60
+LEAD_SECONDS = 20
 ASK_SECONDS = 45
 ANSWER_SECONDS = 20
 PICK_SECONDS = 30

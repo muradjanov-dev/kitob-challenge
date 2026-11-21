@@ -68,14 +68,14 @@ from tgbot.services.game_questions import (
 )
 
 GAME_TYPE = "quiz"  # GameJoker.game_type — jokerlar qaysi o'yin jadvaliga tegishli
-LEAD_SECONDS = 30
+LEAD_SECONDS = 20
 # The VIP arena needs a longer lobby than an ordinary game. Its invitation
 # only reaches people through the groups, and getting in means tapping the
 # group button, then the bot's button, then waiting for the Mini App -- 30
 # seconds is not enough for that, and the arena is the one game where the
 # whole eligible audience is small enough that a few lost joins show up as
 # an empty room.
-VIP_LEAD_SECONDS = 180  # exactly 3 minutes, so the announcement can say so
+VIP_LEAD_SECONDS = 20  # owner 2026-11-21: every game starts 20 s after its announcement
 ANSWER_SECONDS = 20
 REVEAL_SECONDS = 0
 POINTS = 10

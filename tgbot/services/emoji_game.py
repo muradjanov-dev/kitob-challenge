@@ -19,7 +19,7 @@ from tgbot.services.chain_game import (
 )
 from tgbot.services.game_questions import EMOJI_QUESTIONS
 
-LEAD_SECONDS = 30
+LEAD_SECONDS = 20
 NUM_QUESTIONS = 10
 ANSWER_SECONDS = 15
 REVEAL_SECONDS = 0

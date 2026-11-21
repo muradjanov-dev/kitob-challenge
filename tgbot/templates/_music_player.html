@@ -33,14 +33,18 @@
     { src: "/static/audio/classical/mozart-eine-kleine-nachtmusik.mp3", label: "Mozart — Eine kleine Nachtmusik" },
     { src: "/static/audio/classical/mozart-piano-sonata-11.mp3", label: "Mozart — Eine kleine Nachtmusik (Rondo)" }
   ];
-  var MUTE_KEY = "kc_music_muted";
+  // The games keep their own switch and play louder (owner, 2026-11-21:
+  // music on as soon as a game opens, a little louder): muting the site does
+  // not silence the games.
+  var IN_GAME = {% if music_corner == "top" %}true{% else %}false{% endif %};
+  var MUTE_KEY = IN_GAME ? "kc_game_music_muted" : "kc_music_muted";
   var POS_KEY = "kc_music_pos"; // {src, time, savedAt} -- lets the next page
   // resume the SAME track at the SAME spot instead of restarting, so moving
   // between Bosh sahifa/Kutubxona/Do'kon/Kabinet feels like the music never
   // stopped (a real page reload always has to re-fetch/re-decode audio --
   // this just hides that gap by not also jumping back to 0:00).
   var POS_MAX_AGE_MS = 30 * 60 * 1000; // stale after 30 min idle -- start fresh instead
-  var VOLUME = 0.14;
+  var VOLUME = IN_GAME ? 0.3 : 0.14;
 
   var audio = document.getElementById("kcBgAudio");
   var btn = document.getElementById("kcMusicToggle");

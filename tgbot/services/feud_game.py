@@ -22,7 +22,7 @@ from tgbot.services.chain_game import (
 )
 from tgbot.services.game_questions import FEUD_QUESTIONS
 
-LEAD_SECONDS = 30
+LEAD_SECONDS = 20
 NUM_QUESTIONS = 8
 MATCH_POINTS = 10  # per person who gave the same answer
 

@@ -18,7 +18,7 @@ from tgbot.services.chain_game import _add_ball_reward, charge_entry_fee, REWARD
 from tgbot.services.game_questions import WISDOM_QUESTIONS
 
 ENTRY_FEE = 0  # bepul (2026-08-19)
-LEAD_SECONDS = 30
+LEAD_SECONDS = 20
 NUM_QUESTIONS = 10
 ANSWER_SECONDS = 15
 REVEAL_SECONDS = 0
