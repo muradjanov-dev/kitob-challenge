@@ -112,7 +112,7 @@ class ThrottlingMiddleware(BaseMiddleware):
 
     async def message_throttled(self, message: types.Message, throttled: Throttled):
         if throttled.exceeded_count <= 2:
-            await message.reply("Too many requests!")
+            await message.reply("⏳ Biroz sekinroq — xabarlar juda tez kelyapti.")
 
 
 try:
@@ -122,6 +122,49 @@ except Exception:
 
 from utils.subscription import get_result
 from tgbot.bot.keyboards.inline import get_check_button
+
+
+class AnswerTapsQuickly(BaseMiddleware):
+    """A tap's spinner stops within a second even when its handler is slow
+    (2026-11-21: "tugmalar aylanib qotib qolyapti"). If the handler has not
+    answered the callback by then, a silent answer goes out; a later answer
+    of the handler's own (an alert) is then quietly dropped instead of
+    raising. CallbackQuery.answer is wrapped once to know who answered."""
+    DELAY = 1.0
+
+    async def on_pre_process_callback_query(self, call: types.CallbackQuery, data: dict):
+        import asyncio
+        call.__dict__["_kc_answered"] = False
+
+        async def safety():
+            await asyncio.sleep(self.DELAY)
+            if not call.__dict__.get("_kc_answered"):
+                call.__dict__["_kc_auto"] = True
+                try:
+                    await _orig_answer(call)
+                except Exception:
+                    pass
+        asyncio.ensure_future(safety())
+
+
+_orig_answer = types.CallbackQuery.answer
+
+
+async def _answer_once(self, *args, **kwargs):
+    if self.__dict__.get("_kc_auto"):
+        try:
+            return await _orig_answer(self, *args, **kwargs)
+        except Exception:
+            return True  # already answered by the safety net
+    self.__dict__["_kc_answered"] = True
+    return await _orig_answer(self, *args, **kwargs)
+
+
+types.CallbackQuery.answer = _answer_once
+try:
+    dp.middleware.setup(AnswerTapsQuickly())
+except Exception:
+    pass
 
 
 class ReachableAgain(BaseMiddleware):

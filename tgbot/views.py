@@ -32,6 +32,29 @@ def _run_loop_forever():
 threading.Thread(target=_run_loop_forever, daemon=True, name="bot-loop").start()
 
 
+# Speed (2026-11-21, "tugmalar aylanib qotib qolyapti"): the bot loop has no
+# parent sync thread, so asgiref ran EVERY thread_sensitive sync_to_async call
+# of this process -- aget_user and most handler DB work -- on one single
+# thread, one at a time: one slow query held every reader's button. A pool
+# lets them run side by side; each job first drops a dead DB connection.
+def _parallel_bot_db():
+    from concurrent.futures import ThreadPoolExecutor
+    from asgiref.sync import SyncToAsync
+    from django.db import close_old_connections
+
+    class _DbPool(ThreadPoolExecutor):
+        def submit(self, fn, *args, **kwargs):
+            def run():
+                close_old_connections()
+                return fn(*args, **kwargs)
+            return super().submit(run)
+
+    SyncToAsync.single_thread_executor = _DbPool(max_workers=16, thread_name_prefix="bot-db")
+
+
+_parallel_bot_db()
+
+
 async def _process_with_cleanup(body_bytes: bytes) -> None:
     start = time.monotonic()
     try:
@@ -49,6 +72,29 @@ async def _process_with_cleanup(body_bytes: bytes) -> None:
         elapsed_ms = int((time.monotonic() - start) * 1000)
         if elapsed_ms > 500:
             print(f"webhook handler took {elapsed_ms} ms")
+        if elapsed_ms > 700:
+            _note_slow_update(body_bytes, elapsed_ms)
+
+
+def _note_slow_update(body_bytes, ms):
+    """Keep the last 300 slow updates (what was pressed or sent, how long)
+    for ops slow-updates -- so the slow buttons are found, not guessed."""
+    try:
+        import json as _j
+        from django.core.cache import cache
+        u = _j.loads(body_bytes)
+        if u.get("callback_query"):
+            what = "btn " + str(u["callback_query"].get("data", ""))[:60]
+        elif u.get("message"):
+            m = u["message"]
+            what = "msg " + str(m.get("text") or next((k for k in ("photo", "document", "voice", "sticker") if k in m), ""))[:60]
+        else:
+            what = "other"
+        rows = cache.get("slow_updates") or []
+        rows.append({"what": what, "ms": ms, "at": time.strftime("%m-%d %H:%M:%S")})
+        cache.set("slow_updates", rows[-300:], 7 * 86400)
+    except Exception:
+        pass
 
 
 def _fmt_num(n):
@@ -1438,6 +1484,21 @@ def internal_ops(request: HttpRequest, action: str):
         if amount <= 0 or amount > 100000:
             return JsonResponse({"ok": False, "error": "amount_1_to_100000"}, status=400)
         return JsonResponse(_ask.draw_day_gift(day, amount, apply))
+
+    if action == "slow-updates":
+        # The slowest recent bot updates, grouped by what was pressed/sent.
+        from collections import defaultdict
+        from django.core.cache import cache as _c
+        rows = _c.get("slow_updates") or []
+        if apply and body.get("clear"):
+            _c.delete("slow_updates")
+        groups = defaultdict(list)
+        for r in rows:
+            key = r["what"].split(":")[0] if r["what"].startswith("btn ") else r["what"][:24]
+            groups[key].append(r["ms"])
+        top = sorted(({"what": k, "n": len(v), "max_ms": max(v), "avg_ms": sum(v) // len(v)}
+                      for k, v in groups.items()), key=lambda x: -x["avg_ms"] * x["n"])
+        return JsonResponse({"ok": True, "total": len(rows), "top": top[:40], "last": rows[-20:]})
 
     if action == "challenges":
         # Reading challenges: {} = state; {"on": true|false, "apply": true}.
