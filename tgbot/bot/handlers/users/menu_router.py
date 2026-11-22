@@ -2047,6 +2047,9 @@ async def _menu_quiz(call, user, _state: FSMContext):
             text="➕ Yangi quiz yaratish", callback_data="qz:new",
         ))
     if can_ai:
+        from tgbot.services import ai_quiz_billing as _b
+        can_ai = not _b.paused()  # paused: the button is not shown at all
+    if can_ai:
         from tgbot.services import ai_quiz_billing as billing
         how = await sync_to_async(billing.plan)(user)
         ai_label = "🤖 AI yordamida yaratish"

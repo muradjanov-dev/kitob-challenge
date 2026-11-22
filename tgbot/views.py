@@ -1485,6 +1485,14 @@ def internal_ops(request: HttpRequest, action: str):
             return JsonResponse({"ok": False, "error": "amount_1_to_100000"}, status=400)
         return JsonResponse(_ask.draw_day_gift(day, amount, apply))
 
+    if action == "ai-quiz":
+        # The AI quiz switch: {} = state; {"on": true|false, "apply": true}.
+        from django.core.cache import cache as _c
+        from tgbot.services import ai_quiz_billing as _b
+        if apply and "on" in body:
+            _c.set("ai_quiz_on", bool(body.get("on")), None)
+        return JsonResponse({"ok": True, "on": not _b.paused()})
+
     if action == "user-today":
         # Read-only: what touched one reader today -- {"q": name part or telegram_id}.
         from django.db.models import Q as _Q

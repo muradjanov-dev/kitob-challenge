@@ -103,6 +103,11 @@ async def offer_ai_quiz_start(target_message, user, state: FSMContext):
     from tgbot.bot.states.main import AIQuizCreateState
     from tgbot.services import ai_quiz_billing as billing
 
+    if billing.paused():
+        await state.finish()
+        await target_message.answer(billing.PAUSED_TEXT, parse_mode="HTML")
+        return
+
     how = await sync_to_async(billing.plan)(user)
     if how == billing.PAID and not billing.can_start(user):
         await target_message.answer(

@@ -24,6 +24,20 @@ FREE_TRY = "free_try"    # the one lifetime try of a non-Premium reader
 PAID = "paid"            # AI_QUIZ_PRICE Kitobcha
 
 
+# Owner, 2026-11-22: "ai quiz xizmati hozircha pauzada ishlamay tursin".
+# Off unless switched on (ops ai-quiz {"on": true, "apply": true}).
+PAUSED_TEXT = ("🤖 <b>AI quiz vaqtincha to'xtatilgan.</b>\n\n"
+               "Tez orada yangilangan holda qaytadi. Hozircha tayyor quizlarni o'ynashingiz "
+               "va o'zingiz qo'lda quiz tuzishingiz mumkin. 📚")
+
+
+def paused() -> bool:
+    try:
+        return cache.get("ai_quiz_on") is not True
+    except Exception:
+        return True
+
+
 def _usage_key(user) -> str:
     return f"ai_quiz_limit_{user.id}"
 

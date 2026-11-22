@@ -316,6 +316,11 @@ async def _ask_content(message, q_count, t_limit, note=""):
 
 @dp.message_handler(content_types=['text', 'photo', 'document'], state=AIQuizCreateState.input_content)
 async def process_ai_input(message: types.Message, state: FSMContext):
+    from tgbot.services import ai_quiz_billing as _billing
+    if _billing.paused():
+        await state.finish()
+        await message.answer(_billing.PAUSED_TEXT, parse_mode="HTML")
+        return
     if not (os.environ.get("OPENAI_API_KEY") or os.environ.get("GEMINI_API_KEY")):
         await message.answer("⚠️ Bot adminstratori AI kalitini (OPENAI_API_KEY yoki GEMINI_API_KEY) kiritmagan. Bot ishlay olmaydi.")
         await state.finish()
