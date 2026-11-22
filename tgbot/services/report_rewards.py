@@ -1,10 +1,10 @@
 """Rewards for readers who keep reporting (owner, 2026-11-11).
 
 - Ketma-ketlik mukofoti: every STREAK_STEP days in a row (10, 20, 30...) the
-  reader gets STREAK_REWARD so'm, the moment the report that completes the
+  reader gets STREAK_PREMIUM_DAYS of Premium, the moment the report that completes the
   step comes in (signal on ConfirmationReport -> reward_report_streak task).
   Freeze-covered days count, as everywhere else (ops_fixes.current_streak).
-- Kunning sovg'asi: once a day the project gives GIFT_AMOUNT so'm to one
+- Kunning sovg'asi: once a day the project gives GIFT_PREMIUM_DAYS of Premium to one
   reader, drawn from those who reported on at least GIFT_MIN_DAYS of the last
   GIFT_WINDOW days; told by DM and announced in the groups. Not a lottery
   (owner, 2026-11-11: "qimor bo'lmasin"): nobody pays or stakes anything for
@@ -21,10 +21,19 @@ from django.db import transaction
 from django.utils import timezone
 
 STREAK_STEP = 10
-STREAK_REWARD = 5000
-GIFT_AMOUNT = 10000
+# Owner, 2026-11-22: reports are free and wallets became Premium, so both
+# rewards are Premium days now (Payment.grant_or_extend, added after any
+# Premium already held). The WalletTransaction row stays as the once-only
+# marker, with delta 0.
+STREAK_PREMIUM_DAYS = 5
+GIFT_PREMIUM_DAYS = 7
 GIFT_MIN_DAYS = 3
 GIFT_WINDOW = 7
+
+
+def _uz(d) -> str:
+    from tgbot.services.wallet import uz_date
+    return uz_date(d)
 
 
 def _som(v) -> str:
@@ -40,11 +49,19 @@ def streak_note(streak: int, day) -> str:
     return f"{streak} kun ketma-ket ({day:%d.%m.%Y})"
 
 
+def _grant_days(p, days: int, kind: str, note: str):
+    """Marker row + Premium days, under the caller's row lock."""
+    from tgbot.models import Payment, WalletTransaction
+    WalletTransaction.objects.create(user=p, kind=kind, delta=0,
+                                     balance_after=int(p.wallet_balance or 0), note=note[:120])
+    return Payment.grant_or_extend(p, days, amount=0)
+
+
 def reward_streak(user_id: int, day=None) -> int:
-    """Pay the streak reward if today's report completed a STREAK_STEP; the
-    so'm paid (0 when nothing is due or it was paid already)."""
+    """Give the streak reward if today's report completed a STREAK_STEP; the
+    Premium days given (0 when nothing is due or it was given already)."""
     from tgbot.models import ConfirmationReport, TelegramProfile, WalletTransaction
-    from tgbot.services import ops_fixes, wallet
+    from tgbot.services import ops_fixes
 
     day = day or timezone.localdate()
     if not ConfirmationReport.objects.filter(user_id=user_id, date__date=day).exists():
@@ -57,20 +74,21 @@ def reward_streak(user_id: int, day=None) -> int:
         p = TelegramProfile.objects.select_for_update().get(id=user_id)
         if WalletTransaction.objects.filter(user=p, kind=WalletTransaction.KIND_STREAK, note=note).exists():
             return 0
-        wallet.credit_locked(p, STREAK_REWARD, WalletTransaction.KIND_STREAK, note)
+        pay = _grant_days(p, STREAK_PREMIUM_DAYS, WalletTransaction.KIND_STREAK, note)
     if not p.is_blocked:
-        _dm(p.telegram_id, streak_text(p, streak))
-    return STREAK_REWARD
+        _dm(p.telegram_id, streak_text(p, streak, pay.end_date))
+    return STREAK_PREMIUM_DAYS
 
 
-def streak_text(p, streak: int) -> str:
+def streak_text(p, streak: int, until=None) -> str:
     from tgbot.services.announce_style import quote_block
     return (
         f"🔥 <b>{streak} kun ketma-ket!</b>\n\n"
         f"{_first_name(p)}, Siz {streak} kundan beri bir kun ham to'xtamay hisobot yuboryapsiz — "
         f"bunday intizom kamdan-kam odamga nasib qiladi.\n\n"
-        f"🎁 Mukofot: <b>{_som(STREAK_REWARD)} so'm</b> hamyoningizga tushdi.\n"
-        f"👛 Hamyoningizda: <b>{_som(p.wallet_balance)} so'm</b>\n\n"
+        f"🎁 Mukofot: <b>{STREAK_PREMIUM_DAYS} kunlik Premium</b>"
+        + (f" — <b>{_uz(until)}gacha</b> faol" if until else "") + ".\n"
+        "💎 Kitobcha ×2, VIP arena va boshqa imtiyozlar.\n\n"
         f"{quote_block('steady', timezone.localdate())}\n\n"
         f"Keyingi mukofot — <b>{streak + STREAK_STEP}-kunda</b>. Zanjirni uzmang! 📚"
     )
@@ -103,7 +121,6 @@ def draw_daily_gift(day=None, apply=True) -> dict:
     """Pick and pay `day`'s winner. Idempotent: a day that already has its
     winner returns that winner and pays nothing."""
     from tgbot.models import TelegramProfile, WalletTransaction
-    from tgbot.services import wallet
 
     day = day or timezone.localdate()
     note = gift_note(day)
@@ -123,19 +140,20 @@ def draw_daily_gift(day=None, apply=True) -> dict:
         if WalletTransaction.objects.select_for_update().filter(
                 kind=WalletTransaction.KIND_DAILY_GIFT, note=note).exists():
             return {"ok": True, "already": True}
-        wallet.credit_locked(p, GIFT_AMOUNT, WalletTransaction.KIND_DAILY_GIFT, note)
-    _dm(p.telegram_id, gift_dm_text(p))
+        pay = _grant_days(p, GIFT_PREMIUM_DAYS, WalletTransaction.KIND_DAILY_GIFT, note)
+    _dm(p.telegram_id, gift_dm_text(p, pay.end_date))
     return {"ok": True, "winner_id": p.id, "telegram_id": p.telegram_id, "name": p.full_name,
             "pool": len(pool), "group_text": gift_group_text(p, day)}
 
 
-def gift_dm_text(p) -> str:
+def gift_dm_text(p, until=None) -> str:
     return (
         f"🎁 <b>{_first_name(p)}, bugungi loyiha sovg'asi — Sizga!</b>\n\n"
         f"Hisobotlaringizdagi sabr va muntazamlik uchun Kitob Challenge'dan kichik tashakkur: "
-        f"hamyoningizga <b>{_som(GIFT_AMOUNT)} so'm</b> tushdi. 🎉\n"
-        f"👛 Hamyoningizda: <b>{_som(p.wallet_balance)} so'm</b>\n\n"
-        f"O'qishda davom eting — har bir sahifa Sizni o'zingizga yana bir qadam yaqinlashtiradi. 📚"
+        f"<b>{GIFT_PREMIUM_DAYS} kunlik Premium</b>"
+        + (f" — <b>{_uz(until)}gacha</b> faol" if until else "") + ". 🎉\n"
+        "💎 Kitobcha ×2, VIP arena va boshqa imtiyozlar.\n\n"
+        "O'qishda davom eting — har bir sahifa Sizni o'zingizga yana bir qadam yaqinlashtiradi. 📚"
     )
 
 
@@ -145,7 +163,7 @@ def gift_group_text(p, day) -> str:
         "🎁 <b>Kunning sovg'asi</b>\n\n"
         f"{quote_block('gift', day)}\n\n"
         f"Bugun loyiha sovg'asi — <b>{name(p.full_name)}</b>ga: "
-        f"hamyoniga <b>{_som(GIFT_AMOUNT)} so'm</b> tushdi. 🎉\n\n"
+        f"<b>{GIFT_PREMIUM_DAYS} kunlik Premium</b>! 🎉\n\n"
         f"Har kuni bitta muntazam kitobxon shunday sovg'a oladi — hech qanday to'lov va ishtirok badalisiz. "
         f"Sharti bitta: oxirgi {GIFT_WINDOW} kunda kamida <b>{GIFT_MIN_DAYS} kun</b> hisobot yuborgan bo'lish.\n"
         "📖 Ertangi sovg'a egasi — balki Siz?"

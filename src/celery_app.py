@@ -246,7 +246,7 @@ app.conf.beat_schedule = {
         'task': 'tgbot.tasks.post_daily_book_question',
         'schedule': crontab(hour=8, minute=30),
     },
-    # Kunning sovg'asi — the project's 10 000 so'm gift to one steady reporter (at least
+    # Kunning sovg'asi — the project's 7-day Premium gift to one steady reporter (at least
     # GIFT_MIN_DAYS report days in the last 7), announced in the groups.
     # 19:30: well before the 20:45-22:15 evening-games window.
     'draw-daily-reporter-gift': {
