@@ -169,6 +169,9 @@ def send_gratitude_letters(stop_after=None):
                 return {"paused": "rate limit", **stats}
             r = requests.post(url, data={"chat_id": p.telegram_id, "text": text, "parse_mode": "HTML"}, timeout=10)
             if r.ok:
+                # Kept so an admin can see what exactly a reader was sent
+                # (2026-11-22: a bot cannot read back its own messages).
+                cache.set(f"gratitude_text:{gratitude.CAMPAIGN}:{uid}", text, 60 * 86400)
                 stats["sent"] += 1
                 stats["template"] += src == "template"
             else:

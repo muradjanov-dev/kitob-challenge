@@ -1512,6 +1512,7 @@ def internal_ops(request: HttpRequest, action: str):
                 "kitobcha_today": list(KitobchaLedger.objects.filter(user=p, created_at__date=day)
                                        .values_list("reason", "delta")),
                 "letter_sent": bool(_c.get(_g.sent_key(p.id))),
+                "letter_text": _c.get(f"gratitude_text:{_g.CAMPAIGN}:{p.id}"),
             })
         return JsonResponse({"ok": True, "found": out}, json_dumps_params={"default": str})
 
