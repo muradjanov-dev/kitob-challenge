@@ -2133,6 +2133,9 @@ def _pinned_balance_text(user) -> str:
     def _n(v):
         return f"{int(v or 0):,}".replace(",", " ")
 
+    if not _wallet.reports_paid(user):
+        return (f"👛 Hamyon: <b>{_n(user.wallet_balance)} so'm</b> · 🪙 <b>{_n(user.ball)}</b> Kitobcha\n"
+                "✅ Hisobot yuborish bepul")
     days = _wallet.days_left(user)
     text = f"👛 Hamyon: <b>{_n(user.wallet_balance)} so'm</b> · 🪙 <b>{_n(user.ball)}</b> Kitobcha\n"
     until = _wallet.member_until(user)

@@ -218,14 +218,14 @@ def api_submit_report(request: HttpRequest) -> JsonResponse:
     today = timezone.localdate()
     from tgbot.services import wallet
     already_today = ConfirmationReport.objects.filter(user=profile, date__date=today).exists()
-    if already_today and not is_premium and not wallet.launched(profile):
+    if already_today and not is_premium and not wallet.reports_paid(profile):
         return JsonResponse({"ok": False, "error": "already_reported_today"}, status=409)
 
     # Hamyon: each report paid before anything is written, never without a
     # yes -- the page asks with a native confirm popup and sends the report
     # again with fee_confirmed = the charge number it was asked about.
     wallet_charge = None
-    if wallet.launched(profile):
+    if wallet.reports_paid(profile):
         wallet.ensure_launch_credit(profile)
         asked = body.get("fee_confirmed")
         if isinstance(asked, int) and not isinstance(asked, bool):

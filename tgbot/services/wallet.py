@@ -83,6 +83,18 @@ def launched(user=None) -> bool:
     return bool(user is not None and int(getattr(user, "telegram_id", 0) or 0) in _testers())
 
 
+# Owner, 2026-11-22: "hisobot yuborish bepul bo'lsin" -- reports are free
+# again and the report flow is back to its Kitobcha rules (one a day, many for
+# members). The wallet stays for the shop and the gifts. True turns the per-
+# report fee back on.
+REPORT_FEES_ON = False
+
+
+def reports_paid(user=None) -> bool:
+    """Is the next report charged from the wallet?"""
+    return REPORT_FEES_ON and launched(user)
+
+
 def is_live_launch() -> bool:
     """The real launch date has come (not just a tester preview)."""
     return timezone.localdate() >= LAUNCH_DATE

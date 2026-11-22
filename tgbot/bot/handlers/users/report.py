@@ -518,7 +518,7 @@ async def cta_send_report_handler(call: CallbackQuery, state: FSMContext):
     from tgbot.services import wallet as _wallet
     already_today = await get_confirmation_report_exists(user, today)
     # From the wallet launch any number of reports a day, each paid.
-    if already_today and not _wallet.launched(user) and not await _is_premium_user(user):
+    if already_today and not _wallet.reports_paid(user) and not await _is_premium_user(user):
         await call.answer(
             _("Siz bugungi kun uchun allaqachon hisobotingizni yubordingiz. 💎 Premium foydalanuvchilar kuniga bir nechta hisobot yubora oladi."),
             show_alert=True,
@@ -562,7 +562,7 @@ async def send_daily_report_handler(message: types.Message, state: FSMContext):
     today = timezone.localdate()
     from tgbot.services import wallet as _wallet
     already_today = await get_confirmation_report_exists(user, today)
-    if already_today and not _wallet.launched(user) and not await _is_premium_user(user):
+    if already_today and not _wallet.reports_paid(user) and not await _is_premium_user(user):
         await message.answer(
             _("Siz bugungi kun uchun allaqachon hisobotingizni yubordingiz.\n\n💎 Premium foydalanuvchilar kuniga bir necha marotaba hisobot yubora oladi — barcha hisobotlar avtomatik jamlanadi va guruhdagi xabar yangilanadi."),
         )
@@ -1495,7 +1495,7 @@ async def _do_confirm_report(message, user, state: FSMContext):
     from tgbot.services import wallet as _wallet
     # From the wallet launch every reader may send more reports (each paid)
     # and all of a day's reports merge into one group message.
-    is_aggregating = bool(prior_reports) and (is_premium or _wallet.launched(user))
+    is_aggregating = bool(prior_reports) and (is_premium or _wallet.reports_paid(user))
 
     if prior_reports and not is_aggregating:
         await message.answer(
@@ -1537,7 +1537,7 @@ async def _do_confirm_report(message, user, state: FSMContext):
     # with the yes the reader gave at the entry point (wallet.charge_report
     # uses it up, so one yes pays once).
     wallet_note = ""
-    if _wallet.launched(user):
+    if _wallet.reports_paid(user):
         from tgbot.bot.handlers.users.wallet import (
             charged_text, fee_confirm_kb, fee_confirm_text, insufficient_text, topup_kb,
         )

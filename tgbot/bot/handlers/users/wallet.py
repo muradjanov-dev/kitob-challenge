@@ -56,6 +56,16 @@ def wallet_text(user) -> str:
         else:
             perks = (f"💎 Пополнение за один раз от <b>{_som(wallet.MEMBER_MIN)} сум</b> даёт привилегии на "
                      f"1 день за каждые {_som(wallet.DAY_FEE)} сум: 2× Kitobcha, VIP-арена, следующие отчёты дня по {_som(wallet.EXTRA_FEE_MEMBER)} сум.\n\n")
+        if not wallet.reports_paid(user):
+            return (
+                "👛 <b>Ваш кошелёк</b>\n\n"
+                f"💰 Баланс: <b>{_som(bal)} сум</b>\n"
+                f"🪙 Kitobcha: <b>{_som(ball)}</b>\n\n"
+                "✅ <b>Отправка отчётов — бесплатно!</b>\n"
+                "Средства кошелька можно тратить на товары и аукционы в магазине.\n\n"
+                f"{refund_line}"
+                "Выберите сумму пополнения 👇"
+            )
         return (
             "👛 <b>Ваш кошелёк</b>\n\n"
             f"💰 Баланс: <b>{_som(bal)} сум</b>\n"
@@ -84,6 +94,18 @@ def wallet_text(user) -> str:
         perks = (f"💎 Bir martada <b>{_som(wallet.MEMBER_MIN)} so'm</b> va undan ko'p to'ldirsangiz — har "
                  f"{_som(wallet.DAY_FEE)} so'm uchun 1 kunlik imtiyoz: 2× Kitobcha, VIP arena, kunning keyingi "
                  f"hisobotlari {_som(wallet.EXTRA_FEE_MEMBER)} so'mdan.\n\n")
+    if not wallet.reports_paid(user):
+        # Reports are free again (owner, 2026-11-22): the wallet is for the
+        # shop and the gifts only.
+        return (
+            "👛 <b>Hamyoningiz</b>\n\n"
+            f"💰 Balans: <b>{_som(bal)} so'm</b>\n"
+            f"🪙 Kitobcha: <b>{_som(ball)}</b>\n\n"
+            "✅ <b>Hisobot yuborish — bepul!</b>\n"
+            "Hamyondagi mablag'ni do'kondagi so'mli mahsulot va auksionlarda ishlatishingiz mumkin.\n\n"
+            f"{refund_line}"
+            "To'ldirish uchun summani tanlang 👇"
+        )
     return (
         "👛 <b>Hamyoningiz</b>\n\n"
         f"💰 Balans: <b>{_som(bal)} so'm</b>\n"
@@ -211,7 +233,7 @@ async def report_allowed(message: types.Message, user) -> bool:
     report (wallet not launched yet, today already paid, or it can be paid
     and the reader said yes to the fee -- asked once a day, before anything
     is taken; the fee itself is taken when the report is saved)."""
-    if not user or not wallet.launched(user):
+    if not user or not wallet.reports_paid(user):
         return True
     await sync_to_async(wallet.ensure_launch_credit)(user)
     if not await sync_to_async(wallet.can_report)(user):
