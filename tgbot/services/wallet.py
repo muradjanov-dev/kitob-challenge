@@ -676,3 +676,30 @@ def parse_amount(text: str):
         return None
     n = int(digits)
     return n if MIN_TOPUP <= n <= MAX_TOPUP else None
+
+
+
+# ── Wallet -> Premium (owner, 2026-11-22) ───────────────────────────────────
+# Reports are free again, so the money readers hold becomes Premium: one day
+# for every DAY_FEE (1 000) so'm, added after any Premium they already have
+# (Payment.grant_or_extend -- the real Premium every perk check reads). What
+# is under 1 000 stays in the wallet. Once per reader per `tag`.
+
+def to_premium(user_id, tag: str) -> dict:
+    """{"days", "until", "rest"} for this reader, or {"skip": reason}."""
+    from tgbot.models import Payment, TelegramProfile, WalletTransaction
+    with transaction.atomic():
+        p = TelegramProfile.objects.select_for_update().get(id=user_id)
+        if WalletTransaction.objects.filter(user=p, kind=WalletTransaction.KIND_ADMIN, note=tag).exists():
+            return {"skip": "done"}
+        bal = int(p.wallet_balance or 0)
+        days = bal // DAY_FEE
+        if days <= 0:
+            return {"skip": "under_1000"}
+        take = days * DAY_FEE
+        p.wallet_balance = bal - take
+        p.save(update_fields=["wallet_balance"])
+        WalletTransaction.objects.create(user=p, kind=WalletTransaction.KIND_ADMIN, delta=-take,
+                                         balance_after=p.wallet_balance, note=tag[:120])
+        pay = Payment.grant_or_extend(p, days, amount=0)
+    return {"days": days, "until": pay.end_date, "rest": p.wallet_balance, "user": p}

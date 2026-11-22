@@ -1485,6 +1485,74 @@ def internal_ops(request: HttpRequest, action: str):
             return JsonResponse({"ok": False, "error": "amount_1_to_100000"}, status=400)
         return JsonResponse(_ask.draw_day_gift(day, amount, apply))
 
+    if action == "user-today":
+        # Read-only: what touched one reader today -- {"q": name part or telegram_id}.
+        from django.db.models import Q as _Q
+        from django.utils import timezone as _tz
+        from django.core.cache import cache as _c
+        from tgbot.models import TelegramProfile, WalletTransaction, KitobchaLedger
+        from tgbot.services import gratitude as _g
+        q = str(body.get("q") or "").strip()
+        qs = TelegramProfile.objects.filter(telegram_id=int(q)) if q.isdigit() else             TelegramProfile.objects.filter(_Q(full_name__icontains=q) | _Q(username__icontains=q))
+        day = _tz.localdate()
+        out = []
+        for p in qs[:5]:
+            out.append({
+                "id": p.id, "telegram_id": p.telegram_id, "name": p.full_name, "blocked": p.is_blocked,
+                "wallet_today": list(WalletTransaction.objects.filter(user=p, created_at__date=day)
+                                     .values_list("kind", "delta", "note")),
+                "kitobcha_today": list(KitobchaLedger.objects.filter(user=p, created_at__date=day)
+                                       .values_list("reason", "delta")),
+                "letter_sent": bool(_c.get(_g.sent_key(p.id))),
+            })
+        return JsonResponse({"ok": True, "found": out}, json_dumps_params={"default": str})
+
+    if action == "wallet-to-premium":
+        # Every wallet of 1 000+ so'm becomes Premium days (1 day per 1 000),
+        # once per reader per `tag`, `limit` readers a call (call again until
+        # "left" is 0). `text` ({name} {days} {until} {rest}) is DMed to each.
+        import html as _h
+        import os as _os
+        import requests as _rq
+        from tgbot.models import TelegramProfile, WalletTransaction
+        from tgbot.services import wallet as _w
+        tag = (body.get("tag") or "")[:120]
+        if not tag:
+            return JsonResponse({"ok": False, "error": "tag_required"}, status=400)
+        done_ids = WalletTransaction.objects.filter(kind=WalletTransaction.KIND_ADMIN, note=tag).values("user_id")
+        todo = (TelegramProfile.objects.filter(wallet_balance__gte=_w.DAY_FEE)
+                .exclude(id__in=done_ids).order_by("id"))
+        from django.db.models import Sum as _Sum
+        out = {"ok": True, "left": todo.count(),
+               "days_if_all": int((todo.aggregate(s=_Sum("wallet_balance"))["s"] or 0)) // _w.DAY_FEE,
+               "som_if_all": int(todo.aggregate(s=_Sum("wallet_balance"))["s"] or 0),
+               "reachable_left": todo.filter(is_blocked=False).count()}
+        if not apply:
+            return JsonResponse(out)
+        template = body.get("text") or ""
+        limit = max(1, min(int(body.get("limit") or 150), 400))
+        converted = days_total = dms = 0
+        for p in list(todo[:limit]):
+            r = _w.to_premium(p.id, tag)
+            if "skip" in r:
+                continue
+            converted += 1
+            days_total += r["days"]
+            q = r["user"]
+            if template and not q.is_blocked:
+                try:
+                    _rq.post(f"https://api.telegram.org/bot{_os.environ.get('API_TOKEN', '')}/sendMessage", data={
+                        "chat_id": q.telegram_id, "parse_mode": "HTML", "text": template.format(
+                            name=_h.escape(((q.full_name or "Kitobxon").split() or ["Kitobxon"])[0], quote=False),
+                            days=r["days"], until=_w.uz_date(r["until"]),
+                            rest=f"{r['rest']:,}".replace(",", " "))}, timeout=8)
+                    dms += 1
+                except Exception:
+                    pass
+                time.sleep(0.05)
+        out.update(converted=converted, days=days_total, dms=dms, left=todo.count())
+        return JsonResponse(out)
+
     if action == "slow-updates":
         # The slowest recent bot updates, grouped by what was pressed/sent.
         from collections import defaultdict
