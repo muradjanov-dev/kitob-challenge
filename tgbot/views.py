@@ -1493,6 +1493,41 @@ def internal_ops(request: HttpRequest, action: str):
             _c.set("ai_quiz_on", bool(body.get("on")), None)
         return JsonResponse({"ok": True, "on": not _b.paused()})
 
+    if action == "lapsed-readers":
+        # Read-only: readers who reported on >= min_days days between "from"
+        # and "to" but not once since "since" (default: regulars of October
+        # who stopped when reports became paid on 2026-11-01).
+        import datetime as _dt
+        from django.db.models import Count, Max
+        from django.db.models.functions import TruncDate
+        from django.utils import timezone as _tz
+        from tgbot.models import ConfirmationReport, TelegramProfile
+
+        def _start(s):
+            return _tz.make_aware(_dt.datetime.combine(_dt.date.fromisoformat(s), _dt.time.min))
+
+        frm, to = _start(body.get("from") or "2026-10-01"), _start(body.get("to") or "2026-11-01")
+        since = _start(body.get("since") or "2026-11-01")
+        min_days = int(body.get("min_days") or 5)
+        days = (ConfirmationReport.objects.filter(date__gte=frm, date__lt=to)
+                .annotate(d=TruncDate("date")).values("user_id")
+                .annotate(n=Count("d", distinct=True)).filter(n__gte=min_days))
+        regular = {r["user_id"]: r["n"] for r in days}
+        recent = set(ConfirmationReport.objects.filter(date__gte=since, user_id__in=regular)
+                     .values_list("user_id", flat=True))
+        last = dict(ConfirmationReport.objects.filter(user_id__in=regular).values("user_id")
+                    .annotate(m=Max("date")).values_list("user_id", "m"))
+        rows = []
+        for p in TelegramProfile.objects.filter(id__in=set(regular) - recent):
+            rows.append({"telegram_id": p.telegram_id, "name": p.full_name, "days": regular[p.id],
+                         "last": _tz.localtime(last[p.id]).date().isoformat() if last.get(p.id) else None,
+                         "blocked": p.is_blocked, "banned": p.is_banned, "admin": p.is_admin})
+        rows.sort(key=lambda r: -r["days"])
+        return JsonResponse({"ok": True, "regulars": len(regular), "still_reporting": len(recent),
+                             "lapsed": len(rows),
+                             "reachable": sum(1 for r in rows if not (r["blocked"] or r["banned"] or r["admin"])),
+                             "rows": rows})
+
     if action == "user-today":
         # Read-only: what touched one reader today -- {"q": name part or telegram_id}.
         from django.db.models import Q as _Q
